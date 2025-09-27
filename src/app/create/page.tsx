@@ -1,0 +1,267 @@
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { useSurveyBuilderStore } from "@/stores/survey-store";
+import { SortableQuestionList } from "@/components/survey-builder/sortable-question-list";
+import {
+  FileText,
+  Eye,
+  Share2,
+  Save,
+  ArrowLeft,
+  Plus,
+  Type,
+  List,
+  CheckSquare,
+  Circle,
+  ChevronDown,
+  Table,
+  PlayCircle,
+} from "lucide-react";
+import Link from "next/link";
+
+const questionTypes = [
+  {
+    type: "text" as const,
+    label: "단답형",
+    icon: Type,
+    description: "짧은 텍스트 입력",
+    color: "bg-blue-100 text-blue-600",
+  },
+  {
+    type: "textarea" as const,
+    label: "장문형",
+    icon: FileText,
+    description: "긴 텍스트 입력",
+    color: "bg-green-100 text-green-600",
+  },
+  {
+    type: "radio" as const,
+    label: "단일선택",
+    icon: Circle,
+    description: "하나만 선택 가능",
+    color: "bg-purple-100 text-purple-600",
+  },
+  {
+    type: "checkbox" as const,
+    label: "다중선택",
+    icon: CheckSquare,
+    description: "여러 개 선택 가능",
+    color: "bg-orange-100 text-orange-600",
+  },
+  {
+    type: "select" as const,
+    label: "드롭다운",
+    icon: ChevronDown,
+    description: "드롭다운 메뉴",
+    color: "bg-pink-100 text-pink-600",
+  },
+  {
+    type: "multiselect" as const,
+    label: "다단계선택",
+    icon: List,
+    description: "시/도/구 연동 드롭다운",
+    color: "bg-teal-100 text-teal-600",
+  },
+  {
+    type: "table" as const,
+    label: "테이블",
+    icon: Table,
+    description: "표 형태 질문",
+    color: "bg-indigo-100 text-indigo-600",
+  },
+];
+
+export default function CreateSurveyPage() {
+  const {
+    currentSurvey,
+    selectedQuestionId,
+    isPreviewMode,
+    isTestMode,
+    updateSurveyTitle,
+    updateSurveyDescription,
+    addQuestion,
+    selectQuestion,
+    togglePreviewMode,
+    toggleTestMode,
+    updateSurveySettings,
+  } = useSurveyBuilderStore();
+
+  const [titleInput, setTitleInput] = useState(currentSurvey.title);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Top Navigation */}
+      <nav className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Link href="/">
+              <Button variant="ghost" size="sm">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                돌아가기
+              </Button>
+            </Link>
+            <div className="h-6 w-px bg-gray-300" />
+            <Input
+              value={titleInput}
+              onChange={(e) => {
+                setTitleInput(e.target.value);
+                updateSurveyTitle(e.target.value);
+              }}
+              className="text-lg font-medium border-none bg-transparent px-2 focus:bg-white focus:border focus:border-blue-200"
+              placeholder="설문 제목을 입력하세요"
+            />
+          </div>
+
+          <div className="flex items-center space-x-3">
+            <Button variant="outline" size="sm" onClick={togglePreviewMode}>
+              <Eye className="w-4 h-4 mr-2" />
+              {isPreviewMode ? "편집" : "미리보기"}
+            </Button>
+            <Button
+              variant={isTestMode ? "default" : "outline"}
+              size="sm"
+              onClick={toggleTestMode}
+              className={isTestMode ? "bg-green-600 hover:bg-green-700" : ""}
+            >
+              <PlayCircle className="w-4 h-4 mr-2" />
+              {isTestMode ? "테스트 중" : "테스트"}
+            </Button>
+            <Button variant="outline" size="sm">
+              <Save className="w-4 h-4 mr-2" />
+              저장
+            </Button>
+            <Button size="sm">
+              <Share2 className="w-4 h-4 mr-2" />
+              공유
+            </Button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="grid grid-cols-12 gap-6 h-[calc(100vh-140px)]">
+          {/* Left Sidebar - Question Types */}
+          <div className="col-span-3 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6">질문 유형</h3>
+
+            <div className="space-y-3">
+              {questionTypes.map((questionType) => {
+                const IconComponent = questionType.icon;
+                return (
+                  <Card
+                    key={questionType.type}
+                    className="p-4 cursor-pointer hover-lift border-gray-200 hover:border-blue-200 transition-all duration-200"
+                    onClick={() => addQuestion(questionType.type)}
+                  >
+                    <div className="flex items-start space-x-3">
+                      <div
+                        className={`w-10 h-10 rounded-lg flex items-center justify-center ${questionType.color}`}
+                      >
+                        <IconComponent className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-gray-900 text-sm">{questionType.label}</h4>
+                        <p className="text-xs text-gray-500 mt-1">{questionType.description}</p>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <h4 className="text-sm font-medium text-gray-700 mb-3">설문 정보</h4>
+              <div className="text-xs text-gray-500 space-y-1">
+                <p>질문 수: {currentSurvey.questions.length}개</p>
+                <p>마지막 수정: {currentSurvey.updatedAt.toLocaleDateString()}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Center - Survey Preview/Edit */}
+          <div className="col-span-6 bg-white rounded-xl shadow-sm border border-gray-200">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {isTestMode ? "질문 테스트" : isPreviewMode ? "미리보기" : "설문 편집"}
+                  </h3>
+                  {isTestMode && (
+                    <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                      테스트 모드
+                    </span>
+                  )}
+                </div>
+                <div className="text-sm text-gray-500">{currentSurvey.questions.length}개 질문</div>
+              </div>
+            </div>
+
+            <div className="p-6">
+              {currentSurvey.questions.length === 0 ? (
+                <div className="text-center py-16">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Plus className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">질문을 추가해보세요</h3>
+                  <p className="text-gray-500 mb-6">
+                    왼쪽에서 원하는 질문 유형을 클릭하여 추가할 수 있습니다.
+                  </p>
+                  <Button onClick={() => addQuestion("text")}>
+                    <Plus className="w-4 h-4 mr-2" />첫 번째 질문 추가
+                  </Button>
+                </div>
+              ) : (
+                <SortableQuestionList
+                  questions={currentSurvey.questions}
+                  selectedQuestionId={selectedQuestionId}
+                  isTestMode={isTestMode}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Right Sidebar - Settings */}
+          <div className="col-span-3 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6">설정</h3>
+
+            {selectedQuestionId ? (
+              <div>
+                <p className="text-sm text-gray-600">선택된 질문의 설정을 편집할 수 있습니다.</p>
+                {/* 질문별 설정 UI 구현 예정 */}
+              </div>
+            ) : (
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-3">설문 설정</h4>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-gray-600">공개 설문</label>
+                    <input
+                      type="checkbox"
+                      checked={currentSurvey.settings.isPublic}
+                      onChange={(e) => updateSurveySettings({ isPublic: e.target.checked })}
+                      className="rounded"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm text-gray-600">진행률 표시</label>
+                    <input
+                      type="checkbox"
+                      checked={currentSurvey.settings.showProgressBar}
+                      onChange={(e) => updateSurveySettings({ showProgressBar: e.target.checked })}
+                      className="rounded"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
