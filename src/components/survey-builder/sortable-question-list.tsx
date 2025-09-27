@@ -9,6 +9,9 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
+  DragOverEvent,
+  DragOverlay,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -27,6 +30,8 @@ import { QuestionEditModal } from "./question-edit-modal";
 import { UserDefinedMultiLevelSelectPreview } from "./user-defined-multi-level-select";
 import { MultiLevelSelect } from "./multi-level-select";
 import { UserDefinedMultiLevelSelect } from "./user-defined-multi-level-select";
+import { InteractiveTableResponse } from "./interactive-table-response";
+import { TablePreview } from "./table-preview";
 import { GripVertical, Settings, Trash2, Copy, Edit3, Eye, EyeOff } from "lucide-react";
 
 interface SortableQuestionProps {
@@ -54,8 +59,8 @@ function SortableQuestion({
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+    transition: isDragging ? "none" : transition,
+    opacity: isDragging ? 0.8 : 1,
   };
 
   return (
@@ -66,7 +71,11 @@ function SortableQuestion({
         isSelected
           ? "ring-2 ring-blue-500 border-blue-200 shadow-lg"
           : "border-gray-200 hover:border-gray-300 hover:shadow-md"
-      } ${isDragging ? "z-50 rotate-1 scale-105" : ""}`}
+      } ${
+        isDragging
+          ? "z-50 rotate-2 scale-105 shadow-2xl ring-4 ring-blue-300 ring-opacity-50 bg-blue-50 border-blue-300"
+          : ""
+      }`}
       onClick={() => onSelect(question.id)}
     >
       <div className="p-6">
@@ -74,11 +83,16 @@ function SortableQuestion({
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center space-x-3">
             <div
-              className="cursor-grab active:cursor-grabbing p-1 text-gray-400 hover:text-gray-600"
+              className={`p-2 rounded-md transition-all duration-200 ${
+                isDragging
+                  ? "bg-blue-200 text-blue-700 cursor-grabbing"
+                  : "cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              }`}
               {...attributes}
               {...listeners}
+              title="드래그하여 순서 변경"
             >
-              <GripVertical className="w-4 h-4" />
+              <GripVertical className={`w-4 h-4 ${isDragging ? "animate-pulse" : ""}`} />
             </div>
             <span className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">
               {index + 1}
@@ -201,39 +215,16 @@ function QuestionPreview({ question }: { question: Question }) {
       );
 
     case "table":
-      return (
-        <div className="overflow-x-auto">
-          <table className="w-full border border-gray-200 rounded">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="border-r border-gray-200 p-2 text-left text-sm font-medium text-gray-700">
-                  항목
-                </th>
-                <th className="border-r border-gray-200 p-2 text-center text-sm font-medium text-gray-700">
-                  매우 좋음
-                </th>
-                <th className="border-r border-gray-200 p-2 text-center text-sm font-medium text-gray-700">
-                  좋음
-                </th>
-                <th className="p-2 text-center text-sm font-medium text-gray-700">보통</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className="border-r border-gray-200 p-2 text-sm">서비스 품질</td>
-                <td className="border-r border-gray-200 p-2 text-center">
-                  <input type="radio" disabled className="text-blue-500" />
-                </td>
-                <td className="border-r border-gray-200 p-2 text-center">
-                  <input type="radio" disabled className="text-blue-500" />
-                </td>
-                <td className="p-2 text-center">
-                  <input type="radio" disabled className="text-blue-500" />
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      return question.tableColumns && question.tableRowsData ? (
+        <TablePreview
+          tableTitle={question.tableTitle}
+          tableRowHeaderTitle={question.tableRowHeaderTitle}
+          columns={question.tableColumns}
+          rows={question.tableRowsData}
+          className="border-0 shadow-none"
+        />
+      ) : (
+        <div className="text-gray-400 text-sm text-center py-4">테이블이 구성되지 않았습니다.</div>
       );
 
     default:
@@ -395,10 +386,17 @@ function QuestionTestInput({
       ) : null;
 
     case "table":
-      return (
-        <div className="text-center py-4 text-gray-500">
-          테이블 질문 테스트 기능은 준비 중입니다.
-        </div>
+      return question.tableColumns && question.tableRowsData ? (
+        <InteractiveTableResponse
+          questionId={question.id}
+          tableTitle={question.tableTitle}
+          columns={question.tableColumns}
+          rows={question.tableRowsData}
+          isTestMode={true}
+          className="border-0 shadow-none"
+        />
+      ) : (
+        <div className="text-center py-4 text-gray-500">테이블이 구성되지 않았습니다.</div>
       );
 
     default:
@@ -436,6 +434,8 @@ export function SortableQuestionList({
     useSurveyBuilderStore();
 
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -443,6 +443,16 @@ export function SortableQuestionList({
       coordinateGetter: sortableKeyboardCoordinates,
     }),
   );
+
+  function handleDragStart(event: DragStartEvent) {
+    const { active } = event;
+    setActiveId(active.id as string);
+  }
+
+  function handleDragOver(event: DragOverEvent) {
+    const { over } = event;
+    setOverId((over?.id as string) || null);
+  }
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -454,6 +464,9 @@ export function SortableQuestionList({
       const newOrder = arrayMove(questions, oldIndex, newIndex);
       reorderQuestions(newOrder.map((q) => q.id));
     }
+
+    setActiveId(null);
+    setOverId(null);
   }
 
   const handleEdit = (questionId: string) => {
@@ -513,23 +526,50 @@ export function SortableQuestionList({
 
   return (
     <>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+      >
         <SortableContext items={questions.map((q) => q.id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-4">
             {questions.map((question, index) => (
-              <SortableQuestion
-                key={question.id}
-                question={question}
-                index={index}
-                isSelected={selectedQuestionId === question.id}
-                onSelect={selectQuestion}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onDuplicate={handleDuplicate}
-              />
+              <div key={question.id} className="relative">
+                {/* 드롭 영역 표시 */}
+                {overId === question.id && activeId !== question.id && (
+                  <div className="absolute -top-2 left-0 right-0 h-1 bg-blue-500 rounded-full animate-pulse z-10" />
+                )}
+                <SortableQuestion
+                  question={question}
+                  index={index}
+                  isSelected={selectedQuestionId === question.id}
+                  onSelect={selectQuestion}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onDuplicate={handleDuplicate}
+                />
+              </div>
             ))}
           </div>
         </SortableContext>
+
+        <DragOverlay>
+          {activeId ? (
+            <div className="opacity-95">
+              <SortableQuestion
+                question={questions.find((q) => q.id === activeId)!}
+                index={questions.findIndex((q) => q.id === activeId)}
+                isSelected={false}
+                onSelect={() => {}}
+                onEdit={() => {}}
+                onDelete={() => {}}
+                onDuplicate={() => {}}
+              />
+            </div>
+          ) : null}
+        </DragOverlay>
       </DndContext>
 
       <QuestionEditModal

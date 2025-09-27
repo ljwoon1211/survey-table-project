@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
 import { SortableQuestionList } from "@/components/survey-builder/sortable-question-list";
+import { generateOTTSurvey } from "@/utils/ott-survey-generator";
 import {
   FileText,
   Eye,
@@ -20,6 +21,8 @@ import {
   ChevronDown,
   Table,
   PlayCircle,
+  Tv,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -84,6 +87,7 @@ export default function CreateSurveyPage() {
     updateSurveyTitle,
     updateSurveyDescription,
     addQuestion,
+    addPreparedQuestion,
     selectQuestion,
     togglePreviewMode,
     toggleTestMode,
@@ -91,6 +95,20 @@ export default function CreateSurveyPage() {
   } = useSurveyBuilderStore();
 
   const [titleInput, setTitleInput] = useState(currentSurvey.title);
+
+  // OTT 설문지 예제 추가 함수
+  const handleAddOTTSurvey = () => {
+    const ottQuestion = generateOTTSurvey();
+
+    // 설문 제목을 OTT 관련으로 업데이트
+    if (currentSurvey.title === "새 설문조사") {
+      updateSurveyTitle("OTT 서비스 이용 현황 조사");
+      setTitleInput("OTT 서비스 이용 현황 조사");
+    }
+
+    // 질문을 현재 설문에 추가
+    addPreparedQuestion(ottQuestion);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -174,7 +192,31 @@ export default function CreateSurveyPage() {
               })}
             </div>
 
-            <div className="mt-8 pt-6 border-t border-gray-200">
+            {/* OTT 설문지 예제 버튼 */}
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <h4 className="text-sm font-medium text-gray-700 mb-3">설문 예제</h4>
+              <Card
+                className="p-4 cursor-pointer hover-lift border-gray-200 hover:border-orange-200 transition-all duration-200"
+                onClick={handleAddOTTSurvey}
+              >
+                <div className="flex items-start space-x-3">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-orange-100 text-orange-600">
+                    <Tv className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-medium text-gray-900 text-sm flex items-center gap-1">
+                      OTT 설문지
+                      <Sparkles className="w-3 h-3 text-yellow-500" />
+                    </h4>
+                    <p className="text-xs text-gray-500 mt-1">
+                      업로드한 이미지와 동일한 OTT 서비스 설문지
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            <div className="mt-6 pt-6 border-t border-gray-200">
               <h4 className="text-sm font-medium text-gray-700 mb-3">설문 정보</h4>
               <div className="text-xs text-gray-500 space-y-1">
                 <p>질문 수: {currentSurvey.questions.length}개</p>

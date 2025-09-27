@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { Survey, Question, QuestionType, SurveySettings, SelectLevel } from '@/types/survey';
+import { Survey, Question, QuestionType, SurveySettings, SelectLevel, TableColumn, TableRow } from '@/types/survey';
 
 interface SurveyBuilderState {
   // 현재 편집 중인 설문
@@ -19,6 +19,7 @@ interface SurveyBuilderState {
   updateSurveyDescription: (description: string) => void;
 
   addQuestion: (type: QuestionType) => void;
+  addPreparedQuestion: (question: Question) => void;
   updateQuestion: (questionId: string, updates: Partial<Question>) => void;
   deleteQuestion: (questionId: string) => void;
   reorderQuestions: (questionIds: string[]) => void;
@@ -96,7 +97,14 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
               { id: `option-${Date.now()}-2`, label: '옵션 2', value: '옵션2' }
             ]
           }),
-          ...(needsSelectLevels(type) && { selectLevels: getDefaultSelectLevels() })
+          ...(needsSelectLevels(type) && { selectLevels: getDefaultSelectLevels() }),
+          ...(needsTableData(type) && {
+            tableTitle: '',
+            tableRowHeaderTitle: '항목',
+            tableColumns: getDefaultTableColumns(),
+            tableRowsData: getDefaultTableRows(),
+            tableHeaderCell: { id: 'header-cell-1', content: '항목', type: 'text' }
+          })
         };
 
         set((state) => ({
@@ -106,6 +114,22 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
             updatedAt: new Date()
           },
           selectedQuestionId: newQuestion.id
+        }));
+      },
+
+      addPreparedQuestion: (question: Question) => {
+        const questionWithOrder = {
+          ...question,
+          order: get().currentSurvey.questions.length
+        };
+
+        set((state) => ({
+          currentSurvey: {
+            ...state.currentSurvey,
+            questions: [...state.currentSurvey.questions, questionWithOrder],
+            updatedAt: new Date()
+          },
+          selectedQuestionId: question.id
         }));
       },
 
@@ -216,6 +240,10 @@ function needsSelectLevels(type: QuestionType): boolean {
   return type === 'multiselect';
 }
 
+function needsTableData(type: QuestionType): boolean {
+  return type === 'table';
+}
+
 function getDefaultSelectLevels(): SelectLevel[] {
   return [
     {
@@ -244,6 +272,44 @@ function getDefaultSelectLevels(): SelectLevel[] {
         { id: 'sub3-1', label: '스테이크', value: '양식-스테이크' },
         { id: 'sub3-2', label: '파스타', value: '양식-파스타' },
         { id: 'sub3-3', label: '피자', value: '양식-피자' }
+      ]
+    }
+  ];
+}
+
+function getDefaultTableColumns(): TableColumn[] {
+  return [
+    { id: 'col-1', label: '매우 좋음' },
+    { id: 'col-2', label: '좋음' },
+    { id: 'col-3', label: '보통' },
+    { id: 'col-4', label: '나쁨' }
+  ];
+}
+
+function getDefaultTableRows(): TableRow[] {
+  return [
+    {
+      id: 'row-1',
+      label: '서비스 품질',
+      height: 60, // 기본 행 높이
+      minHeight: 40, // 최소 행 높이
+      cells: [
+        { id: 'cell-1-1', content: '', type: 'text' },
+        { id: 'cell-1-2', content: '', type: 'text' },
+        { id: 'cell-1-3', content: '', type: 'text' },
+        { id: 'cell-1-4', content: '', type: 'text' }
+      ]
+    },
+    {
+      id: 'row-2',
+      label: '직원 친절도',
+      height: 60, // 기본 행 높이
+      minHeight: 40, // 최소 행 높이
+      cells: [
+        { id: 'cell-2-1', content: '', type: 'text' },
+        { id: 'cell-2-2', content: '', type: 'text' },
+        { id: 'cell-2-3', content: '', type: 'text' },
+        { id: 'cell-2-4', content: '', type: 'text' }
       ]
     }
   ];

@@ -17,6 +17,11 @@ export default function Home() {
               <span className="text-xl font-semibold text-gray-900">Survey Table</span>
             </div>
             <div className="flex items-center space-x-4">
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/analytics">
+                  분석 보기
+                </Link>
+              </Button>
               <Button variant="ghost" size="sm">
                 로그인
               </Button>

@@ -14,6 +14,47 @@ export interface QuestionOption {
   hasOther?: boolean;
 }
 
+export interface TableCell {
+  id: string;
+  content: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  type: 'text' | 'image' | 'video' | 'checkbox' | 'radio';
+  // 체크박스/라디오 버튼 관련 속성
+  checkboxOptions?: CheckboxOption[];
+  radioOptions?: RadioOption[];
+  radioGroupName?: string; // 라디오 버튼 그룹명
+}
+
+export interface CheckboxOption {
+  id: string;
+  label: string;
+  value: string;
+  checked?: boolean;
+}
+
+export interface RadioOption {
+  id: string;
+  label: string;
+  value: string;
+  selected?: boolean;
+}
+
+export interface TableRow {
+  id: string;
+  label: string;
+  cells: TableCell[];
+  height?: number; // 행 높이 (픽셀 단위)
+  minHeight?: number; // 최소 높이
+}
+
+export interface TableColumn {
+  id: string;
+  label: string;
+  width?: number; // 열 너비 (픽셀 단위)
+  minWidth?: number; // 최소 너비
+}
+
 export interface SelectLevel {
   id: string;
   label: string;
@@ -32,6 +73,12 @@ export interface Question {
   selectLevels?: SelectLevel[]; // 다단계 select용
   tableRows?: string[];
   tableCols?: string[];
+  // 새로운 테이블 구조
+  tableTitle?: string;
+  tableRowHeaderTitle?: string; // 행 제목 헤더 (기본값: "항목")
+  tableColumns?: TableColumn[];
+  tableRowsData?: TableRow[];
+  tableHeaderCell?: TableCell; // 첫 번째 셀(1x1) 편집 가능하게
   imageUrl?: string;
   videoUrl?: string;
   order: number;
