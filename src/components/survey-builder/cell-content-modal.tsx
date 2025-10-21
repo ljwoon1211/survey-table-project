@@ -1,14 +1,21 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TableCell, CheckboxOption, RadioOption } from '@/types/survey';
-import { Type, Image, Video, CheckSquare, Circle } from 'lucide-react';
+import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TableCell, CheckboxOption, RadioOption } from "@/types/survey";
+import { Type, Image, Video, CheckSquare, Circle } from "lucide-react";
 
 interface CellContentModalProps {
   isOpen: boolean;
@@ -18,24 +25,92 @@ interface CellContentModalProps {
 }
 
 export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentModalProps) {
-  const [contentType, setContentType] = useState<'text' | 'image' | 'video' | 'checkbox' | 'radio'>(cell.type || 'text');
-  const [textContent, setTextContent] = useState(cell.content || '');
-  const [imageUrl, setImageUrl] = useState(cell.imageUrl || '');
-  const [videoUrl, setVideoUrl] = useState(cell.videoUrl || '');
-  const [checkboxOptions, setCheckboxOptions] = useState<CheckboxOption[]>(cell.checkboxOptions || []);
+  const [contentType, setContentType] = useState<"text" | "image" | "video" | "checkbox" | "radio">(
+    cell.type || "text",
+  );
+  const [textContent, setTextContent] = useState(cell.content || "");
+  const [imageUrl, setImageUrl] = useState(cell.imageUrl || "");
+  const [videoUrl, setVideoUrl] = useState(cell.videoUrl || "");
+  const [checkboxOptions, setCheckboxOptions] = useState<CheckboxOption[]>(
+    cell.checkboxOptions || [],
+  );
   const [radioOptions, setRadioOptions] = useState<RadioOption[]>(cell.radioOptions || []);
-  const [radioGroupName, setRadioGroupName] = useState(cell.radioGroupName || '');
+  const [radioGroupName, setRadioGroupName] = useState(cell.radioGroupName || "");
+  const [allowOtherOption, setAllowOtherOption] = useState(cell.allowOtherOption || false);
+
+  // 기타 옵션 관리 상수들
+  const OTHER_OPTION_ID = "other-option";
+  const OTHER_OPTION_LABEL = "기타";
+
+  // 기타 옵션 헬퍼 함수들
+  const addOtherCheckboxOption = (options: CheckboxOption[]) => {
+    const hasOtherOption = options.some((option) => option.id === OTHER_OPTION_ID);
+    if (!hasOtherOption) {
+      return [
+        ...options,
+        {
+          id: OTHER_OPTION_ID,
+          label: OTHER_OPTION_LABEL,
+          value: "other",
+          checked: false,
+          hasOther: true,
+        },
+      ];
+    }
+    return options;
+  };
+
+  const removeOtherCheckboxOption = (options: CheckboxOption[]) => {
+    return options.filter((option) => option.id !== OTHER_OPTION_ID);
+  };
+
+  const addOtherRadioOption = (options: RadioOption[]) => {
+    const hasOtherOption = options.some((option) => option.id === OTHER_OPTION_ID);
+    if (!hasOtherOption) {
+      return [
+        ...options,
+        {
+          id: OTHER_OPTION_ID,
+          label: OTHER_OPTION_LABEL,
+          value: "other",
+          selected: false,
+          hasOther: true,
+        },
+      ];
+    }
+    return options;
+  };
+
+  const removeOtherRadioOption = (options: RadioOption[]) => {
+    return options.filter((option) => option.id !== OTHER_OPTION_ID);
+  };
+
+  // 기타 옵션 토글 핸들러
+  const handleOtherOptionToggle = (enabled: boolean) => {
+    setAllowOtherOption(enabled);
+
+    if (contentType === "checkbox") {
+      setCheckboxOptions((prev) =>
+        enabled ? addOtherCheckboxOption(prev) : removeOtherCheckboxOption(prev),
+      );
+    } else if (contentType === "radio") {
+      setRadioOptions((prev) =>
+        enabled ? addOtherRadioOption(prev) : removeOtherRadioOption(prev),
+      );
+    }
+  };
 
   const handleSave = () => {
     const updatedCell: TableCell = {
       ...cell,
       type: contentType,
-      content: contentType === 'text' ? textContent : '',
-      imageUrl: contentType === 'image' ? imageUrl : undefined,
-      videoUrl: contentType === 'video' ? videoUrl : undefined,
-      checkboxOptions: contentType === 'checkbox' ? checkboxOptions : undefined,
-      radioOptions: contentType === 'radio' ? radioOptions : undefined,
-      radioGroupName: contentType === 'radio' ? radioGroupName : undefined
+      content: contentType === "text" ? textContent : "",
+      imageUrl: contentType === "image" ? imageUrl : undefined,
+      videoUrl: contentType === "video" ? videoUrl : undefined,
+      checkboxOptions: contentType === "checkbox" ? checkboxOptions : undefined,
+      radioOptions: contentType === "radio" ? radioOptions : undefined,
+      radioGroupName: contentType === "radio" ? radioGroupName : undefined,
+      allowOtherOption: ["checkbox", "radio"].includes(contentType) ? allowOtherOption : undefined,
     };
 
     onSave(updatedCell);
@@ -43,13 +118,14 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
 
   const handleCancel = () => {
     // 원래 값으로 되돌리기
-    setContentType(cell.type || 'text');
-    setTextContent(cell.content || '');
-    setImageUrl(cell.imageUrl || '');
-    setVideoUrl(cell.videoUrl || '');
+    setContentType(cell.type || "text");
+    setTextContent(cell.content || "");
+    setImageUrl(cell.imageUrl || "");
+    setVideoUrl(cell.videoUrl || "");
     setCheckboxOptions(cell.checkboxOptions || []);
     setRadioOptions(cell.radioOptions || []);
-    setRadioGroupName(cell.radioGroupName || '');
+    setRadioGroupName(cell.radioGroupName || "");
+    setAllowOtherOption(cell.allowOtherOption || false);
     onClose();
   };
 
@@ -65,7 +141,7 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
 
   // 이미지 URL 유효성 검사
   const isValidImageUrl = (url: string) => {
-    return /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(url) || url.includes('data:image');
+    return /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(url) || url.includes("data:image");
   };
 
   return (
@@ -75,7 +151,12 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
           <DialogTitle>셀 내용 편집</DialogTitle>
         </DialogHeader>
 
-        <Tabs value={contentType} onValueChange={(value) => setContentType(value as 'text' | 'image' | 'video' | 'checkbox' | 'radio')}>
+        <Tabs
+          value={contentType}
+          onValueChange={(value) =>
+            setContentType(value as "text" | "image" | "video" | "checkbox" | "radio")
+          }
+        >
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="text" className="flex items-center gap-2">
               <Type className="w-4 h-4" />
@@ -131,9 +212,7 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
                 onChange={(e) => setImageUrl(e.target.value)}
                 placeholder="https://example.com/image.jpg"
               />
-              <p className="text-sm text-gray-500">
-                지원 형식: JPG, PNG, GIF, WebP, SVG
-              </p>
+              <p className="text-sm text-gray-500">지원 형식: JPG, PNG, GIF, WebP, SVG</p>
             </div>
             {imageUrl && (
               <div className="space-y-2">
@@ -146,8 +225,8 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
                       className="max-w-full max-h-48 object-contain rounded"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                        target.nextElementSibling!.textContent = '이미지를 불러올 수 없습니다.';
+                        target.style.display = "none";
+                        target.nextElementSibling!.textContent = "이미지를 불러올 수 없습니다.";
                       }}
                     />
                   ) : (
@@ -177,7 +256,7 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
               <div className="space-y-2">
                 <Label>미리보기</Label>
                 <div className="p-3 border rounded-md bg-gray-50">
-                  {videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be') ? (
+                  {videoUrl.includes("youtube.com") || videoUrl.includes("youtu.be") ? (
                     <div className="aspect-video">
                       <iframe
                         src={getYouTubeEmbedUrl(videoUrl)}
@@ -188,10 +267,10 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
                         title="동영상 미리보기"
                       />
                     </div>
-                  ) : videoUrl.includes('vimeo.com') ? (
+                  ) : videoUrl.includes("vimeo.com") ? (
                     <div className="aspect-video">
                       <iframe
-                        src={videoUrl.replace('vimeo.com/', 'player.vimeo.com/video/')}
+                        src={videoUrl.replace("vimeo.com/", "player.vimeo.com/video/")}
                         className="w-full h-full rounded"
                         frameBorder="0"
                         allow="autoplay; fullscreen; picture-in-picture"
@@ -200,16 +279,13 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
                       />
                     </div>
                   ) : videoUrl.match(/\.(mp4|webm|ogg)$/i) ? (
-                    <video
-                      src={videoUrl}
-                      controls
-                      className="w-full max-h-48 rounded"
-                    >
+                    <video src={videoUrl} controls className="w-full max-h-48 rounded">
                       동영상을 지원하지 않는 브라우저입니다.
                     </video>
                   ) : (
                     <p className="text-yellow-600 text-sm">
-                      동영상 링크를 확인할 수 없습니다. YouTube, Vimeo 또는 직접 동영상 링크인지 확인해주세요.
+                      동영상 링크를 확인할 수 없습니다. YouTube, Vimeo 또는 직접 동영상 링크인지
+                      확인해주세요.
                     </p>
                   )}
                 </div>
@@ -219,8 +295,23 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
 
           {/* 체크박스 탭 */}
           <TabsContent value="checkbox" className="space-y-4">
-            <div className="space-y-2">
-              <Label>체크박스 옵션 관리</Label>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label>체크박스 옵션 관리</Label>
+                {/* 기타 옵션 토글 */}
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="checkbox-allow-other"
+                    checked={allowOtherOption}
+                    onCheckedChange={handleOtherOptionToggle}
+                    className="scale-75"
+                  />
+                  <Label htmlFor="checkbox-allow-other" className="text-xs text-gray-600">
+                    기타 옵션 추가
+                  </Label>
+                </div>
+              </div>
+
               <div className="space-y-3">
                 {checkboxOptions.map((option, index) => (
                   <div key={option.id} className="flex items-center gap-2 p-3 border rounded-md">
@@ -233,25 +324,32 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
                         setCheckboxOptions(updated);
                       }}
                       className="rounded"
+                      disabled={option.id === OTHER_OPTION_ID}
                     />
-                    <Input
-                      value={option.label}
-                      onChange={(e) => {
-                        const updated = [...checkboxOptions];
-                        updated[index] = { ...option, label: e.target.value };
-                        setCheckboxOptions(updated);
-                      }}
-                      placeholder="옵션 텍스트"
-                      className="flex-1"
-                    />
+                    <div className="flex-1">
+                      <Input
+                        value={option.label}
+                        onChange={(e) => {
+                          const updated = [...checkboxOptions];
+                          updated[index] = { ...option, label: e.target.value };
+                          setCheckboxOptions(updated);
+                        }}
+                        placeholder="옵션 텍스트"
+                        disabled={option.id === OTHER_OPTION_ID}
+                      />
+                      {option.id === OTHER_OPTION_ID && (
+                        <p className="text-xs text-blue-600 mt-1">🔹 기타 옵션 (자동 추가됨)</p>
+                      )}
+                    </div>
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        setCheckboxOptions(prev => prev.filter((_, i) => i !== index));
+                        setCheckboxOptions((prev) => prev.filter((_, i) => i !== index));
                       }}
                       className="text-red-500 hover:text-red-700"
+                      disabled={option.id === OTHER_OPTION_ID}
                     >
                       삭제
                     </Button>
@@ -264,16 +362,27 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
                 onClick={() => {
                   const newOption: CheckboxOption = {
                     id: `checkbox-${Date.now()}`,
-                    label: '새 옵션',
+                    label: "새 옵션",
                     value: `option-${checkboxOptions.length + 1}`,
-                    checked: false
+                    checked: false,
                   };
-                  setCheckboxOptions(prev => [...prev, newOption]);
+                  setCheckboxOptions((prev) => [...prev, newOption]);
                 }}
                 className="w-full"
               >
                 옵션 추가
               </Button>
+
+              {allowOtherOption && (
+                <div className="p-3 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-blue-700">
+                    <strong>💡 기타 옵션이 활성화되었습니다.</strong>
+                    <br />
+                    마지막에 "기타" 체크박스가 자동으로 추가되어 사용자가 직접 텍스트를 입력할 수
+                    있습니다.
+                  </p>
+                </div>
+              )}
             </div>
             {checkboxOptions.length > 0 && (
               <div className="space-y-2">
@@ -289,6 +398,9 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
                           className="rounded"
                         />
                         <span className="text-sm">{option.label}</span>
+                        {option.id === OTHER_OPTION_ID && (
+                          <span className="text-xs text-blue-600 ml-2">(텍스트 입력)</span>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -308,8 +420,23 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
                 placeholder="라디오 버튼 그룹명 (예: payment-type)"
               />
             </div>
-            <div className="space-y-2">
-              <Label>라디오 버튼 옵션 관리</Label>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <Label>라디오 버튼 옵션 관리</Label>
+                {/* 기타 옵션 토글 */}
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="radio-allow-other"
+                    checked={allowOtherOption}
+                    onCheckedChange={handleOtherOptionToggle}
+                    className="scale-75"
+                  />
+                  <Label htmlFor="radio-allow-other" className="text-xs text-gray-600">
+                    기타 옵션 추가
+                  </Label>
+                </div>
+              </div>
+
               <div className="space-y-3">
                 {radioOptions.map((option, index) => (
                   <div key={option.id} className="flex items-center gap-2 p-3 border rounded-md">
@@ -321,30 +448,37 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
                         if (e.target.checked) {
                           const updated = radioOptions.map((opt, i) => ({
                             ...opt,
-                            selected: i === index
+                            selected: i === index,
                           }));
                           setRadioOptions(updated);
                         }
                       }}
+                      disabled={option.id === OTHER_OPTION_ID}
                     />
-                    <Input
-                      value={option.label}
-                      onChange={(e) => {
-                        const updated = [...radioOptions];
-                        updated[index] = { ...option, label: e.target.value };
-                        setRadioOptions(updated);
-                      }}
-                      placeholder="옵션 텍스트"
-                      className="flex-1"
-                    />
+                    <div className="flex-1">
+                      <Input
+                        value={option.label}
+                        onChange={(e) => {
+                          const updated = [...radioOptions];
+                          updated[index] = { ...option, label: e.target.value };
+                          setRadioOptions(updated);
+                        }}
+                        placeholder="옵션 텍스트"
+                        disabled={option.id === OTHER_OPTION_ID}
+                      />
+                      {option.id === OTHER_OPTION_ID && (
+                        <p className="text-xs text-blue-600 mt-1">🔹 기타 옵션 (자동 추가됨)</p>
+                      )}
+                    </div>
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        setRadioOptions(prev => prev.filter((_, i) => i !== index));
+                        setRadioOptions((prev) => prev.filter((_, i) => i !== index));
                       }}
                       className="text-red-500 hover:text-red-700"
+                      disabled={option.id === OTHER_OPTION_ID}
                     >
                       삭제
                     </Button>
@@ -357,16 +491,27 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
                 onClick={() => {
                   const newOption: RadioOption = {
                     id: `radio-${Date.now()}`,
-                    label: '새 옵션',
+                    label: "새 옵션",
                     value: `option-${radioOptions.length + 1}`,
-                    selected: false
+                    selected: false,
                   };
-                  setRadioOptions(prev => [...prev, newOption]);
+                  setRadioOptions((prev) => [...prev, newOption]);
                 }}
                 className="w-full"
               >
                 옵션 추가
               </Button>
+
+              {allowOtherOption && (
+                <div className="p-3 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-blue-700">
+                    <strong>💡 기타 옵션이 활성화되었습니다.</strong>
+                    <br />
+                    마지막에 "기타" 라디오 버튼이 자동으로 추가되어 사용자가 직접 텍스트를 입력할 수
+                    있습니다.
+                  </p>
+                </div>
+              )}
             </div>
             {radioOptions.length > 0 && (
               <div className="space-y-2">
@@ -382,6 +527,9 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
                           readOnly
                         />
                         <span className="text-sm">{option.label}</span>
+                        {option.id === OTHER_OPTION_ID && (
+                          <span className="text-xs text-blue-600 ml-2">(텍스트 입력)</span>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -395,9 +543,7 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
           <Button variant="outline" onClick={handleCancel}>
             취소
           </Button>
-          <Button onClick={handleSave}>
-            저장
-          </Button>
+          <Button onClick={handleSave}>저장</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

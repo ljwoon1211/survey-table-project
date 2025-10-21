@@ -100,10 +100,8 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           ...(needsSelectLevels(type) && { selectLevels: getDefaultSelectLevels() }),
           ...(needsTableData(type) && {
             tableTitle: '',
-            tableRowHeaderTitle: '항목',
             tableColumns: getDefaultTableColumns(),
-            tableRowsData: getDefaultTableRows(),
-            tableHeaderCell: { id: 'header-cell-1', content: '항목', type: 'text' }
+            tableRowsData: getDefaultTableRows()
           })
         };
 

@@ -188,11 +188,6 @@ function QuestionPreview({ question }: { question: Question }) {
               <label className="text-sm text-gray-700">{option.label}</label>
             </div>
           ))}
-          <div className="flex items-center space-x-2 text-gray-400">
-            <input type={question.type} disabled className="text-gray-300" />
-            <span className="text-sm">기타</span>
-            <Input placeholder="직접 입력..." disabled className="ml-2 text-xs h-8 bg-white" />
-          </div>
         </div>
       );
 
@@ -218,7 +213,6 @@ function QuestionPreview({ question }: { question: Question }) {
       return question.tableColumns && question.tableRowsData ? (
         <TablePreview
           tableTitle={question.tableTitle}
-          tableRowHeaderTitle={question.tableRowHeaderTitle}
           columns={question.tableColumns}
           rows={question.tableRowsData}
           className="border-0 shadow-none"

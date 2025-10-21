@@ -183,9 +183,6 @@ export function TablePreview({
             {/* 헤더 */}
             <thead>
               <tr>
-                <th className="border border-gray-300 p-3 bg-gray-50 font-medium text-left min-w-[120px]">
-                  항목
-                </th>
                 {columns.map((column) => (
                   <th
                     key={column.id}
@@ -203,13 +200,8 @@ export function TablePreview({
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50">
-                  {/* 행 제목 */}
-                  <td className="border border-gray-300 p-3 bg-gray-50 font-medium">
-                    {row.label || <span className="text-gray-400 italic text-sm">(제목 없음)</span>}
-                  </td>
-
                   {/* 셀들 */}
-                  {row.cells.map((cell, cellIndex) => (
+                  {row.cells.map((cell) => (
                     <td
                       key={cell.id}
                       className="border border-gray-300 p-3 text-center align-middle"

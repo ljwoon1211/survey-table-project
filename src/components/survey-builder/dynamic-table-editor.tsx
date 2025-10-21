@@ -14,23 +14,16 @@ import {
   Video,
   CheckSquare,
   Circle,
-  LayoutGrid,
-  Table2,
   GripVertical,
 } from "lucide-react";
 import { CellContentModal } from "./cell-content-modal";
-import { FlexibleTableEditor } from "./flexible-table-editor";
 
 interface DynamicTableEditorProps {
   tableTitle?: string;
-  tableRowHeaderTitle?: string;
-  tableHeaderCell?: TableCell;
   columns?: TableColumn[];
   rows?: TableRow[];
   onTableChange: (data: {
     tableTitle: string;
-    tableRowHeaderTitle: string;
-    tableHeaderCell?: TableCell;
     tableColumns: TableColumn[];
     tableRowsData: TableRow[];
   }) => void;
@@ -38,17 +31,11 @@ interface DynamicTableEditorProps {
 
 export function DynamicTableEditor({
   tableTitle = "",
-  tableRowHeaderTitle = "항목",
-  tableHeaderCell,
   columns = [],
   rows = [],
   onTableChange,
 }: DynamicTableEditorProps) {
   const [currentTitle, setCurrentTitle] = useState(tableTitle);
-  const [currentRowHeaderTitle, setCurrentRowHeaderTitle] = useState(tableRowHeaderTitle);
-  const [currentHeaderCell, setCurrentHeaderCell] = useState<TableCell>(
-    tableHeaderCell || { id: "header-cell-1", content: tableRowHeaderTitle, type: "text" },
-  );
   const [currentColumns, setCurrentColumns] = useState<TableColumn[]>(
     columns.length > 0
       ? columns
@@ -79,7 +66,6 @@ export function DynamicTableEditor({
     cellId: string;
   } | null>(null);
 
-  const [editMode, setEditMode] = useState<"simple" | "flexible">("simple");
 
   // 드래그 리사이즈 관련 상태 (열)
   const [resizingColumn, setResizingColumn] = useState<{
@@ -97,42 +83,27 @@ export function DynamicTableEditor({
   const tableRef = useRef<HTMLTableElement>(null);
 
   // 변경 사항을 부모에게 전달
-  const notifyChange = (
-    title: string,
-    rowHeaderTitle: string,
-    headerCell: TableCell,
-    cols: TableColumn[],
-    rowsData: TableRow[],
-  ) => {
-    onTableChange({
-      tableTitle: title,
-      tableRowHeaderTitle: rowHeaderTitle,
-      tableHeaderCell: headerCell,
-      tableColumns: cols,
-      tableRowsData: rowsData,
-    });
-  };
+  const notifyChange = useCallback(
+    (
+      title: string,
+      cols: TableColumn[],
+      rowsData: TableRow[],
+    ) => {
+      onTableChange({
+        tableTitle: title,
+        tableColumns: cols,
+        tableRowsData: rowsData,
+      });
+    },
+    [onTableChange],
+  );
 
   // 제목 업데이트
   const updateTitle = (title: string) => {
     setCurrentTitle(title);
-    notifyChange(title, currentRowHeaderTitle, currentHeaderCell, currentColumns, currentRows);
+    notifyChange(title, currentColumns, currentRows);
   };
 
-  // 행 헤더 제목 업데이트
-  const updateRowHeaderTitle = (rowHeaderTitle: string) => {
-    setCurrentRowHeaderTitle(rowHeaderTitle);
-    // 헤더셀 내용도 함께 업데이트
-    const updatedHeaderCell = { ...currentHeaderCell, content: rowHeaderTitle };
-    setCurrentHeaderCell(updatedHeaderCell);
-    notifyChange(currentTitle, rowHeaderTitle, updatedHeaderCell, currentColumns, currentRows);
-  };
-
-  // 헤더 셀 업데이트
-  const updateHeaderCell = (cell: TableCell) => {
-    setCurrentHeaderCell(cell);
-    notifyChange(currentTitle, currentRowHeaderTitle, cell, currentColumns, currentRows);
-  };
 
   // 열 너비 리사이즈 관련 함수들
   const handleColumnResizeStart = useCallback(
@@ -204,8 +175,6 @@ export function DynamicTableEditor({
     // 최종 상태를 부모에게 전달
     notifyChange(
       currentTitle,
-      currentRowHeaderTitle,
-      currentHeaderCell,
       currentColumns,
       currentRows,
     );
@@ -213,10 +182,9 @@ export function DynamicTableEditor({
   }, [
     resizingColumn,
     currentTitle,
-    currentRowHeaderTitle,
-    currentHeaderCell,
     currentColumns,
     currentRows,
+    notifyChange,
   ]);
 
   const handleRowResizeEnd = useCallback(() => {
@@ -225,8 +193,6 @@ export function DynamicTableEditor({
     // 최종 상태를 부모에게 전달
     notifyChange(
       currentTitle,
-      currentRowHeaderTitle,
-      currentHeaderCell,
       currentColumns,
       currentRows,
     );
@@ -234,10 +200,9 @@ export function DynamicTableEditor({
   }, [
     resizingRow,
     currentTitle,
-    currentRowHeaderTitle,
-    currentHeaderCell,
     currentColumns,
     currentRows,
+    notifyChange,
   ]);
 
   // 마우스 이벤트 리스너 등록/해제 (열 리사이즈)
@@ -302,8 +267,6 @@ export function DynamicTableEditor({
     setCurrentRows(updatedRows);
     notifyChange(
       currentTitle,
-      currentRowHeaderTitle,
-      currentHeaderCell,
       updatedColumns,
       updatedRows,
     );
@@ -325,8 +288,6 @@ export function DynamicTableEditor({
     setCurrentRows(updatedRows);
     notifyChange(
       currentTitle,
-      currentRowHeaderTitle,
-      currentHeaderCell,
       updatedColumns,
       updatedRows,
     );
@@ -341,8 +302,6 @@ export function DynamicTableEditor({
     setCurrentColumns(updatedColumns);
     notifyChange(
       currentTitle,
-      currentRowHeaderTitle,
-      currentHeaderCell,
       updatedColumns,
       currentRows,
     );
@@ -366,8 +325,6 @@ export function DynamicTableEditor({
     setCurrentRows(updatedRows);
     notifyChange(
       currentTitle,
-      currentRowHeaderTitle,
-      currentHeaderCell,
       currentColumns,
       updatedRows,
     );
@@ -381,8 +338,6 @@ export function DynamicTableEditor({
     setCurrentRows(updatedRows);
     notifyChange(
       currentTitle,
-      currentRowHeaderTitle,
-      currentHeaderCell,
       currentColumns,
       updatedRows,
     );
@@ -397,8 +352,6 @@ export function DynamicTableEditor({
     setCurrentRows(updatedRows);
     notifyChange(
       currentTitle,
-      currentRowHeaderTitle,
-      currentHeaderCell,
       currentColumns,
       updatedRows,
     );
@@ -418,8 +371,6 @@ export function DynamicTableEditor({
     setCurrentRows(updatedRows);
     notifyChange(
       currentTitle,
-      currentRowHeaderTitle,
-      currentHeaderCell,
       currentColumns,
       updatedRows,
     );
@@ -487,72 +438,7 @@ export function DynamicTableEditor({
         />
       </div>
 
-      {/* 행 헤더 제목 */}
-      <div className="space-y-2">
-        <Label htmlFor="row-header-title">행 헤더 제목</Label>
-        <Input
-          id="row-header-title"
-          value={currentRowHeaderTitle}
-          onChange={(e) => updateRowHeaderTitle(e.target.value)}
-          placeholder="행 헤더 제목을 입력하세요 (예: 항목, 질문, 구분 등)"
-        />
-      </div>
-
-      {/* 편집 모드 선택 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>편집 모드</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div
-              className={`p-4 border rounded-lg cursor-pointer transition-all ${
-                editMode === "simple"
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-gray-200 hover:border-gray-300"
-              }`}
-              onClick={() => setEditMode("simple")}
-            >
-              <div className="flex items-center space-x-3 mb-2">
-                <Table2 className="w-5 h-5 text-blue-600" />
-                <h3 className="font-medium">간단한 테이블</h3>
-              </div>
-              <p className="text-sm text-gray-600">정형화된 표 형태로 빠르게 설문 제작</p>
-              <ul className="text-xs text-gray-500 mt-2 space-y-1">
-                <li>• 체크박스, 라디오 버튼 지원</li>
-                <li>• 이미지, 동영상 삽입</li>
-                <li>• 빠른 편집</li>
-              </ul>
-            </div>
-
-            <div
-              className={`p-4 border rounded-lg cursor-pointer transition-all ${
-                editMode === "flexible"
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-gray-200 hover:border-gray-300"
-              }`}
-              onClick={() => setEditMode("flexible")}
-            >
-              <div className="flex items-center space-x-3 mb-2">
-                <LayoutGrid className="w-5 h-5 text-green-600" />
-                <h3 className="font-medium">유연한 테이블</h3>
-                <span className="px-2 py-1 text-xs bg-orange-100 text-orange-600 rounded">NEW</span>
-              </div>
-              <p className="text-sm text-gray-600">워드/한글 문서처럼 자유로운 표 구조</p>
-              <ul className="text-xs text-gray-500 mt-2 space-y-1">
-                <li>• 셀 병합/분할 지원</li>
-                <li>• 복잡한 레이아웃</li>
-                <li>• 기존 설문지 재현</li>
-              </ul>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* 편집기 렌더링 */}
-      {editMode === "simple" ? (
-        <>
-          {/* 테이블 정보 요약 */}
+      {/* 테이블 정보 요약 */}
           <Card>
             <CardHeader>
               <CardTitle>테이블 요약</CardTitle>
@@ -629,33 +515,6 @@ export function DynamicTableEditor({
                   {/* 헤더 행 */}
                   <thead>
                     <tr>
-                      <th className="border border-gray-300 p-2 bg-gray-50 w-32 relative">
-                        <div
-                          className="min-h-[60px] group cursor-pointer hover:bg-gray-100 rounded p-2 transition-colors"
-                          onClick={() =>
-                            setSelectedCell({ rowId: "header", cellId: "header-cell-1" })
-                          }
-                        >
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1">{renderCellContent(currentHeaderCell)}</div>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <Edit3 className="w-3 h-3" />
-                            </Button>
-                          </div>
-                          <div className="text-xs text-gray-400 mt-1 border-t border-gray-100 pt-1">
-                            <div className="flex justify-between items-center">
-                              <span>열 1</span>
-                              <span className="capitalize font-medium">
-                                {currentHeaderCell.type}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </th>
                       {currentColumns.map((column, columnIndex) => (
                         <th
                           key={column.id}
@@ -709,49 +568,6 @@ export function DynamicTableEditor({
                   <tbody>
                     {currentRows.map((row, rowIndex) => (
                       <tr key={row.id} style={{ height: row.height ? `${row.height}px` : "60px" }}>
-                        {/* 행 제목 */}
-                        <td className="border border-gray-300 p-2 bg-gray-50 relative">
-                          <div
-                            className="space-y-2"
-                            style={{
-                              minHeight: row.minHeight ? `${row.minHeight - 16}px` : "40px",
-                            }}
-                          >
-                            <div className="flex items-center gap-2">
-                              <Input
-                                value={row.label}
-                                onChange={(e) => updateRowLabel(rowIndex, e.target.value)}
-                                className="h-8 border border-gray-200 bg-white text-sm"
-                                placeholder="행 제목 (비워둘 수 있음)"
-                              />
-                              {currentRows.length > 1 && (
-                                <Button
-                                  onClick={() => deleteRow(rowIndex)}
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              )}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              행 #{rowIndex + 1} • 높이 {row.height || 60}px • 셀 {row.cells.length}
-                              개
-                            </div>
-                          </div>
-
-                          {/* 행 높이 리사이즈 핸들 */}
-                          {rowIndex < currentRows.length - 1 && (
-                            <div
-                              className="absolute bottom-0 left-0 right-0 h-2 cursor-row-resize hover:bg-green-200 transition-colors group flex items-center justify-center"
-                              onMouseDown={(e) => handleRowResizeStart(e, rowIndex)}
-                              title="드래그하여 행 높이 조절"
-                            >
-                              <div className="w-8 h-1 bg-gray-400 group-hover:bg-green-600 rounded"></div>
-                            </div>
-                          )}
-                        </td>
 
                         {/* 셀들 */}
                         {row.cells.map((cell, cellIndex) => {
@@ -825,109 +641,26 @@ export function DynamicTableEditor({
               isOpen={!!selectedCell}
               onClose={() => setSelectedCell(null)}
               cell={
-                selectedCell.rowId === "header"
-                  ? currentHeaderCell
-                  : currentRows
-                      .find((row) => row.id === selectedCell.rowId)
-                      ?.cells.find((cell) => cell.id === selectedCell.cellId) || {
-                      id: "",
-                      content: "",
-                      type: "text",
-                    }
+                currentRows
+                  .find((row) => row.id === selectedCell.rowId)
+                  ?.cells.find((cell) => cell.id === selectedCell.cellId) || {
+                  id: "",
+                  content: "",
+                  type: "text",
+                }
               }
               onSave={(cell) => {
-                if (selectedCell.rowId === "header") {
-                  // 헤더 셀 업데이트
-                  updateHeaderCell(cell);
-                } else {
-                  // 일반 셀 업데이트
-                  const rowIndex = currentRows.findIndex((row) => row.id === selectedCell.rowId);
-                  const cellIndex = currentRows[rowIndex]?.cells.findIndex(
-                    (c) => c.id === selectedCell.cellId,
-                  );
-                  if (rowIndex !== -1 && cellIndex !== -1) {
-                    updateCell(rowIndex, cellIndex, cell);
-                  }
+                // 일반 셀 업데이트
+                const rowIndex = currentRows.findIndex((row) => row.id === selectedCell.rowId);
+                const cellIndex = currentRows[rowIndex]?.cells.findIndex(
+                  (c) => c.id === selectedCell.cellId,
+                );
+                if (rowIndex !== -1 && cellIndex !== -1) {
+                  updateCell(rowIndex, cellIndex, cell);
                 }
               }}
             />
           )}
-        </>
-      ) : (
-        /* 유연한 테이블 편집기 */
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <LayoutGrid className="w-5 h-5 text-green-600" />
-                <span>유연한 테이블 편집기</span>
-                <span className="px-2 py-1 text-xs bg-orange-100 text-orange-600 rounded">
-                  워드/한글 호환
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <LayoutGrid className="h-5 w-5 text-yellow-400" />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-yellow-800">
-                      <strong>유연한 테이블 모드</strong>는 기존 워드/한글 설문지의 복잡한 표 구조를
-                      재현할 수 있습니다.
-                    </p>
-                    <ul className="mt-2 text-sm text-yellow-700 list-disc list-inside space-y-1">
-                      <li>셀 병합/분할로 복잡한 레이아웃 구성</li>
-                      <li>다중 셀 선택 및 일괄 편집</li>
-                      <li>자유로운 표 구조로 기존 설문지 완벽 재현</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
-              <FlexibleTableEditor
-                onTableChange={(flexTable) => {
-                  // 유연한 테이블을 기본 테이블 형식으로 변환
-                  const convertedColumns: TableColumn[] = flexTable.columns.map((col) => ({
-                    id: col.id,
-                    label: col.label || "",
-                  }));
-
-                  const convertedRows: TableRow[] = flexTable.rows.map((row) => ({
-                    id: row.id,
-                    label: row.label || "",
-                    cells: row.cells
-                      .filter((cell) => !cell.isMerged)
-                      .map((cell) => ({
-                        id: cell.id,
-                        content: cell.content,
-                        type: cell.type as any,
-                        imageUrl: cell.imageUrl,
-                        videoUrl: cell.videoUrl,
-                        checkboxOptions: cell.checkboxOptions,
-                        radioOptions: cell.radioOptions,
-                        radioGroupName: cell.radioGroupName,
-                      })),
-                  }));
-
-                  notifyChange(
-                    flexTable.title || "",
-                    flexTable.rowHeaderTitle || "항목",
-                    {
-                      id: "header-cell-1",
-                      content: flexTable.rowHeaderTitle || "항목",
-                      type: "text",
-                    },
-                    convertedColumns,
-                    convertedRows,
-                  );
-                }}
-              />
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }

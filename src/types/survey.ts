@@ -24,6 +24,7 @@ export interface TableCell {
   checkboxOptions?: CheckboxOption[];
   radioOptions?: RadioOption[];
   radioGroupName?: string; // 라디오 버튼 그룹명
+  allowOtherOption?: boolean; // 기타 옵션 허용 여부
 }
 
 export interface CheckboxOption {
@@ -31,6 +32,7 @@ export interface CheckboxOption {
   label: string;
   value: string;
   checked?: boolean;
+  hasOther?: boolean;
 }
 
 export interface RadioOption {
@@ -38,6 +40,7 @@ export interface RadioOption {
   label: string;
   value: string;
   selected?: boolean;
+  hasOther?: boolean;
 }
 
 export interface TableRow {
@@ -75,13 +78,12 @@ export interface Question {
   tableCols?: string[];
   // 새로운 테이블 구조
   tableTitle?: string;
-  tableRowHeaderTitle?: string; // 행 제목 헤더 (기본값: "항목")
   tableColumns?: TableColumn[];
   tableRowsData?: TableRow[];
-  tableHeaderCell?: TableCell; // 첫 번째 셀(1x1) 편집 가능하게
   imageUrl?: string;
   videoUrl?: string;
   order: number;
+  allowOtherOption?: boolean; // 기타 옵션 허용 여부 (radio, checkbox, select용)
 }
 
 export interface Survey {
@@ -103,6 +105,19 @@ export interface SurveySettings {
   endDate?: Date;
   maxResponses?: number;
   thankYouMessage: string;
+}
+
+// 기타 옵션 입력값 처리를 위한 타입
+export interface OtherInputValue {
+  optionId: string;
+  inputValue: string;
+}
+
+// 설문 응답데이터 타입
+export interface SurveyResponse {
+  questionId: string;
+  value: string | string[] | { [key: string]: string | string[] | object };
+  otherInputs?: OtherInputValue[]; // 기타 옵션 입력값들
 }
 
 export interface QuestionTypeInfo {

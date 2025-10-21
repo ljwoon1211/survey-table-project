@@ -52,7 +52,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         tableTitle: question.tableTitle,
         tableColumns: question.tableColumns ? [...question.tableColumns] : [],
         tableRowsData: question.tableRowsData ? [...question.tableRowsData] : [],
-        tableHeaderCell: question.tableHeaderCell ? { ...question.tableHeaderCell } : undefined,
+        allowOtherOption: question.allowOtherOption || false,
       });
     }
   }, [question]);
@@ -115,6 +115,46 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
       return () => document.removeEventListener("keydown", handleKeyDown);
     }
   }, [isOpen, handleKeyDown]);
+
+  // 기타 옵션 관리 헬퍼 함수들
+  const OTHER_OPTION_ID = "other-option";
+  const OTHER_OPTION_LABEL = "기타";
+
+  const addOtherOptionIfNeeded = (options: QuestionOption[]) => {
+    const hasOtherOption = options.some((option) => option.id === OTHER_OPTION_ID);
+    if (!hasOtherOption) {
+      return [
+        ...options,
+        {
+          id: OTHER_OPTION_ID,
+          label: OTHER_OPTION_LABEL,
+          value: "other",
+          hasOther: true,
+        },
+      ];
+    }
+    return options;
+  };
+
+  const removeOtherOption = (options: QuestionOption[]) => {
+    return options.filter((option) => option.id !== OTHER_OPTION_ID);
+  };
+
+  // allowOtherOption 토글 핸들러
+  const handleOtherOptionToggle = (enabled: boolean) => {
+    setFormData((prev) => {
+      const currentOptions = prev.options || [];
+      const updatedOptions = enabled
+        ? addOtherOptionIfNeeded(currentOptions)
+        : removeOtherOption(currentOptions);
+
+      return {
+        ...prev,
+        allowOtherOption: enabled,
+        options: updatedOptions,
+      };
+    });
+  };
 
   if (!question) return null;
 
@@ -352,21 +392,35 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                   <Label>
                     선택 옵션 <span className="text-red-500">*</span>
                   </Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      addOption();
-                      if (validationErrors.options) {
-                        setValidationErrors((prev) => ({ ...prev, options: "" }));
-                      }
-                    }}
-                    className="flex items-center space-x-1"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>옵션 추가</span>
-                  </Button>
+                  <div className="flex items-center space-x-4">
+                    {/* 기타 옵션 토글 */}
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="allow-other-option"
+                        checked={formData.allowOtherOption || false}
+                        onCheckedChange={handleOtherOptionToggle}
+                        className="scale-75"
+                      />
+                      <Label htmlFor="allow-other-option" className="text-xs text-gray-600">
+                        기타 옵션 추가
+                      </Label>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        addOption();
+                        if (validationErrors.options) {
+                          setValidationErrors((prev) => ({ ...prev, options: "" }));
+                        }
+                      }}
+                      className="flex items-center space-x-1"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>옵션 추가</span>
+                    </Button>
+                  </div>
                 </div>
                 {validationErrors.options && (
                   <p className="text-red-500 text-sm">{validationErrors.options}</p>
@@ -388,7 +442,13 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                           onChange={(e) => updateOption(option.id, { label: e.target.value })}
                           placeholder={`옵션 ${index + 1}`}
                           className="border-none bg-transparent px-0 focus:bg-white focus:border focus:border-blue-200"
+                          disabled={option.id === OTHER_OPTION_ID}
                         />
+                        {option.id === OTHER_OPTION_ID && (
+                          <p className="text-xs text-blue-600 mt-1 px-0">
+                            🔹 기타 옵션 (자동 추가됨)
+                          </p>
+                        )}
                       </div>
 
                       <Button
@@ -397,6 +457,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                         size="sm"
                         onClick={() => removeOption(option.id)}
                         className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                        disabled={option.id === OTHER_OPTION_ID}
                       >
                         <X className="w-4 h-4" />
                       </Button>
@@ -410,6 +471,17 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                     <Button type="button" variant="outline" onClick={addOption}>
                       첫 번째 옵션 추가
                     </Button>
+                  </div>
+                )}
+
+                {formData.allowOtherOption && (
+                  <div className="p-3 bg-blue-50 rounded-lg">
+                    <p className="text-sm text-blue-700">
+                      <strong>💡 기타 옵션이 활성화되었습니다.</strong>
+                      <br />
+                      마지막에 &ldquo;기타&rdquo; 선택지가 자동으로 추가되어 사용자가 직접 텍스트를
+                      입력할 수 있습니다.
+                    </p>
                   </div>
                 )}
               </div>
@@ -659,16 +731,12 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
 
                 <DynamicTableEditor
                   tableTitle={formData.tableTitle}
-                  tableRowHeaderTitle={formData.tableRowHeaderTitle}
-                  tableHeaderCell={formData.tableHeaderCell}
                   columns={formData.tableColumns}
                   rows={formData.tableRowsData}
                   onTableChange={(data) => {
                     setFormData((prev) => ({
                       ...prev,
                       tableTitle: data.tableTitle,
-                      tableRowHeaderTitle: data.tableRowHeaderTitle,
-                      tableHeaderCell: data.tableHeaderCell,
                       tableColumns: data.tableColumns,
                       tableRowsData: data.tableRowsData,
                     }));
@@ -681,8 +749,6 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                     <Label className="text-base font-medium">미리보기</Label>
                     <TablePreview
                       tableTitle={formData.tableTitle}
-                      tableRowHeaderTitle={formData.tableRowHeaderTitle}
-                      tableHeaderCell={formData.tableHeaderCell}
                       columns={formData.tableColumns}
                       rows={formData.tableRowsData}
                       className="border-2 border-dashed border-gray-300"
