@@ -92,22 +92,22 @@ export const useSurveyResponseStore = create<SurveyResponseState>()(
             responses: state.responses.map((response) =>
               response.id === responseId
                 ? {
-                    ...response,
-                    questionResponses: {
-                      ...response.questionResponses,
-                      [questionId]: value
-                    }
+                  ...response,
+                  questionResponses: {
+                    ...response.questionResponses,
+                    [questionId]: value
                   }
+                }
                 : response
             ),
             currentResponse: state.currentResponse?.id === responseId
               ? {
-                  ...state.currentResponse,
-                  questionResponses: {
-                    ...state.currentResponse.questionResponses,
-                    [questionId]: value
-                  }
+                ...state.currentResponse,
+                questionResponses: {
+                  ...state.currentResponse.questionResponses,
+                  [questionId]: value
                 }
+              }
               : state.currentResponse
           }));
         },
@@ -117,18 +117,18 @@ export const useSurveyResponseStore = create<SurveyResponseState>()(
             responses: state.responses.map((response) =>
               response.id === responseId
                 ? {
-                    ...response,
-                    isCompleted: true,
-                    completedAt: new Date()
-                  }
+                  ...response,
+                  isCompleted: true,
+                  completedAt: new Date()
+                }
                 : response
             ),
             currentResponse: state.currentResponse?.id === responseId
               ? {
-                  ...state.currentResponse,
-                  isCompleted: true,
-                  completedAt: new Date()
-                }
+                ...state.currentResponse,
+                isCompleted: true,
+                completedAt: new Date()
+              }
               : state.currentResponse
           }));
 
@@ -219,9 +219,19 @@ export const useSurveyResponseStore = create<SurveyResponseState>()(
             // 다중 선택 또는 체크박스
             const allOptions = questionResponses.flat();
             const optionCounts: Record<string, number> = {};
+            const otherResponses: string[] = [];
 
             allOptions.forEach(option => {
-              optionCounts[option] = (optionCounts[option] || 0) + 1;
+              // 기타 옵션 처리
+              if (typeof option === 'object' && option?.hasOther) {
+                const otherLabel = option.otherValue ? `기타: ${option.otherValue}` : '기타';
+                optionCounts[otherLabel] = (optionCounts[otherLabel] || 0) + 1;
+                if (option.otherValue) {
+                  otherResponses.push(option.otherValue);
+                }
+              } else {
+                optionCounts[option] = (optionCounts[option] || 0) + 1;
+              }
             });
 
             return {
@@ -229,16 +239,46 @@ export const useSurveyResponseStore = create<SurveyResponseState>()(
               responseRate: (questionResponses.length / completedResponses.length) * 100,
               type: 'multiple',
               optionCounts,
+              otherResponses,
               responses: questionResponses
             };
           } else if (typeof firstResponse === 'object') {
-            // 테이블 응답
-            return {
-              totalResponses: questionResponses.length,
-              responseRate: (questionResponses.length / completedResponses.length) * 100,
-              type: 'table',
-              responses: questionResponses
-            };
+            // 기타 옵션을 포함한 단일 응답 또는 테이블 응답
+            if (firstResponse?.hasOther) {
+              // 기타 옵션이 있는 단일 응답 (라디오, select 등)
+              const responseCounts: Record<string, number> = {};
+              const otherResponses: string[] = [];
+
+              questionResponses.forEach(response => {
+                if (typeof response === 'object' && response?.hasOther) {
+                  const otherLabel = response.otherValue ? `기타: ${response.otherValue}` : '기타';
+                  responseCounts[otherLabel] = (responseCounts[otherLabel] || 0) + 1;
+                  if (response.otherValue) {
+                    otherResponses.push(response.otherValue);
+                  }
+                } else {
+                  const key = String(response.selectedValue || response);
+                  responseCounts[key] = (responseCounts[key] || 0) + 1;
+                }
+              });
+
+              return {
+                totalResponses: questionResponses.length,
+                responseRate: (questionResponses.length / completedResponses.length) * 100,
+                type: 'single',
+                responseCounts,
+                otherResponses,
+                responses: questionResponses
+              };
+            } else {
+              // 테이블 응답
+              return {
+                totalResponses: questionResponses.length,
+                responseRate: (questionResponses.length / completedResponses.length) * 100,
+                type: 'table',
+                responses: questionResponses
+              };
+            }
           } else {
             // 단일 응답 (텍스트, 라디오)
             const responseCounts: Record<string, number> = {};

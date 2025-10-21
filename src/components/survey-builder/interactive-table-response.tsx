@@ -83,6 +83,20 @@ export function InteractiveTableResponse({
     }
   };
 
+  // select 변경 핸들러
+  const handleSelectChange = (cellId: string, optionId: string) => {
+    const isOtherOption = optionId === "other-option";
+    if (isOtherOption) {
+      updateResponse(cellId, {
+        optionId,
+        otherValue: "",
+        hasOther: true,
+      });
+    } else {
+      updateResponse(cellId, optionId);
+    }
+  };
+
   // 기타 옵션 입력 변경 핸들러
   const handleOtherInputChange = (cellId: string, optionId: string, otherValue: string) => {
     const currentCellResponse = currentResponse[cellId];
@@ -249,6 +263,60 @@ export function InteractiveTableResponse({
           </div>
         );
 
+      case "select":
+        return cell.selectOptions && cell.selectOptions.length > 0 ? (
+          <div className="space-y-2">
+            <select
+              value={
+                typeof cellResponse === "object" && cellResponse?.optionId
+                  ? cellResponse.optionId
+                  : cellResponse || ""
+              }
+              onChange={(e) => handleSelectChange(cell.id, e.target.value)}
+              className="w-full p-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={!isTestMode}
+            >
+              <option value="">선택하세요...</option>
+              {cell.selectOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            {(() => {
+              const selectedValue =
+                typeof cellResponse === "object" && cellResponse?.optionId
+                  ? cellResponse.optionId
+                  : cellResponse;
+              const isOtherSelected = selectedValue === "other-option";
+              const otherValue =
+                typeof cellResponse === "object" && cellResponse?.otherValue
+                  ? cellResponse.otherValue
+                  : "";
+
+              return (
+                isOtherSelected && (
+                  <div>
+                    <Input
+                      placeholder="기타 내용 입력..."
+                      value={otherValue}
+                      onChange={(e) =>
+                        handleOtherInputChange(cell.id, "other-option", e.target.value)
+                      }
+                      className="text-xs h-8"
+                      disabled={!isTestMode}
+                    />
+                  </div>
+                )
+              );
+            })()}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 text-gray-500">
+            <span className="text-sm">선택 옵션 없음</span>
+          </div>
+        );
+
       case "image":
         return cell.imageUrl ? (
           <div className="flex flex-col items-center gap-2">
@@ -262,7 +330,7 @@ export function InteractiveTableResponse({
                 target.nextElementSibling!.classList.remove("hidden");
               }}
             />
-            <div className="hidden flex items-center gap-1 text-red-500 text-sm">
+            <div className="hidden items-center gap-1 text-red-500 text-sm">
               <Image className="w-4 h-4" />
               <span>이미지 오류</span>
             </div>
@@ -375,9 +443,6 @@ export function InteractiveTableResponse({
             {/* 헤더 */}
             <thead>
               <tr>
-                <th className="border border-gray-300 p-3 bg-gray-50 font-medium text-left min-w-[120px]">
-                  항목
-                </th>
                 {columns.map((column) => (
                   <th
                     key={column.id}
@@ -395,29 +460,22 @@ export function InteractiveTableResponse({
             <tbody>
               {rows.map((row, rowIndex) => (
                 <tr key={row.id} className="hover:bg-gray-50">
-                  {/* 행 제목 */}
-                  <td className="border border-gray-300 p-3 bg-gray-50 font-medium align-top">
-                    {row.label || <span className="text-gray-400 italic text-sm">(제목 없음)</span>}
-                  </td>
-
                   {/* 셀들 */}
-                  {row.cells.map((cell, cellIndex) => (
-                    <td key={cell.id} className="border border-gray-300 p-3 text-center align-top">
-                      {renderInteractiveCell(cell, rowIndex)}
-                    </td>
-                  ))}
+                  {row.cells.map((cell) => {
+                    // rowspan으로 숨겨진 셀은 렌더링하지 않음
+                    if (cell.isHidden) return null;
 
-                  {/* 빈 셀들 (열 수가 셀 수보다 많은 경우) */}
-                  {Array.from({ length: Math.max(0, columns.length - row.cells.length) }).map(
-                    (_, index) => (
+                    return (
                       <td
-                        key={`empty-${row.id}-${index}`}
-                        className="border border-gray-300 p-3 text-center"
+                        key={cell.id}
+                        className="border border-gray-300 p-3 text-center align-top"
+                        rowSpan={cell.rowspan || 1}
+                        colSpan={cell.colspan || 1}
                       >
-                        <span className="text-gray-400 text-sm">-</span>
+                        {renderInteractiveCell(cell, rowIndex)}
                       </td>
-                    ),
-                  )}
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>

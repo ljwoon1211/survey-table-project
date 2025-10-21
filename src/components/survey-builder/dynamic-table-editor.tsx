@@ -6,16 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TableCell, TableColumn, TableRow } from "@/types/survey";
-import {
-  Plus,
-  Trash2,
-  Edit3,
-  Image,
-  Video,
-  CheckSquare,
-  Circle,
-  GripVertical,
-} from "lucide-react";
+import { Plus, Trash2, Edit3, Image, Video, CheckSquare, Circle, GripVertical } from "lucide-react";
 import { CellContentModal } from "./cell-content-modal";
 
 interface DynamicTableEditorProps {
@@ -66,7 +57,6 @@ export function DynamicTableEditor({
     cellId: string;
   } | null>(null);
 
-
   // 드래그 리사이즈 관련 상태 (열)
   const [resizingColumn, setResizingColumn] = useState<{
     columnIndex: number;
@@ -84,11 +74,7 @@ export function DynamicTableEditor({
 
   // 변경 사항을 부모에게 전달
   const notifyChange = useCallback(
-    (
-      title: string,
-      cols: TableColumn[],
-      rowsData: TableRow[],
-    ) => {
+    (title: string, cols: TableColumn[], rowsData: TableRow[]) => {
       onTableChange({
         tableTitle: title,
         tableColumns: cols,
@@ -103,7 +89,6 @@ export function DynamicTableEditor({
     setCurrentTitle(title);
     notifyChange(title, currentColumns, currentRows);
   };
-
 
   // 열 너비 리사이즈 관련 함수들
   const handleColumnResizeStart = useCallback(
@@ -173,37 +158,17 @@ export function DynamicTableEditor({
     if (!resizingColumn) return;
 
     // 최종 상태를 부모에게 전달
-    notifyChange(
-      currentTitle,
-      currentColumns,
-      currentRows,
-    );
+    notifyChange(currentTitle, currentColumns, currentRows);
     setResizingColumn(null);
-  }, [
-    resizingColumn,
-    currentTitle,
-    currentColumns,
-    currentRows,
-    notifyChange,
-  ]);
+  }, [resizingColumn, currentTitle, currentColumns, currentRows, notifyChange]);
 
   const handleRowResizeEnd = useCallback(() => {
     if (!resizingRow) return;
 
     // 최종 상태를 부모에게 전달
-    notifyChange(
-      currentTitle,
-      currentColumns,
-      currentRows,
-    );
+    notifyChange(currentTitle, currentColumns, currentRows);
     setResizingRow(null);
-  }, [
-    resizingRow,
-    currentTitle,
-    currentColumns,
-    currentRows,
-    notifyChange,
-  ]);
+  }, [resizingRow, currentTitle, currentColumns, currentRows, notifyChange]);
 
   // 마우스 이벤트 리스너 등록/해제 (열 리사이즈)
   React.useEffect(() => {
@@ -265,11 +230,7 @@ export function DynamicTableEditor({
 
     setCurrentColumns(updatedColumns);
     setCurrentRows(updatedRows);
-    notifyChange(
-      currentTitle,
-      updatedColumns,
-      updatedRows,
-    );
+    notifyChange(currentTitle, updatedColumns, updatedRows);
   };
 
   // 열 삭제
@@ -286,11 +247,7 @@ export function DynamicTableEditor({
 
     setCurrentColumns(updatedColumns);
     setCurrentRows(updatedRows);
-    notifyChange(
-      currentTitle,
-      updatedColumns,
-      updatedRows,
-    );
+    notifyChange(currentTitle, updatedColumns, updatedRows);
   };
 
   // 열 제목 업데이트
@@ -300,11 +257,7 @@ export function DynamicTableEditor({
     );
 
     setCurrentColumns(updatedColumns);
-    notifyChange(
-      currentTitle,
-      updatedColumns,
-      currentRows,
-    );
+    notifyChange(currentTitle, updatedColumns, currentRows);
   };
 
   // 행 추가
@@ -323,11 +276,7 @@ export function DynamicTableEditor({
 
     const updatedRows = [...currentRows, newRow];
     setCurrentRows(updatedRows);
-    notifyChange(
-      currentTitle,
-      currentColumns,
-      updatedRows,
-    );
+    notifyChange(currentTitle, currentColumns, updatedRows);
   };
 
   // 행 삭제
@@ -336,11 +285,7 @@ export function DynamicTableEditor({
 
     const updatedRows = currentRows.filter((_, index) => index !== rowIndex);
     setCurrentRows(updatedRows);
-    notifyChange(
-      currentTitle,
-      currentColumns,
-      updatedRows,
-    );
+    notifyChange(currentTitle, currentColumns, updatedRows);
   };
 
   // 행 제목 업데이트
@@ -350,11 +295,7 @@ export function DynamicTableEditor({
     );
 
     setCurrentRows(updatedRows);
-    notifyChange(
-      currentTitle,
-      currentColumns,
-      updatedRows,
-    );
+    notifyChange(currentTitle, currentColumns, updatedRows);
   };
 
   // 셀 내용 업데이트
@@ -369,11 +310,7 @@ export function DynamicTableEditor({
     );
 
     setCurrentRows(updatedRows);
-    notifyChange(
-      currentTitle,
-      currentColumns,
-      updatedRows,
-    );
+    notifyChange(currentTitle, currentColumns, updatedRows);
     setSelectedCell(null);
   };
 
@@ -439,228 +376,226 @@ export function DynamicTableEditor({
       </div>
 
       {/* 테이블 정보 요약 */}
-          <Card>
-            <CardHeader>
-              <CardTitle>테이블 요약</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div className="bg-blue-50 p-3 rounded-lg">
-                  <div className="text-blue-600 font-medium">전체 크기</div>
-                  <div className="text-blue-900 text-lg font-bold">
-                    {currentRows.length} × {currentColumns.length}
-                  </div>
-                  <div className="text-blue-600 text-xs">행 × 열</div>
-                </div>
-                <div className="bg-green-50 p-3 rounded-lg">
-                  <div className="text-green-600 font-medium">총 셀 수</div>
-                  <div className="text-green-900 text-lg font-bold">
-                    {currentRows.length * currentColumns.length}
-                  </div>
-                  <div className="text-green-600 text-xs">개</div>
-                </div>
-                <div className="bg-purple-50 p-3 rounded-lg">
-                  <div className="text-purple-600 font-medium">인터랙티브 셀</div>
-                  <div className="text-purple-900 text-lg font-bold">
-                    {currentRows.reduce(
-                      (count, row) =>
-                        count +
-                        row.cells.filter(
-                          (cell) => cell.type === "checkbox" || cell.type === "radio",
-                        ).length,
-                      0,
-                    )}
-                  </div>
-                  <div className="text-purple-600 text-xs">개</div>
-                </div>
-                <div className="bg-orange-50 p-3 rounded-lg">
-                  <div className="text-orange-600 font-medium">미디어 셀</div>
-                  <div className="text-orange-900 text-lg font-bold">
-                    {currentRows.reduce(
-                      (count, row) =>
-                        count +
-                        row.cells.filter((cell) => cell.type === "image" || cell.type === "video")
-                          .length,
-                      0,
-                    )}
-                  </div>
-                  <div className="text-orange-600 text-xs">개</div>
-                </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>테이블 요약</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="bg-blue-50 p-3 rounded-lg">
+              <div className="text-blue-600 font-medium">전체 크기</div>
+              <div className="text-blue-900 text-lg font-bold">
+                {currentRows.length} × {currentColumns.length}
               </div>
-            </CardContent>
-          </Card>
+              <div className="text-blue-600 text-xs">행 × 열</div>
+            </div>
+            <div className="bg-green-50 p-3 rounded-lg">
+              <div className="text-green-600 font-medium">총 셀 수</div>
+              <div className="text-green-900 text-lg font-bold">
+                {currentRows.length * currentColumns.length}
+              </div>
+              <div className="text-green-600 text-xs">개</div>
+            </div>
+            <div className="bg-purple-50 p-3 rounded-lg">
+              <div className="text-purple-600 font-medium">인터랙티브 셀</div>
+              <div className="text-purple-900 text-lg font-bold">
+                {currentRows.reduce(
+                  (count, row) =>
+                    count +
+                    row.cells.filter((cell) => cell.type === "checkbox" || cell.type === "radio")
+                      .length,
+                  0,
+                )}
+              </div>
+              <div className="text-purple-600 text-xs">개</div>
+            </div>
+            <div className="bg-orange-50 p-3 rounded-lg">
+              <div className="text-orange-600 font-medium">미디어 셀</div>
+              <div className="text-orange-900 text-lg font-bold">
+                {currentRows.reduce(
+                  (count, row) =>
+                    count +
+                    row.cells.filter((cell) => cell.type === "image" || cell.type === "video")
+                      .length,
+                  0,
+                )}
+              </div>
+              <div className="text-orange-600 text-xs">개</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-          {/* 테이블 편집 영역 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>테이블 구조 편집</span>
-                <div className="flex gap-2">
-                  <Button onClick={addColumn} size="sm" variant="outline">
-                    <Plus className="w-4 h-4 mr-1" />열 추가
-                  </Button>
-                  <Button onClick={addRow} size="sm" variant="outline">
-                    <Plus className="w-4 h-4 mr-1" />행 추가
-                  </Button>
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table
-                  ref={tableRef}
-                  className="w-full border-collapse border border-gray-300"
-                  style={{ tableLayout: "fixed" }}
-                >
-                  {/* 헤더 행 */}
-                  <thead>
-                    <tr>
-                      {currentColumns.map((column, columnIndex) => (
-                        <th
-                          key={column.id}
-                          className="border border-gray-300 p-2 bg-gray-50 relative"
+      {/* 테이블 편집 영역 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>테이블 구조 편집</span>
+            <div className="flex gap-2">
+              <Button onClick={addColumn} size="sm" variant="outline">
+                <Plus className="w-4 h-4 mr-1" />열 추가
+              </Button>
+              <Button onClick={addRow} size="sm" variant="outline">
+                <Plus className="w-4 h-4 mr-1" />행 추가
+              </Button>
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table
+              ref={tableRef}
+              className="w-full border-collapse border border-gray-300"
+              style={{ tableLayout: "fixed" }}
+            >
+              {/* 헤더 행 */}
+              <thead>
+                <tr>
+                  {currentColumns.map((column, columnIndex) => (
+                    <th
+                      key={column.id}
+                      className="border border-gray-300 p-2 bg-gray-50 relative"
+                      style={{
+                        width: column.width ? `${column.width}px` : "150px",
+                        minWidth: column.minWidth ? `${column.minWidth}px` : "60px",
+                      }}
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={column.label}
+                            onChange={(e) => updateColumnLabel(columnIndex, e.target.value)}
+                            className="h-8 text-center border border-gray-200 bg-white text-sm"
+                            placeholder="열 제목 (비워둘 수 있음)"
+                          />
+                          {currentColumns.length > 1 && (
+                            <Button
+                              onClick={() => deleteColumn(columnIndex)}
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                          <span>열 #{columnIndex + 1}</span>
+                          <span>{column.width ? `${column.width}px` : "150px"}</span>
+                        </div>
+                      </div>
+
+                      {/* 열 너비 리사이즈 핸들 */}
+                      {columnIndex < currentColumns.length - 1 && (
+                        <div
+                          className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-blue-200 transition-colors group flex items-center justify-center"
+                          onMouseDown={(e) => handleColumnResizeStart(e, columnIndex)}
+                          title="드래그하여 열 너비 조절"
+                        >
+                          <GripVertical className="w-3 h-3 text-gray-400 group-hover:text-blue-600" />
+                        </div>
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+
+              {/* 데이터 행들 */}
+              <tbody>
+                {currentRows.map((row, rowIndex) => (
+                  <tr key={row.id} style={{ height: row.height ? `${row.height}px` : "60px" }}>
+                    {/* 셀들 */}
+                    {row.cells.map((cell, cellIndex) => {
+                      const column = currentColumns[cellIndex];
+                      return (
+                        <td
+                          key={cell.id}
+                          className="border border-gray-300 p-2 relative"
                           style={{
-                            width: column.width ? `${column.width}px` : "150px",
-                            minWidth: column.minWidth ? `${column.minWidth}px` : "60px",
+                            width: column?.width ? `${column.width}px` : "150px",
+                            maxWidth: column?.width ? `${column.width}px` : "150px",
+                            height: row.height ? `${row.height}px` : "60px",
                           }}
                         >
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <Input
-                                value={column.label}
-                                onChange={(e) => updateColumnLabel(columnIndex, e.target.value)}
-                                className="h-8 text-center border border-gray-200 bg-white text-sm"
-                                placeholder="열 제목 (비워둘 수 있음)"
-                              />
-                              {currentColumns.length > 1 && (
-                                <Button
-                                  onClick={() => deleteColumn(columnIndex)}
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
+                          <div
+                            className="h-full group cursor-pointer hover:bg-gray-50 rounded p-2 transition-colors flex flex-col"
+                            onClick={() => setSelectedCell({ rowId: row.id, cellId: cell.id })}
+                            style={{
+                              minHeight: row.minHeight ? `${row.minHeight - 16}px` : "40px",
+                            }}
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">{renderCellContent(cell)}</div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <Edit3 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                            <div className="text-xs text-gray-400 mt-1 border-t border-gray-100 pt-1">
+                              <div className="flex justify-between items-center">
+                                <span>
+                                  셀 ({rowIndex + 1}, {cellIndex + 1})
+                                </span>
+                                <span className="capitalize font-medium">{cell.type}</span>
+                              </div>
+                              {cell.type === "checkbox" && cell.checkboxOptions && (
+                                <div className="mt-1 text-green-600">
+                                  체크박스 {cell.checkboxOptions.length}개
+                                </div>
+                              )}
+                              {cell.type === "radio" && cell.radioOptions && (
+                                <div className="mt-1 text-purple-600">
+                                  라디오 {cell.radioOptions.length}개
+                                </div>
+                              )}
+                              {cell.type === "image" && cell.imageUrl && (
+                                <div className="mt-1 text-blue-600">이미지 설정됨</div>
+                              )}
+                              {cell.type === "video" && cell.videoUrl && (
+                                <div className="mt-1 text-red-600">비디오 설정됨</div>
                               )}
                             </div>
-                            <div className="flex items-center justify-between text-xs text-gray-500">
-                              <span>열 #{columnIndex + 1}</span>
-                              <span>{column.width ? `${column.width}px` : "150px"}</span>
-                            </div>
                           </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
 
-                          {/* 열 너비 리사이즈 핸들 */}
-                          {columnIndex < currentColumns.length - 1 && (
-                            <div
-                              className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-blue-200 transition-colors group flex items-center justify-center"
-                              onMouseDown={(e) => handleColumnResizeStart(e, columnIndex)}
-                              title="드래그하여 열 너비 조절"
-                            >
-                              <GripVertical className="w-3 h-3 text-gray-400 group-hover:text-blue-600" />
-                            </div>
-                          )}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-
-                  {/* 데이터 행들 */}
-                  <tbody>
-                    {currentRows.map((row, rowIndex) => (
-                      <tr key={row.id} style={{ height: row.height ? `${row.height}px` : "60px" }}>
-
-                        {/* 셀들 */}
-                        {row.cells.map((cell, cellIndex) => {
-                          const column = currentColumns[cellIndex];
-                          return (
-                            <td
-                              key={cell.id}
-                              className="border border-gray-300 p-2 relative"
-                              style={{
-                                width: column?.width ? `${column.width}px` : "150px",
-                                maxWidth: column?.width ? `${column.width}px` : "150px",
-                                height: row.height ? `${row.height}px` : "60px",
-                              }}
-                            >
-                              <div
-                                className="h-full group cursor-pointer hover:bg-gray-50 rounded p-2 transition-colors flex flex-col"
-                                onClick={() => setSelectedCell({ rowId: row.id, cellId: cell.id })}
-                                style={{
-                                  minHeight: row.minHeight ? `${row.minHeight - 16}px` : "40px",
-                                }}
-                              >
-                                <div className="flex items-start justify-between mb-2">
-                                  <div className="flex-1">{renderCellContent(cell)}</div>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  >
-                                    <Edit3 className="w-3 h-3" />
-                                  </Button>
-                                </div>
-                                <div className="text-xs text-gray-400 mt-1 border-t border-gray-100 pt-1">
-                                  <div className="flex justify-between items-center">
-                                    <span>
-                                      셀 ({rowIndex + 1}, {cellIndex + 1})
-                                    </span>
-                                    <span className="capitalize font-medium">{cell.type}</span>
-                                  </div>
-                                  {cell.type === "checkbox" && cell.checkboxOptions && (
-                                    <div className="mt-1 text-green-600">
-                                      체크박스 {cell.checkboxOptions.length}개
-                                    </div>
-                                  )}
-                                  {cell.type === "radio" && cell.radioOptions && (
-                                    <div className="mt-1 text-purple-600">
-                                      라디오 {cell.radioOptions.length}개
-                                    </div>
-                                  )}
-                                  {cell.type === "image" && cell.imageUrl && (
-                                    <div className="mt-1 text-blue-600">이미지 설정됨</div>
-                                  )}
-                                  {cell.type === "video" && cell.videoUrl && (
-                                    <div className="mt-1 text-red-600">비디오 설정됨</div>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 셀 내용 편집 모달 */}
-          {selectedCell && (
-            <CellContentModal
-              isOpen={!!selectedCell}
-              onClose={() => setSelectedCell(null)}
-              cell={
-                currentRows
-                  .find((row) => row.id === selectedCell.rowId)
-                  ?.cells.find((cell) => cell.id === selectedCell.cellId) || {
-                  id: "",
-                  content: "",
-                  type: "text",
-                }
-              }
-              onSave={(cell) => {
-                // 일반 셀 업데이트
-                const rowIndex = currentRows.findIndex((row) => row.id === selectedCell.rowId);
-                const cellIndex = currentRows[rowIndex]?.cells.findIndex(
-                  (c) => c.id === selectedCell.cellId,
-                );
-                if (rowIndex !== -1 && cellIndex !== -1) {
-                  updateCell(rowIndex, cellIndex, cell);
-                }
-              }}
-            />
-          )}
+      {/* 셀 내용 편집 모달 */}
+      {selectedCell && (
+        <CellContentModal
+          isOpen={!!selectedCell}
+          onClose={() => setSelectedCell(null)}
+          cell={
+            currentRows
+              .find((row) => row.id === selectedCell.rowId)
+              ?.cells.find((cell) => cell.id === selectedCell.cellId) || {
+              id: "",
+              content: "",
+              type: "text",
+            }
+          }
+          onSave={(cell) => {
+            // 일반 셀 업데이트
+            const rowIndex = currentRows.findIndex((row) => row.id === selectedCell.rowId);
+            const cellIndex = currentRows[rowIndex]?.cells.findIndex(
+              (c) => c.id === selectedCell.cellId,
+            );
+            if (rowIndex !== -1 && cellIndex !== -1) {
+              updateCell(rowIndex, cellIndex, cell);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

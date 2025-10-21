@@ -79,6 +79,22 @@ export function TablePreview({
           </div>
         );
 
+      case "select":
+        return cell.selectOptions && cell.selectOptions.length > 0 ? (
+          <select className="w-full p-2 text-sm border border-gray-300 rounded" disabled>
+            <option value="">선택하세요...</option>
+            {cell.selectOptions.map((option: any) => (
+              <option key={option.id} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="flex items-center gap-2 text-gray-500">
+            <span className="text-sm">선택 옵션 없음</span>
+          </div>
+        );
+
       case "image":
         return cell.imageUrl ? (
           <div className="flex flex-col items-center gap-2">
@@ -92,10 +108,13 @@ export function TablePreview({
                 target.nextElementSibling!.classList.remove("hidden");
               }}
             />
-            <div className="hidden flex items-center gap-1 text-red-500 text-sm">
+            <div className="hidden items-center gap-1 text-red-500 text-sm">
               <Image className="w-4 h-4" />
               <span>이미지 오류</span>
             </div>
+            {cell.content && (
+              <div className="text-sm text-gray-700 mt-2 text-center">{cell.content}</div>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-2 text-gray-500">
@@ -142,6 +161,9 @@ export function TablePreview({
                 <Video className="w-4 h-4" />
                 <span className="text-sm">동영상 링크 오류</span>
               </div>
+            )}
+            {cell.content && (
+              <div className="text-sm text-gray-700 mt-2 text-center">{cell.content}</div>
             )}
           </div>
         ) : (
@@ -201,26 +223,21 @@ export function TablePreview({
               {rows.map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50">
                   {/* 셀들 */}
-                  {row.cells.map((cell) => (
-                    <td
-                      key={cell.id}
-                      className="border border-gray-300 p-3 text-center align-middle"
-                    >
-                      {renderCellContent(cell)}
-                    </td>
-                  ))}
+                  {row.cells.map((cell) => {
+                    // rowspan으로 숨겨진 셀은 렌더링하지 않음
+                    if (cell.isHidden) return null;
 
-                  {/* 빈 셀들 (열 수가 셀 수보다 많은 경우) */}
-                  {Array.from({ length: Math.max(0, columns.length - row.cells.length) }).map(
-                    (_, index) => (
+                    return (
                       <td
-                        key={`empty-${row.id}-${index}`}
-                        className="border border-gray-300 p-3 text-center"
+                        key={cell.id}
+                        className="border border-gray-300 p-3 text-center align-middle"
+                        rowSpan={cell.rowspan || 1}
+                        colSpan={cell.colspan || 1}
                       >
-                        <span className="text-gray-400 text-sm">-</span>
+                        {renderCellContent(cell)}
                       </td>
-                    ),
-                  )}
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>

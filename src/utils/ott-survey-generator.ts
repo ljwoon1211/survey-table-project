@@ -33,10 +33,11 @@ const ottServices = [
 export function generateOTTSurvey(): Question {
   // 테이블 열 생성 (헤더)
   const columns: TableColumn[] = [
-    { id: 'category', label: '사업자 유형' },
-    { id: 'service', label: '온라인 동영상 제공 서비스' },
-    { id: 'usage', label: '이용 여부(V)' },
-    { id: 'payment', label: '월정액 또는 추가요금 유료(V) / 무료' }
+    { id: 'category', label: '사업자 유형', width: 150 },
+    { id: 'service', label: '온라인 동영상 제공 서비스', width: 200 },
+    { id: 'image', label: '이미지', width: 100 },
+    { id: 'usage', label: '이용 여부', width: 100 },
+    { id: 'payment', label: '월정액 또는 추가요금 여부', width: 180 }
   ];
 
   // 카테고리별로 그룹화
@@ -53,20 +54,37 @@ export function generateOTTSurvey(): Question {
   let serviceIndex = 1;
 
   Object.entries(servicesByCategory).forEach(([category, services]) => {
+    // 각 서비스 행 추가 (카테고리의 첫 행에만 사업자 유형 셀 표시)
     services.forEach((service, index) => {
       const rowId = `row-${serviceIndex}`;
+      const isFirstInCategory = index === 0;
 
-      // 카테고리 셀 (첫 번째 서비스에만 표시)
-      const categoryCell: TableCell = {
-        id: `${rowId}-category`,
-        content: index === 0 ? category : '',
+      // 사업자 유형 셀 (첫 행에만 rowspan 적용)
+      const categoryCell: TableCell = isFirstInCategory
+        ? {
+          id: `${rowId}-category`,
+          content: category.replace('공개 ', '국내 ').replace('사업자', '\n사업자'),
+          type: 'text',
+          rowspan: services.length, // 카테고리 내 서비스 수만큼 병합
+        }
+        : {
+          id: `${rowId}-category`,
+          content: '',
+          type: 'text',
+          isHidden: true, // rowspan에 의해 숨겨진 셀
+        };
+
+      // 서비스 이름 셀
+      const serviceNameCell: TableCell = {
+        id: `${rowId}-service`,
+        content: `${String.fromCharCode(9312 + serviceIndex - 1)} ${service.name}`,
         type: 'text'
       };
 
-      // 서비스 이름 + 로고 셀
-      const serviceCell: TableCell = {
-        id: `${rowId}-service`,
-        content: `${serviceIndex}. ${service.name}`,
+      // 이미지 셀
+      const imageCell: TableCell = {
+        id: `${rowId}-image`,
+        content: service.name,
         type: 'image',
         imageUrl: service.logoUrl
       };
@@ -94,15 +112,15 @@ export function generateOTTSurvey(): Question {
         radioGroupName: `payment-${serviceIndex}`,
         radioOptions: [
           {
-            id: `paid-${serviceIndex}`,
-            label: '유료',
-            value: 'paid',
-            selected: false
-          },
-          {
             id: `free-${serviceIndex}`,
             label: '무료',
             value: 'free',
+            selected: false
+          },
+          {
+            id: `paid-${serviceIndex}`,
+            label: '유료',
+            value: 'paid',
             selected: false
           }
         ]
@@ -111,7 +129,8 @@ export function generateOTTSurvey(): Question {
       rows.push({
         id: rowId,
         label: service.name,
-        cells: [categoryCell, serviceCell, usageCell, paymentCell]
+        height: 60,
+        cells: [categoryCell, serviceNameCell, imageCell, usageCell, paymentCell]
       });
 
       serviceIndex++;
@@ -123,6 +142,7 @@ export function generateOTTSurvey(): Question {
   const otherRow: TableRow = {
     id: otherRowId,
     label: '기타',
+    height: 60,
     cells: [
       {
         id: `${otherRowId}-category`,
@@ -131,7 +151,12 @@ export function generateOTTSurvey(): Question {
       },
       {
         id: `${otherRowId}-service`,
-        content: `${serviceIndex}. 기타 (                    )`,
+        content: `${String.fromCharCode(9312 + serviceIndex - 1)} 기타 (                    )`,
+        type: 'text'
+      },
+      {
+        id: `${otherRowId}-image`,
+        content: '',
         type: 'text'
       },
       {
@@ -154,15 +179,15 @@ export function generateOTTSurvey(): Question {
         radioGroupName: 'payment-other',
         radioOptions: [
           {
-            id: 'paid-other',
-            label: '유료',
-            value: 'paid',
+            id: 'free-other',
+            label: '무료',
+            value: 'free',
             selected: false
           },
           {
-            id: 'free-other',
-            label: 'free',
-            value: 'free',
+            id: 'paid-other',
+            label: '유료',
+            value: 'paid',
             selected: false
           }
         ]
@@ -189,16 +214,9 @@ export function generateOTTSurvey(): Question {
 }
 
 // OTT 설문지를 현재 설문에 추가하는 헬퍼 함수
-export function addOTTSurveyToBuilder(surveyBuilderStore: any) {
+export function addOTTSurveyToBuilder(addPreparedQuestion: (question: Question) => void) {
   const ottQuestion = generateOTTSurvey();
-
-  // 스토어의 현재 설문에 질문 추가
-  surveyBuilderStore.getState().currentSurvey.questions.push(ottQuestion);
-  surveyBuilderStore.getState().updateSurvey({
-    questions: [...surveyBuilderStore.getState().currentSurvey.questions],
-    updatedAt: new Date()
-  });
-
+  addPreparedQuestion(ottQuestion);
   return ottQuestion.id;
 }
 

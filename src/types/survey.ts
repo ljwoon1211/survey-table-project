@@ -19,12 +19,18 @@ export interface TableCell {
   content: string;
   imageUrl?: string;
   videoUrl?: string;
-  type: 'text' | 'image' | 'video' | 'checkbox' | 'radio';
+  type: 'text' | 'image' | 'video' | 'checkbox' | 'radio' | 'select';
   // 체크박스/라디오 버튼 관련 속성
   checkboxOptions?: CheckboxOption[];
   radioOptions?: RadioOption[];
   radioGroupName?: string; // 라디오 버튼 그룹명
+  // select 관련 속성
+  selectOptions?: QuestionOption[];
   allowOtherOption?: boolean; // 기타 옵션 허용 여부
+  // 셀 병합 관련 속성
+  rowspan?: number; // 행 병합 (세로)
+  colspan?: number; // 열 병합 (가로)
+  isHidden?: boolean; // rowspan/colspan으로 인해 숨겨진 셀인지 여부
 }
 
 export interface CheckboxOption {
