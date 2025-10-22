@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
+import { devtools, persist } from 'zustand/middleware';
 import { Survey, Question, QuestionType, SurveySettings, SelectLevel, TableColumn, TableRow } from '@/types/survey';
 
 interface SurveyBuilderState {
@@ -12,7 +12,7 @@ interface SurveyBuilderState {
   isTestMode: boolean; // 테스트 모드 (실제 응답 가능하지만 데이터 저장 안됨)
 
   // 테스트용 임시 응답 데이터
-  testResponses: Record<string, any>;
+  testResponses: Record<string, string | string[] | Record<string, string | string[] | object>>;
 
   // 액션들
   updateSurveyTitle: (title: string) => void;
@@ -29,7 +29,7 @@ interface SurveyBuilderState {
   toggleTestMode: () => void;
 
   // 테스트 응답 관리
-  updateTestResponse: (questionId: string, value: any) => void;
+  updateTestResponse: (questionId: string, value: string | string[] | Record<string, string | string[] | object>) => void;
   clearTestResponses: () => void;
 
   updateSurveySettings: (settings: Partial<SurveySettings>) => void;
@@ -59,158 +59,189 @@ const defaultSurvey: Survey = {
 
 export const useSurveyBuilderStore = create<SurveyBuilderState>()(
   devtools(
-    (set, get) => ({
-      currentSurvey: defaultSurvey,
-      selectedQuestionId: null,
-      isPreviewMode: false,
-      isTestMode: false,
-      testResponses: {},
+    persist(
+      (set, get) => ({
+        currentSurvey: defaultSurvey,
+        selectedQuestionId: null,
+        isPreviewMode: false,
+        isTestMode: false,
+        testResponses: {},
 
-      updateSurveyTitle: (title: string) =>
-        set((state) => ({
-          currentSurvey: {
-            ...state.currentSurvey,
-            title,
-            updatedAt: new Date()
-          }
-        })),
-
-      updateSurveyDescription: (description: string) =>
-        set((state) => ({
-          currentSurvey: {
-            ...state.currentSurvey,
-            description,
-            updatedAt: new Date()
-          }
-        })),
-
-      addQuestion: (type: QuestionType) => {
-        const newQuestion: Question = {
-          id: `question-${Date.now()}`,
-          type,
-          title: getDefaultQuestionTitle(type),
-          required: false,
-          order: get().currentSurvey.questions.length,
-          ...(needsOptions(type) && {
-            options: [
-              { id: `option-${Date.now()}-1`, label: '옵션 1', value: '옵션1' },
-              { id: `option-${Date.now()}-2`, label: '옵션 2', value: '옵션2' }
-            ]
-          }),
-          ...(needsSelectLevels(type) && { selectLevels: getDefaultSelectLevels() }),
-          ...(needsTableData(type) && {
-            tableTitle: '',
-            tableColumns: getDefaultTableColumns(),
-            tableRowsData: getDefaultTableRows()
-          })
-        };
-
-        set((state) => ({
-          currentSurvey: {
-            ...state.currentSurvey,
-            questions: [...state.currentSurvey.questions, newQuestion],
-            updatedAt: new Date()
-          },
-          selectedQuestionId: newQuestion.id
-        }));
-      },
-
-      addPreparedQuestion: (question: Question) => {
-        const questionWithOrder = {
-          ...question,
-          order: get().currentSurvey.questions.length
-        };
-
-        set((state) => ({
-          currentSurvey: {
-            ...state.currentSurvey,
-            questions: [...state.currentSurvey.questions, questionWithOrder],
-            updatedAt: new Date()
-          },
-          selectedQuestionId: question.id
-        }));
-      },
-
-      updateQuestion: (questionId: string, updates: Partial<Question>) =>
-        set((state) => ({
-          currentSurvey: {
-            ...state.currentSurvey,
-            questions: state.currentSurvey.questions.map((q) =>
-              q.id === questionId ? { ...q, ...updates } : q
-            ),
-            updatedAt: new Date()
-          }
-        })),
-
-      deleteQuestion: (questionId: string) =>
-        set((state) => ({
-          currentSurvey: {
-            ...state.currentSurvey,
-            questions: state.currentSurvey.questions.filter((q) => q.id !== questionId),
-            updatedAt: new Date()
-          },
-          selectedQuestionId: state.selectedQuestionId === questionId ? null : state.selectedQuestionId
-        })),
-
-      reorderQuestions: (questionIds: string[]) =>
-        set((state) => {
-          const questionsMap = new Map(state.currentSurvey.questions.map(q => [q.id, q]));
-          const reorderedQuestions = questionIds
-            .map(id => questionsMap.get(id))
-            .filter((q): q is Question => q !== undefined)
-            .map((q, index) => ({ ...q, order: index }));
-
-          return {
+        updateSurveyTitle: (title: string) =>
+          set((state) => ({
             currentSurvey: {
               ...state.currentSurvey,
-              questions: reorderedQuestions,
+              title,
               updatedAt: new Date()
             }
+          })),
+
+        updateSurveyDescription: (description: string) =>
+          set((state) => ({
+            currentSurvey: {
+              ...state.currentSurvey,
+              description,
+              updatedAt: new Date()
+            }
+          })),
+
+        addQuestion: (type: QuestionType) => {
+          const newQuestion: Question = {
+            id: `question-${Date.now()}`,
+            type,
+            title: getDefaultQuestionTitle(type),
+            required: false,
+            order: get().currentSurvey.questions.length,
+            ...(needsOptions(type) && {
+              options: [
+                { id: `option-${Date.now()}-1`, label: '옵션 1', value: '옵션1' },
+                { id: `option-${Date.now()}-2`, label: '옵션 2', value: '옵션2' }
+              ]
+            }),
+            ...(needsSelectLevels(type) && { selectLevels: getDefaultSelectLevels() }),
+            ...(needsTableData(type) && {
+              tableTitle: '',
+              tableColumns: getDefaultTableColumns(),
+              tableRowsData: getDefaultTableRows()
+            })
           };
+
+          set((state) => ({
+            currentSurvey: {
+              ...state.currentSurvey,
+              questions: [...state.currentSurvey.questions, newQuestion],
+              updatedAt: new Date()
+            },
+            selectedQuestionId: newQuestion.id
+          }));
+        },
+
+        addPreparedQuestion: (question: Question) => {
+          const questionWithOrder = {
+            ...question,
+            order: get().currentSurvey.questions.length
+          };
+
+          set((state) => ({
+            currentSurvey: {
+              ...state.currentSurvey,
+              questions: [...state.currentSurvey.questions, questionWithOrder],
+              updatedAt: new Date()
+            },
+            selectedQuestionId: question.id
+          }));
+        },
+
+        updateQuestion: (questionId: string, updates: Partial<Question>) =>
+          set((state) => ({
+            currentSurvey: {
+              ...state.currentSurvey,
+              questions: state.currentSurvey.questions.map((q) =>
+                q.id === questionId ? { ...q, ...updates } : q
+              ),
+              updatedAt: new Date()
+            }
+          })),
+
+        deleteQuestion: (questionId: string) =>
+          set((state) => ({
+            currentSurvey: {
+              ...state.currentSurvey,
+              questions: state.currentSurvey.questions.filter((q) => q.id !== questionId),
+              updatedAt: new Date()
+            },
+            selectedQuestionId: state.selectedQuestionId === questionId ? null : state.selectedQuestionId
+          })),
+
+        reorderQuestions: (questionIds: string[]) =>
+          set((state) => {
+            const questionsMap = new Map(state.currentSurvey.questions.map(q => [q.id, q]));
+            const reorderedQuestions = questionIds
+              .map(id => questionsMap.get(id))
+              .filter((q): q is Question => q !== undefined)
+              .map((q, index) => ({ ...q, order: index }));
+
+            return {
+              currentSurvey: {
+                ...state.currentSurvey,
+                questions: reorderedQuestions,
+                updatedAt: new Date()
+              }
+            };
+          }),
+
+        selectQuestion: (questionId: string | null) =>
+          set(() => ({ selectedQuestionId: questionId })),
+
+        togglePreviewMode: () =>
+          set((state) => ({ isPreviewMode: !state.isPreviewMode })),
+
+        toggleTestMode: () =>
+          set((state) => ({
+            isTestMode: !state.isTestMode,
+            // 테스트 모드 끌 때 응답 데이터 초기화
+            ...(state.isTestMode && { testResponses: {} })
+          })),
+
+        updateTestResponse: (questionId: string, value: string | string[] | Record<string, string | string[] | object>) =>
+          set((state) => ({
+            testResponses: {
+              ...state.testResponses,
+              [questionId]: value
+            }
+          })),
+
+        clearTestResponses: () =>
+          set(() => ({ testResponses: {} })),
+
+        updateSurveySettings: (settings: Partial<SurveySettings>) =>
+          set((state) => ({
+            currentSurvey: {
+              ...state.currentSurvey,
+              settings: { ...state.currentSurvey.settings, ...settings },
+              updatedAt: new Date()
+            }
+          })),
+
+        resetSurvey: () =>
+          set(() => ({
+            currentSurvey: { ...defaultSurvey, id: `survey-${Date.now()}` },
+            selectedQuestionId: null,
+            isPreviewMode: false,
+            isTestMode: false,
+            testResponses: {}
+          }))
+      }),
+      {
+        name: 'survey-builder-storage',
+        // 현재 설문만 저장 (UI 상태는 제외)
+        partialize: (state) => ({
+          currentSurvey: state.currentSurvey,
         }),
-
-      selectQuestion: (questionId: string | null) =>
-        set(() => ({ selectedQuestionId: questionId })),
-
-      togglePreviewMode: () =>
-        set((state) => ({ isPreviewMode: !state.isPreviewMode })),
-
-      toggleTestMode: () =>
-        set((state) => ({
-          isTestMode: !state.isTestMode,
-          // 테스트 모드 끌 때 응답 데이터 초기화
-          ...(state.isTestMode && { testResponses: {} })
-        })),
-
-      updateTestResponse: (questionId: string, value: any) =>
-        set((state) => ({
-          testResponses: {
-            ...state.testResponses,
-            [questionId]: value
-          }
-        })),
-
-      clearTestResponses: () =>
-        set(() => ({ testResponses: {} })),
-
-      updateSurveySettings: (settings: Partial<SurveySettings>) =>
-        set((state) => ({
-          currentSurvey: {
-            ...state.currentSurvey,
-            settings: { ...state.currentSurvey.settings, ...settings },
-            updatedAt: new Date()
-          }
-        })),
-
-      resetSurvey: () =>
-        set(() => ({
-          currentSurvey: { ...defaultSurvey, id: `survey-${Date.now()}` },
-          selectedQuestionId: null,
-          isPreviewMode: false,
-          isTestMode: false,
-          testResponses: {}
-        }))
-    }),
+        // Date 객체 직렬화/역직렬화 처리
+        storage: {
+          getItem: (name) => {
+            const str = localStorage.getItem(name);
+            if (!str) return null;
+            const { state } = JSON.parse(str);
+            return {
+              state: {
+                ...state,
+                currentSurvey: state.currentSurvey ? {
+                  ...state.currentSurvey,
+                  createdAt: new Date(state.currentSurvey.createdAt),
+                  updatedAt: new Date(state.currentSurvey.updatedAt),
+                } : state.currentSurvey,
+              },
+            };
+          },
+          setItem: (name, value) => {
+            localStorage.setItem(name, JSON.stringify(value));
+          },
+          removeItem: (name) => localStorage.removeItem(name),
+        },
+      }
+    ),
     {
       name: 'survey-builder-store'
     }
@@ -224,7 +255,7 @@ function getDefaultQuestionTitle(type: QuestionType): string {
     radio: '단일 선택 질문',
     checkbox: '다중 선택 질문',
     select: '드롭다운 질문',
-    multiselect: '다단계 선택 질문',
+    multiselect: '다중 드롭다운 질문',
     table: '테이블 질문'
   };
   return titles[type];

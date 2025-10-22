@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
+import { useSurveyListStore } from "@/stores/survey-list-store";
 import { SortableQuestionList } from "@/components/survey-builder/sortable-question-list";
 import { generateOTTSurvey } from "@/utils/ott-survey-generator";
 import {
@@ -23,6 +24,9 @@ import {
   PlayCircle,
   Tv,
   Sparkles,
+  FolderOpen,
+  Check,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -66,7 +70,7 @@ const questionTypes = [
     type: "multiselect" as const,
     label: "다단계선택",
     icon: List,
-    description: "시/도/구 연동 드롭다운",
+    description: "다중 드롭다운",
     color: "bg-teal-100 text-teal-600",
   },
   {
@@ -92,9 +96,14 @@ export default function CreateSurveyPage() {
     togglePreviewMode,
     toggleTestMode,
     updateSurveySettings,
+    resetSurvey,
   } = useSurveyBuilderStore();
 
+  const { surveys, saveSurvey, getSurveyById, deleteSurvey } = useSurveyListStore();
+
   const [titleInput, setTitleInput] = useState(currentSurvey.title);
+  const [showSavedSurveys, setShowSavedSurveys] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
 
   // OTT 설문지 예제 추가 함수
   const handleAddOTTSurvey = () => {
@@ -108,6 +117,37 @@ export default function CreateSurveyPage() {
 
     // 질문을 현재 설문에 추가
     addPreparedQuestion(ottQuestion);
+  };
+
+  // 설문 저장
+  const handleSaveSurvey = () => {
+    // ID가 없으면 새로 생성
+    const surveyToSave = currentSurvey.id
+      ? currentSurvey
+      : { ...currentSurvey, id: `survey-${Date.now()}` };
+
+    saveSurvey(surveyToSave);
+    setSaveMessage("저장되었습니다!");
+
+    setTimeout(() => setSaveMessage(""), 2000);
+  };
+
+  // 설문 불러오기
+  const handleLoadSurvey = (surveyId: string) => {
+    const survey = getSurveyById(surveyId);
+    if (survey) {
+      useSurveyBuilderStore.setState({ currentSurvey: survey });
+      setTitleInput(survey.title);
+      setShowSavedSurveys(false);
+    }
+  };
+
+  // 새 설문 시작
+  const handleNewSurvey = () => {
+    if (confirm("현재 작업 중인 설문을 저장하지 않고 새로 시작하시겠습니까?")) {
+      resetSurvey();
+      setTitleInput("새 설문조사");
+    }
   };
 
   return (
@@ -135,6 +175,65 @@ export default function CreateSurveyPage() {
           </div>
 
           <div className="flex items-center space-x-3">
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSavedSurveys(!showSavedSurveys)}
+              >
+                <FolderOpen className="w-4 h-4 mr-2" />
+                불러오기
+                {surveys.length > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-600 rounded-full">
+                    {surveys.length}
+                  </span>
+                )}
+              </Button>
+
+              {showSavedSurveys && surveys.length > 0 && (
+                <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                  <div className="p-3 border-b border-gray-200 flex items-center justify-between">
+                    <h4 className="font-medium text-sm">저장된 설문</h4>
+                    <Button size="sm" variant="ghost" onClick={handleNewSurvey} className="text-xs">
+                      <Plus className="w-3 h-3 mr-1" />새 설문
+                    </Button>
+                  </div>
+                  <div className="max-h-96 overflow-y-auto">
+                    {surveys.map((survey) => (
+                      <div
+                        key={survey.id}
+                        className="p-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 flex items-start justify-between group"
+                      >
+                        <button
+                          onClick={() => handleLoadSurvey(survey.id)}
+                          className="flex-1 text-left"
+                        >
+                          <h5 className="font-medium text-sm text-gray-900">{survey.title}</h5>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {survey.questions.length}개 질문 •{" "}
+                            {new Date(survey.updatedAt).toLocaleDateString()}
+                          </p>
+                        </button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm("이 설문을 삭제하시겠습니까?")) {
+                              deleteSurvey(survey.id);
+                            }
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Trash2 className="w-3 h-3 text-red-500" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <Button variant="outline" size="sm" onClick={togglePreviewMode}>
               <Eye className="w-4 h-4 mr-2" />
               {isPreviewMode ? "편집" : "미리보기"}
@@ -148,9 +247,15 @@ export default function CreateSurveyPage() {
               <PlayCircle className="w-4 h-4 mr-2" />
               {isTestMode ? "테스트 중" : "테스트"}
             </Button>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleSaveSurvey} className="relative">
               <Save className="w-4 h-4 mr-2" />
               저장
+              {saveMessage && (
+                <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-green-600 text-white text-xs rounded whitespace-nowrap">
+                  <Check className="w-3 h-3 inline mr-1" />
+                  {saveMessage}
+                </span>
+              )}
             </Button>
             <Button size="sm">
               <Share2 className="w-4 h-4 mr-2" />

@@ -442,11 +442,10 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                           onChange={(e) => updateOption(option.id, { label: e.target.value })}
                           placeholder={`옵션 ${index + 1}`}
                           className="border-none bg-transparent px-0 focus:bg-white focus:border focus:border-blue-200"
-                          disabled={option.id === OTHER_OPTION_ID}
                         />
                         {option.id === OTHER_OPTION_ID && (
                           <p className="text-xs text-blue-600 mt-1 px-0">
-                            🔹 기타 옵션 (자동 추가됨)
+                            🔹 기타 옵션 (수정 가능)
                           </p>
                         )}
                       </div>
@@ -457,7 +456,6 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                         size="sm"
                         onClick={() => removeOption(option.id)}
                         className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                        disabled={option.id === OTHER_OPTION_ID}
                       >
                         <X className="w-4 h-4" />
                       </Button>

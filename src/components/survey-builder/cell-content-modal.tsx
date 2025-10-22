@@ -372,7 +372,6 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
                         setCheckboxOptions(updated);
                       }}
                       className="rounded"
-                      disabled={option.id === OTHER_OPTION_ID}
                     />
                     <div className="flex-1">
                       <Input
@@ -383,10 +382,9 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
                           setCheckboxOptions(updated);
                         }}
                         placeholder="옵션 텍스트"
-                        disabled={option.id === OTHER_OPTION_ID}
                       />
                       {option.id === OTHER_OPTION_ID && (
-                        <p className="text-xs text-blue-600 mt-1">🔹 기타 옵션 자동 추가됨</p>
+                        <p className="text-xs text-blue-600 mt-1">🔹 기타 옵션 (수정 가능)</p>
                       )}
                     </div>
                     <Button
@@ -397,7 +395,6 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
                         setCheckboxOptions((prev) => prev.filter((_, i) => i !== index));
                       }}
                       className="text-red-500 hover:text-red-700"
-                      disabled={option.id === OTHER_OPTION_ID}
                     >
                       삭제
                     </Button>
@@ -501,7 +498,6 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
                           setRadioOptions(updated);
                         }
                       }}
-                      disabled={option.id === OTHER_OPTION_ID}
                     />
                     <div className="flex-1">
                       <Input
@@ -512,10 +508,9 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
                           setRadioOptions(updated);
                         }}
                         placeholder="옵션 텍스트"
-                        disabled={option.id === OTHER_OPTION_ID}
                       />
                       {option.id === OTHER_OPTION_ID && (
-                        <p className="text-xs text-blue-600 mt-1">🔹 기타 옵션 자동 추가됨</p>
+                        <p className="text-xs text-blue-600 mt-1">🔹 기타 옵션 (수정 가능)</p>
                       )}
                     </div>
                     <Button
@@ -526,7 +521,6 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
                         setRadioOptions((prev) => prev.filter((_, i) => i !== index));
                       }}
                       className="text-red-500 hover:text-red-700"
-                      disabled={option.id === OTHER_OPTION_ID}
                     >
                       삭제
                     </Button>
@@ -617,10 +611,9 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
                           setSelectOptions(updated);
                         }}
                         placeholder="옵션 텍스트"
-                        disabled={option.id === OTHER_OPTION_ID}
                       />
                       {option.id === OTHER_OPTION_ID && (
-                        <p className="text-xs text-blue-600 mt-1">🔹 기타 옵션 자동 추가됨</p>
+                        <p className="text-xs text-blue-600 mt-1">🔹 기타 옵션 (수정 가능)</p>
                       )}
                     </div>
                     <Button
@@ -631,7 +624,6 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
                         setSelectOptions((prev) => prev.filter((_, i) => i !== index));
                       }}
                       className="text-red-500 hover:text-red-700"
-                      disabled={option.id === OTHER_OPTION_ID}
                     >
                       삭제
                     </Button>

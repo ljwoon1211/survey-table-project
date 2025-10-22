@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TableCell, TableColumn, TableRow } from "@/types/survey";
-import { Plus, Trash2, Edit3, Image, Video, CheckSquare, Circle, GripVertical } from "lucide-react";
+import { Plus, Trash2, Edit3, Image, Video, CheckSquare, Circle } from "lucide-react";
 import { CellContentModal } from "./cell-content-modal";
 
 interface DynamicTableEditorProps {
@@ -57,13 +57,6 @@ export function DynamicTableEditor({
     cellId: string;
   } | null>(null);
 
-  // 드래그 리사이즈 관련 상태 (열)
-  const [resizingColumn, setResizingColumn] = useState<{
-    columnIndex: number;
-    startX: number;
-    startWidth: number;
-  } | null>(null);
-
   // 드래그 리사이즈 관련 상태 (행)
   const [resizingRow, setResizingRow] = useState<{
     rowIndex: number;
@@ -71,6 +64,12 @@ export function DynamicTableEditor({
     startHeight: number;
   } | null>(null);
   const tableRef = useRef<HTMLTableElement>(null);
+
+  // 열 너비 편집 상태
+  const [editingColumnWidth, setEditingColumnWidth] = useState<{
+    columnIndex: number;
+    value: string;
+  } | null>(null);
 
   // 변경 사항을 부모에게 전달
   const notifyChange = useCallback(
@@ -90,20 +89,17 @@ export function DynamicTableEditor({
     notifyChange(title, currentColumns, currentRows);
   };
 
-  // 열 너비 리사이즈 관련 함수들
-  const handleColumnResizeStart = useCallback(
-    (e: React.MouseEvent, columnIndex: number) => {
-      e.preventDefault();
-      e.stopPropagation();
+  // 열 너비 직접 입력 관련 함수들
+  const handleColumnWidthChange = useCallback(
+    (columnIndex: number, width: number) => {
+      const updatedColumns = currentColumns.map((col, index) =>
+        index === columnIndex ? { ...col, width: Math.max(60, width) } : col,
+      );
 
-      const currentWidth = currentColumns[columnIndex].width || 150;
-      setResizingColumn({
-        columnIndex,
-        startX: e.clientX,
-        startWidth: currentWidth,
-      });
+      setCurrentColumns(updatedColumns);
+      notifyChange(currentTitle, updatedColumns, currentRows);
     },
-    [currentColumns],
+    [currentColumns, currentTitle, currentRows, notifyChange],
   );
 
   // 행 높이 리사이즈 관련 함수들
@@ -122,22 +118,6 @@ export function DynamicTableEditor({
     [currentRows],
   );
 
-  const handleColumnResizeMove = useCallback(
-    (e: MouseEvent) => {
-      if (!resizingColumn) return;
-
-      const deltaX = e.clientX - resizingColumn.startX;
-      const newWidth = Math.max(60, resizingColumn.startWidth + deltaX); // 최소 너비 60px
-
-      const updatedColumns = currentColumns.map((col, index) =>
-        index === resizingColumn.columnIndex ? { ...col, width: newWidth } : col,
-      );
-
-      setCurrentColumns(updatedColumns);
-    },
-    [resizingColumn, currentColumns],
-  );
-
   const handleRowResizeMove = useCallback(
     (e: MouseEvent) => {
       if (!resizingRow) return;
@@ -154,14 +134,6 @@ export function DynamicTableEditor({
     [resizingRow, currentRows],
   );
 
-  const handleColumnResizeEnd = useCallback(() => {
-    if (!resizingColumn) return;
-
-    // 최종 상태를 부모에게 전달
-    notifyChange(currentTitle, currentColumns, currentRows);
-    setResizingColumn(null);
-  }, [resizingColumn, currentTitle, currentColumns, currentRows, notifyChange]);
-
   const handleRowResizeEnd = useCallback(() => {
     if (!resizingRow) return;
 
@@ -169,23 +141,6 @@ export function DynamicTableEditor({
     notifyChange(currentTitle, currentColumns, currentRows);
     setResizingRow(null);
   }, [resizingRow, currentTitle, currentColumns, currentRows, notifyChange]);
-
-  // 마우스 이벤트 리스너 등록/해제 (열 리사이즈)
-  React.useEffect(() => {
-    if (resizingColumn) {
-      document.addEventListener("mousemove", handleColumnResizeMove);
-      document.addEventListener("mouseup", handleColumnResizeEnd);
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
-
-      return () => {
-        document.removeEventListener("mousemove", handleColumnResizeMove);
-        document.removeEventListener("mouseup", handleColumnResizeEnd);
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-      };
-    }
-  }, [resizingColumn, handleColumnResizeMove, handleColumnResizeEnd]);
 
   // 마우스 이벤트 리스너 등록/해제 (행 리사이즈)
   React.useEffect(() => {
@@ -448,6 +403,13 @@ export function DynamicTableEditor({
               className="w-full border-collapse border border-gray-300"
               style={{ tableLayout: "fixed" }}
             >
+              {/* 열 너비 정의 */}
+              <colgroup>
+                {currentColumns.map((column, index) => (
+                  <col key={`col-${index}`} style={{ width: `${column.width || 150}px` }} />
+                ))}
+              </colgroup>
+
               {/* 헤더 행 */}
               <thead>
                 <tr>
@@ -481,20 +443,57 @@ export function DynamicTableEditor({
                         </div>
                         <div className="flex items-center justify-between text-xs text-gray-500">
                           <span>열 #{columnIndex + 1}</span>
-                          <span>{column.width ? `${column.width}px` : "150px"}</span>
+                          {editingColumnWidth?.columnIndex === columnIndex ? (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                type="number"
+                                min={60}
+                                value={editingColumnWidth.value}
+                                onChange={(e) => {
+                                  setEditingColumnWidth({
+                                    columnIndex,
+                                    value: e.target.value,
+                                  });
+                                }}
+                                onBlur={() => {
+                                  const width = parseInt(editingColumnWidth.value);
+                                  if (!isNaN(width) && width >= 60) {
+                                    handleColumnWidthChange(columnIndex, width);
+                                  }
+                                  setEditingColumnWidth(null);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    const width = parseInt(editingColumnWidth.value);
+                                    if (!isNaN(width) && width >= 60) {
+                                      handleColumnWidthChange(columnIndex, width);
+                                    }
+                                    setEditingColumnWidth(null);
+                                  } else if (e.key === "Escape") {
+                                    setEditingColumnWidth(null);
+                                  }
+                                }}
+                                className="w-14 h-5 px-1 text-xs"
+                                autoFocus
+                              />
+                              <span>px</span>
+                            </div>
+                          ) : (
+                            <span
+                              className="cursor-pointer hover:text-blue-600 hover:underline"
+                              onClick={() => {
+                                setEditingColumnWidth({
+                                  columnIndex,
+                                  value: String(column.width || 150),
+                                });
+                              }}
+                              title="클릭하여 너비 변경"
+                            >
+                              {column.width ? `${column.width}px` : "150px"}
+                            </span>
+                          )}
                         </div>
                       </div>
-
-                      {/* 열 너비 리사이즈 핸들 */}
-                      {columnIndex < currentColumns.length - 1 && (
-                        <div
-                          className="absolute right-0 top-0 bottom-0 w-2 cursor-col-resize hover:bg-blue-200 transition-colors group flex items-center justify-center"
-                          onMouseDown={(e) => handleColumnResizeStart(e, columnIndex)}
-                          title="드래그하여 열 너비 조절"
-                        >
-                          <GripVertical className="w-3 h-3 text-gray-400 group-hover:text-blue-600" />
-                        </div>
-                      )}
                     </th>
                   ))}
                 </tr>

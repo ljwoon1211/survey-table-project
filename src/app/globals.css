@@ -1,18 +1,18 @@
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
 @import "tailwindcss";
 
 :root {
   --background: #ffffff;
   --foreground: #1c1c1e;
-  --primary: #007AFF;
-  --secondary: #8E8E93;
-  --border: #E5E5EA;
+  --primary: #007aff;
+  --secondary: #8e8e93;
+  --border: #e5e5ea;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-sans: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: var(--font-geist-mono);
 }
 
@@ -26,7 +26,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-feature-settings: "rlig" 1, "calt" 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -56,7 +56,7 @@ html {
 
 /* 그라디언트 텍스트 */
 .gradient-text {
-  background: linear-gradient(135deg, #007AFF 0%, #0056CC 100%);
+  background: linear-gradient(135deg, #007aff 0%, #0056cc 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;

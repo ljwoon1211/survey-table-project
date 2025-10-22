@@ -1,10 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { TableColumn, TableRow, TableCell } from "@/types/survey";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Image, Video, FileText } from "lucide-react";
+import { Image, Video, FileText, ChevronRight, ChevronLeft, CheckCircle2 } from "lucide-react";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
 
 interface InteractiveTableResponseProps {
@@ -25,9 +25,60 @@ export function InteractiveTableResponse({
   isTestMode = false,
 }: InteractiveTableResponseProps) {
   const { updateTestResponse, testResponses } = useSurveyBuilderStore();
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const [showLeftShadow, setShowLeftShadow] = useState(false);
+  const [showRightShadow, setShowRightShadow] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // 현재 질문의 응답 데이터 가져오기
   const currentResponse = testResponses[questionId] || {};
+
+  // 모바일 여부 확인
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // 스크롤 인디케이터 업데이트
+  useEffect(() => {
+    const handleScroll = () => {
+      if (tableContainerRef.current) {
+        const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current;
+        setShowLeftShadow(scrollLeft > 0);
+        setShowRightShadow(scrollLeft < scrollWidth - clientWidth - 1);
+      }
+    };
+
+    const container = tableContainerRef.current;
+    if (container) {
+      handleScroll();
+      container.addEventListener("scroll", handleScroll);
+      return () => container.removeEventListener("scroll", handleScroll);
+    }
+  }, []);
+
+  // 행이 완료되었는지 확인
+  const isRowCompleted = (row: TableRow) => {
+    return row.cells.every((cell) => {
+      if (
+        cell.type === "text" ||
+        cell.type === "checkbox" ||
+        cell.type === "radio" ||
+        cell.type === "select"
+      ) {
+        return (
+          currentResponse[cell.id] !== undefined &&
+          currentResponse[cell.id] !== null &&
+          currentResponse[cell.id] !== ""
+        );
+      }
+      return true; // 다른 타입은 완료로 간주
+    });
+  };
 
   // 응답 업데이트 함수
   const updateResponse = (cellId: string, value: string | string[] | object) => {
@@ -430,23 +481,95 @@ export function InteractiveTableResponse({
     return url;
   };
 
-  return (
-    <Card className={className}>
-      {tableTitle && (
-        <CardHeader>
-          <CardTitle className="text-lg font-medium">{tableTitle}</CardTitle>
-        </CardHeader>
-      )}
-      <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse border border-gray-300 text-sm">
+  // 모바일 카드 뷰 렌더링
+  const renderMobileCardView = () => {
+    return (
+      <div className="space-y-4">
+        {rows.map((row, rowIndex) => {
+          const completed = isRowCompleted(row);
+          return (
+            <Card key={row.id} className={`${completed ? "border-green-500 border-2" : ""}`}>
+              <CardContent className="p-4 space-y-3">
+                {completed && (
+                  <div className="flex items-center gap-2 text-green-600 text-sm font-medium mb-2">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>완료</span>
+                  </div>
+                )}
+                {row.cells.map((cell, cellIndex) => {
+                  if (cell.isHidden) return null;
+                  const columnLabel = columns[cellIndex]?.label || `열 ${cellIndex + 1}`;
+                  return (
+                    <div key={cell.id} className="space-y-1">
+                      <div className="text-sm font-medium text-gray-700">{columnLabel}</div>
+                      <div className="pl-2">{renderInteractiveCell(cell, rowIndex)}</div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // 데스크톱 테이블 뷰 렌더링
+  const renderDesktopTableView = () => {
+    return (
+      <div className="relative">
+        {/* 스크롤 힌트 */}
+        {showRightShadow && (
+          <div className="absolute top-0 right-0 h-full w-20 bg-gradient-to-l from-white via-white/80 to-transparent pointer-events-none z-10 flex items-center justify-end pr-2">
+            <div className="bg-blue-500 text-white px-2 py-1 rounded-full shadow-lg animate-pulse">
+              <ChevronRight className="w-4 h-4" />
+            </div>
+          </div>
+        )}
+        {showLeftShadow && (
+          <div className="absolute top-0 left-0 h-full w-20 bg-gradient-to-r from-white via-white/80 to-transparent pointer-events-none z-10 flex items-center justify-start pl-2">
+            <div className="bg-blue-500 text-white px-2 py-1 rounded-full shadow-lg">
+              <ChevronLeft className="w-4 h-4" />
+            </div>
+          </div>
+        )}
+
+        {/* 안내 텍스트 */}
+        {!showLeftShadow && showRightShadow && (
+          <div className="mb-2 text-center text-sm text-gray-500 flex items-center justify-center gap-1">
+            <ChevronLeft className="w-3 h-3" />
+            <span>좌우로 스크롤하여 모든 항목을 확인하세요</span>
+            <ChevronRight className="w-3 h-3" />
+          </div>
+        )}
+
+        <div
+          ref={tableContainerRef}
+          className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"
+        >
+          <table
+            className="w-full border-collapse border border-gray-300 text-sm"
+            style={{ tableLayout: "fixed" }}
+          >
+            {/* 열 너비 정의 */}
+            <colgroup>
+              {columns.map((column, index) => (
+                <col key={`col-${index}`} style={{ width: `${column.width || 150}px` }} />
+              ))}
+            </colgroup>
+
             {/* 헤더 */}
             <thead>
               <tr>
-                {columns.map((column) => (
+                {columns.map((column, colIndex) => (
                   <th
                     key={column.id}
-                    className="border border-gray-300 p-3 bg-gray-50 font-medium text-center min-w-[150px]"
+                    className={`border border-gray-300 p-3 bg-gray-50 font-medium text-center ${
+                      colIndex === 0
+                        ? "sticky left-0 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]"
+                        : ""
+                    }`}
+                    style={{ width: `${column.width || 150}px` }}
                   >
                     {column.label || (
                       <span className="text-gray-400 italic text-sm">(제목 없음)</span>
@@ -458,29 +581,59 @@ export function InteractiveTableResponse({
 
             {/* 본문 */}
             <tbody>
-              {rows.map((row, rowIndex) => (
-                <tr key={row.id} className="hover:bg-gray-50">
-                  {/* 셀들 */}
-                  {row.cells.map((cell) => {
-                    // rowspan으로 숨겨진 셀은 렌더링하지 않음
-                    if (cell.isHidden) return null;
+              {rows.map((row, rowIndex) => {
+                const completed = isRowCompleted(row);
+                return (
+                  <tr
+                    key={row.id}
+                    className={`hover:bg-blue-50 transition-colors ${
+                      completed ? "bg-green-50" : ""
+                    }`}
+                  >
+                    {/* 셀들 */}
+                    {row.cells.map((cell, cellIndex) => {
+                      // rowspan으로 숨겨진 셀은 렌더링하지 않음
+                      if (cell.isHidden) return null;
 
-                    return (
-                      <td
-                        key={cell.id}
-                        className="border border-gray-300 p-3 text-center align-top"
-                        rowSpan={cell.rowspan || 1}
-                        colSpan={cell.colspan || 1}
-                      >
-                        {renderInteractiveCell(cell, rowIndex)}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+                      return (
+                        <td
+                          key={cell.id}
+                          className={`border border-gray-300 p-3 text-center align-top relative ${
+                            cellIndex === 0
+                              ? "sticky left-0 z-10 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]"
+                              : ""
+                          } ${completed ? "bg-green-50" : ""}`}
+                          rowSpan={cell.rowspan || 1}
+                          colSpan={cell.colspan || 1}
+                        >
+                          {completed && cellIndex === 0 && (
+                            <div className="absolute top-2 right-2">
+                              <CheckCircle2 className="w-4 h-4 text-green-500" />
+                            </div>
+                          )}
+                          {renderInteractiveCell(cell, rowIndex)}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
+      </div>
+    );
+  };
+
+  return (
+    <Card className={className}>
+      {tableTitle && (
+        <CardHeader>
+          <CardTitle className="text-lg font-medium">{tableTitle}</CardTitle>
+        </CardHeader>
+      )}
+      <CardContent>
+        {isMobile ? renderMobileCardView() : renderDesktopTableView()}
 
         {isTestMode && (
           <div className="mt-4 p-3 bg-blue-50 rounded-lg">

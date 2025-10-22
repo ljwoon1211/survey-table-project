@@ -158,11 +158,15 @@ export default function SurveyResponsePage() {
     );
   }
 
+  // 현재 질문이 테이블 타입인지 확인
+  const isTableQuestion = currentQuestion?.type === "table";
+  const containerMaxWidth = isTableQuestion ? "max-w-7xl" : "max-w-4xl";
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-6 py-4">
+        <div className={`${containerMaxWidth} mx-auto px-6 py-4 transition-all duration-300`}>
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-semibold text-gray-900">{currentSurvey.title}</h1>
@@ -184,7 +188,7 @@ export default function SurveyResponsePage() {
       </div>
 
       {/* 메인 콘텐츠 */}
-      <div className="max-w-4xl mx-auto px-6 py-8">
+      <div className={`${containerMaxWidth} mx-auto px-6 py-8 transition-all duration-300`}>
         <Card>
           <CardHeader>
             <div className="flex items-start justify-between">

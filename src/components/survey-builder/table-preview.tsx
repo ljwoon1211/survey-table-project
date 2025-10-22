@@ -201,14 +201,25 @@ export function TablePreview({
       )}
       <CardContent>
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse border border-gray-300 text-sm">
+          <table
+            className="w-full border-collapse border border-gray-300 text-sm"
+            style={{ tableLayout: "fixed" }}
+          >
+            {/* 열 너비 정의 */}
+            <colgroup>
+              {columns.map((column, index) => (
+                <col key={`col-${index}`} style={{ width: `${column.width || 150}px` }} />
+              ))}
+            </colgroup>
+
             {/* 헤더 */}
             <thead>
               <tr>
                 {columns.map((column) => (
                   <th
                     key={column.id}
-                    className="border border-gray-300 p-3 bg-gray-50 font-medium text-center min-w-[150px]"
+                    className="border border-gray-300 p-3 bg-gray-50 font-medium text-center"
+                    style={{ width: `${column.width || 150}px` }}
                   >
                     {column.label || (
                       <span className="text-gray-400 italic text-sm">(제목 없음)</span>
