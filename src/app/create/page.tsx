@@ -27,16 +27,24 @@ import {
   FolderOpen,
   Check,
   Trash2,
+  Info,
 } from "lucide-react";
 import Link from "next/link";
 
 const questionTypes = [
   {
+    type: "notice" as const,
+    label: "공지사항",
+    icon: Info,
+    description: "설명 및 안내 문구",
+    color: "bg-blue-100 text-blue-600",
+  },
+  {
     type: "text" as const,
     label: "단답형",
     icon: Type,
     description: "짧은 텍스트 입력",
-    color: "bg-blue-100 text-blue-600",
+    color: "bg-sky-100 text-sky-600",
   },
   {
     type: "textarea" as const,

@@ -12,6 +12,8 @@ import { useSurveyBuilderStore } from "@/stores/survey-store";
 import { UserDefinedMultiSelectPreview } from "./user-defined-multi-select";
 import { DynamicTableEditor } from "./dynamic-table-editor";
 import { TablePreview } from "./table-preview";
+import { NoticeEditor } from "./notice-editor";
+import { NoticeRenderer } from "./notice-renderer";
 import {
   Plus,
   X,
@@ -25,6 +27,7 @@ import {
   Image,
   Video,
   Settings,
+  Info,
 } from "lucide-react";
 
 interface QuestionEditModalProps {
@@ -53,6 +56,8 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         tableColumns: question.tableColumns ? [...question.tableColumns] : [],
         tableRowsData: question.tableRowsData ? [...question.tableRowsData] : [],
         allowOtherOption: question.allowOtherOption || false,
+        noticeContent: question.noticeContent || "",
+        requiresAcknowledgment: question.requiresAcknowledgment || false,
       });
     }
   }, [question]);
@@ -722,6 +727,45 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
               </div>
             )}
 
+            {/* 공지사항 설정 */}
+            {question.type === "notice" && (
+              <div className="space-y-6">
+                <div>
+                  <Label className="text-base font-medium mb-3 block">공지사항 내용 편집</Label>
+                  <NoticeEditor
+                    content={formData.noticeContent || ""}
+                    onChange={(content) => setFormData((prev) => ({ ...prev, noticeContent: content }))}
+                  />
+                </div>
+
+                {/* 이해 확인 체크 옵션 */}
+                <div className="flex items-center space-x-2 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                  <Switch
+                    id="requires-acknowledgment"
+                    checked={formData.requiresAcknowledgment || false}
+                    onCheckedChange={(checked) =>
+                      setFormData((prev) => ({ ...prev, requiresAcknowledgment: checked }))
+                    }
+                  />
+                  <Label htmlFor="requires-acknowledgment" className="cursor-pointer">
+                    이해했다는 체크 필요 (필수 확인)
+                  </Label>
+                </div>
+
+                {/* 미리보기 */}
+                {formData.noticeContent && (
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">미리보기</Label>
+                    <NoticeRenderer
+                      content={formData.noticeContent}
+                      requiresAcknowledgment={formData.requiresAcknowledgment}
+                      isTestMode={true}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* 테이블 설정 */}
             {question.type === "table" && (
               <div className="space-y-6">
@@ -832,6 +876,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
 
 function getQuestionTypeIcon(type: string) {
   const icons = {
+    notice: Info,
     text: Type,
     textarea: FileText,
     radio: Circle,
@@ -846,6 +891,7 @@ function getQuestionTypeIcon(type: string) {
 
 function getQuestionTypeLabel(type: string): string {
   const labels = {
+    notice: "공지사항",
     text: "단답형",
     textarea: "장문형",
     radio: "단일선택",

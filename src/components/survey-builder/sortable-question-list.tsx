@@ -32,6 +32,7 @@ import { MultiLevelSelect } from "./multi-level-select";
 import { UserDefinedMultiLevelSelect } from "./user-defined-multi-level-select";
 import { InteractiveTableResponse } from "./interactive-table-response";
 import { TablePreview } from "./table-preview";
+import { NoticeRenderer } from "./notice-renderer";
 import { GripVertical, Settings, Trash2, Copy, Edit3, Eye, EyeOff } from "lucide-react";
 
 interface SortableQuestionProps {
@@ -393,6 +394,17 @@ function QuestionTestInput({
         <div className="text-center py-4 text-gray-500">테이블이 구성되지 않았습니다.</div>
       );
 
+    case "notice":
+      return (
+        <NoticeRenderer
+          content={question.noticeContent || ""}
+          requiresAcknowledgment={question.requiresAcknowledgment}
+          value={value || false}
+          onChange={onChange}
+          isTestMode={true}
+        />
+      );
+
     default:
       return (
         <div className="text-center py-4 text-gray-500">이 질문 유형은 테스트할 수 없습니다.</div>
@@ -402,6 +414,7 @@ function QuestionTestInput({
 
 function getQuestionTypeLabel(type: string): string {
   const labels = {
+    notice: "공지사항",
     text: "단답형",
     textarea: "장문형",
     radio: "단일선택",

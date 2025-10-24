@@ -5,13 +5,27 @@ export type QuestionType =
   | 'checkbox'
   | 'select'
   | 'multiselect'
-  | 'table';
+  | 'table'
+  | 'notice';
+
+// 분기 동작 타입
+export type BranchAction = 'goto' | 'end';
+
+// 분기 규칙
+export interface BranchRule {
+  id: string;
+  value: string; // 응답 값 (radio value, checkbox value, select value, table cell value 등)
+  action: BranchAction;
+  targetQuestionId?: string; // action이 'goto'일 때 이동할 질문 ID
+}
 
 export interface QuestionOption {
   id: string;
   label: string;
   value: string;
   hasOther?: boolean;
+  // 조건부 분기
+  branchRule?: BranchRule;
 }
 
 export interface TableCell {
@@ -39,6 +53,8 @@ export interface CheckboxOption {
   value: string;
   checked?: boolean;
   hasOther?: boolean;
+  // 조건부 분기
+  branchRule?: BranchRule;
 }
 
 export interface RadioOption {
@@ -47,6 +63,8 @@ export interface RadioOption {
   value: string;
   selected?: boolean;
   hasOther?: boolean;
+  // 조건부 분기
+  branchRule?: BranchRule;
 }
 
 export interface TableRow {
@@ -90,6 +108,9 @@ export interface Question {
   videoUrl?: string;
   order: number;
   allowOtherOption?: boolean; // 기타 옵션 허용 여부 (radio, checkbox, select용)
+  // 공지사항(notice) 타입용
+  noticeContent?: string; // TipTap HTML 콘텐츠
+  requiresAcknowledgment?: boolean; // 이해했다는 체크 필요 여부
 }
 
 export interface Survey {

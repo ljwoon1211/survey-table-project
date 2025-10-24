@@ -10,6 +10,7 @@ import { useSurveyBuilderStore } from "@/stores/survey-store";
 import { useSurveyResponseStore } from "@/stores/survey-response-store";
 import { InteractiveTableResponse } from "@/components/survey-builder/interactive-table-response";
 import { UserDefinedMultiLevelSelect } from "@/components/survey-builder/user-defined-multi-level-select";
+import { NoticeRenderer } from "@/components/survey-builder/notice-renderer";
 import { CheckCircle, AlertCircle, ArrowLeft, ArrowRight } from "lucide-react";
 
 export default function SurveyResponsePage() {
@@ -54,6 +55,9 @@ export default function SurveyResponsePage() {
     if (!response) return false;
 
     switch (question.type) {
+      case "notice":
+        // 공지사항은 requiresAcknowledgment가 true일 때만 체크 필요
+        return question.requiresAcknowledgment ? response === true : true;
       case "text":
       case "textarea":
         return typeof response === "string" && response.trim().length > 0;
@@ -261,6 +265,17 @@ function QuestionInput({
   onChange: (value: any) => void;
 }) {
   switch (question.type) {
+    case "notice":
+      return (
+        <NoticeRenderer
+          content={question.noticeContent || ""}
+          requiresAcknowledgment={question.requiresAcknowledgment}
+          value={value || false}
+          onChange={onChange}
+          isTestMode={false}
+        />
+      );
+
     case "text":
       return (
         <Input
