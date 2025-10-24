@@ -16,15 +16,25 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TableCell, CheckboxOption, RadioOption, QuestionOption } from "@/types/survey";
 import { Type, Image, Video, CheckSquare, Circle, ChevronDown } from "lucide-react";
+import { useSurveyBuilderStore } from "@/stores/survey-store";
+import { BranchRuleEditor } from "./branch-rule-editor";
 
 interface CellContentModalProps {
   isOpen: boolean;
   onClose: () => void;
   cell: TableCell;
   onSave: (cell: TableCell) => void;
+  currentQuestionId?: string;
 }
 
-export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentModalProps) {
+export function CellContentModal({
+  isOpen,
+  onClose,
+  cell,
+  onSave,
+  currentQuestionId = "",
+}: CellContentModalProps) {
+  const { currentSurvey } = useSurveyBuilderStore();
   const [contentType, setContentType] = useState<
     "text" | "image" | "video" | "checkbox" | "radio" | "select"
   >(cell.type || "text");
@@ -362,42 +372,58 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
 
               <div className="space-y-3">
                 {checkboxOptions.map((option, index) => (
-                  <div key={option.id} className="flex items-center gap-2 p-3 border rounded-md">
-                    <input
-                      type="checkbox"
-                      checked={option.checked || false}
-                      onChange={(e) => {
-                        const updated = [...checkboxOptions];
-                        updated[index] = { ...option, checked: e.target.checked };
-                        setCheckboxOptions(updated);
-                      }}
-                      className="rounded"
-                    />
-                    <div className="flex-1">
-                      <Input
-                        value={option.label}
+                  <div key={option.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="flex items-center gap-2 p-3">
+                      <input
+                        type="checkbox"
+                        checked={option.checked || false}
                         onChange={(e) => {
                           const updated = [...checkboxOptions];
-                          updated[index] = { ...option, label: e.target.value };
+                          updated[index] = { ...option, checked: e.target.checked };
                           setCheckboxOptions(updated);
                         }}
-                        placeholder="옵션 텍스트"
+                        className="rounded"
                       />
-                      {option.id === OTHER_OPTION_ID && (
-                        <p className="text-xs text-blue-600 mt-1">🔹 기타 옵션 (수정 가능)</p>
-                      )}
+                      <div className="flex-1">
+                        <Input
+                          value={option.label}
+                          onChange={(e) => {
+                            const updated = [...checkboxOptions];
+                            updated[index] = { ...option, label: e.target.value };
+                            setCheckboxOptions(updated);
+                          }}
+                          placeholder="옵션 텍스트"
+                        />
+                        {option.id === OTHER_OPTION_ID && (
+                          <p className="text-xs text-blue-600 mt-1">🔹 기타 옵션 (수정 가능)</p>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setCheckboxOptions((prev) => prev.filter((_, i) => i !== index));
+                        }}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        삭제
+                      </Button>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setCheckboxOptions((prev) => prev.filter((_, i) => i !== index));
-                      }}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      삭제
-                    </Button>
+
+                    {/* 분기 규칙 설정 */}
+                    <div className="px-3 pb-3">
+                      <BranchRuleEditor
+                        branchRule={option.branchRule}
+                        allQuestions={currentSurvey.questions}
+                        currentQuestionId={currentQuestionId}
+                        onChange={(branchRule) => {
+                          const updated = [...checkboxOptions];
+                          updated[index] = { ...option, branchRule };
+                          setCheckboxOptions(updated);
+                        }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -484,46 +510,62 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
 
               <div className="space-y-3">
                 {radioOptions.map((option, index) => (
-                  <div key={option.id} className="flex items-center gap-2 p-3 border rounded-md">
-                    <input
-                      type="radio"
-                      name="preview-radio"
-                      checked={option.selected || false}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          const updated = radioOptions.map((opt, i) => ({
-                            ...opt,
-                            selected: i === index,
-                          }));
-                          setRadioOptions(updated);
-                        }
-                      }}
-                    />
-                    <div className="flex-1">
-                      <Input
-                        value={option.label}
+                  <div key={option.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="flex items-center gap-2 p-3">
+                      <input
+                        type="radio"
+                        name="preview-radio"
+                        checked={option.selected || false}
                         onChange={(e) => {
+                          if (e.target.checked) {
+                            const updated = radioOptions.map((opt, i) => ({
+                              ...opt,
+                              selected: i === index,
+                            }));
+                            setRadioOptions(updated);
+                          }
+                        }}
+                      />
+                      <div className="flex-1">
+                        <Input
+                          value={option.label}
+                          onChange={(e) => {
+                            const updated = [...radioOptions];
+                            updated[index] = { ...option, label: e.target.value };
+                            setRadioOptions(updated);
+                          }}
+                          placeholder="옵션 텍스트"
+                        />
+                        {option.id === OTHER_OPTION_ID && (
+                          <p className="text-xs text-blue-600 mt-1">🔹 기타 옵션 (수정 가능)</p>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setRadioOptions((prev) => prev.filter((_, i) => i !== index));
+                        }}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        삭제
+                      </Button>
+                    </div>
+
+                    {/* 분기 규칙 설정 */}
+                    <div className="px-3 pb-3">
+                      <BranchRuleEditor
+                        branchRule={option.branchRule}
+                        allQuestions={currentSurvey.questions}
+                        currentQuestionId={currentQuestionId}
+                        onChange={(branchRule) => {
                           const updated = [...radioOptions];
-                          updated[index] = { ...option, label: e.target.value };
+                          updated[index] = { ...option, branchRule };
                           setRadioOptions(updated);
                         }}
-                        placeholder="옵션 텍스트"
                       />
-                      {option.id === OTHER_OPTION_ID && (
-                        <p className="text-xs text-blue-600 mt-1">🔹 기타 옵션 (수정 가능)</p>
-                      )}
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setRadioOptions((prev) => prev.filter((_, i) => i !== index));
-                      }}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      삭제
-                    </Button>
                   </div>
                 ))}
               </div>
@@ -601,32 +643,51 @@ export function CellContentModal({ isOpen, onClose, cell, onSave }: CellContentM
 
               <div className="space-y-3">
                 {selectOptions.map((option, index) => (
-                  <div key={option.id} className="flex items-center gap-2 p-3 border rounded-md">
-                    <div className="flex-1">
-                      <Input
-                        value={option.label}
-                        onChange={(e) => {
+                  <div
+                    key={option.id}
+                    className="border border-gray-200 rounded-lg overflow-hidden"
+                  >
+                    <div className="flex items-center gap-2 p-3">
+                      <div className="flex-1">
+                        <Input
+                          value={option.label}
+                          onChange={(e) => {
+                            const updated = [...selectOptions];
+                            updated[index] = { ...option, label: e.target.value };
+                            setSelectOptions(updated);
+                          }}
+                          placeholder="옵션 텍스트"
+                        />
+                        {option.id === OTHER_OPTION_ID && (
+                          <p className="text-xs text-blue-600 mt-1">🔹 기타 옵션 (수정 가능)</p>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectOptions((prev) => prev.filter((_, i) => i !== index));
+                        }}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        삭제
+                      </Button>
+                    </div>
+
+                    {/* 분기 규칙 설정 */}
+                    <div className="px-3 pb-3">
+                      <BranchRuleEditor
+                        branchRule={option.branchRule}
+                        allQuestions={currentSurvey.questions}
+                        currentQuestionId={currentQuestionId}
+                        onChange={(branchRule) => {
                           const updated = [...selectOptions];
-                          updated[index] = { ...option, label: e.target.value };
+                          updated[index] = { ...option, branchRule };
                           setSelectOptions(updated);
                         }}
-                        placeholder="옵션 텍스트"
                       />
-                      {option.id === OTHER_OPTION_ID && (
-                        <p className="text-xs text-blue-600 mt-1">🔹 기타 옵션 (수정 가능)</p>
-                      )}
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setSelectOptions((prev) => prev.filter((_, i) => i !== index));
-                      }}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      삭제
-                    </Button>
                   </div>
                 ))}
               </div>

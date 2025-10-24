@@ -13,6 +13,7 @@ interface DynamicTableEditorProps {
   tableTitle?: string;
   columns?: TableColumn[];
   rows?: TableRow[];
+  currentQuestionId?: string;
   onTableChange: (data: {
     tableTitle: string;
     tableColumns: TableColumn[];
@@ -24,6 +25,7 @@ export function DynamicTableEditor({
   tableTitle = "",
   columns = [],
   rows = [],
+  currentQuestionId = "",
   onTableChange,
 }: DynamicTableEditorProps) {
   const [currentTitle, setCurrentTitle] = useState(tableTitle);
@@ -574,6 +576,7 @@ export function DynamicTableEditor({
         <CellContentModal
           isOpen={!!selectedCell}
           onClose={() => setSelectedCell(null)}
+          currentQuestionId={currentQuestionId}
           cell={
             currentRows
               .find((row) => row.id === selectedCell.rowId)

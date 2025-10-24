@@ -12,6 +12,7 @@ import { InteractiveTableResponse } from "@/components/survey-builder/interactiv
 import { UserDefinedMultiLevelSelect } from "@/components/survey-builder/user-defined-multi-level-select";
 import { NoticeRenderer } from "@/components/survey-builder/notice-renderer";
 import { CheckCircle, AlertCircle, ArrowLeft, ArrowRight } from "lucide-react";
+import { getNextQuestionIndex } from "@/utils/branch-logic";
 
 export default function SurveyResponsePage() {
   const params = useParams();
@@ -27,6 +28,7 @@ export default function SurveyResponsePage() {
   const [responses, setResponses] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [questionHistory, setQuestionHistory] = useState<number[]>([]); // 방문한 질문 인덱스 히스토리
 
   const questions = currentSurvey.questions;
   const currentQuestion = questions[currentQuestionIndex];
@@ -81,14 +83,29 @@ export default function SurveyResponsePage() {
   };
 
   const handleNext = () => {
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex((prev) => prev + 1);
+    // 현재 응답 가져오기
+    const currentResponse = responses[currentQuestion.id];
+
+    // 다음 질문 인덱스 계산 (분기 규칙 고려)
+    const nextIndex = getNextQuestionIndex(questions, currentQuestionIndex, currentResponse);
+
+    // 히스토리에 현재 인덱스 추가
+    setQuestionHistory((prev) => [...prev, currentQuestionIndex]);
+
+    if (nextIndex === -1) {
+      // 분기 규칙으로 설문 종료
+      handleSubmit();
+    } else if (nextIndex < questions.length) {
+      setCurrentQuestionIndex(nextIndex);
     }
   };
 
   const handlePrevious = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex((prev) => prev - 1);
+    if (questionHistory.length > 0) {
+      // 히스토리에서 이전 인덱스 가져오기
+      const previousIndex = questionHistory[questionHistory.length - 1];
+      setQuestionHistory((prev) => prev.slice(0, -1)); // 히스토리에서 마지막 항목 제거
+      setCurrentQuestionIndex(previousIndex);
     }
   };
 
@@ -228,7 +245,7 @@ export default function SurveyResponsePage() {
 
         {/* 네비게이션 */}
         <div className="flex justify-between items-center mt-8">
-          <Button variant="outline" onClick={handlePrevious} disabled={currentQuestionIndex === 0}>
+          <Button variant="outline" onClick={handlePrevious} disabled={questionHistory.length === 0}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             이전
           </Button>

@@ -1,0 +1,235 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { BranchRule, BranchAction, Question } from "@/types/survey";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { ArrowRight, XCircle, GitBranch, Info, Check, ChevronsUpDown } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { cn } from "@/lib/utils";
+
+interface BranchRuleEditorProps {
+  branchRule?: BranchRule;
+  allQuestions: Question[];
+  currentQuestionId: string;
+  onChange: (branchRule: BranchRule | undefined) => void;
+}
+
+export function BranchRuleEditor({
+  branchRule,
+  allQuestions,
+  currentQuestionId,
+  onChange,
+}: BranchRuleEditorProps) {
+  const [enabled, setEnabled] = useState(!!branchRule);
+  const [action, setAction] = useState<BranchAction>(branchRule?.action || "goto");
+  const [targetQuestionId, setTargetQuestionId] = useState(branchRule?.targetQuestionId || "");
+  const [open, setOpen] = useState(false);
+
+  // 현재 질문 이후의 질문만 필터링
+  const currentIndex = allQuestions.findIndex((q) => q.id === currentQuestionId);
+  const availableQuestions = allQuestions.filter((_, index) => index > currentIndex);
+
+  useEffect(() => {
+    if (!enabled) {
+      onChange(undefined);
+    } else {
+      const newBranchRule: BranchRule = {
+        id: branchRule?.id || `branch-${Date.now()}`,
+        value: branchRule?.value || "",
+        action,
+        targetQuestionId: action === "goto" ? targetQuestionId : undefined,
+      };
+      onChange(newBranchRule);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, action, targetQuestionId]);
+
+  if (!enabled) {
+    return (
+      <div className="mt-3 pt-3 border-t border-gray-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <GitBranch className="w-4 h-4 text-gray-400" />
+            <Label className="text-sm text-gray-600 cursor-pointer" htmlFor="branch-toggle">
+              조건부 분기
+            </Label>
+          </div>
+          <Switch
+            id="branch-toggle"
+            checked={enabled}
+            onCheckedChange={setEnabled}
+            className="scale-90"
+          />
+        </div>
+        <p className="text-xs text-gray-500 mt-1 ml-6">
+          이 옵션 선택 시 다음 질문으로 순차 이동
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-200">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <GitBranch className="w-4 h-4 text-blue-600" />
+          <Label className="text-sm font-medium text-gray-900">조건부 분기 설정</Label>
+        </div>
+        <Switch
+          id="branch-toggle"
+          checked={enabled}
+          onCheckedChange={setEnabled}
+          className="scale-90"
+        />
+      </div>
+
+      <div className="space-y-3 pl-6">
+        {/* 분기 동작 선택 */}
+        <div className="space-y-2">
+          <Label className="text-xs text-gray-600">이 옵션 선택 시</Label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setAction("goto")}
+              className={`flex-1 px-3 py-2 rounded-lg border-2 transition-all ${
+                action === "goto"
+                  ? "border-blue-500 bg-blue-50 text-blue-700"
+                  : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <ArrowRight className="w-4 h-4" />
+                <span className="text-sm font-medium">질문 이동</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setAction("end")}
+              className={`flex-1 px-3 py-2 rounded-lg border-2 transition-all ${
+                action === "end"
+                  ? "border-red-500 bg-red-50 text-red-700"
+                  : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+              }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <XCircle className="w-4 h-4" />
+                <span className="text-sm font-medium">설문 종료</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* 질문 이동 옵션 */}
+        {action === "goto" && (
+          <div className="space-y-2">
+            <Label className="text-xs text-gray-600">이동할 질문 선택</Label>
+            {availableQuestions.length > 0 ? (
+              <Popover open={open} onOpenChange={setOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    role="combobox"
+                    aria-expanded={open}
+                    className={cn(
+                      "w-full px-3 py-2 text-sm border rounded-lg transition-all text-left flex items-center justify-between",
+                      targetQuestionId
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-300 hover:border-gray-400"
+                    )}
+                  >
+                    <span className={targetQuestionId ? "text-blue-700" : "text-gray-500"}>
+                      {targetQuestionId
+                        ? (() => {
+                            const selectedQuestion = availableQuestions.find((q) => q.id === targetQuestionId);
+                            if (!selectedQuestion) return "-- 질문을 선택하세요 --";
+                            const index = availableQuestions.indexOf(selectedQuestion);
+                            const title = selectedQuestion.title || "제목 없음";
+                            const displayTitle = title.length > 40 ? title.substring(0, 40) + "..." : title;
+                            return `Q${currentIndex + index + 2}. ${displayTitle}`;
+                          })()
+                        : "-- 질문을 선택하세요 --"}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="질문 검색..." />
+                    <CommandList>
+                      <CommandEmpty>검색 결과가 없습니다.</CommandEmpty>
+                      <CommandGroup>
+                        {availableQuestions.map((q, index) => {
+                          const title = q.title || "제목 없음";
+                          const displayTitle = title.length > 60 ? title.substring(0, 60) + "..." : title;
+                          const questionNumber = `Q${currentIndex + index + 2}`;
+                          return (
+                            <CommandItem
+                              key={q.id}
+                              value={`${questionNumber} ${title}`}
+                              onSelect={() => {
+                                setTargetQuestionId(q.id);
+                                setOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  targetQuestionId === q.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <div className="flex flex-col">
+                                <span className="font-medium">{questionNumber}</span>
+                                <span className="text-xs text-gray-500">{displayTitle}</span>
+                              </div>
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            ) : (
+              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <Info className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-amber-800">
+                  이동 가능한 질문이 없습니다. 현재 질문 이후에 질문을 추가해주세요.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 설문 종료 경고 */}
+        {action === "end" && (
+          <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <Info className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-red-800">
+              사용자가 이 옵션을 선택하면 설문이 즉시 종료되고 응답이 제출됩니다.
+            </p>
+          </div>
+        )}
+
+        {/* 분기 요약 */}
+        {action === "goto" && targetQuestionId && (
+          <div className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <ArrowRight className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-green-800">
+              <strong>분기 설정 완료:</strong>{" "}
+              {availableQuestions.find((q) => q.id === targetQuestionId)?.title || "선택된 질문"}로 이동합니다.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -14,6 +14,7 @@ import { DynamicTableEditor } from "./dynamic-table-editor";
 import { TablePreview } from "./table-preview";
 import { NoticeEditor } from "./notice-editor";
 import { NoticeRenderer } from "./notice-renderer";
+import { BranchRuleEditor } from "./branch-rule-editor";
 import {
   Plus,
   X,
@@ -43,6 +44,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
   const [formData, setFormData] = useState<Partial<Question>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [showBranchSettings, setShowBranchSettings] = useState(false);
 
   useEffect(() => {
     if (question) {
@@ -68,6 +70,8 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
 
     const needsOptions = ["radio", "checkbox", "select"].includes(question.type);
     const needsSelectLevels = question.type === "multiselect";
+    const isTableType = question.type === "table";
+    const isNoticeType = question.type === "notice";
     const errors: Record<string, string> = {};
 
     if (!formData.title?.trim()) {
@@ -81,6 +85,10 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
     if (needsSelectLevels && (!formData.selectLevels || formData.selectLevels.length === 0)) {
       errors.selectLevels = "최소 하나의 선택 레벨이 필요합니다.";
     }
+
+    // 테이블 타입은 title만 있으면 저장 가능 (테이블 데이터는 선택적)
+    // 공지사항 타입은 title만 있으면 저장 가능 (내용은 선택적)
+    // text, textarea 타입은 title만 있으면 저장 가능
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -410,6 +418,18 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                         기타 옵션 추가
                       </Label>
                     </div>
+                    {/* 조건부 분기 토글 */}
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="show-branch-settings"
+                        checked={showBranchSettings}
+                        onCheckedChange={setShowBranchSettings}
+                        className="scale-75"
+                      />
+                      <Label htmlFor="show-branch-settings" className="text-xs text-gray-600">
+                        조건부 분기
+                      </Label>
+                    </div>
                     <Button
                       type="button"
                       variant="outline"
@@ -435,35 +455,51 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                   {formData.options?.map((option, index) => (
                     <div
                       key={option.id}
-                      className="flex items-center space-x-2 p-3 border border-gray-200 rounded-lg"
+                      className="border border-gray-200 rounded-lg bg-white hover:shadow-sm transition-shadow"
                     >
-                      <div className="cursor-grab">
-                        <GripVertical className="w-4 h-4 text-gray-400" />
+                      <div className="flex items-center space-x-2 p-3">
+                        <div className="cursor-grab">
+                          <GripVertical className="w-4 h-4 text-gray-400" />
+                        </div>
+
+                        <div className="flex-1">
+                          <Input
+                            value={option.label}
+                            onChange={(e) => updateOption(option.id, { label: e.target.value })}
+                            placeholder={`옵션 ${index + 1}`}
+                            className="border-none bg-transparent px-0 focus:bg-white focus:border focus:border-blue-200"
+                          />
+                          {option.id === OTHER_OPTION_ID && (
+                            <p className="text-xs text-blue-600 mt-1 px-0">
+                              🔹 기타 옵션 (수정 가능)
+                            </p>
+                          )}
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeOption(option.id)}
+                          className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
                       </div>
 
-                      <div className="flex-1">
-                        <Input
-                          value={option.label}
-                          onChange={(e) => updateOption(option.id, { label: e.target.value })}
-                          placeholder={`옵션 ${index + 1}`}
-                          className="border-none bg-transparent px-0 focus:bg-white focus:border focus:border-blue-200"
-                        />
-                        {option.id === OTHER_OPTION_ID && (
-                          <p className="text-xs text-blue-600 mt-1 px-0">
-                            🔹 기타 옵션 (수정 가능)
-                          </p>
-                        )}
-                      </div>
-
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeOption(option.id)}
-                        className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
+                      {/* 분기 규칙 설정 - 토글이 켜져있을 때만 표시 */}
+                      {showBranchSettings && (
+                        <div className="px-3 pb-3">
+                          <BranchRuleEditor
+                            branchRule={option.branchRule}
+                            allQuestions={currentSurvey.questions}
+                            currentQuestionId={questionId || ""}
+                            onChange={(branchRule) =>
+                              updateOption(option.id, { branchRule })
+                            }
+                          />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -775,6 +811,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                   tableTitle={formData.tableTitle}
                   columns={formData.tableColumns}
                   rows={formData.tableRowsData}
+                  currentQuestionId={questionId || ""}
                   onTableChange={(data) => {
                     setFormData((prev) => ({
                       ...prev,
