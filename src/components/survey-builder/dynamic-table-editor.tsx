@@ -344,7 +344,7 @@ export function DynamicTableEditor({
   // 셀 내용 업데이트
   const updateCell = (rowIndex: number, cellIndex: number, cell: TableCell) => {
     // 먼저 해당 셀을 업데이트
-    const updatedRows = currentRows.map((row, rIndex) =>
+    let updatedRows = currentRows.map((row, rIndex) =>
       rIndex === rowIndex
         ? {
             ...row,
@@ -352,6 +352,34 @@ export function DynamicTableEditor({
           }
         : row,
     );
+
+    // 병합된 셀인 경우, 병합 영역 내의 모든 셀에 동일한 내용 복사
+    const rowspan = cell.rowspan || 1;
+    const colspan = cell.colspan || 1;
+
+    if (rowspan > 1 || colspan > 1) {
+      updatedRows = updatedRows.map((row, rIndex) => ({
+        ...row,
+        cells: row.cells.map((c, cIndex) => {
+          // 병합 영역 내에 있는지 확인
+          const isInRowRange = rIndex >= rowIndex && rIndex < rowIndex + rowspan;
+          const isInColRange = cIndex >= cellIndex && cIndex < cellIndex + colspan;
+
+          // 병합 영역 내에 있고, 시작 셀이 아닌 경우
+          if (isInRowRange && isInColRange && !(rIndex === rowIndex && cIndex === cellIndex)) {
+            // 시작 셀의 내용과 속성을 복사 (rowspan, colspan 제외)
+            return {
+              ...cell,
+              id: c.id, // 원래 셀의 ID는 유지
+              rowspan: undefined, // 병합된 셀들은 rowspan/colspan을 가지지 않음
+              colspan: undefined,
+            };
+          }
+
+          return c;
+        }),
+      }));
+    }
 
     // 병합된 셀로 인해 숨겨져야 하는 셀들을 재계산
     const finalRows = recalculateHiddenCells(updatedRows);
