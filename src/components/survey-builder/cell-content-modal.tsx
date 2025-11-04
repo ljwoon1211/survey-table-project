@@ -477,7 +477,7 @@ export function CellContentModal({
             {checkboxOptions.length > 0 && (
               <div className="space-y-2">
                 <Label>미리보기</Label>
-                <div className="p-3 border rounded-md bg-gray-50">
+                <div className="p-3 border rounded-md bg-gray-50 max-h-[200px] overflow-y-auto">
                   <div className="space-y-2">
                     {checkboxOptions.map((option) => (
                       <div key={option.id} className="flex items-center gap-2">
@@ -635,7 +635,7 @@ export function CellContentModal({
             {radioOptions.length > 0 && (
               <div className="space-y-2">
                 <Label>미리보기</Label>
-                <div className="p-3 border rounded-md bg-gray-50">
+                <div className="p-3 border rounded-md bg-gray-50 max-h-[200px] overflow-y-auto">
                   <div className="space-y-2">
                     {radioOptions.map((option) => (
                       <div key={option.id} className="flex items-center gap-2">
