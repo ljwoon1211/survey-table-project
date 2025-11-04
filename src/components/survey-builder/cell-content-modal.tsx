@@ -49,6 +49,9 @@ export function CellContentModal({
   const [selectOptions, setSelectOptions] = useState<QuestionOption[]>(cell.selectOptions || []);
   const [allowOtherOption, setAllowOtherOption] = useState(cell.allowOtherOption || false);
 
+  // 조건부 분기 토글 상태
+  const [showBranchSettings, setShowBranchSettings] = useState(false);
+
   // 셀 병합 관련 state
   const [isMergeEnabled, setIsMergeEnabled] = useState(
     (cell.rowspan && cell.rowspan > 1) || (cell.colspan && cell.colspan > 1) || false,
@@ -356,21 +359,35 @@ export function CellContentModal({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Label>체크박스 옵션 관리</Label>
-                {/* 기타 옵션 토글 */}
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="checkbox-allow-other"
-                    checked={allowOtherOption}
-                    onCheckedChange={handleOtherOptionToggle}
-                    className="scale-75"
-                  />
-                  <Label htmlFor="checkbox-allow-other" className="text-xs text-gray-600">
-                    기타 옵션 추가
-                  </Label>
+                <div className="flex items-center space-x-4">
+                  {/* 기타 옵션 토글 */}
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="checkbox-allow-other"
+                      checked={allowOtherOption}
+                      onCheckedChange={handleOtherOptionToggle}
+                      className="scale-75"
+                    />
+                    <Label htmlFor="checkbox-allow-other" className="text-xs text-gray-600">
+                      기타 옵션 추가
+                    </Label>
+                  </div>
+                  {/* 조건부 분기 토글 */}
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="checkbox-show-branch"
+                      checked={showBranchSettings}
+                      onCheckedChange={setShowBranchSettings}
+                      className="scale-75"
+                    />
+                    <Label htmlFor="checkbox-show-branch" className="text-xs text-gray-600">
+                      조건부 분기
+                    </Label>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
                 {checkboxOptions.map((option, index) => (
                   <div key={option.id} className="border border-gray-200 rounded-lg overflow-hidden">
                     <div className="flex items-center gap-2 p-3">
@@ -411,19 +428,21 @@ export function CellContentModal({
                       </Button>
                     </div>
 
-                    {/* 분기 규칙 설정 */}
-                    <div className="px-3 pb-3">
-                      <BranchRuleEditor
-                        branchRule={option.branchRule}
-                        allQuestions={currentSurvey.questions}
-                        currentQuestionId={currentQuestionId}
-                        onChange={(branchRule) => {
-                          const updated = [...checkboxOptions];
-                          updated[index] = { ...option, branchRule };
-                          setCheckboxOptions(updated);
-                        }}
-                      />
-                    </div>
+                    {/* 분기 규칙 설정 - 토글이 켜져있을 때만 표시 */}
+                    {showBranchSettings && (
+                      <div className="px-3 pb-3">
+                        <BranchRuleEditor
+                          branchRule={option.branchRule}
+                          allQuestions={currentSurvey.questions}
+                          currentQuestionId={currentQuestionId}
+                          onChange={(branchRule) => {
+                            const updated = [...checkboxOptions];
+                            updated[index] = { ...option, branchRule };
+                            setCheckboxOptions(updated);
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -494,21 +513,35 @@ export function CellContentModal({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Label>라디오 버튼 옵션 관리</Label>
-                {/* 기타 옵션 토글 */}
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="radio-allow-other"
-                    checked={allowOtherOption}
-                    onCheckedChange={handleOtherOptionToggle}
-                    className="scale-75"
-                  />
-                  <Label htmlFor="radio-allow-other" className="text-xs text-gray-600">
-                    기타 옵션 추가
-                  </Label>
+                <div className="flex items-center space-x-4">
+                  {/* 기타 옵션 토글 */}
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="radio-allow-other"
+                      checked={allowOtherOption}
+                      onCheckedChange={handleOtherOptionToggle}
+                      className="scale-75"
+                    />
+                    <Label htmlFor="radio-allow-other" className="text-xs text-gray-600">
+                      기타 옵션 추가
+                    </Label>
+                  </div>
+                  {/* 조건부 분기 토글 */}
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="radio-show-branch"
+                      checked={showBranchSettings}
+                      onCheckedChange={setShowBranchSettings}
+                      className="scale-75"
+                    />
+                    <Label htmlFor="radio-show-branch" className="text-xs text-gray-600">
+                      조건부 분기
+                    </Label>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
                 {radioOptions.map((option, index) => (
                   <div key={option.id} className="border border-gray-200 rounded-lg overflow-hidden">
                     <div className="flex items-center gap-2 p-3">
@@ -553,19 +586,21 @@ export function CellContentModal({
                       </Button>
                     </div>
 
-                    {/* 분기 규칙 설정 */}
-                    <div className="px-3 pb-3">
-                      <BranchRuleEditor
-                        branchRule={option.branchRule}
-                        allQuestions={currentSurvey.questions}
-                        currentQuestionId={currentQuestionId}
-                        onChange={(branchRule) => {
-                          const updated = [...radioOptions];
-                          updated[index] = { ...option, branchRule };
-                          setRadioOptions(updated);
-                        }}
-                      />
-                    </div>
+                    {/* 분기 규칙 설정 - 토글이 켜져있을 때만 표시 */}
+                    {showBranchSettings && (
+                      <div className="px-3 pb-3">
+                        <BranchRuleEditor
+                          branchRule={option.branchRule}
+                          allQuestions={currentSurvey.questions}
+                          currentQuestionId={currentQuestionId}
+                          onChange={(branchRule) => {
+                            const updated = [...radioOptions];
+                            updated[index] = { ...option, branchRule };
+                            setRadioOptions(updated);
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -627,21 +662,35 @@ export function CellContentModal({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <Label>Select 옵션 관리</Label>
-                {/* 기타 옵션 토글 */}
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="select-allow-other"
-                    checked={allowOtherOption}
-                    onCheckedChange={handleOtherOptionToggle}
-                    className="scale-75"
-                  />
-                  <Label htmlFor="select-allow-other" className="text-xs text-gray-600">
-                    기타 옵션 추가
-                  </Label>
+                <div className="flex items-center space-x-4">
+                  {/* 기타 옵션 토글 */}
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="select-allow-other"
+                      checked={allowOtherOption}
+                      onCheckedChange={handleOtherOptionToggle}
+                      className="scale-75"
+                    />
+                    <Label htmlFor="select-allow-other" className="text-xs text-gray-600">
+                      기타 옵션 추가
+                    </Label>
+                  </div>
+                  {/* 조건부 분기 토글 */}
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="select-show-branch"
+                      checked={showBranchSettings}
+                      onCheckedChange={setShowBranchSettings}
+                      className="scale-75"
+                    />
+                    <Label htmlFor="select-show-branch" className="text-xs text-gray-600">
+                      조건부 분기
+                    </Label>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
                 {selectOptions.map((option, index) => (
                   <div
                     key={option.id}
@@ -675,19 +724,21 @@ export function CellContentModal({
                       </Button>
                     </div>
 
-                    {/* 분기 규칙 설정 */}
-                    <div className="px-3 pb-3">
-                      <BranchRuleEditor
-                        branchRule={option.branchRule}
-                        allQuestions={currentSurvey.questions}
-                        currentQuestionId={currentQuestionId}
-                        onChange={(branchRule) => {
-                          const updated = [...selectOptions];
-                          updated[index] = { ...option, branchRule };
-                          setSelectOptions(updated);
-                        }}
-                      />
-                    </div>
+                    {/* 분기 규칙 설정 - 토글이 켜져있을 때만 표시 */}
+                    {showBranchSettings && (
+                      <div className="px-3 pb-3">
+                        <BranchRuleEditor
+                          branchRule={option.branchRule}
+                          allQuestions={currentSurvey.questions}
+                          currentQuestionId={currentQuestionId}
+                          onChange={(branchRule) => {
+                            const updated = [...selectOptions];
+                            updated[index] = { ...option, branchRule };
+                            setSelectOptions(updated);
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

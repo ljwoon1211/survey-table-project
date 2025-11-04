@@ -70,9 +70,7 @@ export function BranchRuleEditor({
             className="scale-90"
           />
         </div>
-        <p className="text-xs text-gray-500 mt-1 ml-6">
-          이 옵션 선택 시 다음 질문으로 순차 이동
-        </p>
+        <p className="text-xs text-gray-500 mt-1 ml-6">이 옵션 선택 시 다음 질문으로 순차 이동</p>
       </div>
     );
   }
@@ -131,7 +129,7 @@ export function BranchRuleEditor({
         {/* 질문 이동 옵션 */}
         {action === "goto" && (
           <div className="space-y-2">
-            <Label className="text-xs text-gray-600">이동할 질문 선택</Label>
+            <Label className="text-xs text-gray-600 font-medium">이동할 질문 선택</Label>
             {availableQuestions.length > 0 ? (
               <Popover open={open} onOpenChange={setOpen}>
                 <PopoverTrigger asChild>
@@ -139,56 +137,166 @@ export function BranchRuleEditor({
                     type="button"
                     role="combobox"
                     aria-expanded={open}
-                    className={cn(
-                      "w-full px-3 py-2 text-sm border rounded-lg transition-all text-left flex items-center justify-between",
+                    aria-haspopup="listbox"
+                    aria-label={
                       targetQuestionId
-                        ? "border-blue-500 bg-blue-50"
-                        : "border-gray-300 hover:border-gray-400"
+                        ? `선택된 질문: ${
+                            availableQuestions.find((q) => q.id === targetQuestionId)?.title || ""
+                          }`
+                        : "이동할 질문을 선택하세요"
+                    }
+                    className={cn(
+                      "w-full px-4 py-3 text-sm border-2 rounded-xl transition-all text-left flex items-center justify-between min-h-[48px] shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
+                      targetQuestionId
+                        ? "border-blue-500 bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700"
+                        : "border-gray-300 bg-white hover:border-blue-400 hover:bg-gray-50",
                     )}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setOpen(!open);
+                      }
+                    }}
                   >
-                    <span className={targetQuestionId ? "text-blue-700" : "text-gray-500"}>
-                      {targetQuestionId
-                        ? (() => {
-                            const selectedQuestion = availableQuestions.find((q) => q.id === targetQuestionId);
-                            if (!selectedQuestion) return "-- 질문을 선택하세요 --";
-                            const index = availableQuestions.indexOf(selectedQuestion);
-                            const title = selectedQuestion.title || "제목 없음";
-                            const displayTitle = title.length > 40 ? title.substring(0, 40) + "..." : title;
-                            return `Q${currentIndex + index + 2}. ${displayTitle}`;
-                          })()
-                        : "-- 질문을 선택하세요 --"}
-                    </span>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    <div className="flex items-center gap-3 flex-1">
+                      <ArrowRight
+                        className={cn(
+                          "w-4 h-4 flex-shrink-0",
+                          targetQuestionId ? "text-blue-600" : "text-gray-400",
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          "font-medium",
+                          targetQuestionId ? "text-blue-700" : "text-gray-500",
+                        )}
+                      >
+                        {targetQuestionId
+                          ? (() => {
+                              const selectedQuestion = availableQuestions.find(
+                                (q) => q.id === targetQuestionId,
+                              );
+                              if (!selectedQuestion) return "질문을 선택하세요";
+                              const index = availableQuestions.indexOf(selectedQuestion);
+                              const title = selectedQuestion.title || "제목 없음";
+                              const displayTitle =
+                                title.length > 60 ? title.substring(0, 60) + "..." : title;
+                              return `Q${currentIndex + index + 2}. ${displayTitle}`;
+                            })()
+                          : "질문을 선택하세요"}
+                      </span>
+                    </div>
+                    <ChevronsUpDown
+                      className={cn(
+                        "ml-2 h-4 w-4 flex-shrink-0 transition-transform",
+                        open ? "rotate-180" : "rotate-0",
+                        targetQuestionId ? "text-blue-600" : "text-gray-400",
+                      )}
+                    />
                   </button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="질문 검색..." />
-                    <CommandList>
-                      <CommandEmpty>검색 결과가 없습니다.</CommandEmpty>
+                <PopoverContent className="w-[500px] p-0 shadow-xl border-2" align="start">
+                  <Command className="rounded-xl">
+                    <div className="px-3 py-2 border-b bg-gray-50">
+                      <CommandInput
+                        placeholder="질문 번호나 제목으로 검색..."
+                        className="border-0 bg-transparent focus:ring-0 text-sm placeholder:text-gray-500"
+                      />
+                    </div>
+                    <CommandList className="max-h-64">
+                      <CommandEmpty className="py-6 text-center text-gray-500">
+                        <div className="flex flex-col items-center gap-2">
+                          <ArrowRight className="w-8 h-8 text-gray-300" />
+                          <p className="text-sm">검색 결과가 없습니다</p>
+                          <p className="text-xs text-gray-400">다른 키워드로 검색해보세요</p>
+                        </div>
+                      </CommandEmpty>
                       <CommandGroup>
                         {availableQuestions.map((q, index) => {
                           const title = q.title || "제목 없음";
-                          const displayTitle = title.length > 60 ? title.substring(0, 60) + "..." : title;
+                          const description = q.description || "";
+                          const displayTitle =
+                            title.length > 80 ? title.substring(0, 80) + "..." : title;
+                          const displayDescription =
+                            description.length > 120
+                              ? description.substring(0, 120) + "..."
+                              : description;
                           const questionNumber = `Q${currentIndex + index + 2}`;
+                          const isSelected = targetQuestionId === q.id;
+
                           return (
                             <CommandItem
                               key={q.id}
-                              value={`${questionNumber} ${title}`}
+                              value={`${questionNumber} ${title} ${description}`}
                               onSelect={() => {
                                 setTargetQuestionId(q.id);
                                 setOpen(false);
                               }}
+                              className={cn(
+                                "px-4 py-3 cursor-pointer transition-all hover:bg-blue-50 focus:bg-blue-50 focus:outline-none",
+                                isSelected && "bg-blue-100 border-l-4 border-blue-500",
+                              )}
+                              role="option"
+                              aria-selected={isSelected}
+                              aria-label={`질문 ${questionNumber}: ${title}${
+                                description ? ` - ${description}` : ""
+                              }`}
                             >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  targetQuestionId === q.id ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              <div className="flex flex-col">
-                                <span className="font-medium">{questionNumber}</span>
-                                <span className="text-xs text-gray-500">{displayTitle}</span>
+                              <div className="flex items-start gap-3 w-full">
+                                <Check
+                                  className={cn(
+                                    "mt-1 h-4 w-4 flex-shrink-0 transition-opacity",
+                                    isSelected ? "opacity-100 text-blue-600" : "opacity-0",
+                                  )}
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span
+                                      className={cn(
+                                        "text-xs font-bold px-2 py-1 rounded-full",
+                                        isSelected
+                                          ? "bg-blue-600 text-white"
+                                          : "bg-gray-200 text-gray-600",
+                                      )}
+                                    >
+                                      {questionNumber}
+                                    </span>
+                                    <span
+                                      className={cn(
+                                        "text-xs px-2 py-1 rounded-full capitalize",
+                                        q.type === "text" && "bg-sky-100 text-sky-700",
+                                        q.type === "textarea" && "bg-green-100 text-green-700",
+                                        q.type === "radio" && "bg-purple-100 text-purple-700",
+                                        q.type === "checkbox" && "bg-orange-100 text-orange-700",
+                                        q.type === "select" && "bg-pink-100 text-pink-700",
+                                        q.type === "table" && "bg-indigo-100 text-indigo-700",
+                                        ![
+                                          "text",
+                                          "textarea",
+                                          "radio",
+                                          "checkbox",
+                                          "select",
+                                          "table",
+                                        ].includes(q.type) && "bg-gray-100 text-gray-700",
+                                      )}
+                                    >
+                                      {q.type}
+                                    </span>
+                                  </div>
+                                  <p
+                                    className={cn(
+                                      "font-medium text-sm leading-tight mb-1",
+                                      isSelected ? "text-blue-900" : "text-gray-900",
+                                    )}
+                                  >
+                                    {displayTitle}
+                                  </p>
+                                  {description && (
+                                    <p className="text-xs text-gray-500 leading-relaxed">
+                                      {displayDescription}
+                                    </p>
+                                  )}
+                                </div>
                               </div>
                             </CommandItem>
                           );
@@ -225,7 +333,8 @@ export function BranchRuleEditor({
             <ArrowRight className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-green-800">
               <strong>분기 설정 완료:</strong>{" "}
-              {availableQuestions.find((q) => q.id === targetQuestionId)?.title || "선택된 질문"}로 이동합니다.
+              {availableQuestions.find((q) => q.id === targetQuestionId)?.title || "선택된 질문"}로
+              이동합니다.
             </p>
           </div>
         )}
