@@ -499,7 +499,7 @@ export function InteractiveTableResponse({
         return cell.content ? (
           <div className="whitespace-pre-wrap text-sm">{cell.content}</div>
         ) : (
-          <span className="text-gray-400 text-sm">내용 없음</span>
+          <span className="text-gray-400 text-sm"></span>
         );
     }
   };
@@ -604,9 +604,7 @@ export function InteractiveTableResponse({
                     }`}
                     style={{ width: `${column.width || 150}px` }}
                   >
-                    {column.label || (
-                      <span className="text-gray-400 italic text-sm">(제목 없음)</span>
-                    )}
+                    {column.label || <span className="text-gray-400 italic text-sm"></span>}
                   </th>
                 ))}
               </tr>

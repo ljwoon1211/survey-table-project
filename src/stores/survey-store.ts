@@ -319,7 +319,7 @@ function getDefaultTableRows(): TableRow[] {
   return [
     {
       id: 'row-1',
-      label: '서비스 품질',
+      label: '행 1',
       height: 60, // 기본 행 높이
       minHeight: 40, // 최소 행 높이
       cells: [
@@ -331,7 +331,7 @@ function getDefaultTableRows(): TableRow[] {
     },
     {
       id: 'row-2',
-      label: '직원 친절도',
+      label: '행 2',
       height: 60, // 기본 행 높이
       minHeight: 40, // 최소 행 높이
       cells: [

@@ -33,14 +33,14 @@ export function TablePreview({
   }
 
   // 셀 내용 렌더링 함수
-  const renderCellContent = (cell: any) => {
+  const renderCellContent = (cell: TableRow["cells"][number]) => {
     if (!cell) return <span className="text-gray-400 text-sm">-</span>;
 
     switch (cell.type) {
       case "checkbox":
         return cell.checkboxOptions && cell.checkboxOptions.length > 0 ? (
           <div className="space-y-2">
-            {cell.checkboxOptions.map((option: any) => (
+            {cell.checkboxOptions.map((option) => (
               <div key={option.id} className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -61,7 +61,7 @@ export function TablePreview({
       case "radio":
         return cell.radioOptions && cell.radioOptions.length > 0 ? (
           <div className="space-y-2">
-            {cell.radioOptions.map((option: any) => (
+            {cell.radioOptions.map((option) => (
               <div key={option.id} className="flex items-center gap-2">
                 <input
                   type="radio"
@@ -83,7 +83,7 @@ export function TablePreview({
         return cell.selectOptions && cell.selectOptions.length > 0 ? (
           <select className="w-full p-2 text-sm border border-gray-300 rounded" disabled>
             <option value="">선택하세요...</option>
-            {cell.selectOptions.map((option: any) => (
+            {cell.selectOptions.map((option) => (
               <option key={option.id} value={option.value}>
                 {option.label}
               </option>
@@ -105,7 +105,9 @@ export function TablePreview({
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = "none";
-                target.nextElementSibling!.classList.remove("hidden");
+                if (target.nextElementSibling) {
+                  target.nextElementSibling.classList.remove("hidden");
+                }
               }}
             />
             <div className="hidden items-center gap-1 text-red-500 text-sm">
@@ -173,11 +175,29 @@ export function TablePreview({
           </div>
         );
 
+      case "input":
+        return (
+          <div className="w-full">
+            <input
+              type="text"
+              placeholder={cell.placeholder || "답변을 입력하세요..."}
+              maxLength={cell.inputMaxLength}
+              disabled
+              className="w-full p-2 text-sm border border-gray-300 rounded bg-gray-50"
+            />
+            {cell.inputMaxLength && (
+              <div className="text-xs text-gray-500 mt-1 text-right">
+                최대 {cell.inputMaxLength}자
+              </div>
+            )}
+          </div>
+        );
+
       default:
         return cell.content ? (
           <div className="whitespace-pre-wrap text-sm">{cell.content}</div>
         ) : (
-          <span className="text-gray-400 text-sm">내용 없음</span>
+          <span className="text-gray-400 text-sm"></span>
         );
     }
   };
@@ -221,9 +241,7 @@ export function TablePreview({
                     className="border border-gray-300 p-3 bg-gray-50 font-medium text-center"
                     style={{ width: `${column.width || 150}px` }}
                   >
-                    {column.label || (
-                      <span className="text-gray-400 italic text-sm">(제목 없음)</span>
-                    )}
+                    {column.label || <span className="text-gray-400 italic text-sm"></span>}
                   </th>
                 ))}
               </tr>

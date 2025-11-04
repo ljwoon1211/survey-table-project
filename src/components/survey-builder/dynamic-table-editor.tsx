@@ -432,8 +432,26 @@ export function DynamicTableEditor({
         ) : (
           <span className="text-gray-400 text-sm">동영상 없음</span>
         );
+      case "input":
+        return (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600 truncate">
+              {cell.placeholder ? `입력 필드: ${cell.placeholder}` : "단답형 입력"}
+            </span>
+          </div>
+        );
+      case "select":
+        return cell.selectOptions && cell.selectOptions.length > 0 ? (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600 truncate">
+              선택 ({cell.selectOptions.length}개)
+            </span>
+          </div>
+        ) : (
+          <span className="text-gray-400 text-sm">선택 옵션 없음</span>
+        );
       default:
-        return cell.content || <span className="text-gray-400 text-sm">내용 없음</span>;
+        return cell.content || <span className="text-gray-400 text-sm"></span>;
     }
   };
 
@@ -477,8 +495,13 @@ export function DynamicTableEditor({
                 {currentRows.reduce(
                   (count, row) =>
                     count +
-                    row.cells.filter((cell) => cell.type === "checkbox" || cell.type === "radio")
-                      .length,
+                    row.cells.filter(
+                      (cell) =>
+                        cell.type === "checkbox" ||
+                        cell.type === "radio" ||
+                        cell.type === "select" ||
+                        cell.type === "input",
+                    ).length,
                   0,
                 )}
               </div>
@@ -682,6 +705,16 @@ export function DynamicTableEditor({
                               {cell.type === "radio" && cell.radioOptions && (
                                 <div className="mt-1 text-purple-600">
                                   라디오 {cell.radioOptions.length}개
+                                </div>
+                              )}
+                              {cell.type === "select" && cell.selectOptions && (
+                                <div className="mt-1 text-indigo-600">
+                                  선택 {cell.selectOptions.length}개
+                                </div>
+                              )}
+                              {cell.type === "input" && (
+                                <div className="mt-1 text-teal-600">
+                                  {cell.placeholder || "단답형 입력"}
                                 </div>
                               )}
                               {cell.type === "image" && cell.imageUrl && (
