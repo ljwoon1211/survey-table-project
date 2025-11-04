@@ -68,7 +68,8 @@ export function InteractiveTableResponse({
         cell.type === "text" ||
         cell.type === "checkbox" ||
         cell.type === "radio" ||
-        cell.type === "select"
+        cell.type === "select" ||
+        cell.type === "input"
       ) {
         return (
           currentResponse[cell.id] !== undefined &&
@@ -443,6 +444,38 @@ export function InteractiveTableResponse({
           <div className="flex items-center gap-2 text-gray-500">
             <Video className="w-4 h-4" />
             <span className="text-sm">동영상 없음</span>
+          </div>
+        );
+
+      case "input":
+        return (
+          <div className="space-y-1.5">
+            <Input
+              type="text"
+              value={(cellResponse as string) || ""}
+              onChange={(e) => handleTextChange(cell.id, e.target.value)}
+              placeholder={cell.placeholder || "답변을 입력하세요..."}
+              maxLength={cell.inputMaxLength}
+              disabled={!isTestMode}
+              className="w-full text-sm"
+            />
+            {cell.inputMaxLength && (
+              <div className="flex justify-end">
+                <p className="text-xs text-gray-500">
+                  <span
+                    className={
+                      ((cellResponse as string) || "").length >= cell.inputMaxLength
+                        ? "text-red-500 font-medium"
+                        : ""
+                    }
+                  >
+                    {((cellResponse as string) || "").length}
+                  </span>
+                  {" / "}
+                  {cell.inputMaxLength}자
+                </p>
+              </div>
+            )}
           </div>
         );
 

@@ -28,6 +28,44 @@ export function DynamicTableEditor({
   currentQuestionId = "",
   onTableChange,
 }: DynamicTableEditorProps) {
+  // isHidden 속성을 재계산하는 헬퍼 함수
+  const recalculateHiddenCells = useCallback((tableRows: TableRow[]): TableRow[] => {
+    return tableRows.map((row, rIndex) => ({
+      ...row,
+      cells: row.cells.map((c, cIndex) => {
+        // 현재 셀이 병합으로 인해 숨겨져야 하는지 확인
+        let shouldBeHidden = false;
+
+        // 모든 행과 열을 순회하면서 병합된 셀이 현재 셀을 덮는지 확인
+        for (let r = 0; r < tableRows.length; r++) {
+          for (let col = 0; col < tableRows[r].cells.length; col++) {
+            const checkCell = tableRows[r].cells[col];
+            const rowspan = checkCell.rowspan || 1;
+            const colspan = checkCell.colspan || 1;
+
+            // 병합된 셀이 있고, 병합 영역이 1보다 큰 경우만 처리
+            if (rowspan > 1 || colspan > 1) {
+              const isInRowRange = rIndex >= r && rIndex < r + rowspan;
+              const isInColRange = cIndex >= col && cIndex < col + colspan;
+
+              // 병합 영역 내에 있고, 시작 셀이 아닌 경우
+              if (isInRowRange && isInColRange && !(r === rIndex && col === cIndex)) {
+                shouldBeHidden = true;
+                break;
+              }
+            }
+          }
+          if (shouldBeHidden) break;
+        }
+
+        return {
+          ...c,
+          isHidden: shouldBeHidden,
+        };
+      }),
+    }));
+  }, []);
+
   const [currentTitle, setCurrentTitle] = useState(tableTitle);
   const [currentColumns, setCurrentColumns] = useState<TableColumn[]>(
     columns.length > 0
@@ -37,22 +75,26 @@ export function DynamicTableEditor({
           { id: "col-2", label: "열 2", width: 150, minWidth: 60 },
         ],
   );
-  const [currentRows, setCurrentRows] = useState<TableRow[]>(
-    rows.length > 0
-      ? rows
-      : [
-          {
-            id: "row-1",
-            label: "행 1",
-            height: 60,
-            minHeight: 40,
-            cells: [
-              { id: "cell-1-1", content: "", type: "text" },
-              { id: "cell-1-2", content: "", type: "text" },
-            ],
-          },
-        ],
-  );
+  const [currentRows, setCurrentRows] = useState<TableRow[]>(() => {
+    const initialRows =
+      rows.length > 0
+        ? rows
+        : [
+            {
+              id: "row-1",
+              label: "행 1",
+              height: 60,
+              minHeight: 40,
+              cells: [
+                { id: "cell-1-1", content: "", type: "text" },
+                { id: "cell-1-2", content: "", type: "text" },
+              ],
+            },
+          ];
+
+    // 초기 로드 시 isHidden 재계산
+    return recalculateHiddenCells(initialRows);
+  });
 
   const [selectedCell, setSelectedCell] = useState<{
     rowId: string;
@@ -171,19 +213,34 @@ export function DynamicTableEditor({
     };
 
     const updatedColumns = [...currentColumns, newColumn];
+    const newColIndex = currentColumns.length;
 
     // 모든 행에 새 셀 추가
-    const updatedRows = currentRows.map((row) => ({
-      ...row,
-      cells: [
-        ...row.cells,
-        {
-          id: `cell-${row.id}-${newColumn.id}`,
-          content: "",
-          type: "text" as const,
-        },
-      ],
-    }));
+    const updatedRows = currentRows.map((row, rowIndex) => {
+      // 새 열 위치가 기존 병합 셀의 colspan 영역에 포함되는지 확인
+      let shouldBeHidden = false;
+      for (let col = 0; col < row.cells.length; col++) {
+        const cell = row.cells[col];
+        const colspan = cell.colspan || 1;
+        if (col < newColIndex && col + colspan > newColIndex) {
+          shouldBeHidden = true;
+          break;
+        }
+      }
+
+      return {
+        ...row,
+        cells: [
+          ...row.cells,
+          {
+            id: `cell-${row.id}-${newColumn.id}`,
+            content: "",
+            type: "text" as const,
+            isHidden: shouldBeHidden,
+          },
+        ],
+      };
+    });
 
     setCurrentColumns(updatedColumns);
     setCurrentRows(updatedRows);
@@ -219,16 +276,45 @@ export function DynamicTableEditor({
 
   // 행 추가
   const addRow = () => {
+    const newRowIndex = currentRows.length;
+
+    // 새 행의 각 셀이 기존 병합 셀의 rowspan 영역에 포함되는지 확인
+    const cells = currentColumns.map((col, colIndex) => {
+      let shouldBeHidden = false;
+
+      // 위쪽 행들을 확인하여 rowspan이 새 행까지 미치는지 체크
+      for (let r = 0; r < currentRows.length; r++) {
+        const cell = currentRows[r].cells[colIndex];
+        if (!cell) continue;
+
+        const rowspan = cell.rowspan || 1;
+        const colspan = cell.colspan || 1;
+
+        // 이 셀의 rowspan이 새 행까지 미치고, colspan이 현재 열을 포함하는지 확인
+        if (r + rowspan > newRowIndex) {
+          // colspan 확인
+          const cellColIndex = currentRows[r].cells.findIndex((c) => c.id === cell.id);
+          if (colIndex >= cellColIndex && colIndex < cellColIndex + colspan) {
+            shouldBeHidden = true;
+            break;
+          }
+        }
+      }
+
+      return {
+        id: `cell-${Date.now()}-${colIndex}`,
+        content: "",
+        type: "text" as const,
+        isHidden: shouldBeHidden,
+      };
+    });
+
     const newRow: TableRow = {
       id: `row-${Date.now()}`,
       label: `행 ${currentRows.length + 1}`,
       height: 60, // 기본 행 높이
       minHeight: 40, // 최소 행 높이
-      cells: currentColumns.map((col, index) => ({
-        id: `cell-${Date.now()}-${index}`,
-        content: "",
-        type: "text" as const,
-      })),
+      cells,
     };
 
     const updatedRows = [...currentRows, newRow];
@@ -257,6 +343,7 @@ export function DynamicTableEditor({
 
   // 셀 내용 업데이트
   const updateCell = (rowIndex: number, cellIndex: number, cell: TableCell) => {
+    // 먼저 해당 셀을 업데이트
     const updatedRows = currentRows.map((row, rIndex) =>
       rIndex === rowIndex
         ? {
@@ -266,8 +353,11 @@ export function DynamicTableEditor({
         : row,
     );
 
-    setCurrentRows(updatedRows);
-    notifyChange(currentTitle, currentColumns, updatedRows);
+    // 병합된 셀로 인해 숨겨져야 하는 셀들을 재계산
+    const finalRows = recalculateHiddenCells(updatedRows);
+
+    setCurrentRows(finalRows);
+    notifyChange(currentTitle, currentColumns, finalRows);
     setSelectedCell(null);
   };
 
@@ -507,7 +597,14 @@ export function DynamicTableEditor({
                   <tr key={row.id} style={{ height: row.height ? `${row.height}px` : "60px" }}>
                     {/* 셀들 */}
                     {row.cells.map((cell, cellIndex) => {
+                      // 숨겨진 셀은 렌더링하지 않음
+                      if (cell.isHidden) return null;
+
                       const column = currentColumns[cellIndex];
+                      const rowspan = cell.rowspan || 1;
+                      const colspan = cell.colspan || 1;
+                      const isMerged = rowspan > 1 || colspan > 1;
+
                       return (
                         <td
                           key={cell.id}
@@ -517,6 +614,8 @@ export function DynamicTableEditor({
                             maxWidth: column?.width ? `${column.width}px` : "150px",
                             height: row.height ? `${row.height}px` : "60px",
                           }}
+                          rowSpan={rowspan}
+                          colSpan={colspan}
                         >
                           <div
                             className="h-full group cursor-pointer hover:bg-gray-50 rounded p-2 transition-colors flex flex-col"
@@ -542,6 +641,11 @@ export function DynamicTableEditor({
                                 </span>
                                 <span className="capitalize font-medium">{cell.type}</span>
                               </div>
+                              {isMerged && (
+                                <div className="mt-1 text-orange-600 font-medium">
+                                  🔗 병합: {rowspan}행 × {colspan}열
+                                </div>
+                              )}
                               {cell.type === "checkbox" && cell.checkboxOptions && (
                                 <div className="mt-1 text-green-600">
                                   체크박스 {cell.checkboxOptions.length}개

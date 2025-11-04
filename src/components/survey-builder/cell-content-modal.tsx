@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TableCell, CheckboxOption, RadioOption, QuestionOption } from "@/types/survey";
-import { Type, Image, Video, CheckSquare, Circle, ChevronDown } from "lucide-react";
+import { Type, Image, Video, CheckSquare, Circle, ChevronDown, PenLine } from "lucide-react";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
 import { BranchRuleEditor } from "./branch-rule-editor";
 
@@ -36,7 +36,7 @@ export function CellContentModal({
 }: CellContentModalProps) {
   const { currentSurvey } = useSurveyBuilderStore();
   const [contentType, setContentType] = useState<
-    "text" | "image" | "video" | "checkbox" | "radio" | "select"
+    "text" | "image" | "video" | "checkbox" | "radio" | "select" | "input"
   >(cell.type || "text");
   const [textContent, setTextContent] = useState(cell.content || "");
   const [imageUrl, setImageUrl] = useState(cell.imageUrl || "");
@@ -48,6 +48,8 @@ export function CellContentModal({
   const [radioGroupName, setRadioGroupName] = useState(cell.radioGroupName || "");
   const [selectOptions, setSelectOptions] = useState<QuestionOption[]>(cell.selectOptions || []);
   const [allowOtherOption, setAllowOtherOption] = useState(cell.allowOtherOption || false);
+  const [inputPlaceholder, setInputPlaceholder] = useState(cell.placeholder || "");
+  const [inputMaxLength, setInputMaxLength] = useState<number | "">(cell.inputMaxLength || "");
 
   // 조건부 분기 토글 상태
   const [showBranchSettings, setShowBranchSettings] = useState(false);
@@ -159,6 +161,9 @@ export function CellContentModal({
       allowOtherOption: ["checkbox", "radio", "select"].includes(contentType)
         ? allowOtherOption
         : undefined,
+      placeholder: contentType === "input" ? inputPlaceholder : undefined,
+      inputMaxLength:
+        contentType === "input" && typeof inputMaxLength === "number" ? inputMaxLength : undefined,
       // 셀 병합 속성 추가
       rowspan: isMergeEnabled && typeof rowspan === "number" && rowspan > 1 ? rowspan : undefined,
       colspan: isMergeEnabled && typeof colspan === "number" && colspan > 1 ? colspan : undefined,
@@ -178,6 +183,8 @@ export function CellContentModal({
     setRadioGroupName(cell.radioGroupName || "");
     setSelectOptions(cell.selectOptions || []);
     setAllowOtherOption(cell.allowOtherOption || false);
+    setInputPlaceholder(cell.placeholder || "");
+    setInputMaxLength(cell.inputMaxLength || "");
     setIsMergeEnabled(
       (cell.rowspan && cell.rowspan > 1) || (cell.colspan && cell.colspan > 1) || false,
     );
@@ -211,10 +218,12 @@ export function CellContentModal({
         <Tabs
           value={contentType}
           onValueChange={(value) =>
-            setContentType(value as "text" | "image" | "video" | "checkbox" | "radio" | "select")
+            setContentType(
+              value as "text" | "image" | "video" | "checkbox" | "radio" | "select" | "input",
+            )
           }
         >
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="text" className="flex items-center gap-2">
               <Type className="w-4 h-4" />
               텍스트
@@ -226,6 +235,10 @@ export function CellContentModal({
             <TabsTrigger value="video" className="flex items-center gap-2">
               <Video className="w-4 h-4" />
               동영상
+            </TabsTrigger>
+            <TabsTrigger value="input" className="flex items-center gap-2">
+              <PenLine className="w-4 h-4" />
+              단답형
             </TabsTrigger>
             <TabsTrigger value="checkbox" className="flex items-center gap-2">
               <CheckSquare className="w-4 h-4" />
@@ -354,6 +367,86 @@ export function CellContentModal({
             )}
           </TabsContent>
 
+          {/* 단답형 입력 탭 */}
+          <TabsContent value="input" className="space-y-4">
+            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 mb-4">
+              <div className="flex items-start gap-2">
+                <PenLine className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-blue-900">단답형 입력 필드</p>
+                  <p className="text-xs text-blue-700 mt-1">
+                    사용자가 짧은 텍스트를 입력할 수 있는 필드입니다. 이름, 이메일, 전화번호 등
+                    간단한 정보 수집에 적합합니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="input-placeholder" className="text-sm font-medium">
+                안내 문구 (Placeholder)
+              </Label>
+              <Input
+                id="input-placeholder"
+                value={inputPlaceholder}
+                onChange={(e) => setInputPlaceholder(e.target.value)}
+                placeholder="예: 이름을 입력하세요"
+                className="w-full"
+              />
+              <p className="text-xs text-gray-500">입력 필드에 표시될 안내 문구를 입력하세요</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="input-max-length" className="text-sm font-medium">
+                최대 글자 수 <span className="text-gray-500 font-normal">(선택사항)</span>
+              </Label>
+              <Input
+                id="input-max-length"
+                type="number"
+                min={1}
+                max={500}
+                value={inputMaxLength}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === "") {
+                    setInputMaxLength("");
+                  } else {
+                    const num = parseInt(value);
+                    if (!isNaN(num) && num >= 1 && num <= 500) {
+                      setInputMaxLength(num);
+                    }
+                  }
+                }}
+                placeholder="제한 없음"
+                className="w-full"
+              />
+              <p className="text-xs text-gray-500">
+                {inputMaxLength === "" || inputMaxLength === 0
+                  ? "글자 수 제한이 없습니다"
+                  : `최대 ${inputMaxLength}자까지 입력 가능`}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">미리보기</Label>
+              <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                <div className="space-y-2">
+                  <Input
+                    placeholder={inputPlaceholder || "답변을 입력하세요..."}
+                    maxLength={typeof inputMaxLength === "number" ? inputMaxLength : undefined}
+                    disabled
+                    className="bg-white"
+                  />
+                  {typeof inputMaxLength === "number" && inputMaxLength > 0 && (
+                    <div className="flex justify-between items-center text-xs text-gray-500">
+                      <span>0 / {inputMaxLength}자</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
           {/* 체크박스 탭 */}
           <TabsContent value="checkbox" className="space-y-4">
             <div className="space-y-4">
@@ -387,9 +480,12 @@ export function CellContentModal({
                 </div>
               </div>
 
-              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+              <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
                 {checkboxOptions.map((option, index) => (
-                  <div key={option.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div
+                    key={option.id}
+                    className="border border-gray-200 rounded-lg overflow-hidden"
+                  >
                     <div className="flex items-center gap-2 p-3">
                       <input
                         type="checkbox"
@@ -468,8 +564,8 @@ export function CellContentModal({
                   <p className="text-sm text-blue-700">
                     <strong>💡 기타 옵션이 활성화되었습니다.</strong>
                     <br />
-                    마지막에 "기타" 체크박스가 자동으로 추가되어 사용자가 직접 텍스트를 입력할 수
-                    있습니다.
+                    마지막에 &quot;기타&quot; 체크박스가 자동으로 추가되어 사용자가 직접 텍스트를
+                    입력할 수 있습니다.
                   </p>
                 </div>
               )}
@@ -477,7 +573,7 @@ export function CellContentModal({
             {checkboxOptions.length > 0 && (
               <div className="space-y-2">
                 <Label>미리보기</Label>
-                <div className="p-3 border rounded-md bg-gray-50 max-h-[200px] overflow-y-auto">
+                <div className="p-3 border rounded-md bg-gray-50 max-h-[150px] overflow-y-auto">
                   <div className="space-y-2">
                     {checkboxOptions.map((option) => (
                       <div key={option.id} className="flex items-center gap-2">
@@ -541,9 +637,12 @@ export function CellContentModal({
                 </div>
               </div>
 
-              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+              <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
                 {radioOptions.map((option, index) => (
-                  <div key={option.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div
+                    key={option.id}
+                    className="border border-gray-200 rounded-lg overflow-hidden"
+                  >
                     <div className="flex items-center gap-2 p-3">
                       <input
                         type="radio"
@@ -626,8 +725,8 @@ export function CellContentModal({
                   <p className="text-sm text-blue-700">
                     <strong>💡 기타 옵션이 활성화되었습니다.</strong>
                     <br />
-                    마지막에 "기타" 라디오 버튼이 자동으로 추가되어 사용자가 직접 텍스트를 입력할 수
-                    있습니다.
+                    마지막에 &quot;기타&quot; 라디오 버튼이 자동으로 추가되어 사용자가 직접 텍스트를
+                    입력할 수 있습니다.
                   </p>
                 </div>
               )}
@@ -635,7 +734,7 @@ export function CellContentModal({
             {radioOptions.length > 0 && (
               <div className="space-y-2">
                 <Label>미리보기</Label>
-                <div className="p-3 border rounded-md bg-gray-50 max-h-[200px] overflow-y-auto">
+                <div className="p-3 border rounded-md bg-gray-50 max-h-[150px] overflow-y-auto">
                   <div className="space-y-2">
                     {radioOptions.map((option) => (
                       <div key={option.id} className="flex items-center gap-2">
@@ -690,7 +789,7 @@ export function CellContentModal({
                 </div>
               </div>
 
-              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+              <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
                 {selectOptions.map((option, index) => (
                   <div
                     key={option.id}
@@ -763,8 +862,8 @@ export function CellContentModal({
                   <p className="text-sm text-blue-700">
                     <strong>💡 기타 옵션이 활성화되었습니다.</strong>
                     <br />
-                    마지막에 "기타" 선택 옵션이 자동으로 추가되어 사용자가 직접 텍스트를 입력할 수
-                    있습니다.
+                    마지막에 &quot;기타&quot; 선택 옵션이 자동으로 추가되어 사용자가 직접 텍스트를
+                    입력할 수 있습니다.
                   </p>
                 </div>
               )}

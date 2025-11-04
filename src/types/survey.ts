@@ -33,7 +33,7 @@ export interface TableCell {
   content: string;
   imageUrl?: string;
   videoUrl?: string;
-  type: 'text' | 'image' | 'video' | 'checkbox' | 'radio' | 'select';
+  type: 'text' | 'image' | 'video' | 'checkbox' | 'radio' | 'select' | 'input';
   // 체크박스/라디오 버튼 관련 속성
   checkboxOptions?: CheckboxOption[];
   radioOptions?: RadioOption[];
@@ -41,6 +41,9 @@ export interface TableCell {
   // select 관련 속성
   selectOptions?: QuestionOption[];
   allowOtherOption?: boolean; // 기타 옵션 허용 여부
+  // input 관련 속성
+  placeholder?: string; // 단문형 입력 필드 placeholder
+  inputMaxLength?: number; // 단문형 입력 필드 최대 길이
   // 셀 병합 관련 속성
   rowspan?: number; // 행 병합 (세로)
   colspan?: number; // 열 병합 (가로)
