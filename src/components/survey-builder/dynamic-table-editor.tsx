@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TableCell, TableColumn, TableRow } from "@/types/survey";
-import { Plus, Trash2, Edit3, Image, Video, CheckSquare, Circle } from "lucide-react";
+import { Plus, Trash2, Image, Video, CheckSquare, Circle, Copy, Clipboard } from "lucide-react";
 import { CellContentModal } from "./cell-content-modal";
 
 interface DynamicTableEditorProps {
@@ -76,7 +76,7 @@ export function DynamicTableEditor({
         ],
   );
   const [currentRows, setCurrentRows] = useState<TableRow[]>(() => {
-    const initialRows =
+    const initialRows: TableRow[] =
       rows.length > 0
         ? rows
         : [
@@ -86,8 +86,8 @@ export function DynamicTableEditor({
               height: 60,
               minHeight: 40,
               cells: [
-                { id: "cell-1-1", content: "", type: "text" },
-                { id: "cell-1-2", content: "", type: "text" },
+                { id: "cell-1-1", content: "", type: "text" as const },
+                { id: "cell-1-2", content: "", type: "text" as const },
               ],
             },
           ];
@@ -99,6 +99,13 @@ export function DynamicTableEditor({
   const [selectedCell, setSelectedCell] = useState<{
     rowId: string;
     cellId: string;
+  } | null>(null);
+
+  // 셀 복사/붙여넣기 관련 상태
+  const [copiedCell, setCopiedCell] = useState<TableCell | null>(null);
+  const [copiedCellPosition, setCopiedCellPosition] = useState<{
+    rowIndex: number;
+    cellIndex: number;
   } | null>(null);
 
   // 드래그 리사이즈 관련 상태 (행)
@@ -279,7 +286,7 @@ export function DynamicTableEditor({
     const newRowIndex = currentRows.length;
 
     // 새 행의 각 셀이 기존 병합 셀의 rowspan 영역에 포함되는지 확인
-    const cells = currentColumns.map((col, colIndex) => {
+    const cells = currentColumns.map((_col, colIndex) => {
       let shouldBeHidden = false;
 
       // 위쪽 행들을 확인하여 rowspan이 새 행까지 미치는지 체크
@@ -340,6 +347,85 @@ export function DynamicTableEditor({
     setCurrentRows(updatedRows);
     notifyChange(currentTitle, currentColumns, updatedRows);
   };
+
+  // 셀 복사
+  const copyCell = useCallback(
+    (rowIndex: number, cellIndex: number) => {
+      const cell = currentRows[rowIndex]?.cells[cellIndex];
+      if (!cell) return;
+
+      // ID를 제외한 모든 설정 복사
+      const cellToCopy: TableCell = {
+        ...cell,
+        id: "", // ID는 붙여넣기 시 새로 생성
+      };
+
+      setCopiedCell(cellToCopy);
+      setCopiedCellPosition({ rowIndex, cellIndex });
+    },
+    [currentRows],
+  );
+
+  // 셀 붙여넣기
+  const pasteCell = useCallback(
+    (rowIndex: number, cellIndex: number) => {
+      if (!copiedCell) return;
+
+      const targetCell = currentRows[rowIndex]?.cells[cellIndex];
+      if (!targetCell) return;
+
+      // 복사한 셀의 내용을 붙여넣되, ID는 대상 셀의 것을 유지
+      const pastedCell: TableCell = {
+        ...copiedCell,
+        id: targetCell.id,
+      };
+
+      // 먼저 해당 셀을 업데이트
+      let updatedRows = currentRows.map((row, rIndex) =>
+        rIndex === rowIndex
+          ? {
+              ...row,
+              cells: row.cells.map((c, cIndex) => (cIndex === cellIndex ? pastedCell : c)),
+            }
+          : row,
+      );
+
+      // 병합된 셀인 경우, 병합 영역 내의 모든 셀에 동일한 내용 복사
+      const rowspan = pastedCell.rowspan || 1;
+      const colspan = pastedCell.colspan || 1;
+
+      if (rowspan > 1 || colspan > 1) {
+        updatedRows = updatedRows.map((row, rIndex) => ({
+          ...row,
+          cells: row.cells.map((c, cIndex) => {
+            // 병합 영역 내에 있는지 확인
+            const isInRowRange = rIndex >= rowIndex && rIndex < rowIndex + rowspan;
+            const isInColRange = cIndex >= cellIndex && cIndex < cellIndex + colspan;
+
+            // 병합 영역 내에 있고, 시작 셀이 아닌 경우
+            if (isInRowRange && isInColRange && !(rIndex === rowIndex && cIndex === cellIndex)) {
+              // 시작 셀의 내용과 속성을 복사 (rowspan, colspan 제외)
+              return {
+                ...pastedCell,
+                id: c.id, // 원래 셀의 ID는 유지
+                rowspan: undefined, // 병합된 셀들은 rowspan/colspan을 가지지 않음
+                colspan: undefined,
+              };
+            }
+
+            return c;
+          }),
+        }));
+      }
+
+      // 병합된 셀로 인해 숨겨져야 하는 셀들을 재계산
+      const finalRows = recalculateHiddenCells(updatedRows);
+
+      setCurrentRows(finalRows);
+      notifyChange(currentTitle, currentColumns, finalRows);
+    },
+    [copiedCell, currentRows, recalculateHiddenCells, currentTitle, currentColumns, notifyChange],
+  );
 
   // 셀 내용 업데이트
   const updateCell = (rowIndex: number, cellIndex: number, cell: TableCell) => {
@@ -417,7 +503,7 @@ export function DynamicTableEditor({
       case "image":
         return cell.imageUrl ? (
           <div className="flex items-center gap-2">
-            <Image className="w-4 h-4 text-blue-500" />
+            <Image className="w-4 h-4 text-blue-500" aria-label="이미지 아이콘" />
             <span className="text-sm text-gray-600 truncate">이미지</span>
           </div>
         ) : (
@@ -530,6 +616,18 @@ export function DynamicTableEditor({
           <CardTitle className="flex items-center justify-between">
             <span>테이블 구조 편집</span>
             <div className="flex gap-2">
+              {copiedCell && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700">
+                  <Clipboard className="w-4 h-4" />
+                  <span>
+                    셀 복사됨 (
+                    {copiedCellPosition
+                      ? `${copiedCellPosition.rowIndex + 1}, ${copiedCellPosition.cellIndex + 1}`
+                      : ""}
+                    )
+                  </span>
+                </div>
+              )}
               <Button onClick={addColumn} size="sm" variant="outline">
                 <Plus className="w-4 h-4 mr-1" />열 추가
               </Button>
@@ -677,13 +775,34 @@ export function DynamicTableEditor({
                           >
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">{renderCellContent(cell)}</div>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                <Edit3 className="w-3 h-3" />
-                              </Button>
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    copyCell(rowIndex, cellIndex);
+                                  }}
+                                  title="셀 복사"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                </Button>
+                                {copiedCell && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      pasteCell(rowIndex, cellIndex);
+                                    }}
+                                    title="셀 붙여넣기"
+                                  >
+                                    <Clipboard className="w-3 h-3" />
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                             <div className="text-xs text-gray-400 mt-1 border-t border-gray-100 pt-1">
                               <div className="flex justify-between items-center">

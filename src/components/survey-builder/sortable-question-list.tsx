@@ -68,6 +68,7 @@ function SortableQuestion({
     <Card
       ref={setNodeRef}
       style={style}
+      data-question-index={index}
       className={`relative group transition-all duration-200 ${
         isSelected
           ? "ring-2 ring-blue-500 border-blue-200 shadow-lg"
@@ -236,7 +237,7 @@ function QuestionTestCard({ question, index }: { question: Question; index: numb
   };
 
   return (
-    <Card className="p-6 border-l-4 border-l-blue-500">
+    <Card className="p-6 border-l-4 border-l-blue-500" data-question-index={index}>
       <div className="mb-4">
         <div className="flex items-center space-x-2 mb-2">
           <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-sm font-medium">

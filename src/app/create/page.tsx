@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,8 @@ import {
   Check,
   Trash2,
   Info,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -112,6 +114,23 @@ export default function CreateSurveyPage() {
   const [titleInput, setTitleInput] = useState(currentSurvey.title);
   const [showSavedSurveys, setShowSavedSurveys] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const [questionNumberInput, setQuestionNumberInput] = useState("");
+  const [showScrollButtons, setShowScrollButtons] = useState(false);
+  const mainContentRef = useRef<HTMLDivElement>(null);
+
+  // 스크롤 감지
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 200) {
+        setShowScrollButtons(true);
+      } else {
+        setShowScrollButtons(false);
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   // OTT 설문지 예제 추가 함수
   const handleAddOTTSurvey = () => {
@@ -155,6 +174,40 @@ export default function CreateSurveyPage() {
     if (confirm("현재 작업 중인 설문을 저장하지 않고 새로 시작하시겠습니까?")) {
       resetSurvey();
       setTitleInput("새 설문조사");
+    }
+  };
+
+  // 맨 위로 스크롤
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // 맨 아래로 스크롤
+  const scrollToBottom = () => {
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+  };
+
+  // 특정 질문으로 스크롤
+  const scrollToQuestion = (questionNumber: number) => {
+    const questionIndex = questionNumber - 1;
+    if (questionIndex >= 0 && questionIndex < currentSurvey.questions.length) {
+      const questionElement = document.querySelector(`[data-question-index="${questionIndex}"]`);
+      if (questionElement) {
+        questionElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        // 해당 질문 선택
+        selectQuestion(currentSurvey.questions[questionIndex].id);
+      }
+    }
+  };
+
+  // 질문 번호 입력 핸들러
+  const handleQuestionNumberKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      const questionNumber = parseInt(questionNumberInput, 10);
+      if (!isNaN(questionNumber) && questionNumber > 0) {
+        scrollToQuestion(questionNumber);
+        setQuestionNumberInput("");
+      }
     }
   };
 
@@ -351,6 +404,23 @@ export default function CreateSurveyPage() {
                       테스트 모드
                     </span>
                   )}
+                  {!isTestMode && !isPreviewMode && currentSurvey.questions.length > 0 && (
+                    <div className="flex items-center space-x-2">
+                      <Input
+                        type="number"
+                        min="1"
+                        max={currentSurvey.questions.length}
+                        value={questionNumberInput}
+                        onChange={(e) => setQuestionNumberInput(e.target.value)}
+                        onKeyPress={handleQuestionNumberKeyPress}
+                        placeholder="질문 번호"
+                        className="w-24 h-8 text-sm"
+                      />
+                      <span className="text-xs text-gray-500">
+                        / {currentSurvey.questions.length}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className="text-sm text-gray-500">{currentSurvey.questions.length}개 질문</div>
               </div>
@@ -417,6 +487,28 @@ export default function CreateSurveyPage() {
           </div>
         </div>
       </div>
+
+      {/* Floating Scroll Buttons */}
+      {showScrollButtons && (
+        <div className="fixed right-6 bottom-6 flex flex-col space-y-2 z-50">
+          <Button
+            onClick={scrollToTop}
+            size="sm"
+            className="w-12 h-12 rounded-full shadow-lg bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 transition-all duration-200 hover:scale-110"
+            title="맨 위로"
+          >
+            <ArrowUp className="w-5 h-5" />
+          </Button>
+          <Button
+            onClick={scrollToBottom}
+            size="sm"
+            className="w-12 h-12 rounded-full shadow-lg bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 transition-all duration-200 hover:scale-110"
+            title="맨 아래로"
+          >
+            <ArrowDown className="w-5 h-5" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

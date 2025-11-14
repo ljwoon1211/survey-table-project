@@ -19,6 +19,55 @@ export interface BranchRule {
   targetQuestionId?: string; // action이 'goto'일 때 이동할 질문 ID
 }
 
+// 테이블 검증 규칙 타입
+export type TableValidationType =
+  | 'exclusive-check'      // 특정 행만 체크된 경우 (예: "~만 있는 경우")
+  | 'required-combination' // 특정 조합이 체크된 경우
+  | 'any-of'              // 여러 행 중 하나라도 체크된 경우
+  | 'all-of'              // 특정 행들이 모두 체크된 경우
+  | 'none-of';            // 특정 행들이 모두 체크 안된 경우
+
+// 테이블 검증 규칙
+export interface TableValidationRule {
+  id: string;
+  type: TableValidationType;
+  description?: string; // 규칙 설명
+  conditions: {
+    checkType: 'checkbox' | 'radio' | 'select' | 'input'; // 체크할 셀 타입
+    rowIds: string[]; // 체크할 행 ID들
+    cellColumnIndex?: number; // 체크할 열 인덱스 (선택사항, 없으면 모든 열 확인)
+    expectedValues?: string[]; // 기대하는 값들 (select, radio, input용)
+  };
+  action: BranchAction;
+  targetQuestionId?: string;
+  errorMessage?: string; // 조건 미충족 시 표시할 메시지
+}
+
+// 질문 표시 조건 논리 타입
+export type ConditionLogicType = 'AND' | 'OR' | 'NOT';
+
+// 질문 표시 조건
+export interface QuestionCondition {
+  id: string;
+  sourceQuestionId: string; // 조건을 확인할 질문 ID
+  conditionType: 'value-match' | 'table-cell-check' | 'custom'; // 조건 타입
+  // value-match: 특정 값과 일치하는지 확인 (radio, select 등)
+  requiredValues?: string[]; // 필요한 값들
+  // table-cell-check: 테이블의 특정 셀이 체크되었는지 확인
+  tableConditions?: {
+    rowIds: string[]; // 체크 확인할 행 ID들
+    cellColumnIndex?: number; // 체크할 열 인덱스
+    checkType: 'any' | 'all' | 'none'; // any: 하나라도, all: 모두, none: 모두 아님
+  };
+  logicType: ConditionLogicType; // 여러 조건 결합 시
+}
+
+// 질문 표시 조건 그룹 (여러 조건 조합)
+export interface QuestionConditionGroup {
+  conditions: QuestionCondition[];
+  logicType: ConditionLogicType; // 조건들을 AND/OR로 결합
+}
+
 export interface QuestionOption {
   id: string;
   label: string;
@@ -114,6 +163,10 @@ export interface Question {
   // 공지사항(notice) 타입용
   noticeContent?: string; // TipTap HTML 콘텐츠
   requiresAcknowledgment?: boolean; // 이해했다는 체크 필요 여부
+  // 테이블 검증 규칙 (테이블 타입 전용)
+  tableValidationRules?: TableValidationRule[];
+  // 질문 표시 조건 (이 질문을 표시하기 위한 조건)
+  displayCondition?: QuestionConditionGroup;
 }
 
 export interface Survey {

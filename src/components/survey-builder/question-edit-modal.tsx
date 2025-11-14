@@ -15,6 +15,9 @@ import { TablePreview } from "./table-preview";
 import { NoticeEditor } from "./notice-editor";
 import { NoticeRenderer } from "./notice-renderer";
 import { BranchRuleEditor } from "./branch-rule-editor";
+import { TableValidationEditor } from "./table-validation-editor";
+import { QuestionConditionEditor } from "./question-condition-editor";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Plus,
   X,
@@ -29,6 +32,8 @@ import {
   Video,
   Settings,
   Info,
+  AlertTriangle,
+  Eye,
 } from "lucide-react";
 
 interface QuestionEditModalProps {
@@ -60,6 +65,8 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         allowOtherOption: question.allowOtherOption || false,
         noticeContent: question.noticeContent || "",
         requiresAcknowledgment: question.requiresAcknowledgment || false,
+        tableValidationRules: question.tableValidationRules || [],
+        displayCondition: question.displayCondition,
       });
     }
   }, [question]);
@@ -345,10 +352,29 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         </DialogHeader>
 
         {/* 스크롤 가능한 본문 */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
-          <div className="space-y-6">
-            {/* 기본 정보 */}
-            <div className="space-y-4">
+        <div className="flex-1 overflow-y-auto">
+          <Tabs defaultValue="basic" className="w-full">
+            <TabsList className="w-full justify-start border-b rounded-none px-6">
+              <TabsTrigger value="basic" className="flex items-center gap-2">
+                <Settings className="w-4 h-4" />
+                기본 설정
+              </TabsTrigger>
+              {isTableType && (
+                <TabsTrigger value="validation" className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  검증 규칙
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="display-condition" className="flex items-center gap-2">
+                <Eye className="w-4 h-4" />
+                표시 조건
+              </TabsTrigger>
+            </TabsList>
+
+            {/* 기본 설정 탭 */}
+            <TabsContent value="basic" className="px-6 py-4 space-y-6">
+              {/* 기본 정보 */}
+              <div className="space-y-4">
               <div>
                 <Label htmlFor="title">
                   질문 제목 <span className="text-red-500">*</span>
@@ -865,7 +891,28 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                 </Button>
               </div>
             </div>
-          </div>
+            </TabsContent>
+
+            {/* 검증 규칙 탭 (테이블 타입만) */}
+            {isTableType && (
+              <TabsContent value="validation" className="px-6 py-4">
+                <TableValidationEditor
+                  question={question}
+                  onUpdate={(rules) => setFormData((prev) => ({ ...prev, tableValidationRules: rules }))}
+                  allQuestions={currentSurvey.questions}
+                />
+              </TabsContent>
+            )}
+
+            {/* 표시 조건 탭 */}
+            <TabsContent value="display-condition" className="px-6 py-4">
+              <QuestionConditionEditor
+                question={question}
+                onUpdate={(conditionGroup) => setFormData((prev) => ({ ...prev, displayCondition: conditionGroup }))}
+                allQuestions={currentSurvey.questions}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
 
         {/* 고정 푸터 (액션 버튼) */}
