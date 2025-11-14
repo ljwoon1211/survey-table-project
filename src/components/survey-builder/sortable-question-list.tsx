@@ -152,7 +152,16 @@ function SortableQuestion({
         <div className="mb-4">
           <h4 className="text-base font-medium text-gray-900 mb-2">{question.title}</h4>
           {question.description && (
-            <p className="text-sm text-gray-600 mb-3">{question.description}</p>
+            <div
+              className="text-sm text-gray-600 mb-3 prose prose-sm max-w-none
+                [&_table]:border-collapse [&_table]:w-full [&_table]:my-2 [&_table]:border-2 [&_table]:border-gray-300
+                [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2
+                [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-3 [&_table_th]:py-2
+                [&_table_th]:font-normal [&_table_th]:bg-transparent
+                [&_table_p]:m-0
+                [&_p]:min-h-[1.6em]"
+              dangerouslySetInnerHTML={{ __html: question.description }}
+            />
           )}
         </div>
 
@@ -223,6 +232,18 @@ function QuestionPreview({ question }: { question: Question }) {
         <div className="text-gray-400 text-sm text-center py-4">테이블이 구성되지 않았습니다.</div>
       );
 
+    case "notice":
+      return question.noticeContent ? (
+        <NoticeRenderer
+          content={question.noticeContent}
+          requiresAcknowledgment={question.requiresAcknowledgment}
+          value={false}
+          isTestMode={false}
+        />
+      ) : (
+        <div className="text-gray-400 text-sm text-center py-4">공지사항 내용이 없습니다.</div>
+      );
+
     default:
       return <div className="text-gray-400 text-sm">미리보기 준비 중...</div>;
   }
@@ -247,7 +268,16 @@ function QuestionTestCard({ question, index }: { question: Question; index: numb
         </div>
         <h3 className="text-lg font-medium text-gray-900 mb-1">{question.title}</h3>
         {question.description && (
-          <p className="text-sm text-gray-600 mb-4">{question.description}</p>
+          <div
+            className="text-sm text-gray-600 mb-4 prose prose-sm max-w-none
+              [&_table]:border-collapse [&_table]:w-full [&_table]:my-2 [&_table]:border-2 [&_table]:border-gray-300
+              [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2
+              [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-3 [&_table_th]:py-2
+              [&_table_th]:font-normal [&_table_th]:bg-transparent
+              [&_table_p]:m-0
+              [&_p]:min-h-[1.6em]"
+            dangerouslySetInnerHTML={{ __html: question.description }}
+          />
         )}
       </div>
 

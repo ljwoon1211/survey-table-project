@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Question, QuestionOption, SelectLevel } from "@/types/survey";
@@ -77,8 +76,6 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
 
     const needsOptions = ["radio", "checkbox", "select"].includes(question.type);
     const needsSelectLevels = question.type === "multiselect";
-    const isTableType = question.type === "table";
-    const isNoticeType = question.type === "notice";
     const errors: Record<string, string> = {};
 
     if (!formData.title?.trim()) {
@@ -375,522 +372,522 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
             <TabsContent value="basic" className="px-6 py-4 space-y-6">
               {/* 기본 정보 */}
               <div className="space-y-4">
-              <div>
-                <Label htmlFor="title">
-                  질문 제목 <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="title"
-                  value={formData.title || ""}
-                  onChange={(e) => {
-                    setFormData((prev) => ({ ...prev, title: e.target.value }));
-                    if (validationErrors.title) {
-                      setValidationErrors((prev) => ({ ...prev, title: "" }));
-                    }
-                  }}
-                  placeholder="질문을 입력하세요"
-                  className={`mt-2 ${
-                    validationErrors.title ? "border-red-500 focus:border-red-500" : ""
-                  }`}
-                />
-                {validationErrors.title && (
-                  <p className="text-red-500 text-sm mt-1">{validationErrors.title}</p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="description">설명 (선택사항)</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description || ""}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, description: e.target.value }))
-                  }
-                  placeholder="질문에 대한 추가 설명을 입력하세요"
-                  className="mt-2"
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="required"
-                  checked={formData.required || false}
-                  onCheckedChange={(checked) =>
-                    setFormData((prev) => ({ ...prev, required: checked }))
-                  }
-                />
-                <Label htmlFor="required">필수 질문</Label>
-              </div>
-            </div>
-
-            {/* 옵션 설정 (radio, checkbox, select) */}
-            {needsOptions && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label>
-                    선택 옵션 <span className="text-red-500">*</span>
+                <div>
+                  <Label htmlFor="title">
+                    질문 제목 <span className="text-red-500">*</span>
                   </Label>
-                  <div className="flex items-center space-x-4">
-                    {/* 기타 옵션 토글 */}
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="allow-other-option"
-                        checked={formData.allowOtherOption || false}
-                        onCheckedChange={handleOtherOptionToggle}
-                        className="scale-75"
-                      />
-                      <Label htmlFor="allow-other-option" className="text-xs text-gray-600">
-                        기타 옵션 추가
-                      </Label>
+                  <Input
+                    id="title"
+                    value={formData.title || ""}
+                    onChange={(e) => {
+                      setFormData((prev) => ({ ...prev, title: e.target.value }));
+                      if (validationErrors.title) {
+                        setValidationErrors((prev) => ({ ...prev, title: "" }));
+                      }
+                    }}
+                    placeholder="질문을 입력하세요"
+                    className={`mt-2 ${
+                      validationErrors.title ? "border-red-500 focus:border-red-500" : ""
+                    }`}
+                  />
+                  {validationErrors.title && (
+                    <p className="text-red-500 text-sm mt-1">{validationErrors.title}</p>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="description">설명 (선택사항)</Label>
+                  <div className="mt-2">
+                    <NoticeEditor
+                      content={formData.description || ""}
+                      onChange={(content) =>
+                        setFormData((prev) => ({ ...prev, description: content }))
+                      }
+                      compact={true}
+                      placeholder="질문에 대한 추가 설명을 입력하세요..."
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="required"
+                    checked={formData.required || false}
+                    onCheckedChange={(checked) =>
+                      setFormData((prev) => ({ ...prev, required: checked }))
+                    }
+                  />
+                  <Label htmlFor="required">필수 질문</Label>
+                </div>
+              </div>
+
+              {/* 옵션 설정 (radio, checkbox, select) */}
+              {needsOptions && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label>
+                      선택 옵션 <span className="text-red-500">*</span>
+                    </Label>
+                    <div className="flex items-center space-x-4">
+                      {/* 기타 옵션 토글 */}
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="allow-other-option"
+                          checked={formData.allowOtherOption || false}
+                          onCheckedChange={handleOtherOptionToggle}
+                          className="scale-75"
+                        />
+                        <Label htmlFor="allow-other-option" className="text-xs text-gray-600">
+                          기타 옵션 추가
+                        </Label>
+                      </div>
+                      {/* 조건부 분기 토글 */}
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="show-branch-settings"
+                          checked={showBranchSettings}
+                          onCheckedChange={setShowBranchSettings}
+                          className="scale-75"
+                        />
+                        <Label htmlFor="show-branch-settings" className="text-xs text-gray-600">
+                          조건부 분기
+                        </Label>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          addOption();
+                          if (validationErrors.options) {
+                            setValidationErrors((prev) => ({ ...prev, options: "" }));
+                          }
+                        }}
+                        className="flex items-center space-x-1"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>옵션 추가</span>
+                      </Button>
                     </div>
-                    {/* 조건부 분기 토글 */}
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="show-branch-settings"
-                        checked={showBranchSettings}
-                        onCheckedChange={setShowBranchSettings}
-                        className="scale-75"
-                      />
-                      <Label htmlFor="show-branch-settings" className="text-xs text-gray-600">
-                        조건부 분기
-                      </Label>
+                  </div>
+                  {validationErrors.options && (
+                    <p className="text-red-500 text-sm">{validationErrors.options}</p>
+                  )}
+
+                  <div className="space-y-2">
+                    {formData.options?.map((option, index) => (
+                      <div
+                        key={option.id}
+                        className="border border-gray-200 rounded-lg bg-white hover:shadow-sm transition-shadow"
+                      >
+                        <div className="flex items-center space-x-2 p-3">
+                          <div className="cursor-grab">
+                            <GripVertical className="w-4 h-4 text-gray-400" />
+                          </div>
+
+                          <div className="flex-1">
+                            <Input
+                              value={option.label}
+                              onChange={(e) => updateOption(option.id, { label: e.target.value })}
+                              placeholder={`옵션 ${index + 1}`}
+                              className="border-none bg-transparent px-0 focus:bg-white focus:border focus:border-blue-200"
+                            />
+                            {option.id === OTHER_OPTION_ID && (
+                              <p className="text-xs text-blue-600 mt-1 px-0">
+                                🔹 기타 옵션 (수정 가능)
+                              </p>
+                            )}
+                          </div>
+
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeOption(option.id)}
+                            className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+
+                        {/* 분기 규칙 설정 - 토글이 켜져있을 때만 표시 */}
+                        {showBranchSettings && (
+                          <div className="px-3 pb-3">
+                            <BranchRuleEditor
+                              branchRule={option.branchRule}
+                              allQuestions={currentSurvey.questions}
+                              currentQuestionId={questionId || ""}
+                              onChange={(branchRule) => updateOption(option.id, { branchRule })}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {(formData.options?.length || 0) === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      <p className="mb-2">아직 옵션이 없습니다.</p>
+                      <Button type="button" variant="outline" onClick={addOption}>
+                        첫 번째 옵션 추가
+                      </Button>
                     </div>
+                  )}
+
+                  {formData.allowOtherOption && (
+                    <div className="p-3 bg-blue-50 rounded-lg">
+                      <p className="text-sm text-blue-700">
+                        <strong>💡 기타 옵션이 활성화되었습니다.</strong>
+                        <br />
+                        마지막에 &ldquo;기타&rdquo; 선택지가 자동으로 추가되어 사용자가 직접
+                        텍스트를 입력할 수 있습니다.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 다단계 Select 설정 */}
+              {needsSelectLevels && (
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <Label className="flex items-center space-x-2">
+                      <Settings className="w-4 h-4" />
+                      <span>
+                        다단계 Select 설정 <span className="text-red-500">*</span>
+                      </span>
+                    </Label>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        addOption();
-                        if (validationErrors.options) {
-                          setValidationErrors((prev) => ({ ...prev, options: "" }));
+                        addSelectLevel();
+                        if (validationErrors.selectLevels) {
+                          setValidationErrors((prev) => ({ ...prev, selectLevels: "" }));
                         }
                       }}
-                      className="flex items-center space-x-1"
+                      className="flex items-center space-x-1 w-full sm:w-auto"
                     >
                       <Plus className="w-4 h-4" />
-                      <span>옵션 추가</span>
+                      <span>레벨 추가</span>
                     </Button>
                   </div>
-                </div>
-                {validationErrors.options && (
-                  <p className="text-red-500 text-sm">{validationErrors.options}</p>
-                )}
+                  {validationErrors.selectLevels && (
+                    <p className="text-red-500 text-sm">{validationErrors.selectLevels}</p>
+                  )}
 
-                <div className="space-y-2">
-                  {formData.options?.map((option, index) => (
-                    <div
-                      key={option.id}
-                      className="border border-gray-200 rounded-lg bg-white hover:shadow-sm transition-shadow"
-                    >
-                      <div className="flex items-center space-x-2 p-3">
-                        <div className="cursor-grab">
-                          <GripVertical className="w-4 h-4 text-gray-400" />
-                        </div>
+                  {formData.selectLevels && formData.selectLevels.length > 0 ? (
+                    <div className="space-y-4">
+                      {formData.selectLevels
+                        .sort((a, b) => a.order - b.order)
+                        .map((level, index) => (
+                          <div key={level.id} className="p-4 border border-gray-200 rounded-lg">
+                            <div className="flex items-start space-x-3">
+                              <div className="cursor-grab">
+                                <GripVertical className="w-4 h-4 text-gray-400" />
+                              </div>
 
-                        <div className="flex-1">
-                          <Input
-                            value={option.label}
-                            onChange={(e) => updateOption(option.id, { label: e.target.value })}
-                            placeholder={`옵션 ${index + 1}`}
-                            className="border-none bg-transparent px-0 focus:bg-white focus:border focus:border-blue-200"
-                          />
-                          {option.id === OTHER_OPTION_ID && (
-                            <p className="text-xs text-blue-600 mt-1 px-0">
-                              🔹 기타 옵션 (수정 가능)
-                            </p>
-                          )}
-                        </div>
+                              <div className="flex-1 space-y-4">
+                                {/* 레벨 기본 정보 */}
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-sm font-medium text-gray-600">
+                                    레벨 {index + 1}
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeSelectLevel(level.id)}
+                                    className="text-red-500 hover:text-red-600 hover:bg-red-50 p-1 h-auto"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
+                                </div>
 
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeOption(option.id)}
-                          className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
+                                {/* 레벨 설정 */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                  <div>
+                                    <Label className="text-xs">레이블</Label>
+                                    <Input
+                                      value={level.label}
+                                      onChange={(e) =>
+                                        updateSelectLevel(level.id, { label: e.target.value })
+                                      }
+                                      placeholder="예: 카테고리"
+                                      className="mt-1 text-sm"
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs">플레이스홀더</Label>
+                                    <Input
+                                      value={level.placeholder || ""}
+                                      onChange={(e) =>
+                                        updateSelectLevel(level.id, { placeholder: e.target.value })
+                                      }
+                                      placeholder="예: 카테고리를 선택하세요"
+                                      className="mt-1 text-sm"
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* 레벨 옵션들 */}
+                                <div className="space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <Label className="text-xs font-medium">옵션 목록</Label>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => addLevelOption(level.id)}
+                                      className="h-6 px-2 text-xs"
+                                    >
+                                      <Plus className="w-3 h-3 mr-1" />
+                                      추가
+                                    </Button>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    {level.options?.map((option, optionIndex) => {
+                                      const parentOptions = getParentLevelOptions(index);
+                                      const isFirstLevel = index === 0;
+
+                                      return (
+                                        <div
+                                          key={option.id}
+                                          className="p-3 bg-gray-50 rounded-lg space-y-2"
+                                        >
+                                          <div className="flex items-center space-x-2">
+                                            <span className="text-xs text-gray-500 w-6">
+                                              {optionIndex + 1}.
+                                            </span>
+                                            <Input
+                                              value={option.label}
+                                              onChange={(e) =>
+                                                updateLevelOption(level.id, option.id, {
+                                                  label: e.target.value,
+                                                })
+                                              }
+                                              placeholder="옵션명 (예: 김치찌개)"
+                                              className="flex-1 text-xs h-8"
+                                            />
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => removeLevelOption(level.id, option.id)}
+                                              className="text-red-500 hover:text-red-600 hover:bg-red-100 p-1 h-6 w-6"
+                                            >
+                                              <X className="w-3 h-3" />
+                                            </Button>
+                                          </div>
+
+                                          {!isFirstLevel && parentOptions.length > 0 && (
+                                            <div className="flex items-center space-x-2 ml-8">
+                                              <span className="text-xs text-gray-600 min-w-fit">
+                                                연동할 상위 옵션:
+                                              </span>
+                                              <select
+                                                value={
+                                                  option.value.includes("-")
+                                                    ? option.value.split("-")[0]
+                                                    : ""
+                                                }
+                                                onChange={(e) => {
+                                                  if (e.target.value) {
+                                                    updateOptionWithParent(
+                                                      level.id,
+                                                      option.id,
+                                                      e.target.value,
+                                                      option.label,
+                                                    );
+                                                  }
+                                                }}
+                                                className="text-xs h-6 px-2 border border-gray-200 rounded bg-white flex-1"
+                                              >
+                                                <option value="">상위 옵션 선택...</option>
+                                                {parentOptions.map((parentOption) => (
+                                                  <option
+                                                    key={parentOption.id}
+                                                    value={parentOption.value}
+                                                  >
+                                                    {parentOption.label}
+                                                  </option>
+                                                ))}
+                                              </select>
+                                              <div className="text-xs text-gray-400 min-w-fit">
+                                                → {option.value}
+                                              </div>
+                                            </div>
+                                          )}
+
+                                          {isFirstLevel && (
+                                            <div className="ml-8">
+                                              <div className="text-xs text-gray-400">
+                                                값: {option.value}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+
+                                    {(!level.options || level.options.length === 0) && (
+                                      <div className="text-center py-4 text-gray-400 text-xs">
+                                        옵션이 없습니다. 추가해주세요.
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {index > 0 && (
+                                    <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                                      <strong>💡 자동 연동:</strong> 하위 레벨에서 &ldquo;연동할
+                                      상위 옵션&rdquo;을 선택하면 한글 값이 자동 생성됩니다.
+                                      <br />
+                                      예: 상위 &ldquo;한식&rdquo; 선택 + 하위 &ldquo;김치찌개&rdquo;
+                                      → 값: &ldquo;한식-김치찌개&rdquo; (한글 그대로 저장)
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+
+                      {/* 미리보기 */}
+                      <div className="p-4 bg-gray-50 rounded-lg">
+                        <Label className="text-sm font-medium text-gray-700 mb-3 block">
+                          미리보기
+                        </Label>
+                        <UserDefinedMultiSelectPreview levels={formData.selectLevels} />
                       </div>
-
-                      {/* 분기 규칙 설정 - 토글이 켜져있을 때만 표시 */}
-                      {showBranchSettings && (
-                        <div className="px-3 pb-3">
-                          <BranchRuleEditor
-                            branchRule={option.branchRule}
-                            allQuestions={currentSurvey.questions}
-                            currentQuestionId={questionId || ""}
-                            onChange={(branchRule) =>
-                              updateOption(option.id, { branchRule })
-                            }
-                          />
-                        </div>
-                      )}
                     </div>
-                  ))}
-                </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500 border border-gray-200 rounded-lg">
+                      <Settings className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                      <p className="mb-2">아직 레벨이 없습니다.</p>
+                      <Button type="button" variant="outline" onClick={addSelectLevel}>
+                        첫 번째 레벨 추가
+                      </Button>
+                    </div>
+                  )}
 
-                {(formData.options?.length || 0) === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    <p className="mb-2">아직 옵션이 없습니다.</p>
-                    <Button type="button" variant="outline" onClick={addOption}>
-                      첫 번째 옵션 추가
-                    </Button>
-                  </div>
-                )}
-
-                {formData.allowOtherOption && (
                   <div className="p-3 bg-blue-50 rounded-lg">
                     <p className="text-sm text-blue-700">
-                      <strong>💡 기타 옵션이 활성화되었습니다.</strong>
-                      <br />
-                      마지막에 &ldquo;기타&rdquo; 선택지가 자동으로 추가되어 사용자가 직접 텍스트를
-                      입력할 수 있습니다.
+                      <strong>🔗 다단계 Select 기능:</strong> 카테고리 → 세부항목 같은 계층적 선택을
+                      제공합니다.
+                      <br />• 1단계: 기본 옵션들 설정 (예: 한식, 중식, 양식)
+                      <br />• 2단계 이상: 상위 옵션 선택으로 자동 연동 (한글 값 그대로 저장됩니다)
+                      <br />• 데이터 저장: 한글로 된 값들이 그대로 저장되어 분석이 쉽습니다 📊
                     </p>
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+              )}
 
-            {/* 다단계 Select 설정 */}
-            {needsSelectLevels && (
+              {/* 공지사항 설정 */}
+              {question.type === "notice" && (
+                <div className="space-y-6">
+                  <div>
+                    <Label className="text-base font-medium mb-3 block">공지사항 내용 편집</Label>
+                    <NoticeEditor
+                      content={formData.noticeContent || ""}
+                      onChange={(content) =>
+                        setFormData((prev) => ({ ...prev, noticeContent: content }))
+                      }
+                    />
+                  </div>
+
+                  {/* 이해 확인 체크 옵션 */}
+                  <div className="flex items-center space-x-2 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                    <Switch
+                      id="requires-acknowledgment"
+                      checked={formData.requiresAcknowledgment || false}
+                      onCheckedChange={(checked) =>
+                        setFormData((prev) => ({ ...prev, requiresAcknowledgment: checked }))
+                      }
+                    />
+                    <Label htmlFor="requires-acknowledgment" className="cursor-pointer">
+                      이해했다는 체크 필요 (필수 확인)
+                    </Label>
+                  </div>
+
+                  {/* 미리보기 */}
+                  {formData.noticeContent && (
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">미리보기</Label>
+                      <NoticeRenderer
+                        content={formData.noticeContent}
+                        requiresAcknowledgment={formData.requiresAcknowledgment}
+                        isTestMode={true}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 테이블 설정 */}
+              {question.type === "table" && (
+                <div className="space-y-6">
+                  <Label className="text-lg font-medium">테이블 설정</Label>
+
+                  <DynamicTableEditor
+                    tableTitle={formData.tableTitle}
+                    columns={formData.tableColumns}
+                    rows={formData.tableRowsData}
+                    currentQuestionId={questionId || ""}
+                    onTableChange={(data) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        tableTitle: data.tableTitle,
+                        tableColumns: data.tableColumns,
+                        tableRowsData: data.tableRowsData,
+                      }));
+                    }}
+                  />
+
+                  {/* 미리보기 */}
+                  {formData.tableColumns && formData.tableColumns.length > 0 && (
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">미리보기</Label>
+                      <TablePreview
+                        tableTitle={formData.tableTitle}
+                        columns={formData.tableColumns}
+                        rows={formData.tableRowsData}
+                        className="border-2 border-dashed border-gray-300"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 미디어 설정 */}
               <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <Label className="flex items-center space-x-2">
-                    <Settings className="w-4 h-4" />
-                    <span>
-                      다단계 Select 설정 <span className="text-red-500">*</span>
-                    </span>
-                  </Label>
+                <Label>미디어 첨부</Label>
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      addSelectLevel();
-                      if (validationErrors.selectLevels) {
-                        setValidationErrors((prev) => ({ ...prev, selectLevels: "" }));
-                      }
-                    }}
-                    className="flex items-center space-x-1 w-full sm:w-auto"
+                    className="flex items-center justify-center space-x-1 w-full sm:w-auto"
+                    disabled
                   >
-                    <Plus className="w-4 h-4" />
-                    <span>레벨 추가</span>
+                    <Image className="w-4 h-4" />
+                    <span>이미지 추가</span>
+                    <span className="text-xs text-gray-400 ml-1">(준비 중)</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center justify-center space-x-1 w-full sm:w-auto"
+                    disabled
+                  >
+                    <Video className="w-4 h-4" />
+                    <span>동영상 추가</span>
+                    <span className="text-xs text-gray-400 ml-1">(준비 중)</span>
                   </Button>
                 </div>
-                {validationErrors.selectLevels && (
-                  <p className="text-red-500 text-sm">{validationErrors.selectLevels}</p>
-                )}
-
-                {formData.selectLevels && formData.selectLevels.length > 0 ? (
-                  <div className="space-y-4">
-                    {formData.selectLevels
-                      .sort((a, b) => a.order - b.order)
-                      .map((level, index) => (
-                        <div key={level.id} className="p-4 border border-gray-200 rounded-lg">
-                          <div className="flex items-start space-x-3">
-                            <div className="cursor-grab">
-                              <GripVertical className="w-4 h-4 text-gray-400" />
-                            </div>
-
-                            <div className="flex-1 space-y-4">
-                              {/* 레벨 기본 정보 */}
-                              <div className="flex items-center space-x-2">
-                                <span className="text-sm font-medium text-gray-600">
-                                  레벨 {index + 1}
-                                </span>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeSelectLevel(level.id)}
-                                  className="text-red-500 hover:text-red-600 hover:bg-red-50 p-1 h-auto"
-                                >
-                                  <X className="w-3 h-3" />
-                                </Button>
-                              </div>
-
-                              {/* 레벨 설정 */}
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div>
-                                  <Label className="text-xs">레이블</Label>
-                                  <Input
-                                    value={level.label}
-                                    onChange={(e) =>
-                                      updateSelectLevel(level.id, { label: e.target.value })
-                                    }
-                                    placeholder="예: 카테고리"
-                                    className="mt-1 text-sm"
-                                  />
-                                </div>
-                                <div>
-                                  <Label className="text-xs">플레이스홀더</Label>
-                                  <Input
-                                    value={level.placeholder || ""}
-                                    onChange={(e) =>
-                                      updateSelectLevel(level.id, { placeholder: e.target.value })
-                                    }
-                                    placeholder="예: 카테고리를 선택하세요"
-                                    className="mt-1 text-sm"
-                                  />
-                                </div>
-                              </div>
-
-                              {/* 레벨 옵션들 */}
-                              <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <Label className="text-xs font-medium">옵션 목록</Label>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => addLevelOption(level.id)}
-                                    className="h-6 px-2 text-xs"
-                                  >
-                                    <Plus className="w-3 h-3 mr-1" />
-                                    추가
-                                  </Button>
-                                </div>
-
-                                <div className="space-y-2">
-                                  {level.options?.map((option, optionIndex) => {
-                                    const parentOptions = getParentLevelOptions(index);
-                                    const isFirstLevel = index === 0;
-
-                                    return (
-                                      <div
-                                        key={option.id}
-                                        className="p-3 bg-gray-50 rounded-lg space-y-2"
-                                      >
-                                        <div className="flex items-center space-x-2">
-                                          <span className="text-xs text-gray-500 w-6">
-                                            {optionIndex + 1}.
-                                          </span>
-                                          <Input
-                                            value={option.label}
-                                            onChange={(e) =>
-                                              updateLevelOption(level.id, option.id, {
-                                                label: e.target.value,
-                                              })
-                                            }
-                                            placeholder="옵션명 (예: 김치찌개)"
-                                            className="flex-1 text-xs h-8"
-                                          />
-                                          <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => removeLevelOption(level.id, option.id)}
-                                            className="text-red-500 hover:text-red-600 hover:bg-red-100 p-1 h-6 w-6"
-                                          >
-                                            <X className="w-3 h-3" />
-                                          </Button>
-                                        </div>
-
-                                        {!isFirstLevel && parentOptions.length > 0 && (
-                                          <div className="flex items-center space-x-2 ml-8">
-                                            <span className="text-xs text-gray-600 min-w-fit">
-                                              연동할 상위 옵션:
-                                            </span>
-                                            <select
-                                              value={
-                                                option.value.includes("-")
-                                                  ? option.value.split("-")[0]
-                                                  : ""
-                                              }
-                                              onChange={(e) => {
-                                                if (e.target.value) {
-                                                  updateOptionWithParent(
-                                                    level.id,
-                                                    option.id,
-                                                    e.target.value,
-                                                    option.label,
-                                                  );
-                                                }
-                                              }}
-                                              className="text-xs h-6 px-2 border border-gray-200 rounded bg-white flex-1"
-                                            >
-                                              <option value="">상위 옵션 선택...</option>
-                                              {parentOptions.map((parentOption) => (
-                                                <option
-                                                  key={parentOption.id}
-                                                  value={parentOption.value}
-                                                >
-                                                  {parentOption.label}
-                                                </option>
-                                              ))}
-                                            </select>
-                                            <div className="text-xs text-gray-400 min-w-fit">
-                                              → {option.value}
-                                            </div>
-                                          </div>
-                                        )}
-
-                                        {isFirstLevel && (
-                                          <div className="ml-8">
-                                            <div className="text-xs text-gray-400">
-                                              값: {option.value}
-                                            </div>
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-
-                                  {(!level.options || level.options.length === 0) && (
-                                    <div className="text-center py-4 text-gray-400 text-xs">
-                                      옵션이 없습니다. 추가해주세요.
-                                    </div>
-                                  )}
-                                </div>
-
-                                {index > 0 && (
-                                  <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
-                                    <strong>💡 자동 연동:</strong> 하위 레벨에서 &ldquo;연동할 상위
-                                    옵션&rdquo;을 선택하면 한글 값이 자동 생성됩니다.
-                                    <br />
-                                    예: 상위 &ldquo;한식&rdquo; 선택 + 하위 &ldquo;김치찌개&rdquo; →
-                                    값: &ldquo;한식-김치찌개&rdquo; (한글 그대로 저장)
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-
-                    {/* 미리보기 */}
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                      <Label className="text-sm font-medium text-gray-700 mb-3 block">
-                        미리보기
-                      </Label>
-                      <UserDefinedMultiSelectPreview levels={formData.selectLevels} />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-gray-500 border border-gray-200 rounded-lg">
-                    <Settings className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="mb-2">아직 레벨이 없습니다.</p>
-                    <Button type="button" variant="outline" onClick={addSelectLevel}>
-                      첫 번째 레벨 추가
-                    </Button>
-                  </div>
-                )}
-
-                <div className="p-3 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-blue-700">
-                    <strong>🔗 다단계 Select 기능:</strong> 카테고리 → 세부항목 같은 계층적 선택을
-                    제공합니다.
-                    <br />• 1단계: 기본 옵션들 설정 (예: 한식, 중식, 양식)
-                    <br />• 2단계 이상: 상위 옵션 선택으로 자동 연동 (한글 값 그대로 저장됩니다)
-                    <br />• 데이터 저장: 한글로 된 값들이 그대로 저장되어 분석이 쉽습니다 📊
-                  </p>
-                </div>
               </div>
-            )}
-
-            {/* 공지사항 설정 */}
-            {question.type === "notice" && (
-              <div className="space-y-6">
-                <div>
-                  <Label className="text-base font-medium mb-3 block">공지사항 내용 편집</Label>
-                  <NoticeEditor
-                    content={formData.noticeContent || ""}
-                    onChange={(content) => setFormData((prev) => ({ ...prev, noticeContent: content }))}
-                  />
-                </div>
-
-                {/* 이해 확인 체크 옵션 */}
-                <div className="flex items-center space-x-2 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                  <Switch
-                    id="requires-acknowledgment"
-                    checked={formData.requiresAcknowledgment || false}
-                    onCheckedChange={(checked) =>
-                      setFormData((prev) => ({ ...prev, requiresAcknowledgment: checked }))
-                    }
-                  />
-                  <Label htmlFor="requires-acknowledgment" className="cursor-pointer">
-                    이해했다는 체크 필요 (필수 확인)
-                  </Label>
-                </div>
-
-                {/* 미리보기 */}
-                {formData.noticeContent && (
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">미리보기</Label>
-                    <NoticeRenderer
-                      content={formData.noticeContent}
-                      requiresAcknowledgment={formData.requiresAcknowledgment}
-                      isTestMode={true}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* 테이블 설정 */}
-            {question.type === "table" && (
-              <div className="space-y-6">
-                <Label className="text-lg font-medium">테이블 설정</Label>
-
-                <DynamicTableEditor
-                  tableTitle={formData.tableTitle}
-                  columns={formData.tableColumns}
-                  rows={formData.tableRowsData}
-                  currentQuestionId={questionId || ""}
-                  onTableChange={(data) => {
-                    setFormData((prev) => ({
-                      ...prev,
-                      tableTitle: data.tableTitle,
-                      tableColumns: data.tableColumns,
-                      tableRowsData: data.tableRowsData,
-                    }));
-                  }}
-                />
-
-                {/* 미리보기 */}
-                {formData.tableColumns && formData.tableColumns.length > 0 && (
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">미리보기</Label>
-                    <TablePreview
-                      tableTitle={formData.tableTitle}
-                      columns={formData.tableColumns}
-                      rows={formData.tableRowsData}
-                      className="border-2 border-dashed border-gray-300"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* 미디어 설정 */}
-            <div className="space-y-4">
-              <Label>미디어 첨부</Label>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center justify-center space-x-1 w-full sm:w-auto"
-                  disabled
-                >
-                  <Image className="w-4 h-4" />
-                  <span>이미지 추가</span>
-                  <span className="text-xs text-gray-400 ml-1">(준비 중)</span>
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center justify-center space-x-1 w-full sm:w-auto"
-                  disabled
-                >
-                  <Video className="w-4 h-4" />
-                  <span>동영상 추가</span>
-                  <span className="text-xs text-gray-400 ml-1">(준비 중)</span>
-                </Button>
-              </div>
-            </div>
             </TabsContent>
 
             {/* 검증 규칙 탭 (테이블 타입만) */}
@@ -898,7 +895,9 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
               <TabsContent value="validation" className="px-6 py-4">
                 <TableValidationEditor
                   question={question}
-                  onUpdate={(rules) => setFormData((prev) => ({ ...prev, tableValidationRules: rules }))}
+                  onUpdate={(rules) =>
+                    setFormData((prev) => ({ ...prev, tableValidationRules: rules }))
+                  }
                   allQuestions={currentSurvey.questions}
                 />
               </TabsContent>
@@ -908,7 +907,9 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
             <TabsContent value="display-condition" className="px-6 py-4">
               <QuestionConditionEditor
                 question={question}
-                onUpdate={(conditionGroup) => setFormData((prev) => ({ ...prev, displayCondition: conditionGroup }))}
+                onUpdate={(conditionGroup) =>
+                  setFormData((prev) => ({ ...prev, displayCondition: conditionGroup }))
+                }
                 allQuestions={currentSurvey.questions}
               />
             </TabsContent>

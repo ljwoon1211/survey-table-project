@@ -34,6 +34,8 @@ import { useState } from "react";
 interface NoticeEditorProps {
   content: string;
   onChange: (content: string) => void;
+  compact?: boolean; // 간소화 모드 (설명 필드용)
+  placeholder?: string; // placeholder 텍스트
 }
 
 // 배경색을 지원하는 TableCell 확장
@@ -80,7 +82,12 @@ const TableHeaderWithBackground = TableHeader.extend({
   },
 });
 
-export function NoticeEditor({ content, onChange }: NoticeEditorProps) {
+export function NoticeEditor({
+  content,
+  onChange,
+  compact = false,
+  placeholder = "",
+}: NoticeEditorProps) {
   const [imageUrl, setImageUrl] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [showImageInput, setShowImageInput] = useState(false);
@@ -119,16 +126,25 @@ export function NoticeEditor({ content, onChange }: NoticeEditorProps) {
     },
     editorProps: {
       attributes: {
-        class:
-          "prose prose-sm max-w-none focus:outline-none min-h-[300px] p-4 border border-gray-200 rounded-lg " +
-          "[&_table]:border-collapse [&_table]:table-fixed [&_table]:w-full [&_table]:my-4 [&_table]:overflow-hidden [&_table]:border-2 [&_table]:border-gray-300 " +
-          "[&_table_td]:min-w-[1em] [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2 [&_table_td]:align-top [&_table_td]:box-border [&_table_td]:relative [&_table_td]:cursor-pointer " +
-          "[&_table_th]:min-w-[1em] [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-3 [&_table_th]:py-2 [&_table_th]:align-top [&_table_th]:box-border [&_table_th]:relative [&_table_th]:cursor-pointer " +
-          "[&_table_th]:font-normal [&_table_th]:text-left [&_table_th]:bg-transparent " +
-          "[&_table_.selectedCell]:bg-blue-100 [&_table_.selectedCell]:border-2 [&_table_.selectedCell]:border-blue-500 " +
-          "[&_table_.selected]:bg-blue-50 " +
-          "[&_table:hover]:border-blue-500 " +
-          "[&_table_p]:m-0",
+        class: compact
+          ? "prose prose-sm max-w-none focus:outline-none min-h-[80px] p-3 border border-gray-200 rounded-lg " +
+            "[&_table]:border-collapse [&_table]:table-fixed [&_table]:w-full [&_table]:my-2 [&_table]:overflow-hidden [&_table]:border-2 [&_table]:border-gray-300 " +
+            "[&_table_td]:min-w-[1em] [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-2 [&_table_td]:py-1 [&_table_td]:align-top [&_table_td]:box-border [&_table_td]:relative [&_table_td]:cursor-pointer " +
+            "[&_table_th]:min-w-[1em] [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-2 [&_table_th]:py-1 [&_table_th]:align-top [&_table_th]:box-border [&_table_th]:relative [&_table_th]:cursor-pointer " +
+            "[&_table_th]:font-normal [&_table_th]:text-left [&_table_th]:bg-transparent " +
+            "[&_table_.selectedCell]:bg-blue-100 [&_table_.selectedCell]:border-2 [&_table_.selectedCell]:border-blue-500 " +
+            "[&_table_.selected]:bg-blue-50 " +
+            "[&_table:hover]:border-blue-500 " +
+            "[&_table_p]:m-0"
+          : "prose prose-sm max-w-none focus:outline-none min-h-[300px] p-4 border border-gray-200 rounded-lg " +
+            "[&_table]:border-collapse [&_table]:table-fixed [&_table]:w-full [&_table]:my-4 [&_table]:overflow-hidden [&_table]:border-2 [&_table]:border-gray-300 " +
+            "[&_table_td]:min-w-[1em] [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2 [&_table_td]:align-top [&_table_td]:box-border [&_table_td]:relative [&_table_td]:cursor-pointer " +
+            "[&_table_th]:min-w-[1em] [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-3 [&_table_th]:py-2 [&_table_th]:align-top [&_table_th]:box-border [&_table_th]:relative [&_table_th]:cursor-pointer " +
+            "[&_table_th]:font-normal [&_table_th]:text-left [&_table_th]:bg-transparent " +
+            "[&_table_.selectedCell]:bg-blue-100 [&_table_.selectedCell]:border-2 [&_table_.selectedCell]:border-blue-500 " +
+            "[&_table_.selected]:bg-blue-50 " +
+            "[&_table:hover]:border-blue-500 " +
+            "[&_table_p]:m-0",
       },
       handleDOMEvents: {
         mousedown: (view, event) => {
@@ -210,9 +226,13 @@ export function NoticeEditor({ content, onChange }: NoticeEditorProps) {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {/* Toolbar */}
-      <div className="flex flex-wrap gap-2 p-2 bg-gray-50 border border-gray-200 rounded-lg">
+      <div
+        className={`flex flex-wrap gap-2 p-2 bg-gray-50 border border-gray-200 rounded-lg ${
+          compact ? "gap-1" : ""
+        }`}
+      >
         <div className="flex gap-1">
           <Button
             type="button"
@@ -496,21 +516,31 @@ export function NoticeEditor({ content, onChange }: NoticeEditorProps) {
       )}
 
       {/* Editor */}
-      <EditorContent editor={editor} />
-
-      {/* Help Text */}
-      <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded-lg">
-        <p>
-          💡 <strong>사용 팁:</strong> 텍스트, 이미지, 동영상 URL, 표를 자유롭게 추가할 수 있습니다.
-        </p>
-        <p className="mt-1">• 이미지: 이미지 버튼 클릭 후 URL 입력</p>
-        <p>• 링크: 텍스트 선택 후 링크 버튼 클릭</p>
-        <p>• 표: 표 버튼 클릭으로 3x3 표 자동 생성</p>
-        <p>• 표 편집: 표 내부 클릭 시 행/열 추가/삭제, 셀 병합/분할 버튼 표시</p>
-        <p>• 셀 병합: 여러 셀을 드래그하여 선택 후 병합 버튼 클릭</p>
-        <p>• 셀 분할: 병합된 셀 선택 후 분할 버튼 클릭</p>
-        <p>• 셀 배경색: 셀을 드래그하여 선택 후 붓 아이콘 클릭으로 회색 배경 적용/제거</p>
+      <div className="relative">
+        <EditorContent editor={editor} />
+        {compact && !content && placeholder && (
+          <div className="absolute top-3 left-3 text-gray-400 text-sm pointer-events-none">
+            {placeholder}
+          </div>
+        )}
       </div>
+
+      {/* Help Text - 일반 모드에서만 표시 */}
+      {!compact && (
+        <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded-lg">
+          <p>
+            💡 <strong>사용 팁:</strong> 텍스트, 이미지, 동영상 URL, 표를 자유롭게 추가할 수
+            있습니다.
+          </p>
+          <p className="mt-1">• 이미지: 이미지 버튼 클릭 후 URL 입력</p>
+          <p>• 링크: 텍스트 선택 후 링크 버튼 클릭</p>
+          <p>• 표: 표 버튼 클릭으로 3x3 표 자동 생성</p>
+          <p>• 표 편집: 표 내부 클릭 시 행/열 추가/삭제, 셀 병합/분할 버튼 표시</p>
+          <p>• 셀 병합: 여러 셀을 드래그하여 선택 후 병합 버튼 클릭</p>
+          <p>• 셀 분할: 병합된 셀 선택 후 분할 버튼 클릭</p>
+          <p>• 셀 배경색: 셀을 드래그하여 선택 후 붓 아이콘 클릭으로 회색 배경 적용/제거</p>
+        </div>
+      )}
     </div>
   );
 }

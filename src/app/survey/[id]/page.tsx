@@ -226,7 +226,16 @@ export default function SurveyResponsePage() {
                   {currentQuestion.title}
                 </CardTitle>
                 {currentQuestion.description && (
-                  <p className="text-sm text-gray-600 mt-2">{currentQuestion.description}</p>
+                  <div
+                    className="text-sm text-gray-600 mt-2 prose prose-sm max-w-none
+                      [&_table]:border-collapse [&_table]:w-full [&_table]:my-2 [&_table]:border-2 [&_table]:border-gray-300
+                      [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2
+                      [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-3 [&_table_th]:py-2
+                      [&_table_th]:font-normal [&_table_th]:bg-transparent
+                      [&_table_p]:m-0
+                      [&_p]:min-h-[1.6em]"
+                    dangerouslySetInnerHTML={{ __html: currentQuestion.description }}
+                  />
                 )}
               </div>
             </div>
@@ -346,6 +355,8 @@ function QuestionInput({
           tableTitle={question.tableTitle}
           columns={question.tableColumns}
           rows={question.tableRowsData}
+          value={value}
+          onChange={onChange}
           isTestMode={false}
           className="border-0 shadow-none"
         />
@@ -379,6 +390,13 @@ function RadioQuestion({
 
   const handleOptionChange = (optionValue: string, optionId: string) => {
     const isOtherOption = optionId === "other-option";
+
+    // 이미 선택된 항목을 다시 클릭하면 선택 취소
+    if (isSelected(optionValue)) {
+      onChange(null);
+      return;
+    }
+
     if (isOtherOption) {
       // 기타 옵션 선택 시 객체로 저장
       onChange({
@@ -416,13 +434,24 @@ function RadioQuestion({
           <div className="flex items-center space-x-3">
             <input
               type="radio"
+              id={`${question.id}-${option.id}`}
               name={question.id}
               value={option.value}
               checked={isSelected(option.value)}
               onChange={() => handleOptionChange(option.value, option.id)}
-              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+              onClick={() => handleOptionChange(option.value, option.id)}
+              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
             />
-            <label className="text-sm text-gray-700 cursor-pointer flex-1">{option.label}</label>
+            <label
+              htmlFor={`${question.id}-${option.id}`}
+              onClick={(e) => {
+                e.preventDefault();
+                handleOptionChange(option.value, option.id);
+              }}
+              className="text-sm text-gray-700 cursor-pointer flex-1"
+            >
+              {option.label}
+            </label>
           </div>
           {option.id === "other-option" && isSelected(option.value) && (
             <div className="ml-7">
@@ -528,11 +557,17 @@ function CheckboxQuestion({
             <div className="flex items-center space-x-3">
               <input
                 type="checkbox"
+                id={`${question.id}-${option.id}`}
                 checked={checked}
                 onChange={(e) => handleOptionChange(option.value, option.id, e.target.checked)}
                 className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
               />
-              <label className="text-sm text-gray-700 cursor-pointer flex-1">{option.label}</label>
+              <label
+                htmlFor={`${question.id}-${option.id}`}
+                className="text-sm text-gray-700 cursor-pointer flex-1"
+              >
+                {option.label}
+              </label>
             </div>
             {option.id === "other-option" && checked && (
               <div className="ml-7">
