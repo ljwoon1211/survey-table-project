@@ -12,7 +12,7 @@ import { InteractiveTableResponse } from "@/components/survey-builder/interactiv
 import { UserDefinedMultiLevelSelect } from "@/components/survey-builder/user-defined-multi-level-select";
 import { NoticeRenderer } from "@/components/survey-builder/notice-renderer";
 import { CheckCircle, AlertCircle, ArrowLeft, ArrowRight } from "lucide-react";
-import { getNextQuestionIndex, shouldDisplayQuestion } from "@/utils/branch-logic";
+import { getNextQuestionIndex } from "@/utils/branch-logic";
 
 export default function SurveyResponsePage() {
   const params = useParams();
@@ -40,24 +40,6 @@ export default function SurveyResponsePage() {
       setResponseId(newResponseId);
     }
   }, [surveyId, responseId, startResponse]);
-
-  // 초기 질문 또는 현재 질문의 표시 조건 확인
-  useEffect(() => {
-    if (questions.length > 0) {
-      const currentQ = questions[currentQuestionIndex];
-      if (currentQ && !shouldDisplayQuestion(currentQ, responses, questions)) {
-        // 현재 질문이 표시 조건을 만족하지 않으면 다음 표시 가능한 질문으로 이동
-        let nextIndex = currentQuestionIndex + 1;
-        while (nextIndex < questions.length) {
-          if (shouldDisplayQuestion(questions[nextIndex], responses, questions)) {
-            setCurrentQuestionIndex(nextIndex);
-            return;
-          }
-          nextIndex++;
-        }
-      }
-    }
-  }, [currentQuestionIndex, responses, questions]);
 
   const handleResponse = (questionId: string, value: any) => {
     setResponses((prev) => ({ ...prev, [questionId]: value }));
@@ -105,7 +87,7 @@ export default function SurveyResponsePage() {
     const currentResponse = responses[currentQuestion.id];
 
     // 다음 질문 인덱스 계산 (분기 규칙 고려)
-    let nextIndex = getNextQuestionIndex(questions, currentQuestionIndex, currentResponse);
+    const nextIndex = getNextQuestionIndex(questions, currentQuestionIndex, currentResponse);
 
     // 히스토리에 현재 인덱스 추가
     setQuestionHistory((prev) => [...prev, currentQuestionIndex]);
@@ -113,26 +95,8 @@ export default function SurveyResponsePage() {
     if (nextIndex === -1) {
       // 분기 규칙으로 설문 종료
       handleSubmit();
-      return;
-    }
-
-    // 표시 조건을 만족하는 다음 질문 찾기
-    while (nextIndex < questions.length) {
-      const nextQuestion = questions[nextIndex];
-      
-      // 질문 표시 조건 확인
-      if (shouldDisplayQuestion(nextQuestion, responses, questions)) {
-        setCurrentQuestionIndex(nextIndex);
-        return;
-      }
-      
-      // 조건을 만족하지 않으면 다음 질문으로 건너뛰기
-      nextIndex++;
-    }
-
-    // 모든 질문을 확인했지만 표시할 질문이 없으면 제출
-    if (nextIndex >= questions.length) {
-      handleSubmit();
+    } else if (nextIndex < questions.length) {
+      setCurrentQuestionIndex(nextIndex);
     }
   };
 
@@ -281,7 +245,11 @@ export default function SurveyResponsePage() {
 
         {/* 네비게이션 */}
         <div className="flex justify-between items-center mt-8">
-          <Button variant="outline" onClick={handlePrevious} disabled={questionHistory.length === 0}>
+          <Button
+            variant="outline"
+            onClick={handlePrevious}
+            disabled={questionHistory.length === 0}
+          >
             <ArrowLeft className="w-4 h-4 mr-2" />
             이전
           </Button>

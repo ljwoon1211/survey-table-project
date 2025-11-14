@@ -12,6 +12,8 @@ interface InteractiveTableResponseProps {
   tableTitle?: string;
   columns?: TableColumn[];
   rows?: TableRow[];
+  value?: Record<string, any>;
+  onChange?: (value: Record<string, any>) => void;
   className?: string;
   isTestMode?: boolean;
 }
@@ -21,6 +23,8 @@ export function InteractiveTableResponse({
   tableTitle,
   columns = [],
   rows = [],
+  value,
+  onChange,
   className,
   isTestMode = false,
 }: InteractiveTableResponseProps) {
@@ -31,7 +35,8 @@ export function InteractiveTableResponse({
   const [isMobile, setIsMobile] = useState(false);
 
   // 현재 질문의 응답 데이터 가져오기
-  const currentResponse = testResponses[questionId] || {};
+  // 테스트 모드일 때는 testResponses, 실제 응답 모드일 때는 value 사용
+  const currentResponse = isTestMode ? testResponses[questionId] || {} : value || {};
 
   // 모바일 여부 확인
   useEffect(() => {
@@ -48,18 +53,32 @@ export function InteractiveTableResponse({
     const handleScroll = () => {
       if (tableContainerRef.current) {
         const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current;
-        setShowLeftShadow(scrollLeft > 0);
-        setShowRightShadow(scrollLeft < scrollWidth - clientWidth - 1);
+        setShowLeftShadow(scrollLeft > 10);
+        setShowRightShadow(scrollLeft < scrollWidth - clientWidth - 10);
       }
     };
 
     const container = tableContainerRef.current;
     if (container) {
+      // 초기 체크
       handleScroll();
+
+      // 스크롤 이벤트 리스너
       container.addEventListener("scroll", handleScroll);
-      return () => container.removeEventListener("scroll", handleScroll);
+
+      // 윈도우 리사이즈 시에도 체크
+      window.addEventListener("resize", handleScroll);
+
+      // 컨텐츠 로드 후 다시 체크 (이미지 등이 로드되면서 크기가 변할 수 있음)
+      const timeoutId = setTimeout(handleScroll, 100);
+
+      return () => {
+        container.removeEventListener("scroll", handleScroll);
+        window.removeEventListener("resize", handleScroll);
+        clearTimeout(timeoutId);
+      };
     }
-  }, []);
+  }, [columns, rows]);
 
   // 행이 완료되었는지 확인
   const isRowCompleted = (row: TableRow) => {
@@ -82,12 +101,17 @@ export function InteractiveTableResponse({
   };
 
   // 응답 업데이트 함수
-  const updateResponse = (cellId: string, value: string | string[] | object) => {
+  const updateResponse = (cellId: string, cellValue: string | string[] | object) => {
     const updatedResponse = {
       ...currentResponse,
-      [cellId]: value,
+      [cellId]: cellValue,
     };
-    updateTestResponse(questionId, updatedResponse);
+
+    if (isTestMode) {
+      updateTestResponse(questionId, updatedResponse);
+    } else if (onChange) {
+      onChange(updatedResponse);
+    }
   };
 
   // 체크박스 변경 핸들러
@@ -229,7 +253,6 @@ export function InteractiveTableResponse({
                       checked={isChecked}
                       onChange={(e) => handleCheckboxChange(cell.id, option.id, e.target.checked)}
                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      disabled={!isTestMode}
                     />
                     <label
                       htmlFor={`${cell.id}-${option.id}`}
@@ -245,7 +268,6 @@ export function InteractiveTableResponse({
                         value={otherValue}
                         onChange={(e) => handleOtherInputChange(cell.id, option.id, e.target.value)}
                         className="text-xs h-8"
-                        disabled={!isTestMode}
                       />
                     </div>
                   )}
@@ -285,7 +307,6 @@ export function InteractiveTableResponse({
                       checked={isSelected}
                       onChange={() => handleRadioChange(cell.id, option.id)}
                       className="border-gray-300 text-blue-600 focus:ring-blue-500"
-                      disabled={!isTestMode}
                     />
                     <label
                       htmlFor={`${cell.id}-${option.id}`}
@@ -301,7 +322,6 @@ export function InteractiveTableResponse({
                         value={otherValue}
                         onChange={(e) => handleOtherInputChange(cell.id, option.id, e.target.value)}
                         className="text-xs h-8"
-                        disabled={!isTestMode}
                       />
                     </div>
                   )}
@@ -326,7 +346,6 @@ export function InteractiveTableResponse({
               }
               onChange={(e) => handleSelectChange(cell.id, e.target.value)}
               className="w-full p-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={!isTestMode}
             >
               <option value="">선택하세요...</option>
               {cell.selectOptions.map((option) => (
@@ -356,7 +375,6 @@ export function InteractiveTableResponse({
                         handleOtherInputChange(cell.id, "other-option", e.target.value)
                       }
                       className="text-xs h-8"
-                      disabled={!isTestMode}
                     />
                   </div>
                 )
@@ -456,7 +474,6 @@ export function InteractiveTableResponse({
               onChange={(e) => handleTextChange(cell.id, e.target.value)}
               placeholder={cell.placeholder || "답변을 입력하세요..."}
               maxLength={cell.inputMaxLength}
-              disabled={!isTestMode}
               className="w-full text-sm"
             />
             {cell.inputMaxLength && (
@@ -547,24 +564,42 @@ export function InteractiveTableResponse({
     );
   };
 
+  // 스크롤 함수
+  const scrollTable = (direction: "left" | "right") => {
+    if (tableContainerRef.current) {
+      const scrollAmount = 300;
+      const currentScroll = tableContainerRef.current.scrollLeft;
+      tableContainerRef.current.scrollTo({
+        left: direction === "right" ? currentScroll + scrollAmount : currentScroll - scrollAmount,
+        behavior: "smooth",
+      });
+    }
+  };
+
   // 데스크톱 테이블 뷰 렌더링
   const renderDesktopTableView = () => {
     return (
       <div className="relative">
-        {/* 스크롤 힌트 */}
-        {showRightShadow && (
-          <div className="absolute top-0 right-0 h-full w-20 bg-gradient-to-l from-white via-white/80 to-transparent pointer-events-none z-10 flex items-center justify-end pr-2">
-            <div className="bg-blue-500 text-white px-2 py-1 rounded-full shadow-lg animate-pulse">
-              <ChevronRight className="w-4 h-4" />
-            </div>
-          </div>
-        )}
+        {/* 왼쪽 스크롤 버튼 */}
         {showLeftShadow && (
-          <div className="absolute top-0 left-0 h-full w-20 bg-gradient-to-r from-white via-white/80 to-transparent pointer-events-none z-10 flex items-center justify-start pl-2">
-            <div className="bg-blue-500 text-white px-2 py-1 rounded-full shadow-lg">
-              <ChevronLeft className="w-4 h-4" />
-            </div>
-          </div>
+          <button
+            onClick={() => scrollTable("left")}
+            className="absolute top-1/2 left-2 -translate-y-1/2 z-30 bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-full shadow-lg transition-colors"
+            aria-label="왼쪽으로 스크롤"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+        )}
+
+        {/* 오른쪽 스크롤 버튼 */}
+        {showRightShadow && (
+          <button
+            onClick={() => scrollTable("right")}
+            className="absolute top-1/2 right-2 -translate-y-1/2 z-30 bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-full shadow-lg animate-pulse hover:animate-none transition-colors"
+            aria-label="오른쪽으로 스크롤"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
         )}
 
         {/* 안내 텍스트 */}
@@ -579,10 +614,11 @@ export function InteractiveTableResponse({
         <div
           ref={tableContainerRef}
           className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"
+          style={{ WebkitOverflowScrolling: "touch" }}
         >
           <table
-            className="w-full border-collapse border border-gray-300 text-sm"
-            style={{ tableLayout: "fixed" }}
+            className="border-collapse border border-gray-300 text-sm"
+            style={{ tableLayout: "auto", minWidth: "100%" }}
           >
             {/* 열 너비 정의 */}
             <colgroup>

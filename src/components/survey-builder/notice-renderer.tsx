@@ -29,7 +29,13 @@ export function NoticeRenderer({
     <div className="space-y-4">
       {/* Rich Text Content Display */}
       <div
-        className="prose prose-sm max-w-none p-6 bg-blue-50 border-2 border-blue-200 rounded-lg"
+        className="prose prose-sm max-w-none p-6 bg-blue-50 border-2 border-blue-200 rounded-lg
+          [&_table]:border-collapse [&_table]:w-full [&_table]:my-4 [&_table]:border-2 [&_table]:border-gray-300
+          [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2
+          [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-3 [&_table_th]:py-2
+          [&_table_th]:font-normal [&_table_th]:bg-transparent
+          [&_table_p]:m-0
+          [&_p]:min-h-[1.6em]"
         dangerouslySetInnerHTML={{ __html: content }}
         style={{
           // TipTap 스타일 재정의
