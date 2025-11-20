@@ -33,6 +33,7 @@ import { UserDefinedMultiLevelSelect } from "./user-defined-multi-level-select";
 import { InteractiveTableResponse } from "./interactive-table-response";
 import { TablePreview } from "./table-preview";
 import { NoticeRenderer } from "./notice-renderer";
+import { GroupHeader } from "./group-header";
 import { GripVertical, Settings, Trash2, Copy, Edit3, Eye, EyeOff } from "lucide-react";
 
 interface SortableQuestionProps {
@@ -468,12 +469,35 @@ export function SortableQuestionList({
   selectedQuestionId,
   isTestMode = false,
 }: SortableQuestionListProps) {
-  const { reorderQuestions, selectQuestion, deleteQuestion, updateQuestion, addQuestion } =
+  const { currentSurvey, reorderQuestions, selectQuestion, deleteQuestion, updateQuestion, addQuestion } =
     useSurveyBuilderStore();
 
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+
+  const groups = currentSurvey.groups || [];
+  
+  // 최상위 그룹만 필터링
+  const topLevelGroups = groups.filter(g => !g.parentGroupId).sort((a, b) => a.order - b.order);
+  
+  // 특정 그룹의 하위 그룹들 가져오기
+  const getSubGroups = (parentId: string) => {
+    return groups.filter(g => g.parentGroupId === parentId).sort((a, b) => a.order - b.order);
+  };
+
+  // 그룹별로 질문 분류
+  const questionsByGroup = questions.reduce((acc, question) => {
+    const groupId = question.groupId || 'ungrouped';
+    if (!acc[groupId]) {
+      acc[groupId] = [];
+    }
+    acc[groupId].push(question);
+    return acc;
+  }, {} as Record<string, Question[]>);
+
+  // 그룹 없는 질문들
+  const ungroupedQuestions = questionsByGroup['ungrouped'] || [];
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -555,9 +579,64 @@ export function SortableQuestionList({
   if (isTestMode) {
     return (
       <div className="space-y-6">
-        {questions.map((question, index) => (
-          <QuestionTestCard key={question.id} question={question} index={index} />
-        ))}
+        {/* 그룹별로 렌더링 (2단계 계층) */}
+        {topLevelGroups.map((group) => {
+          const groupQuestions = questionsByGroup[group.id] || [];
+          const subGroups = getSubGroups(group.id);
+
+          return (
+            <div key={group.id} className="space-y-4">
+              <GroupHeader group={group} questionCount={groupQuestions.length} />
+              {!group.collapsed && (
+                <>
+                  {/* 최상위 그룹의 질문들 */}
+                  {groupQuestions.length > 0 && (
+                    <div className="space-y-4 pl-4">
+                      {groupQuestions.map((question) => (
+                        <QuestionTestCard key={question.id} question={question} index={questions.indexOf(question)} />
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* 하위 그룹들 */}
+                  {subGroups.map((subGroup) => {
+                    const subGroupQuestions = questionsByGroup[subGroup.id] || [];
+                    if (subGroupQuestions.length === 0) return null;
+
+                    return (
+                      <div key={subGroup.id} className="ml-4 space-y-4">
+                        <GroupHeader group={subGroup} questionCount={subGroupQuestions.length} />
+                        {!subGroup.collapsed && (
+                          <div className="space-y-4 pl-4">
+                            {subGroupQuestions.map((question) => (
+                              <QuestionTestCard key={question.id} question={question} index={questions.indexOf(question)} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+          );
+        })}
+
+        {/* 그룹 없는 질문들 */}
+        {ungroupedQuestions.length > 0 && (
+          <div className="space-y-4">
+            {topLevelGroups.length > 0 && (
+              <div className="flex items-center space-x-2 py-2">
+                <div className="flex-1 h-px bg-gray-200" />
+                <span className="text-xs text-gray-400">그룹 없음</span>
+                <div className="flex-1 h-px bg-gray-200" />
+              </div>
+            )}
+            {ungroupedQuestions.map((question, index) => (
+              <QuestionTestCard key={question.id} question={question} index={questions.indexOf(question)} />
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -572,24 +651,107 @@ export function SortableQuestionList({
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={questions.map((q) => q.id)} strategy={verticalListSortingStrategy}>
-          <div className="space-y-4">
-            {questions.map((question, index) => (
-              <div key={question.id} className="relative">
-                {/* 드롭 영역 표시 */}
-                {overId === question.id && activeId !== question.id && (
-                  <div className="absolute -top-2 left-0 right-0 h-1 bg-blue-500 rounded-full animate-pulse z-10" />
+          <div className="space-y-6">
+            {/* 그룹별로 렌더링 (2단계 계층) */}
+            {topLevelGroups.map((group) => {
+              const groupQuestions = questionsByGroup[group.id] || [];
+              const subGroups = getSubGroups(group.id);
+
+              return (
+                <div key={group.id} className="space-y-4">
+                  <GroupHeader group={group} questionCount={groupQuestions.length} />
+                  {!group.collapsed && (
+                    <>
+                      {/* 최상위 그룹의 질문들 */}
+                      {groupQuestions.length > 0 && (
+                        <div className="space-y-4 pl-4">
+                          {groupQuestions.map((question) => (
+                            <div key={question.id} className="relative">
+                              {/* 드롭 영역 표시 */}
+                              {overId === question.id && activeId !== question.id && (
+                                <div className="absolute -top-2 left-0 right-0 h-1 bg-blue-500 rounded-full animate-pulse z-10" />
+                              )}
+                              <SortableQuestion
+                                question={question}
+                                index={questions.indexOf(question)}
+                                isSelected={selectedQuestionId === question.id}
+                                onSelect={selectQuestion}
+                                onEdit={handleEdit}
+                                onDelete={handleDelete}
+                                onDuplicate={handleDuplicate}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* 하위 그룹들 */}
+                      {subGroups.map((subGroup) => {
+                        const subGroupQuestions = questionsByGroup[subGroup.id] || [];
+                        if (subGroupQuestions.length === 0) return null;
+
+                        return (
+                          <div key={subGroup.id} className="ml-4 space-y-4">
+                            <GroupHeader group={subGroup} questionCount={subGroupQuestions.length} />
+                            {!subGroup.collapsed && (
+                              <div className="space-y-4 pl-4">
+                                {subGroupQuestions.map((question) => (
+                                  <div key={question.id} className="relative">
+                                    {/* 드롭 영역 표시 */}
+                                    {overId === question.id && activeId !== question.id && (
+                                      <div className="absolute -top-2 left-0 right-0 h-1 bg-blue-500 rounded-full animate-pulse z-10" />
+                                    )}
+                                    <SortableQuestion
+                                      question={question}
+                                      index={questions.indexOf(question)}
+                                      isSelected={selectedQuestionId === question.id}
+                                      onSelect={selectQuestion}
+                                      onEdit={handleEdit}
+                                      onDelete={handleDelete}
+                                      onDuplicate={handleDuplicate}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* 그룹 없는 질문들 */}
+            {ungroupedQuestions.length > 0 && (
+              <div className="space-y-4">
+                {topLevelGroups.length > 0 && (
+                  <div className="flex items-center space-x-2 py-2">
+                    <div className="flex-1 h-px bg-gray-200" />
+                    <span className="text-xs text-gray-400">그룹 없음</span>
+                    <div className="flex-1 h-px bg-gray-200" />
+                  </div>
                 )}
-                <SortableQuestion
-                  question={question}
-                  index={index}
-                  isSelected={selectedQuestionId === question.id}
-                  onSelect={selectQuestion}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onDuplicate={handleDuplicate}
-                />
+                {ungroupedQuestions.map((question, index) => (
+                  <div key={question.id} className="relative">
+                    {/* 드롭 영역 표시 */}
+                    {overId === question.id && activeId !== question.id && (
+                      <div className="absolute -top-2 left-0 right-0 h-1 bg-blue-500 rounded-full animate-pulse z-10" />
+                    )}
+                    <SortableQuestion
+                      question={question}
+                      index={questions.indexOf(question)}
+                      isSelected={selectedQuestionId === question.id}
+                      onSelect={selectQuestion}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      onDuplicate={handleDuplicate}
+                    />
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         </SortableContext>
 

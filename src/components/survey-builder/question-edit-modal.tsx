@@ -56,6 +56,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         title: question.title,
         description: question.description,
         required: question.required,
+        groupId: question.groupId,
         options: question.options ? [...question.options] : [],
         selectLevels: question.selectLevels ? [...question.selectLevels] : [],
         tableTitle: question.tableTitle,
@@ -393,6 +394,58 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                   {validationErrors.title && (
                     <p className="text-red-500 text-sm mt-1">{validationErrors.title}</p>
                   )}
+                </div>
+
+                <div>
+                  <Label htmlFor="group">그룹 선택 (선택사항)</Label>
+                  <select
+                    id="group"
+                    value={formData.groupId || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        groupId: e.target.value || undefined,
+                      }))
+                    }
+                    className="w-full mt-2 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">그룹 없음</option>
+                    {(() => {
+                      const groups = currentSurvey.groups || [];
+                      const topLevelGroups = groups
+                        .filter((g) => !g.parentGroupId)
+                        .sort((a, b) => a.order - b.order);
+                      const getSubGroups = (parentId: string) =>
+                        groups
+                          .filter((g) => g.parentGroupId === parentId)
+                          .sort((a, b) => a.order - b.order);
+
+                      const options: React.ReactElement[] = [];
+
+                      topLevelGroups.forEach((group) => {
+                        options.push(
+                          <option key={group.id} value={group.id}>
+                            {group.name}
+                          </option>,
+                        );
+
+                        // 하위 그룹들 추가
+                        const subGroups = getSubGroups(group.id);
+                        subGroups.forEach((subGroup) => {
+                          options.push(
+                            <option key={subGroup.id} value={subGroup.id}>
+                              └─ {subGroup.name}
+                            </option>,
+                          );
+                        });
+                      });
+
+                      return options;
+                    })()}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    이 질문을 특정 그룹에 포함시킬 수 있습니다.
+                  </p>
                 </div>
 
                 <div>

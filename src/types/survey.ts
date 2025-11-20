@@ -142,12 +142,24 @@ export interface SelectLevel {
   options: QuestionOption[];
 }
 
+// 질문 그룹 (2단계 계층 구조 지원)
+export interface QuestionGroup {
+  id: string;
+  name: string; // 그룹 이름 (예: "공통", "응답자 정보", "1번", "III. 지상파 직접 수신")
+  description?: string; // 그룹 설명
+  order: number; // 그룹 순서
+  parentGroupId?: string; // 상위 그룹 ID (하위 그룹인 경우)
+  color?: string; // 그룹 색상 (UI용)
+  collapsed?: boolean; // 접힘 상태 (UI용)
+}
+
 export interface Question {
   id: string;
   type: QuestionType;
   title: string;
   description?: string;
   required: boolean;
+  groupId?: string; // 소속 그룹 ID (QuestionGroup의 id 참조)
   options?: QuestionOption[];
   selectLevels?: SelectLevel[]; // 다단계 select용
   tableRows?: string[];
@@ -173,6 +185,7 @@ export interface Survey {
   id: string;
   title: string;
   description?: string;
+  groups?: QuestionGroup[]; // 질문 그룹 목록
   questions: Question[];
   settings: SurveySettings;
   createdAt: Date;

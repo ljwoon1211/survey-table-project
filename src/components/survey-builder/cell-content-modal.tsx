@@ -210,7 +210,7 @@ export function CellContentModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleCancel()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>셀 내용 편집</DialogTitle>
         </DialogHeader>
@@ -480,7 +480,7 @@ export function CellContentModal({
                 </div>
               </div>
 
-              <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
+              <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
                 {checkboxOptions.map((option, index) => (
                   <div
                     key={option.id}
@@ -637,7 +637,7 @@ export function CellContentModal({
                 </div>
               </div>
 
-              <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
+              <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
                 {radioOptions.map((option, index) => (
                   <div
                     key={option.id}
@@ -789,7 +789,7 @@ export function CellContentModal({
                 </div>
               </div>
 
-              <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
+              <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
                 {selectOptions.map((option, index) => (
                   <div
                     key={option.id}

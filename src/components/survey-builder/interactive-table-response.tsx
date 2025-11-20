@@ -496,23 +496,9 @@ export function InteractiveTableResponse({
           </div>
         );
 
+      case "text":
       default:
-        // 텍스트 입력이 가능한 셀인지 확인
-        if (isTestMode && cell.content.includes("(") && cell.content.includes(")")) {
-          return (
-            <div className="space-y-2">
-              <div className="text-sm">{cell.content.split("(")[0]}</div>
-              <input
-                type="text"
-                value={cellResponse || ""}
-                onChange={(e) => handleTextChange(cell.id, e.target.value)}
-                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="입력하세요..."
-              />
-            </div>
-          );
-        }
-
+        // text 타입은 단순히 텍스트만 표시
         return cell.content ? (
           <div className="whitespace-pre-wrap text-sm">{cell.content}</div>
         ) : (

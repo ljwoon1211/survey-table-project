@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
 import { useSurveyListStore } from "@/stores/survey-list-store";
 import { SortableQuestionList } from "@/components/survey-builder/sortable-question-list";
+import { GroupManager } from "@/components/survey-builder/group-manager";
 import { generateOTTSurvey } from "@/utils/ott-survey-generator";
 import {
   FileText,
@@ -328,9 +329,9 @@ export default function CreateSurveyPage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto p-6">
-        <div className="grid grid-cols-12 gap-6 h-[calc(100vh-140px)]">
+        <div className="grid grid-cols-12 gap-6">
           {/* Left Sidebar - Question Types */}
-          <div className="col-span-3 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="col-span-3 bg-white rounded-xl shadow-sm border border-gray-200 p-6 max-h-[calc(100vh-140px)] overflow-y-auto">
             <h3 className="text-lg font-semibold text-gray-900 mb-6">질문 유형</h3>
 
             <div className="space-y-3">
@@ -385,6 +386,7 @@ export default function CreateSurveyPage() {
             <div className="mt-6 pt-6 border-t border-gray-200">
               <h4 className="text-sm font-medium text-gray-700 mb-3">설문 정보</h4>
               <div className="text-xs text-gray-500 space-y-1">
+                <p>그룹 수: {(currentSurvey.groups || []).length}개</p>
                 <p>질문 수: {currentSurvey.questions.length}개</p>
                 <p>마지막 수정: {currentSurvey.updatedAt.toLocaleDateString()}</p>
               </div>
@@ -392,7 +394,7 @@ export default function CreateSurveyPage() {
           </div>
 
           {/* Center - Survey Preview/Edit */}
-          <div className="col-span-6 bg-white rounded-xl shadow-sm border border-gray-200">
+          <div className="col-span-6 bg-white rounded-xl shadow-sm border border-gray-200 max-h-[calc(100vh-140px)] overflow-y-auto">
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
@@ -451,15 +453,11 @@ export default function CreateSurveyPage() {
           </div>
 
           {/* Right Sidebar - Settings */}
-          <div className="col-span-3 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="col-span-3 bg-white rounded-xl shadow-sm border border-gray-200 p-6 max-h-[calc(100vh-140px)] overflow-y-auto">
             <h3 className="text-lg font-semibold text-gray-900 mb-6">설정</h3>
 
-            {selectedQuestionId ? (
-              <div>
-                <p className="text-sm text-gray-600">선택된 질문의 설정을 편집할 수 있습니다.</p>
-                {/* 질문별 설정 UI 구현 예정 */}
-              </div>
-            ) : (
+            <div className="space-y-6">
+              {/* 설문 설정 */}
               <div>
                 <h4 className="text-sm font-medium text-gray-700 mb-3">설문 설정</h4>
                 <div className="space-y-4">
@@ -483,7 +481,12 @@ export default function CreateSurveyPage() {
                   </div>
                 </div>
               </div>
-            )}
+
+              {/* 그룹 관리 */}
+              <div className="pt-6 border-t border-gray-200">
+                <GroupManager className="max-h-[400px]" />
+              </div>
+            </div>
           </div>
         </div>
       </div>

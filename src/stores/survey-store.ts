@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import { Survey, Question, QuestionType, SurveySettings, SelectLevel, TableColumn, TableRow } from '@/types/survey';
+import { Survey, Question, QuestionType, SurveySettings, SelectLevel, TableColumn, TableRow, QuestionGroup } from '@/types/survey';
 
 interface SurveyBuilderState {
   // 현재 편집 중인 설문
@@ -18,7 +18,14 @@ interface SurveyBuilderState {
   updateSurveyTitle: (title: string) => void;
   updateSurveyDescription: (description: string) => void;
 
-  addQuestion: (type: QuestionType) => void;
+  // 그룹 관리
+  addGroup: (name: string, description?: string, parentGroupId?: string) => void;
+  updateGroup: (groupId: string, updates: Partial<QuestionGroup>) => void;
+  deleteGroup: (groupId: string) => void;
+  reorderGroups: (groupIds: string[]) => void;
+  toggleGroupCollapse: (groupId: string) => void;
+
+  addQuestion: (type: QuestionType, groupId?: string) => void;
   addPreparedQuestion: (question: Question) => void;
   updateQuestion: (questionId: string, updates: Partial<Question>) => void;
   deleteQuestion: (questionId: string) => void;
@@ -51,6 +58,7 @@ const defaultSurvey: Survey = {
   id: '',
   title: '새 설문조사',
   description: '',
+  groups: [],
   questions: [],
   settings: defaultSurveySettings,
   createdAt: new Date(),
@@ -85,13 +93,108 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
             }
           })),
 
-        addQuestion: (type: QuestionType) => {
+        // 그룹 관리
+        addGroup: (name: string, description?: string, parentGroupId?: string) => {
+          const groups = get().currentSurvey.groups || [];
+
+          // 같은 레벨(같은 parentGroupId)의 그룹들 중 가장 큰 order 찾기
+          const siblingGroups = groups.filter(g => g.parentGroupId === parentGroupId);
+          const maxOrder = siblingGroups.length > 0
+            ? Math.max(...siblingGroups.map(g => g.order))
+            : -1;
+
+          const newGroup: QuestionGroup = {
+            id: `group-${Date.now()}`,
+            name,
+            description,
+            parentGroupId,
+            order: maxOrder + 1,
+            collapsed: false
+          };
+
+          set((state) => ({
+            currentSurvey: {
+              ...state.currentSurvey,
+              groups: [...(state.currentSurvey.groups || []), newGroup],
+              updatedAt: new Date()
+            }
+          }));
+        },
+
+        updateGroup: (groupId: string, updates: Partial<QuestionGroup>) =>
+          set((state) => ({
+            currentSurvey: {
+              ...state.currentSurvey,
+              groups: (state.currentSurvey.groups || []).map((g) =>
+                g.id === groupId ? { ...g, ...updates } : g
+              ),
+              updatedAt: new Date()
+            }
+          })),
+
+        deleteGroup: (groupId: string) =>
+          set((state) => {
+            const groups = state.currentSurvey.groups || [];
+            // 삭제할 그룹의 하위 그룹들도 함께 찾기
+            const groupsToDelete = new Set([groupId]);
+            const findChildGroups = (parentId: string) => {
+              groups.forEach(g => {
+                if (g.parentGroupId === parentId) {
+                  groupsToDelete.add(g.id);
+                  findChildGroups(g.id);
+                }
+              });
+            };
+            findChildGroups(groupId);
+
+            return {
+              currentSurvey: {
+                ...state.currentSurvey,
+                groups: groups.filter((g) => !groupsToDelete.has(g.id)),
+                // 삭제된 그룹들에 속한 질문들의 groupId 제거
+                questions: state.currentSurvey.questions.map((q) =>
+                  groupsToDelete.has(q.groupId || '') ? { ...q, groupId: undefined } : q
+                ),
+                updatedAt: new Date()
+              }
+            };
+          }),
+
+        reorderGroups: (groupIds: string[]) =>
+          set((state) => {
+            const groupsMap = new Map((state.currentSurvey.groups || []).map(g => [g.id, g]));
+            const reorderedGroups = groupIds
+              .map(id => groupsMap.get(id))
+              .filter((g): g is QuestionGroup => g !== undefined)
+              .map((g, index) => ({ ...g, order: index }));
+
+            return {
+              currentSurvey: {
+                ...state.currentSurvey,
+                groups: reorderedGroups,
+                updatedAt: new Date()
+              }
+            };
+          }),
+
+        toggleGroupCollapse: (groupId: string) =>
+          set((state) => ({
+            currentSurvey: {
+              ...state.currentSurvey,
+              groups: (state.currentSurvey.groups || []).map((g) =>
+                g.id === groupId ? { ...g, collapsed: !g.collapsed } : g
+              )
+            }
+          })),
+
+        addQuestion: (type: QuestionType, groupId?: string) => {
           const newQuestion: Question = {
             id: `question-${Date.now()}`,
             type,
             title: getDefaultQuestionTitle(type),
             required: false,
             order: get().currentSurvey.questions.length,
+            groupId, // 그룹 ID 추가
             ...(needsOptions(type) && {
               options: [
                 { id: `option-${Date.now()}-1`, label: '옵션 1', value: '옵션1' },
