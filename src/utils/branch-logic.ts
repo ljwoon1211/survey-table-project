@@ -1,10 +1,10 @@
-import { 
-  Question, 
-  BranchRule, 
-  TableValidationRule, 
+import {
+  Question,
+  BranchRule,
+  TableValidationRule,
   QuestionCondition,
   QuestionConditionGroup,
-  SurveyResponse 
+  SurveyResponse
 } from "@/types/survey";
 
 /**
@@ -124,8 +124,8 @@ function getBranchRuleForTable(question: Question, response: unknown): BranchRul
       if (cell.type === "radio" && cell.radioOptions) {
         const selectedValue =
           typeof cellValue === "object" &&
-          cellValue !== null &&
-          "selectedValue" in cellValue
+            cellValue !== null &&
+            "selectedValue" in cellValue
             ? (cellValue as { selectedValue: string }).selectedValue
             : cellValue;
 
@@ -220,45 +220,88 @@ export function checkTableValidationRule(
     return false;
   }
 
-  const tableResponse = response as Record<string, Record<string, unknown>>;
+  // 응답 데이터는 평면 구조: { "cell-id": value, ... }
+  const tableResponse = response as Record<string, unknown>;
   const { conditions, type } = rule;
   const { rowIds, cellColumnIndex, checkType, expectedValues } = conditions;
 
-  // 체크된 행들을 수집
-  const checkedRows: string[] = [];
-  
+  // 디버깅 로그
+  console.group(`🔍 테이블 검증 규칙 체크: ${rule.description || rule.id}`);
+  console.log("검증 타입:", type);
+  console.log("조건:", { rowIds, cellColumnIndex, checkType, expectedValues });
+  console.log("테이블 응답 데이터:", tableResponse);
+  console.log("질문 행 데이터:", question.tableRowsData);
+
+  // 지정된 행(rowIds) 중에서 체크된 행들을 수집
+  const checkedRowsInTarget: string[] = [];
+
   for (const row of question.tableRowsData) {
     if (!rowIds.includes(row.id)) continue;
 
-    const rowResponse = tableResponse[row.id];
-    if (!rowResponse) continue;
-
     // 특정 열만 확인하거나 모든 셀 확인
-    const cellsToCheck = cellColumnIndex !== undefined 
+    let cellsToCheck = cellColumnIndex !== undefined
       ? [row.cells[cellColumnIndex]]
       : row.cells;
 
+    // 만약 특정 열(예: 0번 열)을 선택했는데 해당 셀이 텍스트(라벨) 등 비인터랙티브 타입이라면,
+    // 사용자 의도를 파악하여 해당 행의 첫 번째 입력 필드(라디오, 체크박스 등)를 대신 확인합니다.
+    if (cellColumnIndex !== undefined && cellsToCheck.length === 1) {
+      const targetCell = cellsToCheck[0];
+      if (targetCell && ['text', 'image', 'video'].includes(targetCell.type)) {
+        const firstInteractive = row.cells.find(c => ['checkbox', 'radio', 'select', 'input'].includes(c.type));
+        if (firstInteractive) {
+          cellsToCheck = [firstInteractive];
+        }
+      }
+    }
+
     for (const cell of cellsToCheck) {
       if (!cell) continue;
-      
-      const cellValue = rowResponse[cell.id];
+
+      // 평면 구조에서 셀 값 가져오기
+      const cellValue = tableResponse[cell.id];
       if (!cellValue) continue;
 
-      // 체크 타입에 따라 체크 여부 확인
+      // 셀 타입에 따라 체크 여부 확인
       let isChecked = false;
 
-      switch (checkType) {
+      // 규칙의 checkType 대신 실제 셀의 타입을 기준으로 판단
+      // (사용자가 규칙 설정 시 checkType을 잘못 설정하는 경우를 방지하고, 실제 데이터 타입에 맞게 검증)
+      switch (cell.type) {
         case 'checkbox':
           // 체크박스: 배열에 값이 있으면 체크됨
           if (Array.isArray(cellValue) && cellValue.length > 0) {
-            isChecked = true;
+            if (expectedValues && expectedValues.length > 0) {
+              // expectedValues가 있으면 해당 값들 중 하나라도 포함되어 있는지 확인
+              const checkedValues = cellValue.map(v =>
+                typeof v === 'object' && v !== null && 'selectedValue' in v
+                  ? (v as { selectedValue: string }).selectedValue
+                  : (typeof v === 'object' && v !== null && 'value' in v ? (v as { value: string }).value : v)
+              );
+
+              if (checkedValues.some(v => expectedValues.includes(v))) {
+                isChecked = true;
+              }
+            } else {
+              isChecked = true;
+            }
           }
           break;
 
         case 'radio':
           // 라디오: 값이 있으면 선택됨
           if (cellValue) {
-            isChecked = true;
+            if (expectedValues && expectedValues.length > 0) {
+              const selectedValue = typeof cellValue === "object" && cellValue !== null && "optionId" in cellValue
+                ? (cellValue as { optionId: string }).optionId
+                : (typeof cellValue === "object" && cellValue !== null && "selectedValue" in cellValue ? (cellValue as { selectedValue: string }).selectedValue : cellValue);
+
+              if (expectedValues.includes(selectedValue as string)) {
+                isChecked = true;
+              }
+            } else {
+              isChecked = true;
+            }
           }
           break;
 
@@ -279,78 +322,130 @@ export function checkTableValidationRule(
         case 'input':
           // 입력: 값이 있고, expectedValues가 있으면 그 값과 일치하는지 확인
           if (cellValue) {
-            if (expectedValues && expectedValues.length > 0) {
-              isChecked = expectedValues.includes(cellValue as string);
-            } else {
-              isChecked = (cellValue as string).trim() !== '';
+            const strValue = String(cellValue).trim();
+            if (strValue !== '') {
+              if (expectedValues && expectedValues.length > 0) {
+                isChecked = expectedValues.includes(strValue);
+              } else {
+                isChecked = true;
+              }
             }
           }
           break;
       }
 
-      if (isChecked && !checkedRows.includes(row.id)) {
-        checkedRows.push(row.id);
+      if (isChecked && !checkedRowsInTarget.includes(row.id)) {
+        checkedRowsInTarget.push(row.id);
+        console.log(`✅ 행 ${row.id} (${row.label}): 지정된 행 중 체크됨`);
       }
     }
   }
+
+  console.log("지정된 행 중 체크된 행:", checkedRowsInTarget);
 
   // 검증 타입에 따라 조건 확인
   switch (type) {
     case 'exclusive-check':
       // 특정 행만 체크된 경우 (다른 행은 체크 안됨)
       // 모든 행 중에서 rowIds에 지정된 행만 체크되어야 함
-      const allCheckedRows: string[] = [];
+      const allCheckedRowsInTable: string[] = [];
       for (const row of question.tableRowsData) {
-        const rowResponse = tableResponse[row.id];
-        if (!rowResponse) continue;
-
-        const cellsToCheck = cellColumnIndex !== undefined 
+        let cellsToCheck = cellColumnIndex !== undefined
           ? [row.cells[cellColumnIndex]]
           : row.cells;
 
+        // 만약 특정 열(예: 0번 열)을 선택했는데 해당 셀이 텍스트(라벨) 등 비인터랙티브 타입이라면,
+        // 사용자 의도를 파악하여 해당 행의 첫 번째 입력 필드(라디오, 체크박스 등)를 대신 확인합니다.
+        if (cellColumnIndex !== undefined && cellsToCheck.length === 1) {
+          const targetCell = cellsToCheck[0];
+          if (targetCell && ['text', 'image', 'video'].includes(targetCell.type)) {
+            const firstInteractive = row.cells.find(c => ['checkbox', 'radio', 'select', 'input'].includes(c.type));
+            if (firstInteractive) {
+              cellsToCheck = [firstInteractive];
+            }
+          }
+        }
+
         for (const cell of cellsToCheck) {
           if (!cell) continue;
-          const cellValue = rowResponse[cell.id];
-          
+          // 평면 구조에서 셀 값 가져오기
+          const cellValue = tableResponse[cell.id];
+
           let isAnyChecked = false;
-          if (checkType === 'checkbox' && Array.isArray(cellValue) && cellValue.length > 0) {
-            isAnyChecked = true;
-          } else if (cellValue && checkType !== 'checkbox') {
+
+          // 셀 타입이나 규칙의 checkType에 상관없이 실제 값이 존재하는지 확인
+          if (Array.isArray(cellValue)) {
+            if (cellValue.length > 0) isAnyChecked = true;
+          } else if (typeof cellValue === 'string') {
+            if (cellValue.trim() !== '') isAnyChecked = true;
+          } else if (cellValue) {
+            // 객체나 기타 Truthy 값
             isAnyChecked = true;
           }
 
-          if (isAnyChecked && !allCheckedRows.includes(row.id)) {
-            allCheckedRows.push(row.id);
+          if (isAnyChecked && !allCheckedRowsInTable.includes(row.id)) {
+            allCheckedRowsInTable.push(row.id);
+            console.log(`✅ 행 ${row.id} (${row.label}): 테이블 전체에서 체크됨`);
             break;
           }
         }
       }
 
       // rowIds에 지정된 행들만 체크되고, 다른 행은 체크 안되어야 함
-      const isOnlyTargetRowsChecked = 
-        allCheckedRows.length > 0 &&
-        allCheckedRows.every(id => rowIds.includes(id)) &&
-        allCheckedRows.some(id => rowIds.includes(id));
-      
+      console.log("테이블 전체에서 체크된 행:", allCheckedRowsInTable);
+      console.log("지정된 행:", rowIds);
+
+      // 독점 체크: 체크된 행이 있고, 모든 체크된 행이 지정된 행에 포함되어야 함
+      // (다른 행이 체크되면 안됨)
+      const isOnlyTargetRowsChecked =
+        allCheckedRowsInTable.length > 0 &&
+        allCheckedRowsInTable.every(id => rowIds.includes(id));
+
+      console.log("독점 체크 결과:", isOnlyTargetRowsChecked);
+      console.log("  - 체크된 행 수:", allCheckedRowsInTable.length);
+      console.log("  - 모든 체크된 행이 지정된 행에 포함됨:", allCheckedRowsInTable.every(id => rowIds.includes(id)));
+      console.groupEnd();
+
       return isOnlyTargetRowsChecked;
 
     case 'any-of':
       // 여러 행 중 하나라도 체크된 경우
-      return checkedRows.length > 0;
+      const anyOfResult = checkedRowsInTarget.length > 0;
+      console.log("any-of 결과:", anyOfResult);
+      console.log("  - 지정된 행 중 체크된 행 수:", checkedRowsInTarget.length);
+      console.groupEnd();
+      return anyOfResult;
 
     case 'all-of':
       // 특정 행들이 모두 체크된 경우
-      return rowIds.every(id => checkedRows.includes(id));
+      const allOfResult = rowIds.every(id => checkedRowsInTarget.includes(id));
+      console.log("all-of 결과:", allOfResult);
+      console.log("  - 지정된 행:", rowIds);
+      console.log("  - 체크된 행:", checkedRowsInTarget);
+      console.log("  - 모든 지정된 행이 체크됨:", allOfResult);
+      console.groupEnd();
+      return allOfResult;
 
     case 'none-of':
       // 특정 행들이 모두 체크 안된 경우
-      return checkedRows.length === 0;
+      const noneOfResult = checkedRowsInTarget.length === 0;
+      console.log("none-of 결과:", noneOfResult);
+      console.log("  - 지정된 행 중 체크된 행 수:", checkedRowsInTarget.length, "(0이어야 함)");
+      console.groupEnd();
+      return noneOfResult;
 
     case 'required-combination':
       // 특정 조합이 체크된 경우 (모든 지정된 행이 체크되어야 함)
-      return rowIds.every(id => checkedRows.includes(id));
+      const reqComboResult = rowIds.every(id => checkedRowsInTarget.includes(id));
+      console.log("required-combination 결과:", reqComboResult);
+      console.log("  - 지정된 행:", rowIds);
+      console.log("  - 체크된 행:", checkedRowsInTarget);
+      console.log("  - 모든 지정된 행이 체크됨:", reqComboResult);
+      console.groupEnd();
+      return reqComboResult;
 
     default:
+      console.groupEnd();
       return false;
   }
 }
@@ -399,7 +494,7 @@ export function shouldDisplayQuestion(
   const { conditions, logicType } = question.displayCondition;
 
   // 조건들을 평가
-  const results = conditions.map(condition => 
+  const results = conditions.map(condition =>
     evaluateQuestionCondition(condition, allResponses, allQuestions)
   );
 
@@ -518,7 +613,8 @@ function checkTableCellCondition(
     return false;
   }
 
-  const tableResponse = response as Record<string, Record<string, unknown>>;
+  // 응답 데이터는 평면 구조: { "cell-id": value, ... }
+  const tableResponse = response as Record<string, unknown>;
   const { rowIds, cellColumnIndex, checkType } = tableConditions;
 
   // 체크된 행들 수집
@@ -527,17 +623,15 @@ function checkTableCellCondition(
   for (const row of question.tableRowsData) {
     if (!rowIds.includes(row.id)) continue;
 
-    const rowResponse = tableResponse[row.id];
-    if (!rowResponse) continue;
-
     const cellsToCheck = cellColumnIndex !== undefined
       ? [row.cells[cellColumnIndex]]
       : row.cells;
 
     for (const cell of cellsToCheck) {
       if (!cell) continue;
-      
-      const cellValue = rowResponse[cell.id];
+
+      // 평면 구조에서 셀 값 가져오기
+      const cellValue = tableResponse[cell.id];
       if (!cellValue) continue;
 
       // 셀 타입에 따라 체크 여부 확인

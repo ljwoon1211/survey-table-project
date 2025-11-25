@@ -146,7 +146,13 @@ export function InteractiveTableResponse({
   };
 
   // 라디오 버튼 변경 핸들러
-  const handleRadioChange = (cellId: string, optionId: string) => {
+  const handleRadioChange = (cellId: string, optionId: string, isSelected?: boolean) => {
+    // 이미 선택된 항목을 다시 클릭하면 선택 취소
+    if (isSelected) {
+      updateResponse(cellId, null);
+      return;
+    }
+
     const isOtherOption = optionId === "other-option";
     if (isOtherOption) {
       updateResponse(cellId, {
@@ -305,11 +311,16 @@ export function InteractiveTableResponse({
                       id={`${cell.id}-${option.id}`}
                       name={cell.radioGroupName || cell.id}
                       checked={isSelected}
-                      onChange={() => handleRadioChange(cell.id, option.id)}
-                      className="border-gray-300 text-blue-600 focus:ring-blue-500"
+                      onChange={() => handleRadioChange(cell.id, option.id, isSelected)}
+                      onClick={() => handleRadioChange(cell.id, option.id, isSelected)}
+                      className="border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                     />
                     <label
                       htmlFor={`${cell.id}-${option.id}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleRadioChange(cell.id, option.id, isSelected);
+                      }}
                       className="text-sm cursor-pointer select-none"
                     >
                       {option.label}

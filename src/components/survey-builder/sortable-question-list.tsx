@@ -469,26 +469,32 @@ export function SortableQuestionList({
   selectedQuestionId,
   isTestMode = false,
 }: SortableQuestionListProps) {
-  const { currentSurvey, reorderQuestions, selectQuestion, deleteQuestion, updateQuestion, addQuestion } =
-    useSurveyBuilderStore();
+  const {
+    currentSurvey,
+    reorderQuestions,
+    selectQuestion,
+    deleteQuestion,
+    updateQuestion,
+    addQuestion,
+  } = useSurveyBuilderStore();
 
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
 
   const groups = currentSurvey.groups || [];
-  
+
   // 최상위 그룹만 필터링
-  const topLevelGroups = groups.filter(g => !g.parentGroupId).sort((a, b) => a.order - b.order);
-  
+  const topLevelGroups = groups.filter((g) => !g.parentGroupId).sort((a, b) => a.order - b.order);
+
   // 특정 그룹의 하위 그룹들 가져오기
   const getSubGroups = (parentId: string) => {
-    return groups.filter(g => g.parentGroupId === parentId).sort((a, b) => a.order - b.order);
+    return groups.filter((g) => g.parentGroupId === parentId).sort((a, b) => a.order - b.order);
   };
 
   // 그룹별로 질문 분류
   const questionsByGroup = questions.reduce((acc, question) => {
-    const groupId = question.groupId || 'ungrouped';
+    const groupId = question.groupId || "ungrouped";
     if (!acc[groupId]) {
       acc[groupId] = [];
     }
@@ -497,7 +503,7 @@ export function SortableQuestionList({
   }, {} as Record<string, Question[]>);
 
   // 그룹 없는 질문들
-  const ungroupedQuestions = questionsByGroup['ungrouped'] || [];
+  const ungroupedQuestions = questionsByGroup["ungrouped"] || [];
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -544,30 +550,71 @@ export function SortableQuestionList({
   const handleDuplicate = (questionId: string) => {
     const questionToDuplicate = questions.find((q) => q.id === questionId);
     if (questionToDuplicate) {
-      addQuestion(questionToDuplicate.type);
-      // Get the newly added question and update its details
-      setTimeout(() => {
-        const currentQuestions = questions;
-        const lastQuestion = currentQuestions[currentQuestions.length - 1];
-        if (lastQuestion) {
-          updateQuestion(lastQuestion.id, {
-            title: `${questionToDuplicate.title} (복사본)`,
-            description: questionToDuplicate.description,
-            required: questionToDuplicate.required,
-            options: questionToDuplicate.options
-              ? [
-                  ...questionToDuplicate.options.map((opt) => ({
-                    ...opt,
-                    id: `option-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                  })),
-                ]
-              : undefined,
-            selectLevels: questionToDuplicate.selectLevels
-              ? [...questionToDuplicate.selectLevels]
-              : undefined,
-          });
-        }
-      }, 100);
+      // 새로운 ID를 가진 완전한 복사본 생성
+      const newQuestion: Question = {
+        ...questionToDuplicate,
+        id: `question-${Date.now()}`,
+        title: `${questionToDuplicate.title} (복사본)`,
+        order: questions.length,
+        // options 복사 (새 ID 부여)
+        options: questionToDuplicate.options
+          ? questionToDuplicate.options.map((opt) => ({
+              ...opt,
+              id: `option-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            }))
+          : undefined,
+        // selectLevels 복사 (새 ID 부여)
+        selectLevels: questionToDuplicate.selectLevels
+          ? questionToDuplicate.selectLevels.map((level) => ({
+              ...level,
+              id: `level-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              options: level.options.map((opt) => ({
+                ...opt,
+                id: `option-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              })),
+            }))
+          : undefined,
+        // tableColumns 복사 (새 ID 부여)
+        tableColumns: questionToDuplicate.tableColumns
+          ? questionToDuplicate.tableColumns.map((col) => ({
+              ...col,
+              id: `col-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            }))
+          : undefined,
+        // tableRowsData 복사 (새 ID 부여)
+        tableRowsData: questionToDuplicate.tableRowsData
+          ? questionToDuplicate.tableRowsData.map((row) => ({
+              ...row,
+              id: `row-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              cells: row.cells.map((cell) => ({
+                ...cell,
+                id: `cell-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                // 셀 내부의 옵션들도 복사
+                checkboxOptions: cell.checkboxOptions
+                  ? cell.checkboxOptions.map((opt) => ({
+                      ...opt,
+                      id: `checkbox-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    }))
+                  : undefined,
+                radioOptions: cell.radioOptions
+                  ? cell.radioOptions.map((opt) => ({
+                      ...opt,
+                      id: `radio-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    }))
+                  : undefined,
+                selectOptions: cell.selectOptions
+                  ? cell.selectOptions.map((opt) => ({
+                      ...opt,
+                      id: `select-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    }))
+                  : undefined,
+              })),
+            }))
+          : undefined,
+      };
+
+      // 준비된 질문을 추가
+      useSurveyBuilderStore.getState().addPreparedQuestion(newQuestion);
     }
   };
 
@@ -593,11 +640,15 @@ export function SortableQuestionList({
                   {groupQuestions.length > 0 && (
                     <div className="space-y-4 pl-4">
                       {groupQuestions.map((question) => (
-                        <QuestionTestCard key={question.id} question={question} index={questions.indexOf(question)} />
+                        <QuestionTestCard
+                          key={question.id}
+                          question={question}
+                          index={questions.indexOf(question)}
+                        />
                       ))}
                     </div>
                   )}
-                  
+
                   {/* 하위 그룹들 */}
                   {subGroups.map((subGroup) => {
                     const subGroupQuestions = questionsByGroup[subGroup.id] || [];
@@ -609,7 +660,11 @@ export function SortableQuestionList({
                         {!subGroup.collapsed && (
                           <div className="space-y-4 pl-4">
                             {subGroupQuestions.map((question) => (
-                              <QuestionTestCard key={question.id} question={question} index={questions.indexOf(question)} />
+                              <QuestionTestCard
+                                key={question.id}
+                                question={question}
+                                index={questions.indexOf(question)}
+                              />
                             ))}
                           </div>
                         )}
@@ -633,7 +688,11 @@ export function SortableQuestionList({
               </div>
             )}
             {ungroupedQuestions.map((question, index) => (
-              <QuestionTestCard key={question.id} question={question} index={questions.indexOf(question)} />
+              <QuestionTestCard
+                key={question.id}
+                question={question}
+                index={questions.indexOf(question)}
+              />
             ))}
           </div>
         )}
@@ -684,7 +743,7 @@ export function SortableQuestionList({
                           ))}
                         </div>
                       )}
-                      
+
                       {/* 하위 그룹들 */}
                       {subGroups.map((subGroup) => {
                         const subGroupQuestions = questionsByGroup[subGroup.id] || [];
@@ -692,7 +751,10 @@ export function SortableQuestionList({
 
                         return (
                           <div key={subGroup.id} className="ml-4 space-y-4">
-                            <GroupHeader group={subGroup} questionCount={subGroupQuestions.length} />
+                            <GroupHeader
+                              group={subGroup}
+                              questionCount={subGroupQuestions.length}
+                            />
                             {!subGroup.collapsed && (
                               <div className="space-y-4 pl-4">
                                 {subGroupQuestions.map((question) => (
