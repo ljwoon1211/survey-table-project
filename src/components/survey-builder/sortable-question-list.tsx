@@ -34,7 +34,16 @@ import { InteractiveTableResponse } from "./interactive-table-response";
 import { TablePreview } from "./table-preview";
 import { NoticeRenderer } from "./notice-renderer";
 import { GroupHeader } from "./group-header";
-import { GripVertical, Settings, Trash2, Copy, Edit3, Eye, EyeOff } from "lucide-react";
+import {
+  GripVertical,
+  Settings,
+  Trash2,
+  Copy,
+  Edit3,
+  Eye,
+  EyeOff,
+  BookmarkPlus,
+} from "lucide-react";
 
 interface SortableQuestionProps {
   question: Question;
@@ -44,6 +53,7 @@ interface SortableQuestionProps {
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
+  onSaveToLibrary?: (question: Question) => void;
 }
 
 function SortableQuestion({
@@ -54,6 +64,7 @@ function SortableQuestion({
   onEdit,
   onDelete,
   onDuplicate,
+  onSaveToLibrary,
 }: SortableQuestionProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: question.id,
@@ -120,6 +131,7 @@ function SortableQuestion({
                   e.stopPropagation();
                   onEdit(question.id);
                 }}
+                title="편집"
               >
                 <Edit3 className="w-4 h-4" />
               </Button>
@@ -131,9 +143,24 @@ function SortableQuestion({
                   e.stopPropagation();
                   onDuplicate(question.id);
                 }}
+                title="복제"
               >
                 <Copy className="w-4 h-4" />
               </Button>
+              {onSaveToLibrary && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSaveToLibrary(question);
+                  }}
+                  title="질문 저장"
+                >
+                  <BookmarkPlus className="w-4 h-4" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
@@ -142,6 +169,7 @@ function SortableQuestion({
                   e.stopPropagation();
                   onDelete(question.id);
                 }}
+                title="삭제"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -462,12 +490,14 @@ interface SortableQuestionListProps {
   questions: Question[];
   selectedQuestionId: string | null;
   isTestMode?: boolean;
+  onSaveToLibrary?: (question: Question) => void;
 }
 
 export function SortableQuestionList({
   questions,
   selectedQuestionId,
   isTestMode = false,
+  onSaveToLibrary,
 }: SortableQuestionListProps) {
   const {
     currentSurvey,
@@ -738,6 +768,7 @@ export function SortableQuestionList({
                                 onEdit={handleEdit}
                                 onDelete={handleDelete}
                                 onDuplicate={handleDuplicate}
+                                onSaveToLibrary={onSaveToLibrary}
                               />
                             </div>
                           ))}
@@ -771,6 +802,7 @@ export function SortableQuestionList({
                                       onEdit={handleEdit}
                                       onDelete={handleDelete}
                                       onDuplicate={handleDuplicate}
+                                      onSaveToLibrary={onSaveToLibrary}
                                     />
                                   </div>
                                 ))}
@@ -809,6 +841,7 @@ export function SortableQuestionList({
                       onEdit={handleEdit}
                       onDelete={handleDelete}
                       onDuplicate={handleDuplicate}
+                      onSaveToLibrary={onSaveToLibrary}
                     />
                   </div>
                 ))}

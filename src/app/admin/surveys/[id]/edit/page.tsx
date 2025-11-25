@@ -8,7 +8,11 @@ import { useSurveyBuilderStore } from "@/stores/survey-store";
 import { useSurveyListStore } from "@/stores/survey-list-store";
 import { SortableQuestionList } from "@/components/survey-builder/sortable-question-list";
 import { GroupManager } from "@/components/survey-builder/group-manager";
+import { QuestionLibraryPanel } from "@/components/survey-builder/question-library-panel";
+import { SaveQuestionModal } from "@/components/survey-builder/save-question-modal";
+import { ImportExportLibraryModal } from "@/components/survey-builder/import-export-library-modal";
 import { generateOTTSurvey } from "@/utils/ott-survey-generator";
+import { Question } from "@/types/survey";
 import {
   FileText,
   Eye,
@@ -35,6 +39,8 @@ import {
   Globe,
   Lock,
   Pencil,
+  Library,
+  Download,
 } from "lucide-react";
 import Link from "next/link";
 import { generateSlugFromTitle, validateSlug } from "@/lib/survey-url";
@@ -46,6 +52,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const questionTypes = [
   {
@@ -140,6 +147,12 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [isEditingSlugInModal, setIsEditingSlugInModal] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+
+  // 라이브러리 관련 상태
+  const [leftSidebarTab, setLeftSidebarTab] = useState<"types" | "library">("types");
+  const [showSaveQuestionModal, setShowSaveQuestionModal] = useState(false);
+  const [questionToSave, setQuestionToSave] = useState<Question | null>(null);
+  const [showImportExportModal, setShowImportExportModal] = useState(false);
 
   // 설문 불러오기
   useEffect(() => {
@@ -294,6 +307,17 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
     }
   };
 
+  // 질문 라이브러리에 저장
+  const handleSaveToLibrary = (question: Question) => {
+    setQuestionToSave(question);
+    setShowSaveQuestionModal(true);
+  };
+
+  // 라이브러리에서 질문 추가
+  const handleAddFromLibrary = (question: Question) => {
+    addPreparedQuestion(question);
+  };
+
   // 로딩 상태
   if (isLoading) {
     return (
@@ -380,67 +404,103 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto p-6">
         <div className="grid grid-cols-12 gap-6">
-          {/* Left Sidebar - Question Types */}
-          <div className="col-span-3 bg-white rounded-xl shadow-sm border border-gray-200 p-6 max-h-[calc(100vh-140px)] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900 mb-6">질문 유형</h3>
+          {/* Left Sidebar - Question Types & Library */}
+          <div className="col-span-3 bg-white rounded-xl shadow-sm border border-gray-200 max-h-[calc(100vh-140px)] overflow-hidden flex flex-col">
+            <Tabs
+              value={leftSidebarTab}
+              onValueChange={(v) => setLeftSidebarTab(v as "types" | "library")}
+              className="flex flex-col h-full"
+            >
+              <TabsList className="grid w-full grid-cols-2 p-1 m-2 mb-0">
+                <TabsTrigger value="types" className="text-xs">
+                  <Plus className="w-3 h-3 mr-1" />
+                  질문 생성
+                </TabsTrigger>
+                <TabsTrigger value="library" className="text-xs">
+                  <Library className="w-3 h-3 mr-1" />
+                  보관함
+                </TabsTrigger>
+              </TabsList>
 
-            <div className="space-y-3">
-              {questionTypes.map((questionType) => {
-                const IconComponent = questionType.icon;
-                return (
+              <TabsContent value="types" className="flex-1 overflow-y-auto p-4 pt-2 m-0">
+                <div className="space-y-3">
+                  {questionTypes.map((questionType) => {
+                    const IconComponent = questionType.icon;
+                    return (
+                      <Card
+                        key={questionType.type}
+                        className="p-4 cursor-pointer hover-lift border-gray-200 hover:border-blue-200 transition-all duration-200"
+                        onClick={() => addQuestion(questionType.type)}
+                      >
+                        <div className="flex items-start space-x-3">
+                          <div
+                            className={`w-10 h-10 rounded-lg flex items-center justify-center ${questionType.color}`}
+                          >
+                            <IconComponent className="w-5 h-5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-gray-900 text-sm">
+                              {questionType.label}
+                            </h4>
+                            <p className="text-xs text-gray-500 mt-1">{questionType.description}</p>
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+
+                {/* OTT 설문지 예제 버튼 */}
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <h4 className="text-sm font-medium text-gray-700 mb-3">설문 예제</h4>
                   <Card
-                    key={questionType.type}
-                    className="p-4 cursor-pointer hover-lift border-gray-200 hover:border-blue-200 transition-all duration-200"
-                    onClick={() => addQuestion(questionType.type)}
+                    className="p-4 cursor-pointer hover-lift border-gray-200 hover:border-orange-200 transition-all duration-200"
+                    onClick={handleAddOTTSurvey}
                   >
                     <div className="flex items-start space-x-3">
-                      <div
-                        className={`w-10 h-10 rounded-lg flex items-center justify-center ${questionType.color}`}
-                      >
-                        <IconComponent className="w-5 h-5" />
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-orange-100 text-orange-600">
+                        <Tv className="w-5 h-5" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-gray-900 text-sm">{questionType.label}</h4>
-                        <p className="text-xs text-gray-500 mt-1">{questionType.description}</p>
+                        <h4 className="font-medium text-gray-900 text-sm flex items-center gap-1">
+                          OTT 설문지
+                          <Sparkles className="w-3 h-3 text-yellow-500" />
+                        </h4>
+                        <p className="text-xs text-gray-500 mt-1">
+                          업로드한 이미지와 동일한 OTT 서비스 설문지
+                        </p>
                       </div>
                     </div>
                   </Card>
-                );
-              })}
-            </div>
+                </div>
 
-            {/* OTT 설문지 예제 버튼 */}
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">설문 예제</h4>
-              <Card
-                className="p-4 cursor-pointer hover-lift border-gray-200 hover:border-orange-200 transition-all duration-200"
-                onClick={handleAddOTTSurvey}
-              >
-                <div className="flex items-start space-x-3">
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-orange-100 text-orange-600">
-                    <Tv className="w-5 h-5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-gray-900 text-sm flex items-center gap-1">
-                      OTT 설문지
-                      <Sparkles className="w-3 h-3 text-yellow-500" />
-                    </h4>
-                    <p className="text-xs text-gray-500 mt-1">
-                      업로드한 이미지와 동일한 OTT 서비스 설문지
-                    </p>
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <h4 className="text-sm font-medium text-gray-700 mb-3">설문 정보</h4>
+                  <div className="text-xs text-gray-500 space-y-1">
+                    <p>그룹 수: {(currentSurvey.groups || []).length}개</p>
+                    <p>질문 수: {currentSurvey.questions.length}개</p>
+                    <p>마지막 수정: {currentSurvey.updatedAt.toLocaleDateString()}</p>
                   </div>
                 </div>
-              </Card>
-            </div>
+              </TabsContent>
 
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">설문 정보</h4>
-              <div className="text-xs text-gray-500 space-y-1">
-                <p>그룹 수: {(currentSurvey.groups || []).length}개</p>
-                <p>질문 수: {currentSurvey.questions.length}개</p>
-                <p>마지막 수정: {currentSurvey.updatedAt.toLocaleDateString()}</p>
-              </div>
-            </div>
+              <TabsContent value="library" className="flex-1 overflow-y-auto p-4 pt-2 m-0">
+                <QuestionLibraryPanel onAddQuestion={handleAddFromLibrary} className="h-full" />
+
+                {/* 내보내기/가져오기 버튼 */}
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setShowImportExportModal(true)}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    내보내기 / 가져오기
+                  </Button>
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
 
           {/* Center - Survey Preview/Edit */}
@@ -486,17 +546,24 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                   </div>
                   <h3 className="text-lg font-medium text-gray-900 mb-2">질문을 추가해보세요</h3>
                   <p className="text-gray-500 mb-6">
-                    왼쪽에서 원하는 질문 유형을 클릭하여 추가할 수 있습니다.
+                    왼쪽에서 원하는 질문 유형을 클릭하거나 보관함에서 불러올 수 있습니다.
                   </p>
-                  <Button onClick={() => addQuestion("text")}>
-                    <Plus className="w-4 h-4 mr-2" />첫 번째 질문 추가
-                  </Button>
+                  <div className="flex gap-2 justify-center">
+                    <Button onClick={() => addQuestion("text")}>
+                      <Plus className="w-4 h-4 mr-2" />첫 번째 질문 추가
+                    </Button>
+                    <Button variant="outline" onClick={() => setLeftSidebarTab("library")}>
+                      <Library className="w-4 h-4 mr-2" />
+                      보관함에서 불러오기
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <SortableQuestionList
                   questions={currentSurvey.questions}
                   selectedQuestionId={selectedQuestionId}
                   isTestMode={isTestMode}
+                  onSaveToLibrary={handleSaveToLibrary}
                 />
               )}
             </div>
@@ -722,6 +789,22 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* 질문 저장 모달 */}
+      <SaveQuestionModal
+        open={showSaveQuestionModal}
+        onOpenChange={setShowSaveQuestionModal}
+        question={questionToSave}
+        onSaved={() => {
+          setQuestionToSave(null);
+        }}
+      />
+
+      {/* 라이브러리 내보내기/가져오기 모달 */}
+      <ImportExportLibraryModal
+        open={showImportExportModal}
+        onOpenChange={setShowImportExportModal}
+      />
     </div>
   );
 }

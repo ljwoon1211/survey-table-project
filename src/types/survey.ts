@@ -225,3 +225,36 @@ export interface QuestionTypeInfo {
   description: string;
   color: string;
 }
+
+// 보관함 (라이브러리용)
+export interface SavedQuestion {
+  id: string;
+  question: Question;
+  name: string;           // 사용자가 지정한 이름 (예: "성별 질문", "연령대 선택")
+  description?: string;   // 설명
+  tags: string[];         // 태그 (예: ["인구통계", "기본정보"])
+  category: string;       // 카테고리 (예: "인구통계", "만족도", "NPS")
+  usageCount: number;     // 사용 횟수
+  isPreset: boolean;      // 프리셋 질문 여부
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// 질문 카테고리
+export interface QuestionCategory {
+  id: string;
+  name: string;
+  color: string;
+  icon?: string;
+  order: number;
+}
+
+// 기본 카테고리 목록
+export const DEFAULT_CATEGORIES: QuestionCategory[] = [
+  { id: 'demographics', name: '인구통계', color: 'bg-blue-100 text-blue-600', icon: 'Users', order: 0 },
+  { id: 'satisfaction', name: '만족도', color: 'bg-green-100 text-green-600', icon: 'ThumbsUp', order: 1 },
+  { id: 'nps', name: 'NPS', color: 'bg-purple-100 text-purple-600', icon: 'TrendingUp', order: 2 },
+  { id: 'feedback', name: '피드백', color: 'bg-orange-100 text-orange-600', icon: 'MessageSquare', order: 3 },
+  { id: 'preference', name: '선호도', color: 'bg-pink-100 text-pink-600', icon: 'Heart', order: 4 },
+  { id: 'custom', name: '사용자 정의', color: 'bg-gray-100 text-gray-600', icon: 'Folder', order: 5 },
+];
