@@ -30,9 +30,22 @@ import {
   ArrowUp,
   ArrowDown,
   AlertCircle,
+  Copy,
+  RefreshCw,
+  Globe,
+  Lock,
+  Pencil,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { generateSlugFromTitle, validateSlug } from "@/lib/survey-url";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 const questionTypes = [
   {
@@ -99,7 +112,6 @@ interface EditSurveyPageProps {
 
 export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   const { id } = use(params);
-  const router = useRouter();
   const {
     currentSurvey,
     selectedQuestionId,
@@ -112,9 +124,11 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
     togglePreviewMode,
     toggleTestMode,
     updateSurveySettings,
+    updateSurveySlug,
+    regeneratePrivateToken,
   } = useSurveyBuilderStore();
 
-  const { getSurveyById, saveSurvey } = useSurveyListStore();
+  const { getSurveyById, saveSurvey, isSlugAvailable } = useSurveyListStore();
 
   const [titleInput, setTitleInput] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
@@ -122,6 +136,11 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   const [showScrollButtons, setShowScrollButtons] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [slugInput, setSlugInput] = useState("");
+  const [slugError, setSlugError] = useState("");
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [isEditingSlugInModal, setIsEditingSlugInModal] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   // 설문 불러오기
   useEffect(() => {
@@ -129,12 +148,80 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
     if (survey) {
       useSurveyBuilderStore.setState({ currentSurvey: survey });
       setTitleInput(survey.title);
+      setSlugInput(survey.slug || "");
       setIsLoading(false);
     } else {
       setNotFound(true);
       setIsLoading(false);
     }
   }, [id, getSurveyById]);
+
+  // 슬러그 유효성 검사
+  const handleSlugChange = (value: string) => {
+    setSlugInput(value);
+
+    if (!value) {
+      setSlugError("");
+      updateSurveySlug("");
+      return;
+    }
+
+    const validation = validateSlug(value);
+    if (!validation.isValid) {
+      setSlugError(validation.error || "");
+      return;
+    }
+
+    // 중복 검사 (현재 설문 제외)
+    if (!isSlugAvailable(value, currentSurvey.id)) {
+      setSlugError("이미 사용 중인 URL입니다. 다른 URL을 입력해주세요.");
+      return;
+    }
+
+    setSlugError("");
+    updateSurveySlug(value);
+  };
+
+  // 제목에서 자동 슬러그 생성
+  const handleAutoGenerateSlug = () => {
+    const autoSlug = generateSlugFromTitle(titleInput);
+    if (autoSlug) {
+      // 중복 시 접미사 추가
+      let finalSlug = autoSlug;
+      let counter = 1;
+      while (!isSlugAvailable(finalSlug, currentSurvey.id)) {
+        finalSlug = `${autoSlug}-${counter}`;
+        counter++;
+      }
+      setSlugInput(finalSlug);
+      updateSurveySlug(finalSlug);
+      setSlugError("");
+    }
+  };
+
+  // URL 복사
+  const handleCopyUrl = () => {
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+    let url: string;
+
+    if (currentSurvey.settings.isPublic) {
+      const slug = slugInput || generateSlugFromTitle(titleInput);
+      url = `${baseUrl}/survey/${slug}`;
+    } else {
+      url = `${baseUrl}/survey/${currentSurvey.privateToken}`;
+    }
+
+    navigator.clipboard.writeText(url);
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 2000);
+  };
+
+  // 비공개 토큰 재생성
+  const handleRegenerateToken = () => {
+    if (confirm("새로운 비공개 링크를 생성하시겠습니까? 기존 링크는 더 이상 사용할 수 없습니다.")) {
+      regeneratePrivateToken();
+    }
+  };
 
   // 스크롤 감지
   useEffect(() => {
@@ -164,12 +251,16 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
 
   // 설문 저장
   const handleSaveSurvey = () => {
+    // 공개 설문인데 슬러그가 없으면 자동 생성
+    if (currentSurvey.settings.isPublic && !slugInput) {
+      handleAutoGenerateSlug();
+    }
+
     saveSurvey(currentSurvey);
     setSaveMessage("저장되었습니다!");
-
-    setTimeout(() => {
-      setSaveMessage("");
-    }, 2000);
+    setShowSaveModal(true);
+    setCopySuccess(false);
+    setIsEditingSlugInModal(false);
   };
 
   // 맨 위로 스크롤
@@ -429,11 +520,24 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                 <h4 className="text-sm font-medium text-gray-700 mb-3">설문 설정</h4>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <label className="text-sm text-gray-600">공개 설문</label>
+                    <div className="flex items-center gap-2">
+                      {currentSurvey.settings.isPublic ? (
+                        <Globe className="w-4 h-4 text-green-600" />
+                      ) : (
+                        <Lock className="w-4 h-4 text-gray-500" />
+                      )}
+                      <label className="text-sm text-gray-600">공개 설문</label>
+                    </div>
                     <input
                       type="checkbox"
                       checked={currentSurvey.settings.isPublic}
-                      onChange={(e) => updateSurveySettings({ isPublic: e.target.checked })}
+                      onChange={(e) => {
+                        updateSurveySettings({ isPublic: e.target.checked });
+                        // 공개로 전환 시 자동 슬러그 생성
+                        if (e.target.checked && !slugInput) {
+                          handleAutoGenerateSlug();
+                        }
+                      }}
                       className="rounded"
                     />
                   </div>
@@ -479,6 +583,153 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
           </Button>
         </div>
       )}
+
+      {/* 저장 완료 모달 */}
+      <Dialog open={showSaveModal} onOpenChange={setShowSaveModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                <Check className="w-5 h-5 text-green-600" />
+              </div>
+              설문이 저장되었습니다!
+            </DialogTitle>
+            <DialogDescription>
+              {currentSurvey.settings.isPublic
+                ? "공개 설문 URL을 복사하여 공유하세요."
+                : "비공개 링크를 아는 사람만 설문에 접근할 수 있습니다."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {currentSurvey.settings.isPublic ? (
+              // 공개 설문 URL
+              <>
+                <div>
+                  <Label className="text-sm font-medium flex items-center gap-2 mb-2">
+                    <Globe className="w-4 h-4 text-green-600" />
+                    공개 설문 URL
+                  </Label>
+                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <p className="text-sm text-gray-700 break-all">
+                      {typeof window !== "undefined" ? window.location.origin : ""}/survey/
+                      <span className="font-medium text-blue-600">
+                        {slugInput || generateSlugFromTitle(titleInput)}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* URL 슬러그 편집 */}
+                {isEditingSlugInModal ? (
+                  <div className="space-y-2">
+                    <Label className="text-xs text-gray-500">URL 슬러그 변경</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={slugInput || generateSlugFromTitle(titleInput)}
+                        onChange={(e) => handleSlugChange(e.target.value)}
+                        placeholder="my-survey"
+                        className={`flex-1 ${slugError ? "border-red-300" : ""}`}
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleAutoGenerateSlug}
+                        title="자동 생성"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    {slugError && (
+                      <p className="text-xs text-red-500 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        {slugError}
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleCopyUrl}
+                    className="flex-1"
+                    variant={copySuccess ? "default" : "outline"}
+                  >
+                    {copySuccess ? (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        복사됨!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 mr-2" />
+                        URL 복사
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsEditingSlugInModal(!isEditingSlugInModal)}
+                  >
+                    <Pencil className="w-4 h-4 mr-2" />
+                    {isEditingSlugInModal ? "완료" : "URL 변경"}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              // 비공개 설문 URL
+              <>
+                <div>
+                  <Label className="text-sm font-medium flex items-center gap-2 mb-2">
+                    <Lock className="w-4 h-4 text-amber-600" />
+                    비공개 설문 URL
+                  </Label>
+                  <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
+                    <p className="text-sm text-gray-700 break-all font-mono">
+                      {typeof window !== "undefined" ? window.location.origin : ""}/survey/
+                      {currentSurvey.privateToken}
+                    </p>
+                  </div>
+                  <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />이 링크를 아는 사람만 설문에 접근할 수
+                    있습니다
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleCopyUrl}
+                    className="flex-1"
+                    variant={copySuccess ? "default" : "outline"}
+                  >
+                    {copySuccess ? (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        복사됨!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 mr-2" />
+                        URL 복사
+                      </>
+                    )}
+                  </Button>
+                  <Button variant="outline" onClick={handleRegenerateToken}>
+                    <RefreshCw className="w-4 h-4 mr-2" />새 링크 생성
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button variant="outline" onClick={() => setShowSaveModal(false)}>
+              확인
+            </Button>
+            <Button onClick={() => (window.location.href = "/admin/surveys")}>설문 목록으로</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

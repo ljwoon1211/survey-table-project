@@ -185,6 +185,8 @@ export interface Survey {
   id: string;
   title: string;
   description?: string;
+  slug?: string;           // 공개 설문용 커스텀 URL 슬러그
+  privateToken?: string;   // 비공개 설문용 보안 토큰 (UUID)
   groups?: QuestionGroup[]; // 질문 그룹 목록
   questions: Question[];
   settings: SurveySettings;

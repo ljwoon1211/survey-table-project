@@ -6,6 +6,8 @@ export interface SurveyListItem {
   id: string;
   title: string;
   description?: string;
+  slug?: string;
+  privateToken?: string;
   questionCount: number;
   responseCount: number;
   createdAt: Date;
@@ -24,6 +26,11 @@ interface SurveyListState {
   getSurveyById: (surveyId: string) => Survey | undefined;
   getSurveyListItems: () => SurveyListItem[];
   duplicateSurvey: (surveyId: string) => Survey | undefined;
+
+  // URL 관련 조회
+  getSurveyBySlug: (slug: string) => Survey | undefined;
+  getSurveyByPrivateToken: (token: string) => Survey | undefined;
+  isSlugAvailable: (slug: string, excludeSurveyId?: string) => boolean;
 
   // 필터링 및 정렬
   searchSurveys: (query: string) => Survey[];
@@ -95,12 +102,30 @@ export const useSurveyListStore = create<SurveyListState>()(
             id: survey.id,
             title: survey.title,
             description: survey.description,
+            slug: survey.slug,
+            privateToken: survey.privateToken,
             questionCount: survey.questions.length,
             responseCount: 0, // 일단 0으로 설정
             createdAt: survey.createdAt,
             updatedAt: survey.updatedAt,
             isPublic: survey.settings.isPublic
           }));
+        },
+
+        // URL 관련 조회 함수들
+        getSurveyBySlug: (slug: string) => {
+          return get().surveys.find(survey => survey.slug === slug);
+        },
+
+        getSurveyByPrivateToken: (token: string) => {
+          return get().surveys.find(survey => survey.privateToken === token);
+        },
+
+        isSlugAvailable: (slug: string, excludeSurveyId?: string) => {
+          const existingSurvey = get().surveys.find(survey =>
+            survey.slug === slug && survey.id !== excludeSurveyId
+          );
+          return !existingSurvey;
         },
 
         duplicateSurvey: (surveyId: string) => {

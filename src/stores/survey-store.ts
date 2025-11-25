@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { Survey, Question, QuestionType, SurveySettings, SelectLevel, TableColumn, TableRow, QuestionGroup } from '@/types/survey';
+import { generateSlugFromTitle, generatePrivateToken } from '@/lib/survey-url';
 
 interface SurveyBuilderState {
   // 현재 편집 중인 설문
@@ -15,8 +16,13 @@ interface SurveyBuilderState {
   testResponses: Record<string, string | string[] | Record<string, string | string[] | object>>;
 
   // 액션들
-  updateSurveyTitle: (title: string) => void;
+  updateSurveyTitle: (title: string, autoUpdateSlug?: boolean) => void;
   updateSurveyDescription: (description: string) => void;
+
+  // URL 관련 액션들
+  updateSurveySlug: (slug: string) => void;
+  updatePrivateToken: (token: string) => void;
+  regeneratePrivateToken: () => string;
 
   // 그룹 관리
   addGroup: (name: string, description?: string, parentGroupId?: string) => void;
@@ -58,6 +64,8 @@ const defaultSurvey: Survey = {
   id: '',
   title: '새 설문조사',
   description: '',
+  slug: '',
+  privateToken: '',
   groups: [],
   questions: [],
   settings: defaultSurveySettings,
@@ -75,14 +83,25 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
         isTestMode: false,
         testResponses: {},
 
-        updateSurveyTitle: (title: string) =>
-          set((state) => ({
-            currentSurvey: {
-              ...state.currentSurvey,
+        updateSurveyTitle: (title: string, autoUpdateSlug: boolean = false) =>
+          set((state) => {
+            const updates: Partial<Survey> = {
               title,
               updatedAt: new Date()
+            };
+
+            // 공개 설문이고 autoUpdateSlug가 true이면 슬러그도 자동 업데이트
+            if (autoUpdateSlug && state.currentSurvey.settings.isPublic) {
+              updates.slug = generateSlugFromTitle(title);
             }
-          })),
+
+            return {
+              currentSurvey: {
+                ...state.currentSurvey,
+                ...updates
+              }
+            };
+          }),
 
         updateSurveyDescription: (description: string) =>
           set((state) => ({
@@ -92,6 +111,37 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
               updatedAt: new Date()
             }
           })),
+
+        // URL 관련 액션들
+        updateSurveySlug: (slug: string) =>
+          set((state) => ({
+            currentSurvey: {
+              ...state.currentSurvey,
+              slug,
+              updatedAt: new Date()
+            }
+          })),
+
+        updatePrivateToken: (token: string) =>
+          set((state) => ({
+            currentSurvey: {
+              ...state.currentSurvey,
+              privateToken: token,
+              updatedAt: new Date()
+            }
+          })),
+
+        regeneratePrivateToken: () => {
+          const newToken = generatePrivateToken();
+          set((state) => ({
+            currentSurvey: {
+              ...state.currentSurvey,
+              privateToken: newToken,
+              updatedAt: new Date()
+            }
+          }));
+          return newToken;
+        },
 
         // 그룹 관리
         addGroup: (name: string, description?: string, parentGroupId?: string) => {
@@ -308,7 +358,12 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
 
         resetSurvey: () =>
           set(() => ({
-            currentSurvey: { ...defaultSurvey, id: `survey-${Date.now()}` },
+            currentSurvey: {
+              ...defaultSurvey,
+              id: `survey-${Date.now()}`,
+              slug: '',
+              privateToken: generatePrivateToken() // 비공개 토큰은 항상 생성
+            },
             selectedQuestionId: null,
             isPreviewMode: false,
             isTestMode: false,
@@ -352,14 +407,15 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
 );
 
 function getDefaultQuestionTitle(type: QuestionType): string {
-  const titles = {
+  const titles: Record<QuestionType, string> = {
     text: '단답형 질문',
     textarea: '장문형 질문',
     radio: '단일 선택 질문',
     checkbox: '다중 선택 질문',
     select: '드롭다운 질문',
     multiselect: '다중 드롭다운 질문',
-    table: '테이블 질문'
+    table: '테이블 질문',
+    notice: '공지사항'
   };
   return titles[type];
 }

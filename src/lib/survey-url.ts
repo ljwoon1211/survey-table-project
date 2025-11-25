@@ -1,0 +1,212 @@
+/**
+ * 설문 URL 관련 유틸리티 함수들
+ * - 공개 설문: 사용자 정의 슬러그 또는 제목에서 자동 생성
+ * - 비공개 설문: UUID v4 토큰
+ */
+
+// 시스템 예약어 목록 (URL 충돌 방지)
+const RESERVED_SLUGS = [
+  'admin',
+  'api',
+  'create',
+  'edit',
+  'delete',
+  'new',
+  'settings',
+  'analytics',
+  'responses',
+  'preview',
+  'test',
+  'login',
+  'logout',
+  'signup',
+  'register',
+  'auth',
+  'oauth',
+  'callback',
+  'webhook',
+  'health',
+  'status',
+  'static',
+  'assets',
+  'public',
+  'private',
+  '_next',
+  'favicon',
+  'robots',
+  'sitemap',
+  'manifest',
+];
+
+/**
+ * 한글/영문 제목을 URL-safe 슬러그로 변환
+ * @param title 설문 제목
+ * @returns URL-safe 슬러그
+ */
+export function generateSlugFromTitle(title: string): string {
+  if (!title || title.trim() === '') {
+    return '';
+  }
+
+  return title
+    .toLowerCase()
+    .trim()
+    // 공백을 하이픈으로 변환
+    .replace(/\s+/g, '-')
+    // 한글, 영문, 숫자, 하이픈만 유지 (특수문자 제거)
+    .replace(/[^\w\u3131-\u3163\uac00-\ud7a3-]/g, '')
+    // 연속 하이픈을 단일 하이픈으로
+    .replace(/-+/g, '-')
+    // 앞뒤 하이픈 제거
+    .replace(/^-|-$/g, '')
+    // 최대 50자로 제한
+    .slice(0, 50);
+}
+
+/**
+ * 슬러그 유효성 검사
+ * @param slug 검사할 슬러그
+ * @returns 유효성 검사 결과 객체
+ */
+export function validateSlug(slug: string): {
+  isValid: boolean;
+  error?: string;
+} {
+  // 빈 문자열 체크
+  if (!slug || slug.trim() === '') {
+    return { isValid: false, error: 'URL 슬러그를 입력해주세요.' };
+  }
+
+  // 최소 길이 체크 (3자 이상)
+  if (slug.length < 3) {
+    return { isValid: false, error: 'URL 슬러그는 최소 3자 이상이어야 합니다.' };
+  }
+
+  // 최대 길이 체크 (50자 이하)
+  if (slug.length > 50) {
+    return { isValid: false, error: 'URL 슬러그는 최대 50자까지 가능합니다.' };
+  }
+
+  // 허용 문자 체크 (한글, 영문, 숫자, 하이픈만)
+  const validSlugRegex = /^[\w\u3131-\u3163\uac00-\ud7a3-]+$/;
+  if (!validSlugRegex.test(slug)) {
+    return {
+      isValid: false,
+      error: '영문, 숫자, 한글, 하이픈(-)만 사용할 수 있습니다.',
+    };
+  }
+
+  // 시작/끝이 하이픈인지 체크
+  if (slug.startsWith('-') || slug.endsWith('-')) {
+    return {
+      isValid: false,
+      error: 'URL 슬러그는 하이픈으로 시작하거나 끝날 수 없습니다.',
+    };
+  }
+
+  // 연속 하이픈 체크
+  if (slug.includes('--')) {
+    return {
+      isValid: false,
+      error: '연속된 하이픈은 사용할 수 없습니다.',
+    };
+  }
+
+  // 예약어 체크
+  if (RESERVED_SLUGS.includes(slug.toLowerCase())) {
+    return {
+      isValid: false,
+      error: `'${slug}'는 시스템에서 사용하는 예약어입니다. 다른 URL을 입력해주세요.`,
+    };
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * UUID v4 생성 (비공개 설문용)
+ * crypto.randomUUID() 사용 (브라우저/Node.js 18+ 지원)
+ */
+export function generatePrivateToken(): string {
+  // crypto.randomUUID()가 지원되면 사용
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+
+  // 폴백: 수동 UUID v4 생성
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/**
+ * 문자열이 UUID 형식인지 확인
+ */
+export function isUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
+/**
+ * 설문 접근 URL 생성
+ * @param survey 설문 객체
+ * @param baseUrl 기본 URL (기본값: 현재 origin)
+ * @returns 설문 접근 URL
+ */
+export function getSurveyAccessUrl(
+  survey: {
+    id: string;
+    slug?: string;
+    privateToken?: string;
+    settings: { isPublic: boolean };
+  },
+  baseUrl: string = typeof window !== 'undefined' ? window.location.origin : ''
+): string {
+  if (survey.settings.isPublic) {
+    // 공개 설문: slug 사용, 없으면 id 사용
+    const identifier = survey.slug || survey.id;
+    return `${baseUrl}/survey/${identifier}`;
+  }
+
+  // 비공개 설문: privateToken 사용, 없으면 id 사용
+  const identifier = survey.privateToken || survey.id;
+  return `${baseUrl}/survey/${identifier}`;
+}
+
+/**
+ * URL에서 설문 식별자 추출 및 타입 판별
+ * @param identifier URL에서 추출한 식별자
+ * @returns 식별자 타입과 값
+ */
+export function parsesurveyIdentifier(identifier: string): {
+  type: 'slug' | 'privateToken' | 'id';
+  value: string;
+} {
+  // UUID 형식이면 privateToken
+  if (isUUID(identifier)) {
+    return { type: 'privateToken', value: identifier };
+  }
+
+  // survey- 로 시작하면 내부 ID
+  if (identifier.startsWith('survey-')) {
+    return { type: 'id', value: identifier };
+  }
+
+  // 그 외는 slug
+  return { type: 'slug', value: identifier };
+}
+
+/**
+ * 슬러그에 고유 접미사 추가 (중복 방지용)
+ * @param baseSlug 기본 슬러그
+ * @returns 고유 접미사가 추가된 슬러그
+ */
+export function appendUniqueSlugSuffix(baseSlug: string): string {
+  const suffix = Math.random().toString(36).substring(2, 6);
+  const maxBaseLength = 50 - suffix.length - 1; // -1 for hyphen
+  const truncatedBase = baseSlug.slice(0, maxBaseLength);
+  return `${truncatedBase}-${suffix}`;
+}
+
