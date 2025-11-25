@@ -1,45 +1,101 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { useSurveyBuilderStore } from "@/stores/survey-store";
+import { useSurveyListStore } from "@/stores/survey-list-store";
 import { useSurveyResponseStore } from "@/stores/survey-response-store";
 import { InteractiveTableResponse } from "@/components/survey-builder/interactive-table-response";
 import { UserDefinedMultiLevelSelect } from "@/components/survey-builder/user-defined-multi-level-select";
 import { NoticeRenderer } from "@/components/survey-builder/notice-renderer";
-import { CheckCircle, AlertCircle, ArrowLeft, ArrowRight } from "lucide-react";
+import { CheckCircle, AlertCircle, ArrowLeft, ArrowRight, Loader2, Lock } from "lucide-react";
 import { getNextQuestionIndex } from "@/utils/branch-logic";
+import { parsesurveyIdentifier } from "@/lib/survey-url";
+import { Survey } from "@/types/survey";
 
 export default function SurveyResponsePage() {
   const params = useParams();
   const router = useRouter();
-  const surveyId = params.id as string;
+  // URL 인코딩된 한글 slug를 디코딩
+  const identifier = decodeURIComponent(params.id as string);
 
-  const { currentSurvey } = useSurveyBuilderStore();
-  const { startResponse, updateQuestionResponse, completeResponse, currentResponse } =
-    useSurveyResponseStore();
+  // 설문 목록 스토어에서 조회 함수들 가져오기
+  const { getSurveyById, getSurveyBySlug, getSurveyByPrivateToken } = useSurveyListStore();
+  const { startResponse, updateQuestionResponse, completeResponse } = useSurveyResponseStore();
+
+  // 설문 로딩 상태
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadedSurvey, setLoadedSurvey] = useState<Survey | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [responseId, setResponseId] = useState<string | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [responses, setResponses] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
-  const [questionHistory, setQuestionHistory] = useState<number[]>([]); // 방문한 질문 인덱스 히스토리
+  const [questionHistory, setQuestionHistory] = useState<number[]>([]);
 
-  const questions = currentSurvey.questions;
-  const currentQuestion = questions[currentQuestionIndex];
-  const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
-
+  // URL 식별자로 설문 조회
   useEffect(() => {
-    if (!responseId) {
-      const newResponseId = startResponse(surveyId);
+    const loadSurvey = () => {
+      setIsLoading(true);
+      setLoadError(null);
+
+      try {
+        // URL 식별자 타입 판별
+        const { type, value } = parsesurveyIdentifier(identifier);
+
+        let survey: Survey | undefined;
+
+        switch (type) {
+          case "slug":
+            survey = getSurveyBySlug(value);
+            break;
+          case "privateToken":
+            survey = getSurveyByPrivateToken(value);
+            break;
+          case "id":
+            survey = getSurveyById(value);
+            break;
+        }
+
+        if (!survey) {
+          setLoadError("요청하신 설문을 찾을 수 없습니다.");
+          setLoadedSurvey(null);
+        } else if (!survey.settings.isPublic && type === "slug") {
+          // 비공개 설문인데 slug로 접근한 경우
+          setLoadError("이 설문은 비공개 설문입니다. 올바른 링크로 접근해주세요.");
+          setLoadedSurvey(null);
+        } else {
+          setLoadedSurvey(survey);
+        }
+      } catch (error) {
+        console.error("설문 로딩 오류:", error);
+        setLoadError("설문을 불러오는 중 오류가 발생했습니다.");
+        setLoadedSurvey(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadSurvey();
+  }, [identifier, getSurveyById, getSurveyBySlug, getSurveyByPrivateToken]);
+
+  // 설문 응답 시작
+  useEffect(() => {
+    if (loadedSurvey && !responseId) {
+      const newResponseId = startResponse(loadedSurvey.id);
       setResponseId(newResponseId);
     }
-  }, [surveyId, responseId, startResponse]);
+  }, [loadedSurvey, responseId, startResponse]);
+
+  // 현재 설문의 질문들
+  const questions = useMemo(() => loadedSurvey?.questions || [], [loadedSurvey]);
+  const currentQuestion = questions[currentQuestionIndex];
+  const progress = questions.length > 0 ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0;
 
   const handleResponse = (questionId: string, value: any) => {
     setResponses((prev) => ({ ...prev, [questionId]: value }));
@@ -58,7 +114,6 @@ export default function SurveyResponsePage() {
 
     switch (question.type) {
       case "notice":
-        // 공지사항은 requiresAcknowledgment가 true일 때만 체크 필요
         return question.requiresAcknowledgment ? response === true : true;
       case "text":
       case "textarea":
@@ -83,17 +138,12 @@ export default function SurveyResponsePage() {
   };
 
   const handleNext = () => {
-    // 현재 응답 가져오기
     const currentResponse = responses[currentQuestion.id];
-
-    // 다음 질문 인덱스 계산 (분기 규칙 고려)
     const nextIndex = getNextQuestionIndex(questions, currentQuestionIndex, currentResponse);
 
-    // 히스토리에 현재 인덱스 추가
     setQuestionHistory((prev) => [...prev, currentQuestionIndex]);
 
     if (nextIndex === -1) {
-      // 분기 규칙으로 설문 종료
       handleSubmit();
     } else if (nextIndex < questions.length) {
       setCurrentQuestionIndex(nextIndex);
@@ -102,9 +152,8 @@ export default function SurveyResponsePage() {
 
   const handlePrevious = () => {
     if (questionHistory.length > 0) {
-      // 히스토리에서 이전 인덱스 가져오기
       const previousIndex = questionHistory[questionHistory.length - 1];
-      setQuestionHistory((prev) => prev.slice(0, -1)); // 히스토리에서 마지막 항목 제거
+      setQuestionHistory((prev) => prev.slice(0, -1));
       setCurrentQuestionIndex(previousIndex);
     }
   };
@@ -113,9 +162,8 @@ export default function SurveyResponsePage() {
     setIsSubmitting(true);
 
     try {
-      // 필수 질문 검증
       const unansweredRequired = questions.filter(
-        (q) => isQuestionRequired(q) && !isQuestionAnswered(q),
+        (q) => isQuestionRequired(q) && !isQuestionAnswered(q)
       );
 
       if (unansweredRequired.length > 0) {
@@ -136,15 +184,39 @@ export default function SurveyResponsePage() {
     }
   };
 
-  if (questions.length === 0) {
+  // 로딩 중
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Card className="max-w-md mx-auto">
           <CardContent className="p-8 text-center">
-            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-yellow-500" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">설문을 찾을 수 없습니다</h2>
+            <Loader2 className="w-12 h-12 mx-auto mb-4 text-blue-500 animate-spin" />
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">설문을 불러오는 중...</h2>
+            <p className="text-gray-600">잠시만 기다려주세요.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // 에러 발생
+  if (loadError || !loadedSurvey) {
+    const isPrivateError = loadError?.includes("비공개");
+
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="max-w-md mx-auto">
+          <CardContent className="p-8 text-center">
+            {isPrivateError ? (
+              <Lock className="w-12 h-12 mx-auto mb-4 text-yellow-500" />
+            ) : (
+              <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-500" />
+            )}
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              {isPrivateError ? "접근이 제한된 설문입니다" : "설문을 찾을 수 없습니다"}
+            </h2>
             <p className="text-gray-600 mb-4">
-              요청하신 설문이 존재하지 않거나 아직 준비 중입니다.
+              {loadError || "요청하신 설문이 존재하지 않거나 삭제되었습니다."}
             </p>
             <Button onClick={() => router.push("/")}>
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -156,6 +228,26 @@ export default function SurveyResponsePage() {
     );
   }
 
+  // 질문이 없는 경우
+  if (questions.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="max-w-md mx-auto">
+          <CardContent className="p-8 text-center">
+            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-yellow-500" />
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">아직 질문이 없습니다</h2>
+            <p className="text-gray-600 mb-4">이 설문에는 아직 질문이 등록되지 않았습니다.</p>
+            <Button onClick={() => router.push("/")}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              홈으로 돌아가기
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // 완료 화면
   if (isCompleted) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -164,7 +256,7 @@ export default function SurveyResponsePage() {
             <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-500" />
             <h2 className="text-2xl font-semibold text-gray-900 mb-2">응답 완료!</h2>
             <p className="text-gray-600 mb-6">
-              {currentSurvey.settings.thankYouMessage || "설문에 참여해주셔서 감사합니다!"}
+              {loadedSurvey.settings.thankYouMessage || "설문에 참여해주셔서 감사합니다!"}
             </p>
             <div className="space-y-2 text-sm text-gray-500">
               <p>총 {questions.length}개 질문</p>
@@ -190,9 +282,9 @@ export default function SurveyResponsePage() {
         <div className={`${containerMaxWidth} mx-auto px-6 py-4 transition-all duration-300`}>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-semibold text-gray-900">{currentSurvey.title}</h1>
-              {currentSurvey.description && (
-                <p className="text-sm text-gray-600 mt-1">{currentSurvey.description}</p>
+              <h1 className="text-xl font-semibold text-gray-900">{loadedSurvey.title}</h1>
+              {loadedSurvey.description && (
+                <p className="text-sm text-gray-600 mt-1">{loadedSurvey.description}</p>
               )}
             </div>
             <div className="text-sm text-gray-500">
@@ -200,7 +292,7 @@ export default function SurveyResponsePage() {
             </div>
           </div>
 
-          {currentSurvey.settings.showProgressBar && (
+          {loadedSurvey.settings.showProgressBar && (
             <div className="mt-4">
               <Progress value={progress} className="w-full" />
             </div>
@@ -381,7 +473,6 @@ function RadioQuestion({
 }) {
   const [otherInput, setOtherInput] = useState("");
 
-  // 값이 변경될 때 기타 입력값도 업데이트
   useEffect(() => {
     if (typeof value === "object" && value?.otherValue) {
       setOtherInput(value.otherValue);
@@ -391,21 +482,18 @@ function RadioQuestion({
   const handleOptionChange = (optionValue: string, optionId: string) => {
     const isOtherOption = optionId === "other-option";
 
-    // 이미 선택된 항목을 다시 클릭하면 선택 취소
     if (isSelected(optionValue)) {
       onChange(null);
       return;
     }
 
     if (isOtherOption) {
-      // 기타 옵션 선택 시 객체로 저장
       onChange({
         selectedValue: optionValue,
         otherValue: otherInput,
         hasOther: true,
       });
     } else {
-      // 일반 옵션 선택 시 값만 저장
       onChange(optionValue);
     }
   };
@@ -481,11 +569,9 @@ function CheckboxQuestion({
 }) {
   const [otherInputs, setOtherInputs] = useState<Record<string, string>>({});
 
-  // 현재 값을 배열과 기타 입력값으로 분리
   const currentValues = Array.isArray(value) ? value : [];
 
   useEffect(() => {
-    // 기존 기타 입력값들 복원
     const newOtherInputs: Record<string, string> = {};
     currentValues.forEach((val: any) => {
       if (typeof val === "object" && val?.hasOther) {
@@ -500,7 +586,6 @@ function CheckboxQuestion({
     const isOtherOption = optionId === "other-option";
 
     if (isChecked) {
-      // 체크됨
       if (isOtherOption) {
         newValues.push({
           selectedValue: optionValue,
@@ -511,7 +596,6 @@ function CheckboxQuestion({
         newValues.push(optionValue);
       }
     } else {
-      // 체크 해제됨
       newValues = newValues.filter((val: any) => {
         if (typeof val === "object" && val?.selectedValue) {
           return val.selectedValue !== optionValue;
@@ -527,7 +611,6 @@ function CheckboxQuestion({
     const newOtherInputs = { ...otherInputs, [optionValue]: inputValue };
     setOtherInputs(newOtherInputs);
 
-    // 현재 값들을 업데이트
     const newValues = currentValues.map((val: any) => {
       if (typeof val === "object" && val?.selectedValue === optionValue) {
         return { ...val, otherValue: inputValue };

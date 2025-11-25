@@ -131,7 +131,6 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   const { getSurveyById, saveSurvey, isSlugAvailable } = useSurveyListStore();
 
   const [titleInput, setTitleInput] = useState("");
-  const [saveMessage, setSaveMessage] = useState("");
   const [questionNumberInput, setQuestionNumberInput] = useState("");
   const [showScrollButtons, setShowScrollButtons] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -257,7 +256,6 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
     }
 
     saveSurvey(currentSurvey);
-    setSaveMessage("저장되었습니다!");
     setShowSaveModal(true);
     setCopySuccess(false);
     setIsEditingSlugInModal(false);
@@ -367,15 +365,9 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
               <PlayCircle className="w-4 h-4 mr-2" />
               {isTestMode ? "테스트 중" : "테스트"}
             </Button>
-            <Button variant="outline" size="sm" onClick={handleSaveSurvey} className="relative">
+            <Button variant="outline" size="sm" onClick={handleSaveSurvey}>
               <Save className="w-4 h-4 mr-2" />
               저장
-              {saveMessage && (
-                <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-green-600 text-white text-xs rounded whitespace-nowrap">
-                  <Check className="w-3 h-3 inline mr-1" />
-                  {saveMessage}
-                </span>
-              )}
             </Button>
             <Button size="sm">
               <Share2 className="w-4 h-4 mr-2" />

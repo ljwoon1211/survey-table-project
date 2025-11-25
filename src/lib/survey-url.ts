@@ -143,9 +143,11 @@ export function generatePrivateToken(): string {
 
 /**
  * 문자열이 UUID 형식인지 확인
+ * 모든 UUID 버전을 허용하는 유연한 검증
  */
 export function isUUID(str: string): boolean {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  // 일반적인 UUID 형식: 8-4-4-4-12 (총 36자, 하이픈 포함)
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   return uuidRegex.test(str);
 }
 
