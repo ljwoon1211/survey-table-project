@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
-import { useSurveyListStore } from "@/stores/survey-list-store";
 import { SortableQuestionList } from "@/components/survey-builder/sortable-question-list";
 import { GroupManager } from "@/components/survey-builder/group-manager";
 import { QuestionLibraryPanel } from "@/components/survey-builder/question-library-panel";
@@ -53,6 +52,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useSurvey, useSaveSurvey } from "@/hooks/queries/use-surveys";
+import { isSlugAvailable as checkSlugAvailable } from "@/actions/survey-actions";
 
 const questionTypes = [
   {
@@ -135,13 +136,13 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
     regeneratePrivateToken,
   } = useSurveyBuilderStore();
 
-  const { getSurveyById, saveSurvey, isSlugAvailable } = useSurveyListStore();
+  // TanStack Query 훅 사용
+  const { data: survey, isLoading: isSurveyLoading, isError } = useSurvey(id);
+  const saveSurveyMutation = useSaveSurvey();
 
   const [titleInput, setTitleInput] = useState("");
   const [questionNumberInput, setQuestionNumberInput] = useState("");
   const [showScrollButtons, setShowScrollButtons] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
   const [slugInput, setSlugInput] = useState("");
   const [slugError, setSlugError] = useState("");
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -154,22 +155,17 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   const [questionToSave, setQuestionToSave] = useState<Question | null>(null);
   const [showImportExportModal, setShowImportExportModal] = useState(false);
 
-  // 설문 불러오기
+  // 설문 불러오기 - TanStack Query 데이터가 로드되면 스토어에 설정
   useEffect(() => {
-    const survey = getSurveyById(id);
     if (survey) {
       useSurveyBuilderStore.setState({ currentSurvey: survey });
       setTitleInput(survey.title);
       setSlugInput(survey.slug || "");
-      setIsLoading(false);
-    } else {
-      setNotFound(true);
-      setIsLoading(false);
     }
-  }, [id, getSurveyById]);
+  }, [survey]);
 
   // 슬러그 유효성 검사
-  const handleSlugChange = (value: string) => {
+  const handleSlugChange = async (value: string) => {
     setSlugInput(value);
 
     if (!value) {
@@ -184,8 +180,9 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
       return;
     }
 
-    // 중복 검사 (현재 설문 제외)
-    if (!isSlugAvailable(value, currentSurvey.id)) {
+    // 중복 검사 (현재 설문 제외) - 서버 액션 호출
+    const isAvailable = await checkSlugAvailable(value, currentSurvey.id);
+    if (!isAvailable) {
       setSlugError("이미 사용 중인 URL입니다. 다른 URL을 입력해주세요.");
       return;
     }
@@ -195,15 +192,17 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   };
 
   // 제목에서 자동 슬러그 생성
-  const handleAutoGenerateSlug = () => {
+  const handleAutoGenerateSlug = async () => {
     const autoSlug = generateSlugFromTitle(titleInput);
     if (autoSlug) {
-      // 중복 시 접미사 추가
+      // 중복 시 접미사 추가 - 서버 액션으로 확인
       let finalSlug = autoSlug;
       let counter = 1;
-      while (!isSlugAvailable(finalSlug, currentSurvey.id)) {
+      let isAvailable = await checkSlugAvailable(finalSlug, currentSurvey.id);
+      while (!isAvailable) {
         finalSlug = `${autoSlug}-${counter}`;
         counter++;
+        isAvailable = await checkSlugAvailable(finalSlug, currentSurvey.id);
       }
       setSlugInput(finalSlug);
       updateSurveySlug(finalSlug);
@@ -262,16 +261,20 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   };
 
   // 설문 저장
-  const handleSaveSurvey = () => {
+  const handleSaveSurvey = async () => {
     // 공개 설문인데 슬러그가 없으면 자동 생성
     if (currentSurvey.settings.isPublic && !slugInput) {
-      handleAutoGenerateSlug();
+      await handleAutoGenerateSlug();
     }
 
-    saveSurvey(currentSurvey);
-    setShowSaveModal(true);
-    setCopySuccess(false);
-    setIsEditingSlugInModal(false);
+    // TanStack Query 뮤테이션으로 저장
+    saveSurveyMutation.mutate(currentSurvey, {
+      onSuccess: () => {
+        setShowSaveModal(true);
+        setCopySuccess(false);
+        setIsEditingSlugInModal(false);
+      },
+    });
   };
 
   // 맨 위로 스크롤
@@ -319,7 +322,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   };
 
   // 로딩 상태
-  if (isLoading) {
+  if (isSurveyLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -331,7 +334,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   }
 
   // 설문을 찾을 수 없는 경우
-  if (notFound) {
+  if (isError || (!isSurveyLoading && !survey)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">

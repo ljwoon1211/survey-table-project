@@ -163,7 +163,7 @@ export default function SurveyResponsePage() {
 
     try {
       const unansweredRequired = questions.filter(
-        (q) => isQuestionRequired(q) && !isQuestionAnswered(q)
+        (q) => isQuestionRequired(q) && !isQuestionAnswered(q),
       );
 
       if (unansweredRequired.length > 0) {

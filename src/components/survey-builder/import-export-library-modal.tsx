@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useQuestionLibraryStore } from "@/stores/question-library-store";
+import { useSavedQuestions, useExportLibrary, useImportLibrary } from "@/hooks/queries/use-library";
 import { Download, Upload, Copy, Check, FileJson, AlertCircle } from "lucide-react";
 
 interface ImportExportLibraryModalProps {
@@ -20,7 +20,10 @@ interface ImportExportLibraryModalProps {
 }
 
 export function ImportExportLibraryModal({ open, onOpenChange }: ImportExportLibraryModalProps) {
-  const { exportLibrary, importLibrary, savedQuestions } = useQuestionLibraryStore();
+  // TanStack Query 훅 사용
+  const { data: savedQuestions = [] } = useSavedQuestions();
+  const exportLibraryMutation = useExportLibrary();
+  const importLibraryMutation = useImportLibrary();
 
   const [activeTab, setActiveTab] = useState<"export" | "import">("export");
   const [exportData, setExportData] = useState("");
@@ -30,9 +33,13 @@ export function ImportExportLibraryModal({ open, onOpenChange }: ImportExportLib
   const [importSuccess, setImportSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleExport = () => {
-    const data = exportLibrary();
-    setExportData(data);
+  const handleExport = async () => {
+    try {
+      const data = await exportLibraryMutation.mutateAsync();
+      setExportData(data);
+    } catch (error) {
+      console.error("Failed to export:", error);
+    }
   };
 
   const handleCopyToClipboard = async () => {
@@ -57,7 +64,7 @@ export function ImportExportLibraryModal({ open, onOpenChange }: ImportExportLib
     URL.revokeObjectURL(url);
   };
 
-  const handleImport = () => {
+  const handleImport = async () => {
     setImportError("");
     setImportSuccess(false);
 
@@ -66,15 +73,19 @@ export function ImportExportLibraryModal({ open, onOpenChange }: ImportExportLib
       return;
     }
 
-    const success = importLibrary(importData);
-    if (success) {
-      setImportSuccess(true);
-      setImportData("");
-      setTimeout(() => {
-        setImportSuccess(false);
-        onOpenChange(false);
-      }, 1500);
-    } else {
+    try {
+      const result = await importLibraryMutation.mutateAsync(importData);
+      if (result.success) {
+        setImportSuccess(true);
+        setImportData("");
+        setTimeout(() => {
+          setImportSuccess(false);
+          onOpenChange(false);
+        }, 1500);
+      } else {
+        setImportError("유효하지 않은 데이터입니다.");
+      }
+    } catch (error) {
       setImportError("유효하지 않은 데이터입니다.");
     }
   };

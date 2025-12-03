@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { useSurveyListStore } from "@/stores/survey-list-store";
+import { useSurveys, useDeleteSurvey } from "@/hooks/queries";
 import {
   FileText,
   Plus,
@@ -18,16 +18,47 @@ import {
   ArrowLeft,
   Globe,
   Lock,
+  Loader2,
 } from "lucide-react";
-import { getSurveyAccessUrl } from "@/lib/survey-url";
 import Link from "next/link";
 
 export default function SurveyListPage() {
-  const { surveys, deleteSurvey } = useSurveyListStore();
+  const { data: surveys, isLoading, error } = useSurveys();
+  const { mutate: deleteSurvey } = useDeleteSurvey();
   const [searchQuery, setSearchQuery] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
-  const filteredSurveys = surveys.filter((survey) =>
+  // 로딩 중
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
+          <p className="text-gray-500">설문 목록을 불러오는 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 에러 발생
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FileText className="w-8 h-8 text-red-400" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">오류가 발생했습니다</h3>
+          <p className="text-gray-500 mb-6">설문 목록을 불러올 수 없습니다.</p>
+          <Button onClick={() => window.location.reload()}>다시 시도</Button>
+        </div>
+      </div>
+    );
+  }
+
+  const surveyList = surveys ?? [];
+
+  const filteredSurveys = surveyList.filter((survey) =>
     survey.title.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
@@ -38,16 +69,17 @@ export default function SurveyListPage() {
     }
   };
 
-  const handleCopyLink = (survey: (typeof surveys)[0]) => {
-    const link = getSurveyAccessUrl(survey);
-    navigator.clipboard.writeText(link);
+  const handleCopyLink = (survey: (typeof surveyList)[0]) => {
+    const link = getSurveyUrl(survey);
+    const fullLink = `${window.location.origin}${link}`;
+    navigator.clipboard.writeText(fullLink);
     alert("링크가 복사되었습니다!");
     setOpenMenuId(null);
   };
 
-  // 설문 접근 URL 가져오기 (미리보기용)
-  const getSurveyUrl = (survey: (typeof surveys)[0]) => {
-    if (survey.settings.isPublic && survey.slug) {
+  // 설문 접근 URL 가져오기
+  const getSurveyUrl = (survey: (typeof surveyList)[0]) => {
+    if (survey.isPublic && survey.slug) {
       return `/survey/${survey.slug}`;
     }
     if (survey.privateToken) {
@@ -194,18 +226,18 @@ export default function SurveyListPage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-2 truncate">
                   {survey.title}
                 </h3>
-                <p className="text-sm text-gray-500 mb-4">{survey.questions.length}개 질문</p>
+                <p className="text-sm text-gray-500 mb-4">{survey.questionCount}개 질문</p>
 
                 <div className="flex items-center justify-between text-xs text-gray-400">
                   <span>수정일: {new Date(survey.updatedAt).toLocaleDateString()}</span>
                   <span
                     className={`px-2 py-1 rounded-full flex items-center gap-1 ${
-                      survey.settings.isPublic
+                      survey.isPublic
                         ? "bg-green-100 text-green-600"
                         : "bg-amber-100 text-amber-600"
                     }`}
                   >
-                    {survey.settings.isPublic ? (
+                    {survey.isPublic ? (
                       <>
                         <Globe className="w-3 h-3" />
                         공개
