@@ -411,7 +411,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
               onValueChange={(v) => setLeftSidebarTab(v as "types" | "library")}
               className="flex flex-col h-full"
             >
-              <TabsList className="grid w-full grid-cols-2 p-1 m-2 mb-0">
+              <TabsList className="grid w-full grid-cols-2 p-1 m-4 mb-0">
                 <TabsTrigger value="types" className="text-xs">
                   <Plus className="w-3 h-3 mr-1" />
                   질문 생성
@@ -484,11 +484,16 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                 </div>
               </TabsContent>
 
-              <TabsContent value="library" className="flex-1 overflow-y-auto p-4 pt-2 m-0">
-                <QuestionLibraryPanel onAddQuestion={handleAddFromLibrary} className="h-full" />
+              <TabsContent
+                value="library"
+                className="flex-1 flex flex-col overflow-hidden p-4 pt-2 m-0"
+              >
+                <div className="flex-1 overflow-y-auto min-h-0">
+                  <QuestionLibraryPanel onAddQuestion={handleAddFromLibrary} />
+                </div>
 
                 {/* 내보내기/가져오기 버튼 */}
-                <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="flex-shrink-0 mt-4 pt-4 border-t border-gray-200">
                   <Button
                     variant="outline"
                     size="sm"

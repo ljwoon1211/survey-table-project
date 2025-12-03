@@ -12,26 +12,15 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuestionLibraryStore } from "@/stores/question-library-store";
-import {
-  Download,
-  Upload,
-  Copy,
-  Check,
-  FileJson,
-  AlertCircle,
-} from "lucide-react";
+import { Download, Upload, Copy, Check, FileJson, AlertCircle } from "lucide-react";
 
 interface ImportExportLibraryModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function ImportExportLibraryModal({
-  open,
-  onOpenChange,
-}: ImportExportLibraryModalProps) {
-  const { exportLibrary, importLibrary, savedQuestions } =
-    useQuestionLibraryStore();
+export function ImportExportLibraryModal({ open, onOpenChange }: ImportExportLibraryModalProps) {
+  const { exportLibrary, importLibrary, savedQuestions } = useQuestionLibraryStore();
 
   const [activeTab, setActiveTab] = useState<"export" | "import">("export");
   const [exportData, setExportData] = useState("");
@@ -133,8 +122,7 @@ export function ImportExportLibraryModal({
           <TabsContent value="export" className="space-y-4 mt-4">
             <div className="bg-gray-50 rounded-lg p-3 border">
               <p className="text-sm text-gray-600">
-                현재 보관함에 저장된 <strong>{savedQuestions.length}개</strong>의
-                질문을 내보냅니다.
+                현재 보관함에 저장된 <strong>{savedQuestions.length}개</strong>의 질문을 내보냅니다.
               </p>
             </div>
 
@@ -218,11 +206,7 @@ export function ImportExportLibraryModal({
               </div>
             )}
 
-            <Button
-              onClick={handleImport}
-              disabled={!importData.trim()}
-              className="w-full"
-            >
+            <Button onClick={handleImport} disabled={!importData.trim()} className="w-full">
               <Upload className="w-4 h-4 mr-2" />
               가져오기
             </Button>
@@ -232,4 +216,3 @@ export function ImportExportLibraryModal({
     </Dialog>
   );
 }
-

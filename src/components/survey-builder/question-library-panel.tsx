@@ -357,7 +357,7 @@ export function QuestionLibraryPanel({
   };
 
   return (
-    <div className={cn("flex flex-col h-full", className)}>
+    <div className={cn("flex flex-col", className)}>
       {/* 헤더 */}
       <div className="flex items-center gap-2 mb-4">
         <Library className="w-5 h-5 text-blue-600" />
@@ -405,7 +405,7 @@ export function QuestionLibraryPanel({
       )}
 
       {/* 질문 목록 */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1">
         {searchQuery ? (
           // 검색 결과
           <div>
