@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { useSurveyListStore } from "@/stores/survey-list-store";
 import { useSurveyResponseStore } from "@/stores/survey-response-store";
 import { InteractiveTableResponse } from "@/components/survey-builder/interactive-table-response";
 import { UserDefinedMultiLevelSelect } from "@/components/survey-builder/user-defined-multi-level-select";
@@ -15,6 +14,11 @@ import { CheckCircle, AlertCircle, ArrowLeft, ArrowRight, Loader2, Lock } from "
 import { getNextQuestionIndex } from "@/utils/branch-logic";
 import { parsesurveyIdentifier } from "@/lib/survey-url";
 import { Survey } from "@/types/survey";
+import {
+  getSurveyWithDetails,
+  getSurveyBySlug,
+  getSurveyByPrivateToken,
+} from "@/actions/survey-actions";
 
 export default function SurveyResponsePage() {
   const params = useParams();
@@ -22,25 +26,28 @@ export default function SurveyResponsePage() {
   // URL 인코딩된 한글 slug를 디코딩
   const identifier = decodeURIComponent(params.id as string);
 
-  // 설문 목록 스토어에서 조회 함수들 가져오기
-  const { getSurveyById, getSurveyBySlug, getSurveyByPrivateToken } = useSurveyListStore();
-  const { startResponse, updateQuestionResponse, completeResponse } = useSurveyResponseStore();
+  // 응답 스토어
+  const {
+    setCurrentResponseId,
+    setPendingResponse,
+    resetResponseState,
+  } = useSurveyResponseStore();
 
   // 설문 로딩 상태
   const [isLoading, setIsLoading] = useState(true);
   const [loadedSurvey, setLoadedSurvey] = useState<Survey | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [responseId, setResponseId] = useState<string | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [responses, setResponses] = useState<Record<string, any>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [questionHistory, setQuestionHistory] = useState<number[]>([]);
+  const [responseStarted, setResponseStarted] = useState(false);
 
   // URL 식별자로 설문 조회
   useEffect(() => {
-    const loadSurvey = () => {
+    const loadSurvey = async () => {
       setIsLoading(true);
       setLoadError(null);
 
@@ -48,17 +55,25 @@ export default function SurveyResponsePage() {
         // URL 식별자 타입 판별
         const { type, value } = parsesurveyIdentifier(identifier);
 
-        let survey: Survey | undefined;
+        let survey: Survey | null = null;
 
         switch (type) {
-          case "slug":
-            survey = getSurveyBySlug(value);
+          case "slug": {
+            const dbSurvey = await getSurveyBySlug(value);
+            if (dbSurvey) {
+              survey = await getSurveyWithDetails(dbSurvey.id);
+            }
             break;
-          case "privateToken":
-            survey = getSurveyByPrivateToken(value);
+          }
+          case "privateToken": {
+            const dbSurvey = await getSurveyByPrivateToken(value);
+            if (dbSurvey) {
+              survey = await getSurveyWithDetails(dbSurvey.id);
+            }
             break;
+          }
           case "id":
-            survey = getSurveyById(value);
+            survey = await getSurveyWithDetails(value);
             break;
         }
 
@@ -82,15 +97,17 @@ export default function SurveyResponsePage() {
     };
 
     loadSurvey();
-  }, [identifier, getSurveyById, getSurveyBySlug, getSurveyByPrivateToken]);
+  }, [identifier]);
 
   // 설문 응답 시작
   useEffect(() => {
-    if (loadedSurvey && !responseId) {
-      const newResponseId = startResponse(loadedSurvey.id);
-      setResponseId(newResponseId);
+    if (loadedSurvey && !responseStarted) {
+      // 응답 ID 생성 및 스토어에 설정
+      const newResponseId = `response-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      setCurrentResponseId(newResponseId);
+      setResponseStarted(true);
     }
-  }, [loadedSurvey, responseId, startResponse]);
+  }, [loadedSurvey, responseStarted, setCurrentResponseId]);
 
   // 현재 설문의 질문들
   const questions = useMemo(() => loadedSurvey?.questions || [], [loadedSurvey]);
@@ -99,9 +116,8 @@ export default function SurveyResponsePage() {
 
   const handleResponse = (questionId: string, value: any) => {
     setResponses((prev) => ({ ...prev, [questionId]: value }));
-    if (responseId) {
-      updateQuestionResponse(responseId, questionId, value);
-    }
+    // 스토어에도 임시 응답 저장
+    setPendingResponse(questionId, value);
   };
 
   const isQuestionRequired = (question: any) => {
@@ -172,10 +188,10 @@ export default function SurveyResponsePage() {
         return;
       }
 
-      if (responseId) {
-        completeResponse(responseId);
-        setIsCompleted(true);
-      }
+      // TODO: 서버에 응답 저장 로직 추가 필요
+      // 현재는 클라이언트에서만 완료 처리
+      resetResponseState();
+      setIsCompleted(true);
     } catch (error) {
       console.error("응답 제출 오류:", error);
       alert("응답 제출 중 오류가 발생했습니다. 다시 시도해주세요.");
