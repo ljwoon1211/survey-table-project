@@ -1,243 +1,148 @@
-'use client';
+import Link from "next/link";
+import { BarChart3, FileText, Users, Calendar, ArrowRight, Plus } from "lucide-react";
+import { getSurveys } from "@/actions/survey-actions";
+import {
+  getCompletedResponseCountBySurvey,
+  getResponseCountBySurvey,
+} from "@/actions/response-actions";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { useSurveyBuilderStore } from '@/stores/survey-store';
-import { useSurveyResponseStore } from '@/stores/survey-response-store';
-import { ResponseAnalytics } from '@/components/survey-analytics/response-analytics';
-import { BarChart3, Plus, FileText, Users, ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+export default async function AnalyticsListPage() {
+  const surveys = await getSurveys();
 
-export default function AnalyticsPage() {
-  const { currentSurvey } = useSurveyBuilderStore();
-  const {
-    responses,
-    startResponse,
-    updateQuestionResponse,
-    completeResponse,
-    getResponsesBySurvey,
-    calculateSummary
-  } = useSurveyResponseStore();
-
-  const [isGeneratingTestData, setIsGeneratingTestData] = useState(false);
-
-  // 테스트 데이터 생성 함수
-  const generateTestData = () => {
-    if (!currentSurvey.questions.length) {
-      alert('먼저 설문 질문을 생성해주세요.');
-      return;
-    }
-
-    setIsGeneratingTestData(true);
-
-    try {
-      // 5개의 테스트 응답 생성
-      for (let i = 0; i < 5; i++) {
-        const responseId = startResponse('test-survey');
-
-        currentSurvey.questions.forEach((question, questionIndex) => {
-          let testValue;
-
-          switch (question.type) {
-            case 'text':
-              testValue = `테스트 응답 ${i + 1} - 질문 ${questionIndex + 1}`;
-              break;
-            case 'textarea':
-              testValue = `이것은 테스트 응답 ${i + 1}번의 장문형 답변입니다. 실제 사용자의 응답을 시뮬레이션하기 위한 샘플 텍스트입니다.`;
-              break;
-            case 'radio':
-              if (question.options && question.options.length > 0) {
-                const randomIndex = Math.floor(Math.random() * question.options.length);
-                testValue = question.options[randomIndex].value;
-              }
-              break;
-            case 'checkbox':
-              if (question.options && question.options.length > 0) {
-                const numSelections = Math.floor(Math.random() * question.options.length) + 1;
-                const shuffled = [...question.options].sort(() => 0.5 - Math.random());
-                testValue = shuffled.slice(0, numSelections).map(opt => opt.value);
-              }
-              break;
-            case 'select':
-              if (question.options && question.options.length > 0) {
-                const randomIndex = Math.floor(Math.random() * question.options.length);
-                testValue = question.options[randomIndex].value;
-              }
-              break;
-            case 'multiselect':
-              testValue = ['한식', '김치찌개']; // 샘플 다단계 선택
-              break;
-            case 'table':
-              // 테이블 응답 생성 (OTT 설문의 경우)
-              if (question.tableRowsData && question.tableRowsData.length > 0) {
-                const tableResponse: Record<string, any> = {};
-
-                question.tableRowsData.forEach((row) => {
-                  row.cells.forEach((cell) => {
-                    if (cell.type === 'checkbox') {
-                      // 50% 확률로 체크
-                      tableResponse[cell.id] = Math.random() > 0.5 ? [cell.checkboxOptions?.[0]?.id] : [];
-                    } else if (cell.type === 'radio') {
-                      // 랜덤하게 하나 선택
-                      if (cell.radioOptions && cell.radioOptions.length > 0) {
-                        const randomOption = cell.radioOptions[Math.floor(Math.random() * cell.radioOptions.length)];
-                        tableResponse[cell.id] = randomOption.id;
-                      }
-                    }
-                  });
-                });
-
-                testValue = tableResponse;
-              }
-              break;
-            default:
-              testValue = `테스트 값 ${i + 1}`;
-          }
-
-          if (testValue !== undefined) {
-            updateQuestionResponse(responseId, question.id, testValue);
-          }
-        });
-
-        // 응답 완료 처리
-        completeResponse(responseId);
-      }
-
-      alert('테스트 데이터가 생성되었습니다!');
-    } catch (error) {
-      console.error('테스트 데이터 생성 오류:', error);
-      alert('테스트 데이터 생성 중 오류가 발생했습니다.');
-    } finally {
-      setIsGeneratingTestData(false);
-    }
-  };
-
-  const surveyResponses = getResponsesBySurvey('test-survey');
-  const summary = calculateSummary('test-survey');
+  // 각 설문의 응답 수 조회
+  const surveysWithResponses = await Promise.all(
+    surveys.map(async (survey) => {
+      const [totalResponses, completedResponses] = await Promise.all([
+        getResponseCountBySurvey(survey.id),
+        getCompletedResponseCountBySurvey(survey.id),
+      ]);
+      return {
+        ...survey,
+        totalResponses,
+        completedResponses,
+      };
+    }),
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link href="/">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  홈으로
+      <header className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-3">
+              <BarChart3 className="w-6 h-6 text-blue-500" />
+              <h1 className="text-xl font-semibold text-gray-900">설문 분석</h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link href="/admin/surveys">
+                <Button variant="outline" size="sm">
+                  <FileText className="w-4 h-4 mr-2" />
+                  설문 관리
                 </Button>
               </Link>
-              <div className="h-6 w-px bg-gray-300" />
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900">설문 분석</h1>
-                <p className="text-sm text-gray-600">
-                  {currentSurvey.title || '새 설문조사'}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              <Button
-                onClick={generateTestData}
-                disabled={isGeneratingTestData}
-                variant="outline"
-                size="sm"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                {isGeneratingTestData ? '생성 중...' : '테스트 데이터 생성'}
-              </Button>
-              <Link href="/create">
+              <Link href="/admin/surveys/create">
                 <Button size="sm">
-                  <FileText className="w-4 h-4 mr-2" />
-                  설문 편집
+                  <Plus className="w-4 h-4 mr-2" />새 설문
                 </Button>
               </Link>
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* 메인 콘텐츠 */}
-      <div className="max-w-7xl mx-auto p-6">
-        {currentSurvey.questions.length === 0 ? (
-          <Card>
-            <CardContent className="p-8">
-              <div className="text-center text-gray-500">
-                <FileText className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">설문 질문이 없습니다</h3>
-                <p className="text-sm mb-6">먼저 설문 질문을 생성해주세요.</p>
-                <Link href="/create">
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    질문 추가하기
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        ) : surveyResponses.length === 0 ? (
-          <Card>
-            <CardContent className="p-8">
-              <div className="text-center text-gray-500">
-                <BarChart3 className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">응답 데이터가 없습니다</h3>
-                <p className="text-sm mb-6">
-                  테스트 데이터를 생성하거나 실제 설문 응답을 받아보세요.
-                </p>
-                <div className="flex justify-center space-x-4">
-                  <Button
-                    onClick={generateTestData}
-                    disabled={isGeneratingTestData}
-                    variant="outline"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    테스트 데이터 생성
-                  </Button>
-                  <Link href="/survey/test-survey">
-                    <Button>
-                      <Users className="w-4 h-4 mr-2" />
-                      설문 응답해보기
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-6">
-            {/* 빠른 액션 */}
-            <Card>
-              <CardHeader>
-                <CardTitle>빠른 액션</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-3">
-                  <Link href="/survey/test-survey">
-                    <Button variant="outline" size="sm">
-                      <Users className="w-4 h-4 mr-2" />
-                      설문 응답해보기
-                    </Button>
-                  </Link>
-                  <Button
-                    onClick={generateTestData}
-                    disabled={isGeneratingTestData}
-                    variant="outline"
-                    size="sm"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    추가 테스트 데이터
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {surveysWithResponses.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {surveysWithResponses.map((survey) => (
+              <Link key={survey.id} href={`/analytics/${survey.id}`}>
+                <Card className="p-6 hover:shadow-md transition-shadow cursor-pointer group">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                        {survey.title}
+                      </h3>
+                      {survey.description && (
+                        <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                          {survey.description}
+                        </p>
+                      )}
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors flex-shrink-0 ml-2" />
+                  </div>
 
-            {/* 응답 분석 */}
-            <ResponseAnalytics surveyId="test-survey" />
+                  {/* 통계 */}
+                  <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-100">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-gray-400" />
+                      <div>
+                        <p className="text-lg font-semibold text-gray-900">
+                          {survey.completedResponses}
+                        </p>
+                        <p className="text-xs text-gray-500">완료된 응답</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-gray-400" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {new Date(survey.createdAt).toLocaleDateString("ko-KR", {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </p>
+                        <p className="text-xs text-gray-500">생성일</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 상태 배지 */}
+                  <div className="flex items-center gap-2 mt-4">
+                    {survey.completedResponses > 0 ? (
+                      <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
+                        {survey.completedResponses}개 응답
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded-full">
+                        응답 없음
+                      </span>
+                    )}
+                    {survey.isPublic ? (
+                      <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
+                        공개
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 text-xs font-medium bg-amber-100 text-amber-700 rounded-full">
+                        비공개
+                      </span>
+                    )}
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          // 빈 상태
+          <div className="text-center py-16">
+            <BarChart3 className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">아직 설문이 없습니다</h2>
+            <p className="text-gray-500 mb-6">새 설문을 만들어 응답을 수집하고 분석해보세요.</p>
+            <Link href="/admin/surveys/create">
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />첫 설문 만들기
+              </Button>
+            </Link>
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }
+
+export const metadata = {
+  title: "설문 분석 | Survey Table",
+  description: "설문 응답 데이터를 분석하고 인사이트를 확인하세요.",
+};

@@ -1,0 +1,193 @@
+import type { QuestionType } from '@/types/survey';
+
+// ========================
+// 질문 유형별 분석 결과 타입
+// ========================
+
+export type AnalyticsResult =
+  | SingleChoiceAnalytics
+  | MultipleChoiceAnalytics
+  | TextAnalytics
+  | TableAnalytics
+  | MultiSelectAnalytics
+  | NoticeAnalytics;
+
+// 단일 선택 (radio, select)
+export interface SingleChoiceAnalytics {
+  type: 'single';
+  questionId: string;
+  questionTitle: string;
+  questionType: QuestionType;
+  totalResponses: number;
+  responseRate: number;
+  distribution: OptionDistribution[];
+}
+
+// 다중 선택 (checkbox)
+export interface MultipleChoiceAnalytics {
+  type: 'multiple';
+  questionId: string;
+  questionTitle: string;
+  questionType: QuestionType;
+  totalResponses: number;
+  responseRate: number;
+  avgSelectionsPerResponse: number;
+  distribution: OptionDistribution[];
+}
+
+// 텍스트 (text, textarea)
+export interface TextAnalytics {
+  type: 'text';
+  questionId: string;
+  questionTitle: string;
+  questionType: QuestionType;
+  totalResponses: number;
+  responseRate: number;
+  avgLength: number;
+  responses: {
+    id: string;
+    value: string;
+    submittedAt?: Date;
+  }[];
+  wordFrequency?: {
+    word: string;
+    count: number;
+  }[];
+}
+
+// 테이블
+export interface TableAnalytics {
+  type: 'table';
+  questionId: string;
+  questionTitle: string;
+  questionType: QuestionType;
+  totalResponses: number;
+  responseRate: number;
+  // 셀별 분석
+  cellAnalytics: CellAnalyticsRow[];
+  // 행별 요약 (서비스별 이용률 등)
+  rowSummary: RowSummary[];
+}
+
+// 다단계 선택 (multiselect)
+export interface MultiSelectAnalytics {
+  type: 'multiselect';
+  questionId: string;
+  questionTitle: string;
+  questionType: QuestionType;
+  totalResponses: number;
+  responseRate: number;
+  levelAnalytics: {
+    levelId: string;
+    levelLabel: string;
+    distribution: OptionDistribution[];
+  }[];
+}
+
+// 공지사항
+export interface NoticeAnalytics {
+  type: 'notice';
+  questionId: string;
+  questionTitle: string;
+  questionType: QuestionType;
+  totalResponses: number;
+  responseRate: number;
+  acknowledgedCount: number;
+  acknowledgeRate: number;
+}
+
+// ========================
+// 공통 타입
+// ========================
+
+export interface OptionDistribution {
+  label: string;
+  value: string;
+  count: number;
+  percentage: number;
+}
+
+export interface CellAnalyticsRow {
+  rowId: string;
+  rowLabel: string;
+  cells: CellAnalytics[];
+}
+
+export interface CellAnalytics {
+  cellId: string;
+  columnLabel: string;
+  cellType: 'checkbox' | 'radio' | 'select' | 'input' | 'text' | 'image' | 'video';
+  // 체크박스
+  checkedCount?: number;
+  checkedRate?: number;
+  // 라디오/셀렉트
+  optionDistribution?: OptionDistribution[];
+  // 입력
+  textResponses?: string[];
+}
+
+export interface RowSummary {
+  rowId: string;
+  rowLabel: string;
+  totalInteractions: number;
+  interactionRate: number;
+  // 추가 상세 분석 (OTT 같은 경우 유료/무료 등)
+  details?: Record<string, number>;
+}
+
+// ========================
+// 전체 설문 분석 결과
+// ========================
+
+export interface SurveyAnalytics {
+  surveyId: string;
+  surveyTitle: string;
+  summary: SurveySummary;
+  timeline: TimelineData[];
+  questions: AnalyticsResult[];
+}
+
+export interface SurveySummary {
+  totalResponses: number;
+  completedResponses: number;
+  completionRate: number;
+  avgCompletionTime: number; // 분
+  lastResponseAt?: Date;
+  // 오늘 통계
+  todayResponses: number;
+  // 이번 주 통계
+  weekResponses: number;
+}
+
+export interface TimelineData {
+  date: string;
+  responses: number;
+  completed: number;
+}
+
+// ========================
+// 차트 데이터 포맷 (Tremor용)
+// ========================
+
+export interface ChartDataItem {
+  name: string;
+  value: number;
+  [key: string]: string | number;
+}
+
+export interface BarChartDataItem {
+  name: string;
+  [category: string]: string | number;
+}
+
+// ========================
+// 내보내기 타입
+// ========================
+
+export type ExportFormat = 'csv' | 'json' | 'xlsx';
+
+export interface ExportOptions {
+  format: ExportFormat;
+  includeMetadata: boolean;
+  questionIds?: string[];
+}
