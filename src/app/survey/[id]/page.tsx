@@ -27,11 +27,7 @@ export default function SurveyResponsePage() {
   const identifier = decodeURIComponent(params.id as string);
 
   // 응답 스토어
-  const {
-    setCurrentResponseId,
-    setPendingResponse,
-    resetResponseState,
-  } = useSurveyResponseStore();
+  const { setCurrentResponseId, setPendingResponse, resetResponseState } = useSurveyResponseStore();
 
   // 설문 로딩 상태
   const [isLoading, setIsLoading] = useState(true);

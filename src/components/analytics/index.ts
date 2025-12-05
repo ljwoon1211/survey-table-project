@@ -8,7 +8,14 @@ export { TextResponses } from './charts/text-responses';
 export { TableAnalyticsChart } from './charts/table-analytics';
 export { ResponseTimeline } from './charts/response-timeline';
 
+// Filters
+export { FilterPanel } from './filters';
+
+// Cross-tab
+export { CrossTabPanel } from './cross-tab';
+
 // Components
 export { QuestionAnalytics } from './question-analytics';
 export { SurveyAnalyticsDashboard } from './survey-analytics-dashboard';
+export { AnalyticsDashboardClient } from './analytics-dashboard-client';
 export { ExportPanel } from './export-panel';

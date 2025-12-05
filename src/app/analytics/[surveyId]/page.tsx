@@ -7,8 +7,7 @@ import {
   exportResponsesAsJson,
   exportResponsesAsCsv,
 } from "@/actions/response-actions";
-import { analyzeSurvey } from "@/lib/analytics";
-import { SurveyAnalyticsDashboard } from "@/components/analytics";
+import { AnalyticsDashboardClient } from "@/components/analytics";
 import { Button } from "@/components/ui/button";
 
 interface AnalyticsPageProps {
@@ -27,16 +26,6 @@ export default async function SurveyAnalyticsPage({ params }: AnalyticsPageProps
   if (!survey) {
     notFound();
   }
-
-  // 분석 데이터 생성
-  const analytics = analyzeSurvey(
-    {
-      id: survey.id,
-      title: survey.title,
-      questions: survey.questions,
-    },
-    responses,
-  );
 
   // 내보내기 함수 (서버 액션)
   async function handleExportJson() {
@@ -83,8 +72,13 @@ export default async function SurveyAnalyticsPage({ params }: AnalyticsPageProps
 
       {/* 메인 콘텐츠 */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <SurveyAnalyticsDashboard
-          analytics={analytics}
+        <AnalyticsDashboardClient
+          survey={{
+            id: survey.id,
+            title: survey.title,
+            questions: survey.questions,
+          }}
+          responses={responses}
           onExportJson={handleExportJson}
           onExportCsv={handleExportCsv}
         />
