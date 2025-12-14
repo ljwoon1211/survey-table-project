@@ -4,7 +4,19 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
 import { QuestionGroup } from "@/types/survey";
 import { reorderGroups as reorderGroupsAction } from "@/actions/survey-actions";
@@ -17,7 +29,14 @@ import {
   ChevronRight,
   ChevronDown,
   Plus,
+  MoreVertical,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   DndContext,
   closestCenter,
@@ -140,42 +159,41 @@ function SortableGroupItem({
             )}
           </div>
         </div>
-        <div className="flex items-center space-x-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddSubGroup(group.id);
-            }}
-            title="하위 그룹 추가"
-          >
-            <Plus className="w-3 h-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit(group);
-            }}
-          >
-            <Edit3 className="w-3 h-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0 text-red-500 hover:text-red-600"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(group.id);
-            }}
-          >
-            <Trash2 className="w-3 h-3" />
-          </Button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 hover:bg-gray-200 transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreVertical className="w-4 h-4 text-gray-500" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="bg-white border border-gray-200 shadow-lg rounded-lg p-1 min-w-[160px]">
+            <DropdownMenuItem
+              onClick={() => onAddSubGroup(group.id)}
+              className="flex items-center px-3 py-2 text-sm text-gray-700 rounded-md cursor-pointer hover:bg-blue-50 hover:text-blue-700 transition-colors"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              하위 그룹 추가
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onEdit(group)}
+              className="flex items-center px-3 py-2 text-sm text-gray-700 rounded-md cursor-pointer hover:bg-gray-100 transition-colors"
+            >
+              <Edit3 className="w-4 h-4 mr-2" />
+              편집
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onDelete(group.id)}
+              className="flex items-center px-3 py-2 text-sm text-red-600 rounded-md cursor-pointer hover:bg-red-50 hover:text-red-700 transition-colors"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              삭제
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
@@ -190,6 +208,7 @@ export function GroupManager({ className }: GroupManagerProps) {
   const [groupName, setGroupName] = useState("");
   const [groupDescription, setGroupDescription] = useState("");
   const [parentGroupIdForNew, setParentGroupIdForNew] = useState<string | undefined>(undefined);
+  const [parentGroupIdForEdit, setParentGroupIdForEdit] = useState<string | undefined>(undefined);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -248,18 +267,109 @@ export function GroupManager({ className }: GroupManagerProps) {
     setEditingGroup(group);
     setGroupName(group.name);
     setGroupDescription(group.description || "");
+    setParentGroupIdForEdit(group.parentGroupId);
     setIsEditModalOpen(true);
   };
 
-  const handleUpdateGroup = () => {
+  // 순환 참조 방지: 특정 그룹이 다른 그룹의 상위로 설정 가능한지 확인
+  const canBeParentOf = (potentialParentId: string, childId: string): boolean => {
+    if (potentialParentId === childId) return false;
+
+    // 잠재적 부모가 현재 그룹의 하위 그룹인지 확인
+    const checkDescendant = (targetId: string, ancestorId: string): boolean => {
+      const target = groups.find((g) => g.id === targetId);
+      if (!target || !target.parentGroupId) return false;
+      if (target.parentGroupId === ancestorId) return true;
+      return checkDescendant(target.parentGroupId, ancestorId);
+    };
+
+    return !checkDescendant(potentialParentId, childId);
+  };
+
+  // 편집 모달에서 선택 가능한 상위 그룹 목록
+  const getAvailableParentGroups = (currentGroupId: string) => {
+    return topLevelGroups.filter(
+      (g) => g.id !== currentGroupId && canBeParentOf(g.id, currentGroupId)
+    );
+  };
+
+  const handleUpdateGroup = async () => {
     if (editingGroup && groupName.trim()) {
-      updateGroup(editingGroup.id, {
-        name: groupName.trim(),
-        description: groupDescription.trim() || undefined,
-      });
+      const oldParentGroupId = editingGroup.parentGroupId;
+      const newParentGroupId = parentGroupIdForEdit;
+
+      // 상위 그룹이 변경된 경우
+      if (oldParentGroupId !== newParentGroupId) {
+        // 새로운 상위 그룹의 하위 그룹들 중 마지막 순서 계산
+        let newOrder = 0;
+        if (newParentGroupId) {
+          const newSiblings = groups.filter(
+            (g) => g.parentGroupId === newParentGroupId && g.id !== editingGroup.id
+          );
+          newOrder = newSiblings.length > 0
+            ? Math.max(...newSiblings.map((g) => g.order)) + 1
+            : 0;
+        } else {
+          // 최상위로 이동하는 경우
+          const topLevelSiblings = groups.filter(
+            (g) => !g.parentGroupId && g.id !== editingGroup.id
+          );
+          newOrder = topLevelSiblings.length > 0
+            ? Math.max(...topLevelSiblings.map((g) => g.order)) + 1
+            : 0;
+        }
+
+        updateGroup(editingGroup.id, {
+          name: groupName.trim(),
+          description: groupDescription.trim() || undefined,
+          parentGroupId: newParentGroupId,
+          order: newOrder,
+        });
+
+        // DB에 저장
+        if (currentSurvey.id && isUUID(currentSurvey.id)) {
+          try {
+            const { updateQuestionGroup } = await import("@/actions/survey-actions");
+            await updateQuestionGroup(editingGroup.id, {
+              name: groupName.trim(),
+              description: groupDescription.trim() || null,
+              parentGroupId: newParentGroupId || null,
+              order: newOrder,
+            });
+          } catch (error) {
+            console.error("그룹 업데이트 저장 실패:", error);
+          }
+        }
+
+        // 상위 그룹이 변경되면 해당 그룹을 펼침
+        if (newParentGroupId) {
+          setExpandedGroups((prev) => new Set(prev).add(newParentGroupId));
+        }
+      } else {
+        // 이름/설명만 변경된 경우
+        updateGroup(editingGroup.id, {
+          name: groupName.trim(),
+          description: groupDescription.trim() || undefined,
+        });
+
+        // DB에 저장
+        if (currentSurvey.id && isUUID(currentSurvey.id)) {
+          try {
+            const { updateQuestionGroup } = await import("@/actions/survey-actions");
+            await updateQuestionGroup(editingGroup.id, {
+              name: groupName.trim(),
+              description: groupDescription.trim() || null,
+            });
+          } catch (error) {
+            console.error("그룹 업데이트 저장 실패:", error);
+          }
+        }
+      }
+
       setEditingGroup(null);
       setGroupName("");
       setGroupDescription("");
+      setParentGroupIdForEdit(undefined);
       setIsEditModalOpen(false);
     }
   };
@@ -603,6 +713,40 @@ export function GroupManager({ className }: GroupManagerProps) {
                 placeholder="그룹에 대한 간단한 설명을 입력하세요"
                 rows={3}
               />
+            </div>
+            {/* 상위 그룹 선택 */}
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1 block">
+                상위 그룹 (선택)
+              </label>
+              <Select
+                value={parentGroupIdForEdit || "none"}
+                onValueChange={(value) =>
+                  setParentGroupIdForEdit(value === "none" ? undefined : value)
+                }
+              >
+                <SelectTrigger className="bg-white">
+                  <SelectValue placeholder="상위 그룹 선택" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[200px] overflow-y-auto bg-white">
+                  <SelectItem value="none" className="bg-gray-50 hover:bg-gray-100">
+                    없음 (최상위 그룹)
+                  </SelectItem>
+                  {editingGroup &&
+                    getAvailableParentGroups(editingGroup.id).map((g) => (
+                      <SelectItem
+                        key={g.id}
+                        value={g.id}
+                        className="hover:bg-blue-50"
+                      >
+                        {g.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500 mt-1">
+                다른 그룹의 하위 그룹으로 설정하려면 상위 그룹을 선택하세요
+              </p>
             </div>
             <div className="flex justify-end space-x-2">
               <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
