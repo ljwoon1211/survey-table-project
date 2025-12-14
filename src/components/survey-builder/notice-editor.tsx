@@ -1,13 +1,6 @@
 "use client";
 
 import { useEditor, EditorContent } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
-import Link from "@tiptap/extension-link";
-import { Table } from "@tiptap/extension-table";
-import { TableRow } from "@tiptap/extension-table-row";
-import { TableCell } from "@tiptap/extension-table-cell";
-import { TableHeader } from "@tiptap/extension-table-header";
 import { Button } from "@/components/ui/button";
 import {
   Bold,
@@ -29,7 +22,8 @@ import {
   Paintbrush,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo, useId } from "react";
+import { createEditorExtensions } from "./editor-extensions";
 
 interface NoticeEditorProps {
   content: string;
@@ -37,50 +31,6 @@ interface NoticeEditorProps {
   compact?: boolean; // 간소화 모드 (설명 필드용)
   placeholder?: string; // placeholder 텍스트
 }
-
-// 배경색을 지원하는 TableCell 확장
-const TableCellWithBackground = TableCell.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      backgroundColor: {
-        default: null,
-        parseHTML: (element) => element.getAttribute("data-background-color"),
-        renderHTML: (attributes) => {
-          if (!attributes.backgroundColor) {
-            return {};
-          }
-          return {
-            "data-background-color": attributes.backgroundColor,
-            style: `background-color: ${attributes.backgroundColor}`,
-          };
-        },
-      },
-    };
-  },
-});
-
-// 배경색을 지원하는 TableHeader 확장 (기본 스타일 제거)
-const TableHeaderWithBackground = TableHeader.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      backgroundColor: {
-        default: null,
-        parseHTML: (element) => element.getAttribute("data-background-color"),
-        renderHTML: (attributes) => {
-          if (!attributes.backgroundColor) {
-            return {};
-          }
-          return {
-            "data-background-color": attributes.backgroundColor,
-            style: `background-color: ${attributes.backgroundColor}`,
-          };
-        },
-      },
-    };
-  },
-});
 
 export function NoticeEditor({
   content,
@@ -94,27 +44,11 @@ export function NoticeEditor({
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [, forceUpdate] = useState({});
 
+  // 각 에디터 인스턴스마다 고유한 확장 배열 생성
+  const extensions = useMemo(() => createEditorExtensions(), []);
+
   const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Image.configure({
-        inline: true,
-        allowBase64: true,
-      }),
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: {
-          class: "text-blue-600 underline",
-        },
-      }),
-      Table.configure({
-        resizable: true,
-        allowTableNodeSelection: true,
-      }),
-      TableRow,
-      TableCellWithBackground,
-      TableHeaderWithBackground,
-    ],
+    extensions,
     content: content || "",
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
@@ -163,9 +97,13 @@ export function NoticeEditor({
     return null;
   }
 
+  // tiptap 라이브러리 타입 호환성 문제로 인해 any 타입 사용
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ed = editor as any;
+
   const addImage = () => {
     if (imageUrl) {
-      editor.chain().focus().setImage({ src: imageUrl }).run();
+      ed.chain().focus().setImage({ src: imageUrl }).run();
       setImageUrl("");
       setShowImageInput(false);
     }
@@ -173,30 +111,28 @@ export function NoticeEditor({
 
   const addLink = () => {
     if (linkUrl) {
-      editor.chain().focus().setLink({ href: linkUrl }).run();
+      ed.chain().focus().setLink({ href: linkUrl }).run();
       setLinkUrl("");
       setShowLinkInput(false);
     }
   };
 
   const addTable = () => {
-    editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+    ed.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
   };
 
   // 선택된 셀들에 회색 배경색 적용
   const applyCellBackground = () => {
-    if (!editor) return;
+    if (!ed) return;
 
-    editor
-      .chain()
+    ed.chain()
       .focus()
       .updateAttributes("tableCell", {
         backgroundColor: "#e5e7eb", // gray-200
       })
       .run();
 
-    editor
-      .chain()
+    ed.chain()
       .focus()
       .updateAttributes("tableHeader", {
         backgroundColor: "#e5e7eb", // gray-200
@@ -206,18 +142,16 @@ export function NoticeEditor({
 
   // 선택된 셀들의 배경색 제거
   const removeCellBackground = () => {
-    if (!editor) return;
+    if (!ed) return;
 
-    editor
-      .chain()
+    ed.chain()
       .focus()
       .updateAttributes("tableCell", {
         backgroundColor: null,
       })
       .run();
 
-    editor
-      .chain()
+    ed.chain()
       .focus()
       .updateAttributes("tableHeader", {
         backgroundColor: null,
@@ -238,8 +172,8 @@ export function NoticeEditor({
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            className={editor.isActive("bold") ? "bg-gray-200" : ""}
+            onClick={() => ed.chain().focus().toggleBold().run()}
+            className={ed.isActive("bold") ? "bg-gray-200" : ""}
           >
             <Bold className="w-4 h-4" />
           </Button>
@@ -247,8 +181,8 @@ export function NoticeEditor({
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            className={editor.isActive("italic") ? "bg-gray-200" : ""}
+            onClick={() => ed.chain().focus().toggleItalic().run()}
+            className={ed.isActive("italic") ? "bg-gray-200" : ""}
           >
             <Italic className="w-4 h-4" />
           </Button>
@@ -261,8 +195,8 @@ export function NoticeEditor({
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-            className={editor.isActive("heading", { level: 1 }) ? "bg-gray-200" : ""}
+            onClick={() => ed.chain().focus().toggleHeading({ level: 1 }).run()}
+            className={ed.isActive("heading", { level: 1 }) ? "bg-gray-200" : ""}
           >
             <Heading1 className="w-4 h-4" />
           </Button>
@@ -270,8 +204,8 @@ export function NoticeEditor({
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-            className={editor.isActive("heading", { level: 2 }) ? "bg-gray-200" : ""}
+            onClick={() => ed.chain().focus().toggleHeading({ level: 2 }).run()}
+            className={ed.isActive("heading", { level: 2 }) ? "bg-gray-200" : ""}
           >
             <Heading2 className="w-4 h-4" />
           </Button>
@@ -284,8 +218,8 @@ export function NoticeEditor({
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => editor.chain().focus().toggleBulletList().run()}
-            className={editor.isActive("bulletList") ? "bg-gray-200" : ""}
+            onClick={() => ed.chain().focus().toggleBulletList().run()}
+            className={ed.isActive("bulletList") ? "bg-gray-200" : ""}
           >
             <List className="w-4 h-4" />
           </Button>
@@ -293,8 +227,8 @@ export function NoticeEditor({
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => editor.chain().focus().toggleOrderedList().run()}
-            className={editor.isActive("orderedList") ? "bg-gray-200" : ""}
+            onClick={() => ed.chain().focus().toggleOrderedList().run()}
+            className={ed.isActive("orderedList") ? "bg-gray-200" : ""}
           >
             <ListOrdered className="w-4 h-4" />
           </Button>
@@ -331,8 +265,8 @@ export function NoticeEditor({
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => editor.chain().focus().undo().run()}
-            disabled={!editor.can().undo()}
+            onClick={() => ed.chain().focus().undo().run()}
+            disabled={!ed.can().undo()}
           >
             <Undo className="w-4 h-4" />
           </Button>
@@ -340,15 +274,15 @@ export function NoticeEditor({
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => editor.chain().focus().redo().run()}
-            disabled={!editor.can().redo()}
+            onClick={() => ed.chain().focus().redo().run()}
+            disabled={!ed.can().redo()}
           >
             <Redo className="w-4 h-4" />
           </Button>
         </div>
 
         {/* 표 편집 버튼 - 표가 선택되었을 때만 표시 */}
-        {editor.can().deleteTable() && (
+        {ed.can().deleteTable() && (
           <>
             <div className="w-px h-6 bg-gray-300" />
 
@@ -357,7 +291,7 @@ export function NoticeEditor({
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => editor.chain().focus().addColumnAfter().run()}
+                onClick={() => ed.chain().focus().addColumnAfter().run()}
                 title="열 추가 (뒤)"
               >
                 <Columns className="w-4 h-4" />
@@ -366,7 +300,7 @@ export function NoticeEditor({
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => editor.chain().focus().addRowAfter().run()}
+                onClick={() => ed.chain().focus().addRowAfter().run()}
                 title="행 추가 (아래)"
               >
                 <Rows className="w-4 h-4" />
@@ -380,8 +314,8 @@ export function NoticeEditor({
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => editor.chain().focus().deleteColumn().run()}
-                disabled={!editor.can().deleteColumn()}
+                onClick={() => ed.chain().focus().deleteColumn().run()}
+                disabled={!ed.can().deleteColumn()}
                 title="열 삭제"
                 className="text-red-600 hover:text-red-700"
               >
@@ -392,8 +326,8 @@ export function NoticeEditor({
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => editor.chain().focus().deleteRow().run()}
-                disabled={!editor.can().deleteRow()}
+                onClick={() => ed.chain().focus().deleteRow().run()}
+                disabled={!ed.can().deleteRow()}
                 title="행 삭제"
                 className="text-red-600 hover:text-red-700"
               >
@@ -404,7 +338,7 @@ export function NoticeEditor({
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => editor.chain().focus().deleteTable().run()}
+                onClick={() => ed.chain().focus().deleteTable().run()}
                 title="표 삭제"
                 className="text-red-600 hover:text-red-700"
               >
@@ -415,7 +349,7 @@ export function NoticeEditor({
         )}
 
         {/* 셀 병합/분리 버튼 - 항상 표시, 조건에 따라 활성화 */}
-        {editor.can().deleteTable() && (
+        {ed.can().deleteTable() && (
           <>
             <div className="w-px h-6 bg-gray-300" />
 
@@ -424,8 +358,8 @@ export function NoticeEditor({
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => editor.chain().focus().mergeCells().run()}
-                disabled={!editor.can().mergeCells()}
+                onClick={() => ed.chain().focus().mergeCells().run()}
+                disabled={!ed.can().mergeCells()}
                 title="셀 병합"
               >
                 <Merge className="w-4 h-4" />
@@ -434,8 +368,8 @@ export function NoticeEditor({
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => editor.chain().focus().splitCell().run()}
-                disabled={!editor.can().splitCell()}
+                onClick={() => ed.chain().focus().splitCell().run()}
+                disabled={!ed.can().splitCell()}
                 title="셀 분할"
               >
                 <Split className="w-4 h-4" />
