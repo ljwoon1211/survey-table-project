@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
 import { QuestionGroup } from "@/types/survey";
 import { reorderGroups as reorderGroupsAction } from "@/actions/survey-actions";
@@ -17,6 +18,7 @@ import {
   ChevronRight,
   ChevronDown,
   Plus,
+  MoreVertical,
 } from "lucide-react";
 import {
   DndContext,
@@ -89,7 +91,7 @@ function SortableGroupItem({
     <div ref={setNodeRef} style={style} className={`${isDragging ? "z-50 shadow-lg" : ""}`}>
       <div
         data-group-id={group.id}
-        className={`flex items-center justify-between p-3 rounded-lg transition-all relative ${
+        className={`flex items-center justify-between p-2 rounded-lg transition-all relative ${
           isNesting
             ? "bg-green-100 border-2 border-green-500 border-dashed shadow-md"
             : "bg-gray-50 hover:bg-gray-100"
@@ -140,42 +142,54 @@ function SortableGroupItem({
             )}
           </div>
         </div>
-        <div className="flex items-center space-x-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddSubGroup(group.id);
-            }}
-            title="하위 그룹 추가"
-          >
-            <Plus className="w-3 h-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit(group);
-            }}
-          >
-            <Edit3 className="w-3 h-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0 text-red-500 hover:text-red-600"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(group.id);
-            }}
-          >
-            <Trash2 className="w-3 h-3" />
-          </Button>
-        </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
+            >
+              <MoreVertical className="w-4 h-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-40 p-1" align="end" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-col">
+              <button
+                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddSubGroup(group.id);
+                }}
+              >
+                <Plus className="w-4 h-4" />
+                하위 그룹 추가
+              </button>
+              <button
+                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(group);
+                }}
+              >
+                <Edit3 className="w-4 h-4" />
+                수정
+              </button>
+              <button
+                className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(group.id);
+                }}
+              >
+                <Trash2 className="w-4 h-4" />
+                삭제
+              </button>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
     </div>
   );
@@ -287,6 +301,15 @@ export function GroupManager({ className }: GroupManagerProps) {
     // 드래그 위치에 따라 하위 그룹으로 만들지 순서 변경할지 결정
     // 오른쪽 50% 영역으로 드래그하면 하위 그룹으로
     if (overIdValue && event.active && event.over) {
+      const draggedGroup = groups.find((g) => g.id === event.active.id);
+      const targetGroup = groups.find((g) => g.id === overIdValue);
+
+      // 하위 그룹이 다른 하위 그룹의 하위로 들어갈 수 없음
+      if (draggedGroup?.parentGroupId && targetGroup?.parentGroupId) {
+        setIsNestingMode(false);
+        return;
+      }
+
       const targetElement = document.querySelector(`[data-group-id="${overIdValue}"]`);
       const activeElement = document.querySelector(`[data-group-id="${event.active.id}"]`);
 
@@ -373,8 +396,12 @@ export function GroupManager({ className }: GroupManagerProps) {
         }
       }
     } else {
-      // 같은 레벨의 최상위 그룹인 경우 위치에 따라 결정
+      // 같은 레벨의 그룹인 경우 위치에 따라 결정
       const isSameTopLevel = !draggedGroup.parentGroupId && !targetGroup.parentGroupId;
+      const isSameSubLevel =
+        draggedGroup.parentGroupId &&
+        targetGroup.parentGroupId &&
+        draggedGroup.parentGroupId === targetGroup.parentGroupId;
 
       if (isSameTopLevel && !shouldNest) {
         // 같은 최상위 레벨에서 왼쪽 50%에 드롭: 순서만 변경 (피드백 없음)
@@ -399,8 +426,49 @@ export function GroupManager({ className }: GroupManagerProps) {
             }
           }
         }
+      } else if (isSameSubLevel && !shouldNest) {
+        // 같은 하위 그룹 레벨에서 왼쪽 50%에 드롭: 순서만 변경 (피드백 없음)
+        const sameLevelGroups = groups
+          .filter((g) => g.parentGroupId === draggedGroup.parentGroupId)
+          .sort((a, b) => a.order - b.order);
+
+        const oldIndex = sameLevelGroups.findIndex((g) => g.id === draggedGroup.id);
+        const newIndex = sameLevelGroups.findIndex((g) => g.id === targetGroup.id);
+
+        if (oldIndex !== -1 && newIndex !== -1) {
+          const newOrder = arrayMove(sameLevelGroups, oldIndex, newIndex);
+
+          // 각 그룹의 order를 업데이트
+          newOrder.forEach((group, index) => {
+            updateGroup(group.id, {
+              order: index,
+            });
+          });
+
+          // DB에 저장
+          if (currentSurvey.id && isUUID(currentSurvey.id)) {
+            try {
+              const { updateQuestionGroup } = await import("@/actions/survey-actions");
+              await Promise.all(
+                newOrder.map((group, index) =>
+                  updateQuestionGroup(group.id, {
+                    order: index,
+                  }),
+                ),
+              );
+            } catch (error) {
+              console.error("하위 그룹 순서 저장 실패:", error);
+            }
+          }
+        }
       } else {
         // 하위 그룹으로 변경 (오른쪽 50%에 드롭 또는 다른 레벨)
+        // 하위 그룹이 다른 하위 그룹의 하위로 들어갈 수 없음
+        if (draggedGroup.parentGroupId && targetGroup.parentGroupId) {
+          // 하위 그룹끼리는 순서만 변경 가능하므로 아무것도 하지 않음
+          return;
+        }
+
         const targetSubGroups = groups
           .filter((g) => g.parentGroupId === targetGroup.id && g.id !== draggedGroup.id)
           .sort((a, b) => a.order - b.order);
