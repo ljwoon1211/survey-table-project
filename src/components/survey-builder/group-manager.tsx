@@ -98,10 +98,9 @@ function SortableGroupItem({
         {/* 오른쪽 50% 영역 표시 (하위 그룹으로 만들기 영역) */}
         <div className="absolute inset-0 pointer-events-none">
           {/* 50% 기준선 (항상 표시) */}
-          <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-gray-300 border-l border-dashed" />
           {/* 오른쪽 50% 영역 (하위 그룹으로 만들기) */}
           {isNesting && (
-            <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-green-200/30 border-l-2 border-green-400 border-dashed" />
+            <div className="absolute right-0 top-0 bottom-0  bg-green-200/30 border-l-2 border-green-400 border-dashed" />
           )}
         </div>
         <div className="flex items-center space-x-2 flex-1 min-w-0">
@@ -287,21 +286,26 @@ export function GroupManager({ className }: GroupManagerProps) {
 
     // 드래그 위치에 따라 하위 그룹으로 만들지 순서 변경할지 결정
     // 오른쪽 50% 영역으로 드래그하면 하위 그룹으로
-    if (overIdValue && event.over && event.activatorEvent) {
+    if (overIdValue && event.active && event.over) {
       const targetElement = document.querySelector(`[data-group-id="${overIdValue}"]`);
-      if (targetElement) {
-        const rect = targetElement.getBoundingClientRect();
-        // 마우스 포인터의 X 좌표 (드래그 이벤트에서)
-        const pointerX =
-          (event.activatorEvent as MouseEvent).clientX ||
-          (event.activatorEvent as TouchEvent).touches?.[0]?.clientX ||
-          rect.left + rect.width / 2; // 폴백
+      const activeElement = document.querySelector(`[data-group-id="${event.active.id}"]`);
 
-        const targetCenterX = rect.left + rect.width / 2; // 타겟 그룹의 중심 X 좌표 (50% 기준점)
+      if (targetElement && activeElement) {
+        const targetRect = targetElement.getBoundingClientRect();
+        const activeRect = activeElement.getBoundingClientRect();
 
-        // 마우스 포인터가 타겟 그룹의 오른쪽 50% 영역에 있으면 하위 그룹으로
-        setIsNestingMode(pointerX > targetCenterX);
+        // 드래그된 아이템의 중심 X 좌표
+        const activeCenterX = activeRect.left + activeRect.width / 2;
+        // 타겟 그룹의 중심 X 좌표 (50% 기준점)
+        const targetCenterX = targetRect.left + targetRect.width / 1.5;
+
+        // 드래그된 아이템의 중심이 타겟 그룹의 오른쪽 50% 영역에 있으면 하위 그룹으로
+        setIsNestingMode(activeCenterX > targetCenterX);
+      } else {
+        setIsNestingMode(false);
       }
+    } else {
+      setIsNestingMode(false);
     }
   };
 
