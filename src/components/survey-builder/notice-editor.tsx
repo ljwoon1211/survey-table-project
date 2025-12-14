@@ -21,9 +21,13 @@ import {
   Split,
   Paintbrush,
   X,
+  Upload,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
-import { useState, useMemo, useId } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { createEditorExtensions } from "./editor-extensions";
+import { optimizeImage, validateImageFile } from "@/lib/image-utils";
 
 interface NoticeEditorProps {
   content: string;
@@ -38,14 +42,59 @@ export function NoticeEditor({
   compact = false,
   placeholder = "",
 }: NoticeEditorProps) {
-  const [imageUrl, setImageUrl] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
-  const [showImageInput, setShowImageInput] = useState(false);
+  const [showImageUpload, setShowImageUpload] = useState(false);
   const [showLinkInput, setShowLinkInput] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadAbortController = useRef<AbortController | null>(null);
   const [, forceUpdate] = useState({});
 
   // 각 에디터 인스턴스마다 고유한 확장 배열 생성
   const extensions = useMemo(() => createEditorExtensions(), []);
+
+  // 파일 선택 핸들러
+  const handleFileSelect = useCallback(async (file: File) => {
+    // 파일 유효성 검사
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      setUploadError(validation.error || "파일 검증에 실패했습니다.");
+      return;
+    }
+
+    setUploadError(null);
+    setSelectedFile(file);
+
+    // 미리보기 생성
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setPreviewUrl(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  // 드래그 앤 드롭 핸들러
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const file = e.dataTransfer.files[0];
+      if (file) {
+        handleFileSelect(file);
+      }
+    },
+    [handleFileSelect],
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
 
   const editor = useEditor({
     extensions,
@@ -93,6 +142,107 @@ export function NoticeEditor({
     },
   });
 
+  // 이미지 업로드
+  const handleImageUpload = useCallback(async () => {
+    if (!selectedFile || !editor) return;
+
+    setIsUploading(true);
+    setUploadProgress(0);
+    setUploadError(null);
+
+    uploadAbortController.current = new AbortController();
+
+    try {
+      // 이미지 최적화
+      const optimizedBlob = await optimizeImage(selectedFile);
+      const optimizedFile = new File([optimizedBlob], selectedFile.name, {
+        type: optimizedBlob.type || selectedFile.type,
+      });
+
+      // FormData 생성
+      const formData = new FormData();
+      formData.append("file", optimizedFile);
+
+      // 업로드 (진행률 추적)
+      const xhr = new XMLHttpRequest();
+
+      // 진행률 업데이트
+      xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable) {
+          const percentComplete = (e.loaded / e.total) * 100;
+          setUploadProgress(percentComplete);
+        }
+      });
+
+      // Promise로 래핑
+      const uploadPromise = new Promise<string>((resolve, reject) => {
+        xhr.addEventListener("load", () => {
+          if (xhr.status === 200) {
+            const response = JSON.parse(xhr.responseText);
+            resolve(response.url);
+          } else {
+            const errorResponse = JSON.parse(xhr.responseText);
+            reject(new Error(errorResponse.error || "업로드에 실패했습니다."));
+          }
+        });
+
+        xhr.addEventListener("error", () => {
+          reject(new Error("네트워크 오류가 발생했습니다."));
+        });
+
+        xhr.addEventListener("abort", () => {
+          reject(new Error("업로드가 취소되었습니다."));
+        });
+
+        xhr.open("POST", "/api/upload/image");
+        xhr.send(formData);
+      });
+
+      const imageUrl = await uploadPromise;
+
+      // 에디터에 이미지 추가
+      // tiptap 라이브러리 타입 호환성 문제로 인해 any 타입 사용
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ed = editor as any;
+      ed.chain().focus().setImage({ src: imageUrl }).run();
+
+      // 상태 초기화
+      setSelectedFile(null);
+      setPreviewUrl(null);
+      setShowImageUpload(false);
+      setUploadProgress(0);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "업로드 중 오류가 발생했습니다.";
+      setUploadError(errorMessage);
+      setUploadProgress(0);
+    } finally {
+      setIsUploading(false);
+      uploadAbortController.current = null;
+    }
+  }, [selectedFile, editor]);
+
+  // 업로드 취소
+  const handleCancelUpload = useCallback(() => {
+    if (uploadAbortController.current) {
+      uploadAbortController.current.abort();
+    }
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setUploadError(null);
+    setUploadProgress(0);
+    setIsUploading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, []);
+
+  // 이미지 업로드 패널 닫기
+  const handleCloseImageUpload = useCallback(() => {
+    handleCancelUpload();
+    setShowImageUpload(false);
+  }, [handleCancelUpload]);
+
   if (!editor) {
     return null;
   }
@@ -100,14 +250,6 @@ export function NoticeEditor({
   // tiptap 라이브러리 타입 호환성 문제로 인해 any 타입 사용
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ed = editor as any;
-
-  const addImage = () => {
-    if (imageUrl) {
-      ed.chain().focus().setImage({ src: imageUrl }).run();
-      setImageUrl("");
-      setShowImageInput(false);
-    }
-  };
 
   const addLink = () => {
     if (linkUrl) {
@@ -241,7 +383,8 @@ export function NoticeEditor({
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => setShowImageInput(!showImageInput)}
+            onClick={() => setShowImageUpload(!showImageUpload)}
+            disabled={isUploading}
           >
             <ImageIcon className="w-4 h-4" />
           </Button>
@@ -406,27 +549,144 @@ export function NoticeEditor({
         )}
       </div>
 
-      {/* Image URL Input */}
-      {showImageInput && (
-        <div className="flex gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <input
-            type="text"
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="이미지 URL을 입력하세요"
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
-          />
-          <Button type="button" size="sm" onClick={addImage}>
-            추가
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setShowImageInput(false)}
-          >
-            취소
-          </Button>
+      {/* Image Upload Panel */}
+      {showImageUpload && (
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-4">
+          {/* 드래그 앤 드롭 영역 */}
+          {!selectedFile && !isUploading && (
+            <div
+              className="border-2 border-dashed border-blue-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors cursor-pointer"
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/svg+xml"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    handleFileSelect(file);
+                  }
+                }}
+                className="hidden"
+              />
+              <Upload className="w-8 h-8 mx-auto mb-2 text-blue-500" />
+              <p className="text-sm text-gray-600 mb-2">
+                이미지를 드래그 앤 드롭하거나 클릭하여 선택하세요
+              </p>
+              <p className="text-xs text-gray-500 mt-2">
+                지원 형식: JPG, PNG, GIF, WebP, SVG (최대 10MB)
+              </p>
+            </div>
+          )}
+
+          {/* 선택된 파일 미리보기 */}
+          {selectedFile && previewUrl && !isUploading && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-700 truncate">{selectedFile.name}</p>
+                  <p className="text-xs text-gray-500">
+                    {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCancelUpload}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="border rounded-lg overflow-hidden bg-white">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={previewUrl} alt="미리보기" className="w-full max-h-48 object-contain" />
+              </div>
+              <div className="flex gap-2">
+                <Button type="button" size="sm" onClick={handleImageUpload} className="flex-1">
+                  업로드
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={handleCloseImageUpload}>
+                  취소
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* 업로드 진행 중 */}
+          {isUploading && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700">업로드 중...</span>
+                <span className="text-sm text-gray-500">{Math.round(uploadProgress)}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+              {previewUrl && (
+                <div className="border rounded-lg overflow-hidden bg-white">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={previewUrl}
+                    alt="업로드 중"
+                    className="w-full max-h-32 object-contain opacity-50"
+                  />
+                </div>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCancelUpload}
+                className="w-full"
+                disabled={uploadProgress >= 100}
+              >
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                업로드 취소
+              </Button>
+            </div>
+          )}
+
+          {/* 에러 메시지 */}
+          {uploadError && (
+            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-red-900">업로드 실패</p>
+                <p className="text-sm text-red-700 mt-1">{uploadError}</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setUploadError(null);
+                    if (selectedFile) {
+                      handleImageUpload();
+                    }
+                  }}
+                  className="mt-2"
+                >
+                  다시 시도
+                </Button>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setUploadError(null)}
+                className="text-red-600 hover:text-red-700"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -466,7 +726,7 @@ export function NoticeEditor({
             💡 <strong>사용 팁:</strong> 텍스트, 이미지, 동영상 URL, 표를 자유롭게 추가할 수
             있습니다.
           </p>
-          <p className="mt-1">• 이미지: 이미지 버튼 클릭 후 URL 입력</p>
+          <p className="mt-1">• 이미지: 이미지 버튼 클릭 후 파일 업로드 (드래그 앤 드롭 지원)</p>
           <p>• 링크: 텍스트 선택 후 링크 버튼 클릭</p>
           <p>• 표: 표 버튼 클릭으로 3x3 표 자동 생성</p>
           <p>• 표 편집: 표 내부 클릭 시 행/열 추가/삭제, 셀 병합/분할 버튼 표시</p>

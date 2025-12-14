@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
 import { QuestionGroup } from "@/types/survey";
+import { reorderGroups as reorderGroupsAction } from "@/actions/survey-actions";
+import { isUUID } from "@/lib/survey-url";
 import {
   FolderPlus,
   Edit3,
@@ -24,6 +26,8 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragOverEvent,
+  DragStartEvent,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -47,6 +51,9 @@ interface SortableGroupItemProps {
   onDelete: (groupId: string) => void;
   onToggleExpand: (groupId: string) => void;
   onAddSubGroup: (parentGroupId: string) => void;
+  isDragOver?: boolean;
+  isDragging?: boolean;
+  isNestingMode?: boolean;
 }
 
 function SortableGroupItem({
@@ -58,6 +65,9 @@ function SortableGroupItem({
   onDelete,
   onToggleExpand,
   onAddSubGroup,
+  isDragOver = false,
+  isDragging: isDraggingProp = false,
+  isNestingMode = false,
 }: SortableGroupItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: group.id,
@@ -70,10 +80,30 @@ function SortableGroupItem({
   };
 
   const hasSubGroups = subGroups.length > 0;
+  const showDropZone = isDragOver && !isDraggingProp;
+
+  // 하위 그룹으로 만들기 (오른쪽 50% 영역에 드래그할 때만 피드백 표시)
+  const isNesting = showDropZone && isNestingMode;
 
   return (
     <div ref={setNodeRef} style={style} className={`${isDragging ? "z-50 shadow-lg" : ""}`}>
-      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+      <div
+        data-group-id={group.id}
+        className={`flex items-center justify-between p-3 rounded-lg transition-all relative ${
+          isNesting
+            ? "bg-green-100 border-2 border-green-500 border-dashed shadow-md"
+            : "bg-gray-50 hover:bg-gray-100"
+        }`}
+      >
+        {/* 오른쪽 50% 영역 표시 (하위 그룹으로 만들기 영역) */}
+        <div className="absolute inset-0 pointer-events-none">
+          {/* 50% 기준선 (항상 표시) */}
+          <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-gray-300 border-l border-dashed" />
+          {/* 오른쪽 50% 영역 (하위 그룹으로 만들기) */}
+          {isNesting && (
+            <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-green-200/30 border-l-2 border-green-400 border-dashed" />
+          )}
+        </div>
         <div className="flex items-center space-x-2 flex-1 min-w-0">
           {hasSubGroups && (
             <button
@@ -104,6 +134,11 @@ function SortableGroupItem({
               {questionCount}개 질문
               {hasSubGroups && ` • ${subGroups.length}개 하위그룹`}
             </p>
+            {isNesting && (
+              <p className="text-xs text-green-700 font-medium mt-1">
+                여기에 드롭하여 하위 그룹으로 만들기
+              </p>
+            )}
           </div>
         </div>
         <div className="flex items-center space-x-1">
@@ -157,6 +192,9 @@ export function GroupManager({ className }: GroupManagerProps) {
   const [groupDescription, setGroupDescription] = useState("");
   const [parentGroupIdForNew, setParentGroupIdForNew] = useState<string | undefined>(undefined);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const [isNestingMode, setIsNestingMode] = useState<boolean>(false); // true: 하위 그룹으로, false: 순서 변경
 
   const groups = currentSurvey.groups || [];
 
@@ -239,15 +277,153 @@ export function GroupManager({ className }: GroupManagerProps) {
     }
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const overIdValue = (event.over?.id as string) || null;
+    setOverId(overIdValue);
+
+    // 드래그 위치에 따라 하위 그룹으로 만들지 순서 변경할지 결정
+    // 오른쪽 50% 영역으로 드래그하면 하위 그룹으로
+    if (overIdValue && event.over && event.activatorEvent) {
+      const targetElement = document.querySelector(`[data-group-id="${overIdValue}"]`);
+      if (targetElement) {
+        const rect = targetElement.getBoundingClientRect();
+        // 마우스 포인터의 X 좌표 (드래그 이벤트에서)
+        const pointerX =
+          (event.activatorEvent as MouseEvent).clientX ||
+          (event.activatorEvent as TouchEvent).touches?.[0]?.clientX ||
+          rect.left + rect.width / 2; // 폴백
+
+        const targetCenterX = rect.left + rect.width / 2; // 타겟 그룹의 중심 X 좌표 (50% 기준점)
+
+        // 마우스 포인터가 타겟 그룹의 오른쪽 50% 영역에 있으면 하위 그룹으로
+        setIsNestingMode(pointerX > targetCenterX);
+      }
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
 
-    if (over && active.id !== over.id) {
-      const oldIndex = topLevelGroups.findIndex((g) => g.id === active.id);
-      const newIndex = topLevelGroups.findIndex((g) => g.id === over.id);
+    // isNestingMode 값을 초기화하기 전에 저장
+    const shouldNest = isNestingMode;
 
-      const newOrder = arrayMove(topLevelGroups, oldIndex, newIndex);
-      reorderGroups(newOrder.map((g) => g.id));
+    setActiveId(null);
+    setOverId(null);
+    setIsNestingMode(false);
+
+    if (!over || active.id === over.id) return;
+
+    const draggedGroup = groups.find((g) => g.id === active.id);
+    const targetGroup = groups.find((g) => g.id === over.id);
+
+    if (!draggedGroup || !targetGroup) return;
+
+    // 자기 자신을 하위 그룹으로 만들 수 없음
+    if (draggedGroup.id === targetGroup.id) return;
+
+    // 순환 참조 방지: 타겟 그룹이 드래그된 그룹의 하위 그룹이면 안됨
+    const isTargetDescendant = (targetId: string, parentId: string): boolean => {
+      const target = groups.find((g) => g.id === targetId);
+      if (!target || !target.parentGroupId) return false;
+      if (target.parentGroupId === parentId) return true;
+      return isTargetDescendant(target.parentGroupId, parentId);
+    };
+
+    if (isTargetDescendant(targetGroup.id, draggedGroup.id)) {
+      return; // 순환 참조 방지
+    }
+
+    // 하위 그룹을 최상위로 올리는 경우
+    if (draggedGroup.parentGroupId && !targetGroup.parentGroupId) {
+      // 하위 그룹을 최상위로 이동
+      const topLevelGroups = groups
+        .filter((g) => !g.parentGroupId && g.id !== draggedGroup.id)
+        .sort((a, b) => a.order - b.order);
+      const targetIndex = topLevelGroups.findIndex((g) => g.id === targetGroup.id);
+      const newOrder = [...topLevelGroups];
+      newOrder.splice(targetIndex, 0, draggedGroup);
+
+      const newGroupIds = newOrder.map((g) => g.id);
+      reorderGroups(newGroupIds);
+
+      updateGroup(draggedGroup.id, {
+        parentGroupId: undefined,
+      });
+
+      // DB에 저장
+      if (currentSurvey.id && isUUID(currentSurvey.id)) {
+        try {
+          const { updateQuestionGroup, reorderGroups: reorderGroupsAction } = await import(
+            "@/actions/survey-actions"
+          );
+          await updateQuestionGroup(draggedGroup.id, {
+            parentGroupId: null,
+          });
+          await reorderGroupsAction(currentSurvey.id, newGroupIds);
+        } catch (error) {
+          console.error("그룹 최상위 이동 저장 실패:", error);
+        }
+      }
+    } else {
+      // 같은 레벨의 최상위 그룹인 경우 위치에 따라 결정
+      const isSameTopLevel = !draggedGroup.parentGroupId && !targetGroup.parentGroupId;
+
+      if (isSameTopLevel && !shouldNest) {
+        // 같은 최상위 레벨에서 왼쪽 50%에 드롭: 순서만 변경 (피드백 없음)
+        const sameLevelGroups = groups
+          .filter((g) => !g.parentGroupId)
+          .sort((a, b) => a.order - b.order);
+
+        const oldIndex = sameLevelGroups.findIndex((g) => g.id === draggedGroup.id);
+        const newIndex = sameLevelGroups.findIndex((g) => g.id === targetGroup.id);
+
+        if (oldIndex !== -1 && newIndex !== -1) {
+          const newOrder = arrayMove(sameLevelGroups, oldIndex, newIndex);
+          const newGroupIds = newOrder.map((g) => g.id);
+          reorderGroups(newGroupIds);
+
+          // DB에 저장
+          if (currentSurvey.id && isUUID(currentSurvey.id)) {
+            try {
+              await reorderGroupsAction(currentSurvey.id, newGroupIds);
+            } catch (error) {
+              console.error("그룹 순서 저장 실패:", error);
+            }
+          }
+        }
+      } else {
+        // 하위 그룹으로 변경 (오른쪽 50%에 드롭 또는 다른 레벨)
+        const targetSubGroups = groups
+          .filter((g) => g.parentGroupId === targetGroup.id && g.id !== draggedGroup.id)
+          .sort((a, b) => a.order - b.order);
+        const maxOrder =
+          targetSubGroups.length > 0 ? Math.max(...targetSubGroups.map((g) => g.order)) : -1;
+
+        updateGroup(draggedGroup.id, {
+          parentGroupId: targetGroup.id,
+          order: maxOrder + 1,
+        });
+
+        // DB에 저장
+        if (currentSurvey.id && isUUID(currentSurvey.id)) {
+          try {
+            const { updateQuestionGroup } = await import("@/actions/survey-actions");
+            await updateQuestionGroup(draggedGroup.id, {
+              parentGroupId: targetGroup.id,
+              order: maxOrder + 1,
+            });
+          } catch (error) {
+            console.error("그룹 하위 그룹 변경 저장 실패:", error);
+          }
+        }
+
+        // 하위 그룹으로 변경되면 해당 그룹을 펼침
+        setExpandedGroups((prev) => new Set(prev).add(targetGroup.id));
+      }
     }
   };
 
@@ -267,79 +443,75 @@ export function GroupManager({ className }: GroupManagerProps) {
       </div>
 
       {/* 스크롤 가능한 그룹 리스트 */}
-      <div className={`overflow-y-auto ${className || ''}`}>
+      <div className={`overflow-y-auto ${className || ""}`}>
         {topLevelGroups.length === 0 ? (
           <div className="text-center py-6 text-gray-400 text-xs">
             <p>생성된 그룹이 없습니다</p>
             <p className="mt-1">그룹을 만들어 질문을 정리하세요</p>
           </div>
         ) : (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext
-              items={topLevelGroups.map((g) => g.id)}
-              strategy={verticalListSortingStrategy}
-            >
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={groups.map((g) => g.id)} strategy={verticalListSortingStrategy}>
               <div className="space-y-2">
-              {topLevelGroups.map((group) => {
-                const subGroups = getSubGroups(group.id);
-                const isExpanded = expandedGroups.has(group.id);
+                {topLevelGroups.map((group) => {
+                  const subGroups = getSubGroups(group.id);
+                  const isExpanded = expandedGroups.has(group.id);
+                  const isDragOver = overId === group.id && activeId !== group.id;
+                  const isDragging = activeId === group.id;
 
-                return (
-                  <div key={group.id}>
-                    <SortableGroupItem
-                      group={group}
-                      questionCount={getQuestionCount(group.id)}
-                      subGroups={subGroups}
-                      isExpanded={isExpanded}
-                      onEdit={handleEditGroup}
-                      onDelete={handleDeleteGroup}
-                      onToggleExpand={handleToggleExpand}
-                      onAddSubGroup={handleOpenCreateModal}
-                    />
+                  return (
+                    <div key={group.id}>
+                      <SortableGroupItem
+                        group={group}
+                        questionCount={getQuestionCount(group.id)}
+                        subGroups={subGroups}
+                        isExpanded={isExpanded}
+                        onEdit={handleEditGroup}
+                        onDelete={handleDeleteGroup}
+                        onToggleExpand={handleToggleExpand}
+                        onAddSubGroup={handleOpenCreateModal}
+                        isDragOver={isDragOver}
+                        isDragging={isDragging}
+                        isNestingMode={isNestingMode}
+                      />
 
-                    {/* 하위 그룹 렌더링 */}
-                    {isExpanded && subGroups.length > 0 && (
-                      <div className="ml-6 mt-2 space-y-2 border-l-2 border-gray-200 pl-3">
-                        {subGroups.map((subGroup) => (
-                          <div
-                            key={subGroup.id}
-                            className="flex items-center justify-between p-2 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                          >
-                            <div className="flex items-center space-x-2 flex-1 min-w-0">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-gray-900 truncate">
-                                  {subGroup.name}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {getQuestionCount(subGroup.id)}개 질문
-                                </p>
+                      {/* 하위 그룹 렌더링 */}
+                      {isExpanded && subGroups.length > 0 && (
+                        <div className="ml-6 mt-2 space-y-2 border-l-2 border-gray-200 pl-3">
+                          {subGroups.map((subGroup) => {
+                            const isSubDragOver =
+                              overId === subGroup.id && activeId !== subGroup.id;
+                            const isSubDragging = activeId === subGroup.id;
+
+                            return (
+                              <div key={subGroup.id}>
+                                <SortableGroupItem
+                                  group={subGroup}
+                                  questionCount={getQuestionCount(subGroup.id)}
+                                  subGroups={[]}
+                                  isExpanded={false}
+                                  onEdit={handleEditGroup}
+                                  onDelete={handleDeleteGroup}
+                                  onToggleExpand={handleToggleExpand}
+                                  onAddSubGroup={handleOpenCreateModal}
+                                  isDragOver={isSubDragOver}
+                                  isDragging={isSubDragging}
+                                  isNestingMode={isNestingMode}
+                                />
                               </div>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0"
-                                onClick={() => handleEditGroup(subGroup)}
-                              >
-                                <Edit3 className="w-3 h-3" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0 text-red-500 hover:text-red-600"
-                                onClick={() => handleDeleteGroup(subGroup.id)}
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </SortableContext>
           </DndContext>
@@ -442,6 +614,3 @@ export function GroupManager({ className }: GroupManagerProps) {
     </div>
   );
 }
-
-
-

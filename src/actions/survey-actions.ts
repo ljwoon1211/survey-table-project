@@ -198,7 +198,7 @@ export async function createQuestionGroup(data: {
 
   // 같은 레벨의 그룹 중 가장 큰 order 찾기
   const siblingGroups = await getQuestionGroupsBySurvey(data.surveyId);
-  const filteredGroups = siblingGroups.filter(g => 
+  const filteredGroups = siblingGroups.filter(g =>
     data.parentGroupId ? g.parentGroupId === data.parentGroupId : !g.parentGroupId
   );
 
@@ -228,7 +228,7 @@ export async function updateQuestionGroup(
     name: string;
     description: string;
     order: number;
-    parentGroupId: string;
+    parentGroupId: string | null;
     color: string;
     collapsed: boolean;
   }>
@@ -253,6 +253,20 @@ export async function deleteQuestionGroup(groupId: string) {
 
   // 하위 그룹도 함께 삭제됨 (cascade)
   await db.delete(questionGroups).where(eq(questionGroups.id, groupId));
+}
+
+// 그룹 순서 변경
+export async function reorderGroups(surveyId: string, groupIds: string[]) {
+  await requireAuth();
+
+  for (let i = 0; i < groupIds.length; i++) {
+    await db
+      .update(questionGroups)
+      .set({ order: i, updatedAt: new Date() })
+      .where(eq(questionGroups.id, groupIds[i]));
+  }
+
+  revalidatePath(`/admin/surveys/${surveyId}`);
 }
 
 // ========================

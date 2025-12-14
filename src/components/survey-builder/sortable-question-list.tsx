@@ -514,12 +514,19 @@ export function SortableQuestionList({
 
   const groups = currentSurvey.groups || [];
 
+  // 중복 제거: 같은 ID를 가진 그룹이 있으면 첫 번째 것만 사용
+  const uniqueGroups = Array.from(new Map(groups.map((g) => [g.id, g])).values());
+
   // 최상위 그룹만 필터링
-  const topLevelGroups = groups.filter((g) => !g.parentGroupId).sort((a, b) => a.order - b.order);
+  const topLevelGroups = uniqueGroups
+    .filter((g) => !g.parentGroupId)
+    .sort((a, b) => a.order - b.order);
 
   // 특정 그룹의 하위 그룹들 가져오기
   const getSubGroups = (parentId: string) => {
-    return groups.filter((g) => g.parentGroupId === parentId).sort((a, b) => a.order - b.order);
+    return uniqueGroups
+      .filter((g) => g.parentGroupId === parentId)
+      .sort((a, b) => a.order - b.order);
   };
 
   // 그룹별로 질문 분류
@@ -556,11 +563,38 @@ export function SortableQuestionList({
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      const oldIndex = questions.findIndex((q) => q.id === active.id);
-      const newIndex = questions.findIndex((q) => q.id === over.id);
+      // 전체 질문 목록을 그룹 순서대로 정렬
+      // 1. 그룹별로 질문 분류 (이미 questionsByGroup에 있음)
+      // 2. 그룹 순서대로 질문들을 평탄화
+      const orderedQuestions: Question[] = [];
 
-      const newOrder = arrayMove(questions, oldIndex, newIndex);
-      reorderQuestions(newOrder.map((q) => q.id));
+      // 최상위 그룹 순서대로
+      topLevelGroups.forEach((group) => {
+        const groupQuestions = (questionsByGroup[group.id] || []).sort((a, b) => a.order - b.order);
+        orderedQuestions.push(...groupQuestions);
+
+        // 하위 그룹들도 순서대로
+        const subGroups = getSubGroups(group.id);
+        subGroups.forEach((subGroup) => {
+          const subGroupQuestions = (questionsByGroup[subGroup.id] || []).sort(
+            (a, b) => a.order - b.order,
+          );
+          orderedQuestions.push(...subGroupQuestions);
+        });
+      });
+
+      // 그룹 없는 질문들
+      const ungrouped = (questionsByGroup["ungrouped"] || []).sort((a, b) => a.order - b.order);
+      orderedQuestions.push(...ungrouped);
+
+      const oldIndex = orderedQuestions.findIndex((q) => q.id === active.id);
+      const newIndex = orderedQuestions.findIndex((q) => q.id === over.id);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newOrder = arrayMove(orderedQuestions, oldIndex, newIndex);
+        // 그룹 정보를 유지하면서 순서만 업데이트
+        reorderQuestions(newOrder.map((q) => q.id));
+      }
     }
 
     setActiveId(null);

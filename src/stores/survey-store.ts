@@ -230,11 +230,23 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
 
       reorderGroups: (groupIds: string[]) =>
         set((state) => {
-          const groupsMap = new Map((state.currentSurvey.groups || []).map(g => [g.id, g]));
-          const reorderedGroups = groupIds
+          const allGroups = state.currentSurvey.groups || [];
+          const groupsMap = new Map(allGroups.map(g => [g.id, g]));
+
+          // 재정렬할 그룹들 (최상위 그룹만)
+          const reorderedTopGroups = groupIds
             .map(id => groupsMap.get(id))
             .filter((g): g is QuestionGroup => g !== undefined)
             .map((g, index) => ({ ...g, order: index }));
+
+          // 하위 그룹들은 그대로 유지
+          const subGroups = allGroups.filter(g => g.parentGroupId !== undefined);
+
+          // 재정렬된 최상위 그룹 + 하위 그룹들 (중복 제거)
+          const allReorderedGroups = [...reorderedTopGroups, ...subGroups];
+          const reorderedGroups = Array.from(
+            new Map(allReorderedGroups.map(g => [g.id, g])).values()
+          );
 
           return {
             currentSurvey: {
