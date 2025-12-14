@@ -30,7 +30,7 @@ import {
   Info,
   X,
 } from "lucide-react";
-import { useQuestionLibraryStore } from "@/stores/question-library-store";
+import { hasBranchLogic, removeBranchLogic } from "@/stores/question-library-store";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
 import { SavedQuestion, Question } from "@/types/survey";
 import {
@@ -41,6 +41,18 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import {
+  useSavedQuestions,
+  useCategories,
+  useRecentlyUsedQuestions,
+  useMostUsedQuestions,
+  useSearchQuestions,
+  useDeleteSavedQuestion,
+  useApplyQuestion,
+  useApplyMultipleQuestions,
+  useInitializePresets,
+  useInitializeCategories,
+} from "@/hooks/queries/use-library";
 
 // 카테고리 아이콘 매핑
 const categoryIcons: Record<string, React.ElementType> = {
@@ -87,20 +99,17 @@ export function QuestionLibraryPanel({
   targetGroupId,
   className,
 }: QuestionLibraryPanelProps) {
-  const {
-    savedQuestions,
-    categories,
-    initializePresets,
-    applyQuestion,
-    applyMultipleQuestions,
-    deleteSavedQuestion,
-    searchQuestions,
-    getQuestionsByCategory,
-    getRecentlyUsed,
-    getMostUsed,
-    hasBranchLogic,
-    removeBranchLogic,
-  } = useQuestionLibraryStore();
+  // TanStack Query 훅들
+  const { data: savedQuestions = [], isLoading: isLoadingQuestions } = useSavedQuestions();
+  const { data: categories = [], isLoading: isLoadingCategories } = useCategories();
+  const { data: recentlyUsed = [] } = useRecentlyUsedQuestions(5);
+  const { data: mostUsed = [] } = useMostUsedQuestions(5);
+
+  const { mutate: initializePresets } = useInitializePresets();
+  const { mutate: initializeCategories } = useInitializeCategories();
+  const { mutateAsync: applyQuestion } = useApplyQuestion();
+  const { mutateAsync: applyMultipleQuestions } = useApplyMultipleQuestions();
+  const { mutate: deleteSavedQuestionMutation } = useDeleteSavedQuestion();
 
   const { addPreparedQuestion } = useSurveyBuilderStore();
 
@@ -113,24 +122,22 @@ export function QuestionLibraryPanel({
   const [showBranchWarning, setShowBranchWarning] = useState(false);
   const [pendingQuestion, setPendingQuestion] = useState<SavedQuestion | null>(null);
 
+  // 검색 쿼리 (enabled 옵션으로 검색어가 있을 때만 실행)
+  const { data: searchResults = [] } = useSearchQuestions(searchQuery.trim());
+
   // 프리셋 초기화
   useEffect(() => {
     initializePresets();
-  }, [initializePresets]);
+    initializeCategories();
+  }, [initializePresets, initializeCategories]);
 
   // 검색 결과
   const filteredQuestions = useMemo(() => {
     if (searchQuery.trim()) {
-      return searchQuestions(searchQuery);
+      return searchResults;
     }
     return savedQuestions;
-  }, [searchQuery, savedQuestions, searchQuestions]);
-
-  // 최근 사용
-  const recentlyUsed = useMemo(() => getRecentlyUsed(5), [savedQuestions, getRecentlyUsed]);
-
-  // 가장 많이 사용
-  const mostUsed = useMemo(() => getMostUsed(5), [savedQuestions, getMostUsed]);
+  }, [searchQuery, savedQuestions, searchResults]);
 
   // 카테고리 토글
   const toggleCategory = (categoryId: string) => {
@@ -159,7 +166,7 @@ export function QuestionLibraryPanel({
   };
 
   // 질문 추가 처리
-  const handleAddQuestion = (savedQuestion: SavedQuestion, removeBranch: boolean = false) => {
+  const handleAddQuestion = async (savedQuestion: SavedQuestion, removeBranch: boolean = false) => {
     // 분기 로직 체크
     if (!removeBranch && hasBranchLogic(savedQuestion.question)) {
       setPendingQuestion(savedQuestion);
@@ -167,39 +174,47 @@ export function QuestionLibraryPanel({
       return;
     }
 
-    let questionToAdd = applyQuestion(savedQuestion.id, targetGroupId);
-    if (!questionToAdd) return;
+    try {
+      let questionToAdd = await applyQuestion(savedQuestion.id);
+      if (!questionToAdd) return;
 
-    // 분기 로직 제거 옵션
-    if (removeBranch) {
-      questionToAdd = removeBranchLogic(questionToAdd);
+      // 분기 로직 제거 옵션
+      if (removeBranch) {
+        questionToAdd = removeBranchLogic(questionToAdd);
+      }
+
+      if (onAddQuestion) {
+        onAddQuestion(questionToAdd);
+      } else {
+        addPreparedQuestion(questionToAdd);
+      }
+
+      // 선택 해제
+      setSelectedQuestions((prev) => {
+        const next = new Set(prev);
+        next.delete(savedQuestion.id);
+        return next;
+      });
+    } catch (error) {
+      console.error("질문 추가 실패:", error);
     }
-
-    if (onAddQuestion) {
-      onAddQuestion(questionToAdd);
-    } else {
-      addPreparedQuestion(questionToAdd);
-    }
-
-    // 선택 해제
-    setSelectedQuestions((prev) => {
-      const next = new Set(prev);
-      next.delete(savedQuestion.id);
-      return next;
-    });
   };
 
   // 선택된 질문들 일괄 추가
-  const handleAddSelectedQuestions = () => {
-    const questions = applyMultipleQuestions(Array.from(selectedQuestions), targetGroupId);
-    questions.forEach((q) => {
-      if (onAddQuestion) {
-        onAddQuestion(q);
-      } else {
-        addPreparedQuestion(q);
-      }
-    });
-    setSelectedQuestions(new Set());
+  const handleAddSelectedQuestions = async () => {
+    try {
+      const questions = await applyMultipleQuestions(Array.from(selectedQuestions));
+      questions.forEach((q) => {
+        if (onAddQuestion) {
+          onAddQuestion(q);
+        } else {
+          addPreparedQuestion(q);
+        }
+      });
+      setSelectedQuestions(new Set());
+    } catch (error) {
+      console.error("일괄 질문 추가 실패:", error);
+    }
   };
 
   // 질문 삭제 확인
@@ -209,8 +224,13 @@ export function QuestionLibraryPanel({
       return;
     }
     if (confirm(`"${savedQuestion.name}" 질문을 삭제하시겠습니까?`)) {
-      deleteSavedQuestion(savedQuestion.id);
+      deleteSavedQuestionMutation(savedQuestion.id);
     }
+  };
+
+  // 카테고리별 질문 필터링
+  const getQuestionsByCategory = (categoryId: string) => {
+    return savedQuestions.filter((q) => q.category === categoryId);
   };
 
   // 질문 카드 렌더링
@@ -564,16 +584,20 @@ export function QuestionLibraryPanel({
               <Button
                 variant="outline"
                 className="w-full justify-start"
-                onClick={() => {
+                onClick={async () => {
                   if (pendingQuestion) {
-                    // 분기 로직 유지
-                    const question = applyQuestion(pendingQuestion.id, targetGroupId);
-                    if (question) {
-                      if (onAddQuestion) {
-                        onAddQuestion(question);
-                      } else {
-                        addPreparedQuestion(question);
+                    try {
+                      // 분기 로직 유지
+                      const question = await applyQuestion(pendingQuestion.id);
+                      if (question) {
+                        if (onAddQuestion) {
+                          onAddQuestion(question);
+                        } else {
+                          addPreparedQuestion(question);
+                        }
                       }
+                    } catch (error) {
+                      console.error("질문 적용 실패:", error);
                     }
                   }
                   setShowBranchWarning(false);

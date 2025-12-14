@@ -19,7 +19,10 @@ import {
   Globe,
   Lock,
   Loader2,
+  LogOut,
+  User,
 } from "lucide-react";
+import { logout } from "@/actions/auth-actions";
 import Link from "next/link";
 
 export default function SurveyListPage() {
@@ -109,11 +112,28 @@ export default function SurveyListPage() {
             </div>
           </div>
 
-          <Button asChild>
-            <Link href="/admin/surveys/create">
-              <Plus className="w-4 h-4 mr-2" />새 설문 만들기
+          <div className="flex items-center space-x-2">
+            <Button asChild>
+              <Link href="/admin/surveys/create">
+                <Plus className="w-4 h-4 mr-2" />새 설문 만들기
+              </Link>
+            </Button>
+            <Link href="/admin/profile">
+              <Button variant="ghost" size="icon" title="프로필">
+                <User className="w-5 h-5" />
+              </Button>
             </Link>
-          </Button>
+            <form action={logout}>
+              <Button
+                variant="ghost"
+                size="icon"
+                title="로그아웃"
+                className="text-red-500 hover:text-red-600 hover:bg-red-50"
+              >
+                <LogOut className="w-5 h-5" />
+              </Button>
+            </form>
+          </div>
         </div>
       </nav>
 

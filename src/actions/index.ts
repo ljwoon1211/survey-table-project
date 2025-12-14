@@ -69,3 +69,10 @@ export {
   initializePresetQuestions,
 } from './library-actions';
 
+// Auth Actions
+export {
+  login,
+  logout,
+  updatePassword,
+  getUser,
+} from './auth-actions';

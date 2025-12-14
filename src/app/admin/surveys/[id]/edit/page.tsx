@@ -414,7 +414,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
               onValueChange={(v) => setLeftSidebarTab(v as "types" | "library")}
               className="flex flex-col h-full"
             >
-              <TabsList className="grid w-full grid-cols-2 p-1 m-4 mb-0">
+              <TabsList className="grid w-full grid-cols-2 p-1 mb-0">
                 <TabsTrigger value="types" className="text-xs">
                   <Plus className="w-3 h-3 mr-1" />
                   질문 생성
