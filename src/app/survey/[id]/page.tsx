@@ -18,7 +18,7 @@ import {
   getSurveyWithDetails,
   getSurveyBySlug,
   getSurveyByPrivateToken,
-} from "@/actions/survey-actions";
+} from "@/actions/query-actions";
 
 export default function SurveyResponsePage() {
   const params = useParams();

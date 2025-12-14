@@ -36,7 +36,13 @@ export function InteractiveTableResponse({
 
   // 현재 질문의 응답 데이터 가져오기
   // 테스트 모드일 때는 testResponses, 실제 응답 모드일 때는 value 사용
-  const currentResponse = isTestMode ? testResponses[questionId] || {} : value || {};
+  const currentResponse = (
+    isTestMode
+      ? typeof testResponses[questionId] === "object"
+        ? testResponses[questionId]
+        : {}
+      : value || {}
+  ) as Record<string, any>;
 
   // 모바일 여부 확인
   useEffect(() => {
@@ -135,8 +141,8 @@ export function InteractiveTableResponse({
       }
     } else {
       updatedResponse = currentCellResponse.filter((item: string | object) => {
-        if (typeof item === "object" && item.optionId) {
-          return item.optionId !== optionId;
+        if (typeof item === "object" && item !== null && "optionId" in item) {
+          return (item as { optionId: string }).optionId !== optionId;
         }
         return item !== optionId;
       });
@@ -149,7 +155,7 @@ export function InteractiveTableResponse({
   const handleRadioChange = (cellId: string, optionId: string, isSelected?: boolean) => {
     // 이미 선택된 항목을 다시 클릭하면 선택 취소
     if (isSelected) {
-      updateResponse(cellId, null);
+      updateResponse(cellId, "");
       return;
     }
 
@@ -186,7 +192,12 @@ export function InteractiveTableResponse({
     if (Array.isArray(currentCellResponse)) {
       // 체크박스의 경우
       const updatedResponse = currentCellResponse.map((item: string | object) => {
-        if (typeof item === "object" && item.optionId === optionId) {
+        if (
+          typeof item === "object" &&
+          item !== null &&
+          "optionId" in item &&
+          (item as { optionId: string }).optionId === optionId
+        ) {
           return { ...item, otherValue };
         }
         return item;
@@ -194,7 +205,9 @@ export function InteractiveTableResponse({
       updateResponse(cellId, updatedResponse);
     } else if (
       typeof currentCellResponse === "object" &&
-      currentCellResponse.optionId === optionId
+      currentCellResponse !== null &&
+      "optionId" in currentCellResponse &&
+      (currentCellResponse as { optionId: string }).optionId === optionId
     ) {
       // 라디오의 경우
       updateResponse(cellId, { ...currentCellResponse, otherValue });
@@ -234,8 +247,8 @@ export function InteractiveTableResponse({
               const isChecked =
                 Array.isArray(cellResponse) &&
                 cellResponse.some((item: string | object) => {
-                  if (typeof item === "object" && item.optionId) {
-                    return item.optionId === option.id;
+                  if (typeof item === "object" && item !== null && "optionId" in item) {
+                    return (item as { optionId: string }).optionId === option.id;
                   }
                   return item === option.id;
                 });

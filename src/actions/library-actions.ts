@@ -7,12 +7,14 @@ import {
   NewSavedQuestion,
   NewQuestionCategory,
 } from '@/db/schema';
-import { eq, desc, ilike, or } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import type { Question } from '@/types/survey';
+import { getAllSavedQuestions, getAllCategories } from '@/data/library';
+import { requireAuth } from '@/lib/auth';
 
 // ========================
-// 질문 보관함 관련 액션
+// 질문 보관함 변경 액션 (Mutations)
 // ========================
 
 // 질문 저장
@@ -25,6 +27,8 @@ export async function saveQuestion(
     tags?: string[];
   }
 ) {
+  await requireAuth();
+
   const newSavedQuestion: NewSavedQuestion = {
     question: question as unknown as NewSavedQuestion['question'],
     name: metadata.name,
@@ -51,6 +55,8 @@ export async function updateSavedQuestion(
     question: Question;
   }>
 ) {
+  await requireAuth();
+
   const [updated] = await db
     .update(savedQuestions)
     .set({
@@ -67,59 +73,16 @@ export async function updateSavedQuestion(
 
 // 저장된 질문 삭제
 export async function deleteSavedQuestion(id: string) {
+  await requireAuth();
+
   await db.delete(savedQuestions).where(eq(savedQuestions.id, id));
   revalidatePath('/admin/surveys');
 }
 
-// 모든 저장된 질문 조회
-export async function getAllSavedQuestions() {
-  const questions = await db.query.savedQuestions.findMany({
-    orderBy: [desc(savedQuestions.updatedAt)],
-  });
-  return questions;
-}
-
-// 카테고리별 질문 조회
-export async function getQuestionsByCategory(category: string) {
-  const questions = await db.query.savedQuestions.findMany({
-    where: eq(savedQuestions.category, category),
-    orderBy: [desc(savedQuestions.updatedAt)],
-  });
-  return questions;
-}
-
-// 질문 검색
-export async function searchSavedQuestions(query: string) {
-  const questions = await db.query.savedQuestions.findMany({
-    where: or(
-      ilike(savedQuestions.name, `%${query}%`),
-      ilike(savedQuestions.description, `%${query}%`)
-    ),
-    orderBy: [desc(savedQuestions.updatedAt)],
-  });
-  return questions;
-}
-
-// 최근 사용 질문 조회
-export async function getRecentlyUsedQuestions(limit: number = 5) {
-  const questions = await db.query.savedQuestions.findMany({
-    orderBy: [desc(savedQuestions.updatedAt)],
-    limit,
-  });
-  return questions.filter(q => q.usageCount > 0);
-}
-
-// 가장 많이 사용된 질문 조회
-export async function getMostUsedQuestions(limit: number = 5) {
-  const questions = await db.query.savedQuestions.findMany({
-    orderBy: [desc(savedQuestions.usageCount)],
-    limit,
-  });
-  return questions;
-}
-
 // 질문 사용 (usageCount 증가)
 export async function applyQuestion(id: string) {
+  await requireAuth();
+
   const saved = await db.query.savedQuestions.findFirst({
     where: eq(savedQuestions.id, id),
   });
@@ -149,6 +112,8 @@ export async function applyQuestion(id: string) {
 
 // 여러 질문 사용
 export async function applyMultipleQuestions(ids: string[]) {
+  await requireAuth();
+
   const questions: Question[] = [];
 
   for (const id of ids) {
@@ -161,32 +126,10 @@ export async function applyMultipleQuestions(ids: string[]) {
   return questions;
 }
 
-// 모든 태그 조회
-export async function getAllTags() {
-  const questions = await db.query.savedQuestions.findMany();
-  const tagSet = new Set<string>();
-
-  questions.forEach(q => {
-    const tags = q.tags as string[] | null;
-    if (tags) {
-      tags.forEach(tag => tagSet.add(tag));
-    }
-  });
-
-  return Array.from(tagSet).sort();
-}
-
-// 태그로 질문 조회
-export async function getQuestionsByTag(tag: string) {
-  const questions = await db.query.savedQuestions.findMany();
-  return questions.filter(q => {
-    const tags = q.tags as string[] | null;
-    return tags?.includes(tag);
-  });
-}
-
 // 라이브러리 내보내기
 export async function exportLibrary() {
+  await requireAuth();
+
   const questions = await getAllSavedQuestions();
   const categories = await getAllCategories();
   return JSON.stringify({ savedQuestions: questions, categories }, null, 2);
@@ -194,6 +137,8 @@ export async function exportLibrary() {
 
 // 라이브러리 가져오기
 export async function importLibrary(json: string) {
+  await requireAuth();
+
   try {
     const data = JSON.parse(json);
 
@@ -229,19 +174,13 @@ export async function importLibrary(json: string) {
 }
 
 // ========================
-// 카테고리 관련 액션
+// 카테고리 변경 액션 (Mutations)
 // ========================
-
-// 모든 카테고리 조회
-export async function getAllCategories() {
-  const categories = await db.query.questionCategories.findMany({
-    orderBy: [questionCategories.order],
-  });
-  return categories;
-}
 
 // 카테고리 생성
 export async function createCategory(name: string, color: string = 'bg-gray-100 text-gray-600') {
+  await requireAuth();
+
   const categories = await getAllCategories();
   const maxOrder = categories.length > 0
     ? Math.max(...categories.map(c => c.order))
@@ -268,6 +207,8 @@ export async function updateCategory(
     order: number;
   }>
 ) {
+  await requireAuth();
+
   const [updated] = await db
     .update(questionCategories)
     .set(updates)
@@ -280,6 +221,8 @@ export async function updateCategory(
 
 // 카테고리 삭제
 export async function deleteCategory(id: string) {
+  await requireAuth();
+
   // 해당 카테고리의 질문들을 'custom'으로 이동
   await db
     .update(savedQuestions)
@@ -292,6 +235,8 @@ export async function deleteCategory(id: string) {
 
 // 기본 카테고리 초기화
 export async function initializeDefaultCategories() {
+  await requireAuth();
+
   const existingCategories = await getAllCategories();
 
   if (existingCategories.length > 0) {
@@ -313,6 +258,8 @@ export async function initializeDefaultCategories() {
 
 // 프리셋 질문 초기화
 export async function initializePresetQuestions() {
+  await requireAuth();
+
   const existingQuestions = await db.query.savedQuestions.findMany({
     where: eq(savedQuestions.isPreset, true),
   });
@@ -428,4 +375,3 @@ export async function initializePresetQuestions() {
   const inserted = await db.insert(savedQuestions).values(presetQuestions).returning();
   return inserted;
 }
-

@@ -1,0 +1,42 @@
+// Survey 조회 함수
+export {
+  getSurveys,
+  getSurveyById,
+  getSurveyBySlug,
+  getSurveyByPrivateToken,
+  isSlugAvailable,
+  searchSurveys,
+  getSurveysByDateRange,
+  getQuestionGroupsBySurvey,
+  getQuestionsBySurvey,
+  getSurveyWithDetails,
+  getSurveyListWithCounts,
+} from './surveys';
+
+// Response 조회 함수
+export {
+  getResponsesBySurvey,
+  getCompletedResponses,
+  getResponseById,
+  getResponseCountBySurvey,
+  getCompletedResponseCountBySurvey,
+  calculateResponseSummary,
+  getQuestionStatistics,
+  exportResponsesAsJson,
+  exportResponsesAsCsv,
+} from './responses';
+
+// Library 조회 함수
+export {
+  getAllSavedQuestions,
+  getQuestionsByCategory,
+  searchSavedQuestions,
+  getRecentlyUsedQuestions,
+  getMostUsedQuestions,
+  getAllTags,
+  getQuestionsByTag,
+  getAllCategories,
+} from './library';
+
+// regions는 기존 파일 유지
+export { regions } from './regions';

@@ -9,12 +9,18 @@ import {
   NewQuestion,
   NewQuestionGroup,
 } from '@/db/schema';
-import { eq, desc, ilike, and, gte, lte } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import type { Survey as SurveyType, Question as QuestionType, QuestionGroup as QuestionGroupType } from '@/types/survey';
+import {
+  getSurveyById,
+  getQuestionGroupsBySurvey,
+  getQuestionsBySurvey,
+} from '@/data/surveys';
+import { requireAuth } from '@/lib/auth';
 
 // ========================
-// 설문 관련 액션
+// 설문 변경 액션 (Mutations)
 // ========================
 
 // 설문 생성
@@ -25,6 +31,8 @@ export async function createSurvey(data: {
   isPublic?: boolean;
   settings?: Partial<SurveyType['settings']>;
 }) {
+  await requireAuth();
+
   const newSurvey: NewSurvey = {
     title: data.title,
     description: data.description,
@@ -62,6 +70,8 @@ export async function updateSurvey(
     thankYouMessage: string;
   }>
 ) {
+  await requireAuth();
+
   const [updated] = await db
     .update(surveys)
     .set({
@@ -78,75 +88,16 @@ export async function updateSurvey(
 
 // 설문 삭제
 export async function deleteSurvey(surveyId: string) {
+  await requireAuth();
+
   await db.delete(surveys).where(eq(surveys.id, surveyId));
   revalidatePath('/admin/surveys');
 }
 
-// 설문 목록 조회
-export async function getSurveys() {
-  const result = await db.query.surveys.findMany({
-    orderBy: [desc(surveys.createdAt)],
-  });
-  return result;
-}
-
-// 설문 단일 조회
-export async function getSurveyById(surveyId: string) {
-  const survey = await db.query.surveys.findFirst({
-    where: eq(surveys.id, surveyId),
-  });
-  return survey;
-}
-
-// 슬러그로 설문 조회
-export async function getSurveyBySlug(slug: string) {
-  const survey = await db.query.surveys.findFirst({
-    where: eq(surveys.slug, slug),
-  });
-  return survey;
-}
-
-// 비공개 토큰으로 설문 조회
-export async function getSurveyByPrivateToken(token: string) {
-  const survey = await db.query.surveys.findFirst({
-    where: eq(surveys.privateToken, token),
-  });
-  return survey;
-}
-
-// 슬러그 사용 가능 여부 확인
-export async function isSlugAvailable(slug: string, excludeSurveyId?: string) {
-  const existing = await db.query.surveys.findFirst({
-    where: excludeSurveyId
-      ? and(eq(surveys.slug, slug), eq(surveys.id, excludeSurveyId))
-      : eq(surveys.slug, slug),
-  });
-  return !existing;
-}
-
-// 설문 검색
-export async function searchSurveys(query: string) {
-  const result = await db.query.surveys.findMany({
-    where: ilike(surveys.title, `%${query}%`),
-    orderBy: [desc(surveys.createdAt)],
-  });
-  return result;
-}
-
-// 날짜 범위로 설문 조회
-export async function getSurveysByDateRange(startDate: Date, endDate: Date) {
-  const result = await db.query.surveys.findMany({
-    where: and(
-      gte(surveys.createdAt, startDate),
-      lte(surveys.createdAt, endDate)
-    ),
-    orderBy: [desc(surveys.createdAt)],
-  });
-  return result;
-}
-
 // 설문 복제
 export async function duplicateSurvey(surveyId: string) {
+  await requireAuth();
+
   // 원본 설문 조회
   const original = await getSurveyById(surveyId);
   if (!original) return null;
@@ -231,7 +182,7 @@ export async function duplicateSurvey(surveyId: string) {
 }
 
 // ========================
-// 질문 그룹 관련 액션
+// 질문 그룹 변경 액션 (Mutations)
 // ========================
 
 // 질문 그룹 생성
@@ -243,18 +194,16 @@ export async function createQuestionGroup(data: {
   order?: number;
   color?: string;
 }) {
-  // 같은 레벨의 그룹 중 가장 큰 order 찾기
-  const siblingGroups = await db.query.questionGroups.findMany({
-    where: and(
-      eq(questionGroups.surveyId, data.surveyId),
-      data.parentGroupId
-        ? eq(questionGroups.parentGroupId, data.parentGroupId)
-        : eq(questionGroups.parentGroupId, data.parentGroupId as unknown as string)
-    ),
-  });
+  await requireAuth();
 
-  const maxOrder = siblingGroups.length > 0
-    ? Math.max(...siblingGroups.map(g => g.order))
+  // 같은 레벨의 그룹 중 가장 큰 order 찾기
+  const siblingGroups = await getQuestionGroupsBySurvey(data.surveyId);
+  const filteredGroups = siblingGroups.filter(g => 
+    data.parentGroupId ? g.parentGroupId === data.parentGroupId : !g.parentGroupId
+  );
+
+  const maxOrder = filteredGroups.length > 0
+    ? Math.max(...filteredGroups.map(g => g.order))
     : -1;
 
   const newGroup: NewQuestionGroup = {
@@ -284,6 +233,8 @@ export async function updateQuestionGroup(
     collapsed: boolean;
   }>
 ) {
+  await requireAuth();
+
   const [updated] = await db
     .update(questionGroups)
     .set({
@@ -298,21 +249,14 @@ export async function updateQuestionGroup(
 
 // 질문 그룹 삭제
 export async function deleteQuestionGroup(groupId: string) {
+  await requireAuth();
+
   // 하위 그룹도 함께 삭제됨 (cascade)
   await db.delete(questionGroups).where(eq(questionGroups.id, groupId));
 }
 
-// 설문의 질문 그룹 조회
-export async function getQuestionGroupsBySurvey(surveyId: string) {
-  const groups = await db.query.questionGroups.findMany({
-    where: eq(questionGroups.surveyId, surveyId),
-    orderBy: [questionGroups.order],
-  });
-  return groups;
-}
-
 // ========================
-// 질문 관련 액션
+// 질문 변경 액션 (Mutations)
 // ========================
 
 // 질문 생성
@@ -337,10 +281,10 @@ export async function createQuestion(data: {
   tableValidationRules?: QuestionType['tableValidationRules'];
   displayCondition?: QuestionType['displayCondition'];
 }) {
+  await requireAuth();
+
   // 같은 설문의 질문 중 가장 큰 order 찾기
-  const existingQuestions = await db.query.questions.findMany({
-    where: eq(questions.surveyId, data.surveyId),
-  });
+  const existingQuestions = await getQuestionsBySurvey(data.surveyId);
 
   const maxOrder = existingQuestions.length > 0
     ? Math.max(...existingQuestions.map(q => q.order))
@@ -398,6 +342,8 @@ export async function updateQuestion(
     displayCondition: QuestionType['displayCondition'];
   }>
 ) {
+  await requireAuth();
+
   const [updated] = await db
     .update(questions)
     .set({
@@ -412,20 +358,15 @@ export async function updateQuestion(
 
 // 질문 삭제
 export async function deleteQuestion(questionId: string) {
-  await db.delete(questions).where(eq(questions.id, questionId));
-}
+  await requireAuth();
 
-// 설문의 질문 조회
-export async function getQuestionsBySurvey(surveyId: string) {
-  const result = await db.query.questions.findMany({
-    where: eq(questions.surveyId, surveyId),
-    orderBy: [questions.order],
-  });
-  return result;
+  await db.delete(questions).where(eq(questions.id, questionId));
 }
 
 // 질문 순서 변경
 export async function reorderQuestions(questionIds: string[]) {
+  await requireAuth();
+
   for (let i = 0; i < questionIds.length; i++) {
     await db
       .update(questions)
@@ -439,6 +380,8 @@ export async function reorderQuestions(questionIds: string[]) {
 // ========================
 
 export async function saveSurveyWithDetails(surveyData: SurveyType) {
+  await requireAuth();
+
   // 설문이 이미 존재하는지 확인
   const existingSurvey = await getSurveyById(surveyData.id);
 
@@ -539,95 +482,4 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
   revalidatePath(`/admin/surveys/${surveyId}`);
 
   return { surveyId };
-}
-
-// 전체 설문 데이터 조회 (설문 + 그룹 + 질문)
-export async function getSurveyWithDetails(surveyId: string): Promise<SurveyType | null> {
-  const survey = await getSurveyById(surveyId);
-  if (!survey) return null;
-
-  const groups = await getQuestionGroupsBySurvey(surveyId);
-  const questionList = await getQuestionsBySurvey(surveyId);
-
-  // DB 데이터를 클라이언트 타입으로 변환
-  const surveyData: SurveyType = {
-    id: survey.id,
-    title: survey.title,
-    description: survey.description ?? undefined,
-    slug: survey.slug ?? undefined,
-    privateToken: survey.privateToken ?? undefined,
-    groups: groups.map(g => ({
-      id: g.id,
-      name: g.name,
-      description: g.description ?? undefined,
-      order: g.order,
-      parentGroupId: g.parentGroupId ?? undefined,
-      color: g.color ?? undefined,
-      collapsed: g.collapsed ?? undefined,
-    })),
-    questions: questionList.map(q => ({
-      id: q.id,
-      type: q.type as QuestionType['type'],
-      title: q.title,
-      description: q.description ?? undefined,
-      required: q.required,
-      groupId: q.groupId ?? undefined,
-      options: q.options as QuestionType['options'],
-      selectLevels: q.selectLevels as QuestionType['selectLevels'],
-      tableTitle: q.tableTitle ?? undefined,
-      tableColumns: q.tableColumns as QuestionType['tableColumns'],
-      tableRowsData: q.tableRowsData as QuestionType['tableRowsData'],
-      imageUrl: q.imageUrl ?? undefined,
-      videoUrl: q.videoUrl ?? undefined,
-      order: q.order,
-      allowOtherOption: q.allowOtherOption ?? undefined,
-      noticeContent: q.noticeContent ?? undefined,
-      requiresAcknowledgment: q.requiresAcknowledgment ?? undefined,
-      tableValidationRules: q.tableValidationRules as QuestionType['tableValidationRules'],
-      displayCondition: q.displayCondition as QuestionType['displayCondition'],
-    })),
-    settings: {
-      isPublic: survey.isPublic,
-      allowMultipleResponses: survey.allowMultipleResponses,
-      showProgressBar: survey.showProgressBar,
-      shuffleQuestions: survey.shuffleQuestions,
-      requireLogin: survey.requireLogin,
-      endDate: survey.endDate ?? undefined,
-      maxResponses: survey.maxResponses ?? undefined,
-      thankYouMessage: survey.thankYouMessage,
-    },
-    createdAt: survey.createdAt,
-    updatedAt: survey.updatedAt,
-  };
-
-  return surveyData;
-}
-
-// 전체 설문 목록 조회 (요약 정보)
-export async function getSurveyListWithCounts() {
-  const surveyList = await getSurveys();
-
-  // 각 설문의 질문 수 조회
-  const surveysWithCounts = await Promise.all(
-    surveyList.map(async (survey) => {
-      const questionList = await db.query.questions.findMany({
-        where: eq(questions.surveyId, survey.id),
-      });
-
-      return {
-        id: survey.id,
-        title: survey.title,
-        description: survey.description,
-        slug: survey.slug,
-        privateToken: survey.privateToken,
-        questionCount: questionList.length,
-        responseCount: 0, // TODO: 응답 수 조회 추가
-        createdAt: survey.createdAt,
-        updatedAt: survey.updatedAt,
-        isPublic: survey.isPublic,
-      };
-    })
-  );
-
-  return surveysWithCounts;
 }

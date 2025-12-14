@@ -3,9 +3,13 @@
 import { useCallback, useTransition } from 'react';
 import { useSurveyBuilderStore, useSurveyListStore, useSurveyResponseStore } from '@/stores';
 import {
-  saveSurveyWithDetails,
   getSurveyWithDetails,
   getSurveyListWithCounts,
+  getResponsesBySurvey,
+  calculateResponseSummary,
+} from '@/actions/query-actions';
+import {
+  saveSurveyWithDetails,
   deleteSurvey as deleteSurveyAction,
   duplicateSurvey as duplicateSurveyAction,
 } from '@/actions/survey-actions';
@@ -13,8 +17,6 @@ import {
   startResponse as startResponseAction,
   updateQuestionResponse as updateQuestionResponseAction,
   completeResponse as completeResponseAction,
-  getResponsesBySurvey,
-  calculateResponseSummary,
 } from '@/actions/response-actions';
 import type { Survey } from '@/types/survey';
 
@@ -66,7 +68,7 @@ export function useSurveySync() {
   const createNewSurvey = useCallback(async () => {
     resetSurvey();
     const newSurvey = useSurveyBuilderStore.getState().currentSurvey;
-    
+
     try {
       const result = await saveSurveyWithDetails(newSurvey);
       // 생성된 ID로 store 업데이트
@@ -102,10 +104,10 @@ export function useSurveyListSync() {
   const loadSurveyList = useCallback(async () => {
     try {
       const surveys = await getSurveyListWithCounts();
-      
+
       // Zustand store 업데이트 (선택사항 - 캐싱용)
       // useSurveyListStore.setState({ surveys: ... });
-      
+
       return surveys;
     } catch (error) {
       console.error('설문 목록 불러오기 실패:', error);
@@ -241,4 +243,3 @@ export function useAutoSave(delay: number = 3000) {
 
   return { autoSave };
 }
-

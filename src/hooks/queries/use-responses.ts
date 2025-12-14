@@ -2,10 +2,6 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  startResponse as startResponseAction,
-  updateQuestionResponse as updateQuestionResponseAction,
-  completeResponse as completeResponseAction,
-  deleteResponse as deleteResponseAction,
   getResponsesBySurvey,
   getCompletedResponses,
   getResponseById,
@@ -13,6 +9,12 @@ import {
   getQuestionStatistics,
   exportResponsesAsJson,
   exportResponsesAsCsv,
+} from '@/actions/query-actions';
+import {
+  startResponse as startResponseAction,
+  updateQuestionResponse as updateQuestionResponseAction,
+  completeResponse as completeResponseAction,
+  deleteResponse as deleteResponseAction,
   clearSurveyResponses as clearSurveyResponsesAction,
 } from '@/actions/response-actions';
 
@@ -203,4 +205,3 @@ export function useExportResponsesCsv() {
     mutationFn: (surveyId: string) => exportResponsesAsCsv(surveyId),
   });
 }
-

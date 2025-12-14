@@ -3,8 +3,15 @@
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useSurveyResponseStore } from '@/stores/survey-response-store';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
+import {
+  useResponses,
+  useCompletedResponses,
+  useResponseSummary,
+  useQuestionStatistics,
+  useExportResponsesJson,
+  useExportResponsesCsv,
+} from '@/hooks/queries/use-responses';
 import { BarChart3, PieChart, Download, Users, Clock, TrendingUp, FileText } from 'lucide-react';
 
 interface ResponseAnalyticsProps {
@@ -13,27 +20,20 @@ interface ResponseAnalyticsProps {
 }
 
 export function ResponseAnalytics({ surveyId, className }: ResponseAnalyticsProps) {
-  const {
-    getResponsesBySurvey,
-    getCompletedResponses,
-    calculateSummary,
-    getQuestionStatistics,
-    exportResponses
-  } = useSurveyResponseStore();
-
   const { currentSurvey } = useSurveyBuilderStore();
   const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(null);
 
-  const allResponses = getResponsesBySurvey(surveyId);
-  const completedResponses = getCompletedResponses(surveyId);
-  const summary = useMemo(() => calculateSummary(surveyId), [surveyId, allResponses]);
+  const { data: allResponses = [] } = useResponses(surveyId);
+  const { data: completedResponses = [] } = useCompletedResponses(surveyId);
+  const { data: summary } = useResponseSummary(surveyId);
+  const { mutateAsync: exportJson } = useExportResponsesJson();
+  const { mutateAsync: exportCsv } = useExportResponsesCsv();
 
-  const selectedQuestionStats = selectedQuestionId
-    ? getQuestionStatistics(surveyId, selectedQuestionId)
-    : null;
-
-  const handleExport = (format: 'json' | 'csv') => {
-    const data = exportResponses(surveyId, format);
+  const handleExport = async (format: 'json' | 'csv') => {
+    const data = format === 'json' 
+      ? await exportJson(surveyId)
+      : await exportCsv(surveyId);
+    
     const blob = new Blob([data], {
       type: format === 'json' ? 'application/json' : 'text/csv'
     });
@@ -70,7 +70,7 @@ export function ResponseAnalytics({ surveyId, className }: ResponseAnalyticsProp
             <div className="flex items-center space-x-2">
               <Users className="w-8 h-8 text-blue-500" />
               <div>
-                <p className="text-2xl font-bold text-gray-900">{summary.totalResponses}</p>
+                <p className="text-2xl font-bold text-gray-900">{summary?.totalResponses ?? 0}</p>
                 <p className="text-sm text-gray-600">총 응답 수</p>
               </div>
             </div>
@@ -82,7 +82,7 @@ export function ResponseAnalytics({ surveyId, className }: ResponseAnalyticsProp
             <div className="flex items-center space-x-2">
               <TrendingUp className="w-8 h-8 text-green-500" />
               <div>
-                <p className="text-2xl font-bold text-gray-900">{summary.completedResponses}</p>
+                <p className="text-2xl font-bold text-gray-900">{summary?.completedResponses ?? 0}</p>
                 <p className="text-sm text-gray-600">완료된 응답</p>
               </div>
             </div>
@@ -94,7 +94,7 @@ export function ResponseAnalytics({ surveyId, className }: ResponseAnalyticsProp
             <div className="flex items-center space-x-2">
               <PieChart className="w-8 h-8 text-purple-500" />
               <div>
-                <p className="text-2xl font-bold text-gray-900">{summary.responseRate.toFixed(1)}%</p>
+                <p className="text-2xl font-bold text-gray-900">{(summary?.responseRate ?? 0).toFixed(1)}%</p>
                 <p className="text-sm text-gray-600">완료율</p>
               </div>
             </div>
@@ -107,7 +107,7 @@ export function ResponseAnalytics({ surveyId, className }: ResponseAnalyticsProp
               <Clock className="w-8 h-8 text-orange-500" />
               <div>
                 <p className="text-2xl font-bold text-gray-900">
-                  {summary.averageCompletionTime.toFixed(1)}분
+                  {(summary?.averageCompletionTime ?? 0).toFixed(1)}분
                 </p>
                 <p className="text-sm text-gray-600">평균 완료 시간</p>
               </div>
@@ -144,50 +144,18 @@ export function ResponseAnalytics({ surveyId, className }: ResponseAnalyticsProp
         <CardContent>
           <div className="space-y-4">
             {currentSurvey.questions.map((question, index) => {
-              const stats = getQuestionStatistics(surveyId, question.id);
               const isSelected = selectedQuestionId === question.id;
 
               return (
-                <div
+                <QuestionStatItem
                   key={question.id}
-                  className={`p-4 border rounded-lg cursor-pointer transition-all ${
-                    isSelected
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                  onClick={() => setSelectedQuestionId(isSelected ? null : question.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-medium text-gray-900">
-                        {index + 1}. {question.title}
-                      </h3>
-                      <p className="text-sm text-gray-600 mt-1">
-                        응답률: {stats.responseRate.toFixed(1)}% ({stats.totalResponses}/{summary.completedResponses}명)
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        stats.responseRate > 80
-                          ? 'bg-green-100 text-green-800'
-                          : stats.responseRate > 50
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {stats.responseRate.toFixed(0)}%
-                      </span>
-                    </div>
-                  </div>
-
-                  {isSelected && (
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                      <QuestionResponseDetail
-                        question={question}
-                        stats={stats}
-                      />
-                    </div>
-                  )}
-                </div>
+                  surveyId={surveyId}
+                  question={question}
+                  index={index}
+                  isSelected={isSelected}
+                  completedCount={summary?.completedResponses ?? 0}
+                  onSelect={() => setSelectedQuestionId(isSelected ? null : question.id)}
+                />
               );
             })}
           </div>
@@ -201,12 +169,12 @@ export function ResponseAnalytics({ surveyId, className }: ResponseAnalyticsProp
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {completedResponses
-              .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
+            {[...completedResponses]
+              .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime())
               .slice(0, 10)
               .map((response) => {
                 const completionTime = (
-                  new Date(response.completedAt).getTime() -
+                  new Date(response.completedAt!).getTime() -
                   new Date(response.startedAt).getTime()
                 ) / (1000 * 60);
 
@@ -222,7 +190,7 @@ export function ResponseAnalytics({ surveyId, className }: ResponseAnalyticsProp
                           응답 #{response.id.slice(-8)}
                         </p>
                         <p className="text-xs text-gray-600">
-                          {new Date(response.completedAt).toLocaleString()}
+                          {new Date(response.completedAt!).toLocaleString()}
                         </p>
                       </div>
                     </div>
@@ -231,7 +199,7 @@ export function ResponseAnalytics({ surveyId, className }: ResponseAnalyticsProp
                         완료 시간: {completionTime.toFixed(1)}분
                       </p>
                       <p className="text-xs text-gray-500">
-                        질문 수: {Object.keys(response.questionResponses).length}개
+                        질문 수: {Object.keys(response.questionResponses as Record<string, unknown>).length}개
                       </p>
                     </div>
                   </div>
@@ -250,6 +218,74 @@ export function ResponseAnalytics({ surveyId, className }: ResponseAnalyticsProp
   );
 }
 
+function QuestionStatItem({
+  surveyId,
+  question,
+  index,
+  isSelected,
+  completedCount,
+  onSelect,
+}: {
+  surveyId: string;
+  question: any;
+  index: number;
+  isSelected: boolean;
+  completedCount: number;
+  onSelect: () => void;
+}) {
+  const { data: stats } = useQuestionStatistics(surveyId, question.id);
+
+  if (!stats) {
+    return (
+      <div className="p-4 border rounded-lg border-gray-200">
+        <p className="text-sm text-gray-500">로딩 중...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`p-4 border rounded-lg cursor-pointer transition-all ${
+        isSelected
+          ? 'border-blue-500 bg-blue-50'
+          : 'border-gray-200 hover:border-gray-300'
+      }`}
+      onClick={onSelect}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex-1">
+          <h3 className="font-medium text-gray-900">
+            {index + 1}. {question.title}
+          </h3>
+          <p className="text-sm text-gray-600 mt-1">
+            응답률: {stats.responseRate.toFixed(1)}% ({stats.totalResponses}/{completedCount}명)
+          </p>
+        </div>
+        <div className="flex items-center space-x-2">
+          <span className={`px-2 py-1 rounded text-xs font-medium ${
+            stats.responseRate > 80
+              ? 'bg-green-100 text-green-800'
+              : stats.responseRate > 50
+              ? 'bg-yellow-100 text-yellow-800'
+              : 'bg-red-100 text-red-800'
+          }`}>
+            {stats.responseRate.toFixed(0)}%
+          </span>
+        </div>
+      </div>
+
+      {isSelected && (
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <QuestionResponseDetail
+            question={question}
+            stats={stats}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function QuestionResponseDetail({ question, stats }: { question: any; stats: any }) {
   if (stats.totalResponses === 0) {
     return (
@@ -264,8 +300,8 @@ function QuestionResponseDetail({ question, stats }: { question: any; stats: any
       return (
         <div className="space-y-2">
           <h4 className="font-medium text-gray-900">응답 분포</h4>
-          {Object.entries(stats.responseCounts).map(([value, count]) => {
-            const percentage = ((count as number) / stats.totalResponses) * 100;
+          {Object.entries(stats.responseCounts as Record<string, number>).map(([value, count]) => {
+            const percentage = (count / stats.totalResponses) * 100;
             return (
               <div key={value} className="flex items-center space-x-3">
                 <div className="w-24 text-sm text-gray-600 truncate">{value}</div>
@@ -288,8 +324,8 @@ function QuestionResponseDetail({ question, stats }: { question: any; stats: any
       return (
         <div className="space-y-2">
           <h4 className="font-medium text-gray-900">선택된 옵션 (중복 응답 가능)</h4>
-          {Object.entries(stats.optionCounts).map(([option, count]) => {
-            const percentage = ((count as number) / stats.totalResponses) * 100;
+          {Object.entries(stats.optionCounts as Record<string, number>).map(([option, count]) => {
+            const percentage = (count / stats.totalResponses) * 100;
             return (
               <div key={option} className="flex items-center space-x-3">
                 <div className="w-24 text-sm text-gray-600 truncate">{option}</div>

@@ -2,17 +2,17 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  getSurveys,
-  getSurveyById,
   getSurveyBySlug,
   getSurveyWithDetails,
   getSurveyListWithCounts,
+  searchSurveys,
+} from '@/actions/query-actions';
+import {
   saveSurveyWithDetails,
   createSurvey,
   updateSurvey,
   deleteSurvey as deleteSurveyAction,
   duplicateSurvey as duplicateSurveyAction,
-  searchSurveys,
 } from '@/actions/survey-actions';
 import type { Survey } from '@/types/survey';
 
@@ -161,4 +161,3 @@ export function useDuplicateSurvey() {
     },
   });
 }
-

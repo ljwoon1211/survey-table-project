@@ -53,7 +53,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSurvey, useSaveSurvey } from "@/hooks/queries/use-surveys";
-import { isSlugAvailable as checkSlugAvailable } from "@/actions/survey-actions";
+import { isSlugAvailable as checkSlugAvailable } from "@/actions/query-actions";
 
 const questionTypes = [
   {

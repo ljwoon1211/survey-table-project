@@ -1,12 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Pencil, ExternalLink, BarChart3 } from "lucide-react";
-import { getSurveyWithDetails } from "@/actions/survey-actions";
+import { getSurveyWithDetails } from "@/data/surveys";
 import {
   getCompletedResponses,
   exportResponsesAsJson,
   exportResponsesAsCsv,
-} from "@/actions/response-actions";
+} from "@/data/responses";
 import { AnalyticsDashboardClient } from "@/components/analytics";
 import { Button } from "@/components/ui/button";
 

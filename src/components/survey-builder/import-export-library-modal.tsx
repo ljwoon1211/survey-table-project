@@ -74,17 +74,13 @@ export function ImportExportLibraryModal({ open, onOpenChange }: ImportExportLib
     }
 
     try {
-      const result = await importLibraryMutation.mutateAsync(importData);
-      if (result.success) {
-        setImportSuccess(true);
-        setImportData("");
-        setTimeout(() => {
-          setImportSuccess(false);
-          onOpenChange(false);
-        }, 1500);
-      } else {
-        setImportError("유효하지 않은 데이터입니다.");
-      }
+      await importLibraryMutation.mutateAsync(importData);
+      setImportSuccess(true);
+      setImportData("");
+      setTimeout(() => {
+        setImportSuccess(false);
+        onOpenChange(false);
+      }, 1500);
     } catch (error) {
       setImportError("유효하지 않은 데이터입니다.");
     }

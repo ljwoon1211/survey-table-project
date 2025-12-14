@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
-import { useSurveyListStore } from "@/stores/survey-list-store";
+import { useSurveys, useSaveSurvey, useDeleteSurvey } from "@/hooks/queries/use-surveys";
 import { SortableQuestionList } from "@/components/survey-builder/sortable-question-list";
 import { GroupManager } from "@/components/survey-builder/group-manager";
 import { generateOTTSurvey } from "@/utils/ott-survey-generator";
@@ -110,7 +110,9 @@ export default function CreateSurveyPage() {
     resetSurvey,
   } = useSurveyBuilderStore();
 
-  const { surveys, saveSurvey, getSurveyById, deleteSurvey } = useSurveyListStore();
+  const { data: surveys = [] } = useSurveys();
+  const { mutateAsync: saveSurvey } = useSaveSurvey();
+  const { mutateAsync: deleteSurveyMutation } = useDeleteSurvey();
 
   const [titleInput, setTitleInput] = useState(currentSurvey.title);
   const [showSavedSurveys, setShowSavedSurveys] = useState(false);
@@ -148,13 +150,13 @@ export default function CreateSurveyPage() {
   };
 
   // 설문 저장
-  const handleSaveSurvey = () => {
+  const handleSaveSurvey = async () => {
     // ID가 없으면 새로 생성
     const surveyToSave = currentSurvey.id
       ? currentSurvey
       : { ...currentSurvey, id: `survey-${Date.now()}` };
 
-    saveSurvey(surveyToSave);
+    await saveSurvey(surveyToSave);
     setSaveMessage("저장되었습니다!");
 
     setTimeout(() => setSaveMessage(""), 2000);
@@ -162,10 +164,9 @@ export default function CreateSurveyPage() {
 
   // 설문 불러오기
   const handleLoadSurvey = (surveyId: string) => {
-    const survey = getSurveyById(surveyId);
+    const survey = surveys.find((s) => s.id === surveyId);
     if (survey) {
-      useSurveyBuilderStore.setState({ currentSurvey: survey });
-      setTitleInput(survey.title);
+      // 기본 정보만 있으므로 상세 정보는 별도 로드 필요
       setShowSavedSurveys(false);
     }
   };
@@ -272,7 +273,7 @@ export default function CreateSurveyPage() {
                         >
                           <h5 className="font-medium text-sm text-gray-900">{survey.title}</h5>
                           <p className="text-xs text-gray-500 mt-1">
-                            {survey.questions.length}개 질문 •{" "}
+                            {survey.questionCount}개 질문 •{" "}
                             {new Date(survey.updatedAt).toLocaleDateString()}
                           </p>
                         </button>
@@ -282,7 +283,7 @@ export default function CreateSurveyPage() {
                           onClick={(e) => {
                             e.stopPropagation();
                             if (confirm("이 설문을 삭제하시겠습니까?")) {
-                              deleteSurvey(survey.id);
+                              deleteSurveyMutation(survey.id);
                             }
                           }}
                           className="opacity-0 group-hover:opacity-100 transition-opacity"

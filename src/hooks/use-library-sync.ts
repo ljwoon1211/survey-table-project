@@ -3,21 +3,23 @@
 import { useCallback, useTransition } from 'react';
 import { useQuestionLibraryStore } from '@/stores/question-library-store';
 import {
-  saveQuestion as saveQuestionAction,
-  updateSavedQuestion as updateSavedQuestionAction,
-  deleteSavedQuestion as deleteSavedQuestionAction,
   getAllSavedQuestions,
-  getQuestionsByCategory as getQuestionsByCategoryAction,
+  getQuestionsByCategory as getQuestionsByCategoryFn,
   searchSavedQuestions,
   getRecentlyUsedQuestions,
   getMostUsedQuestions,
+  getAllTags,
+  getQuestionsByTag as getQuestionsByTagFn,
+  getAllCategories,
+} from '@/actions/query-actions';
+import {
+  saveQuestion as saveQuestionAction,
+  updateSavedQuestion as updateSavedQuestionAction,
+  deleteSavedQuestion as deleteSavedQuestionAction,
   applyQuestion as applyQuestionAction,
   applyMultipleQuestions as applyMultipleQuestionsAction,
-  getAllTags,
-  getQuestionsByTag as getQuestionsByTagAction,
   exportLibrary as exportLibraryAction,
   importLibrary as importLibraryAction,
-  getAllCategories,
   createCategory as createCategoryAction,
   updateCategory as updateCategoryAction,
   deleteCategory as deleteCategoryAction,
@@ -101,7 +103,7 @@ export function useLibrarySync() {
   // 카테고리별 질문 불러오기
   const loadQuestionsByCategory = useCallback(async (category: string) => {
     try {
-      const questions = await getQuestionsByCategoryAction(category);
+      const questions = await getQuestionsByCategoryFn(category);
       return questions;
     } catch (error) {
       console.error('카테고리별 질문 불러오기 실패:', error);
@@ -178,7 +180,7 @@ export function useLibrarySync() {
   // 태그별 질문 불러오기
   const loadQuestionsByTag = useCallback(async (tag: string) => {
     try {
-      const questions = await getQuestionsByTagAction(tag);
+      const questions = await getQuestionsByTagFn(tag);
       return questions;
     } catch (error) {
       console.error('태그별 질문 불러오기 실패:', error);
@@ -320,4 +322,3 @@ export function useCategorySync() {
     startTransition,
   };
 }
-

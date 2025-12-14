@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { BarChart3, FileText, Users, Calendar, ArrowRight, Plus } from "lucide-react";
-import { getSurveys } from "@/actions/survey-actions";
+import { getSurveys } from "@/data/surveys";
 import {
   getCompletedResponseCountBySurvey,
   getResponseCountBySurvey,
-} from "@/actions/response-actions";
+} from "@/data/responses";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 

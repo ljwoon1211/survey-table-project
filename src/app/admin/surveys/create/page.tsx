@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
-import { useSurveyListStore } from "@/stores/survey-list-store";
+import { useSaveSurvey } from "@/hooks/queries/use-surveys";
+import { isSlugAvailable } from "@/actions/query-actions";
 import { SortableQuestionList } from "@/components/survey-builder/sortable-question-list";
 import { GroupManager } from "@/components/survey-builder/group-manager";
 import { QuestionLibraryPanel } from "@/components/survey-builder/question-library-panel";
@@ -133,7 +134,7 @@ export default function CreateSurveyPage() {
     resetSurvey,
   } = useSurveyBuilderStore();
 
-  const { saveSurvey, isSlugAvailable } = useSurveyListStore();
+  const { mutateAsync: saveSurvey, isPending: isSaving } = useSaveSurvey();
 
   const [titleInput, setTitleInput] = useState(currentSurvey.title);
   const [questionNumberInput, setQuestionNumberInput] = useState("");
@@ -158,7 +159,7 @@ export default function CreateSurveyPage() {
   }, [resetSurvey]);
 
   // 슬러그 유효성 검사
-  const handleSlugChange = (value: string) => {
+  const handleSlugChange = useCallback(async (value: string) => {
     setSlugInput(value);
 
     if (!value) {
@@ -173,32 +174,35 @@ export default function CreateSurveyPage() {
       return;
     }
 
-    // 중복 검사
-    if (!isSlugAvailable(value, currentSurvey.id)) {
+    // 중복 검사 (비동기)
+    const available = await isSlugAvailable(value, currentSurvey.id);
+    if (!available) {
       setSlugError("이미 사용 중인 URL입니다. 다른 URL을 입력해주세요.");
       return;
     }
 
     setSlugError("");
     updateSurveySlug(value);
-  };
+  }, [currentSurvey.id, updateSurveySlug]);
 
   // 제목에서 자동 슬러그 생성
-  const handleAutoGenerateSlug = () => {
+  const handleAutoGenerateSlug = useCallback(async () => {
     const autoSlug = generateSlugFromTitle(titleInput);
     if (autoSlug) {
       // 중복 시 접미사 추가
       let finalSlug = autoSlug;
       let counter = 1;
-      while (!isSlugAvailable(finalSlug, currentSurvey.id)) {
+      let available = await isSlugAvailable(finalSlug, currentSurvey.id);
+      while (!available) {
         finalSlug = `${autoSlug}-${counter}`;
         counter++;
+        available = await isSlugAvailable(finalSlug, currentSurvey.id);
       }
       setSlugInput(finalSlug);
       updateSurveySlug(finalSlug);
       setSlugError("");
     }
-  };
+  }, [titleInput, currentSurvey.id, updateSurveySlug]);
 
   // URL 복사
   const handleCopyUrl = () => {
@@ -253,7 +257,7 @@ export default function CreateSurveyPage() {
   };
 
   // 설문 저장
-  const handleSaveSurvey = () => {
+  const handleSaveSurvey = async () => {
     // ID가 없으면 새로 생성
     const surveyToSave = currentSurvey.id
       ? currentSurvey
@@ -261,10 +265,10 @@ export default function CreateSurveyPage() {
 
     // 공개 설문인데 슬러그가 없으면 자동 생성
     if (surveyToSave.settings.isPublic && !slugInput) {
-      handleAutoGenerateSlug();
+      await handleAutoGenerateSlug();
     }
 
-    saveSurvey(surveyToSave);
+    await saveSurvey(surveyToSave);
     setShowSaveModal(true);
     setCopySuccess(false);
     setIsEditingSlugInModal(false);
