@@ -380,7 +380,7 @@ export function GroupManager({ className }: GroupManagerProps) {
     }
   };
 
-  const handleDeleteGroup = (groupId: string) => {
+  const handleDeleteGroup = async (groupId: string) => {
     const subGroups = getSubGroups(groupId);
     const message =
       subGroups.length > 0
@@ -388,6 +388,33 @@ export function GroupManager({ className }: GroupManagerProps) {
         : "이 그룹을 삭제하시겠습니까? (그룹에 속한 질문들은 그룹 없음 상태가 됩니다)";
 
     if (confirm(message)) {
+      // 하위 그룹 ID들 수집 (재귀적으로)
+      const groupsToDelete: string[] = [groupId];
+      const collectSubGroups = (parentId: string) => {
+        const children = groups.filter((g) => g.parentGroupId === parentId);
+        children.forEach((child) => {
+          groupsToDelete.push(child.id);
+          collectSubGroups(child.id);
+        });
+      };
+      collectSubGroups(groupId);
+
+      // DB에서 그룹 삭제 (하위 그룹들도 함께)
+      if (currentSurvey.id && isUUID(currentSurvey.id)) {
+        try {
+          const { deleteQuestionGroup } = await import("@/actions/survey-actions");
+          // 하위 그룹부터 삭제 (역순으로)
+          for (const gId of groupsToDelete.reverse()) {
+            await deleteQuestionGroup(gId);
+          }
+        } catch (error) {
+          console.error("그룹 삭제 실패:", error);
+          alert("그룹 삭제에 실패했습니다. 다시 시도해주세요.");
+          return;
+        }
+      }
+
+      // 로컬 스토어 업데이트
       deleteGroup(groupId);
     }
   };
