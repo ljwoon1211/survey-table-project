@@ -245,8 +245,26 @@ export function GroupManager({ className }: GroupManagerProps) {
     return currentSurvey.questions.filter((q) => q.groupId === groupId).length;
   };
 
-  const handleCreateGroup = () => {
+  const handleCreateGroup = async () => {
     if (groupName.trim()) {
+      // DB에 그룹 저장
+      if (currentSurvey.id && isUUID(currentSurvey.id)) {
+        try {
+          const { createQuestionGroup } = await import("@/actions/survey-actions");
+          await createQuestionGroup({
+            surveyId: currentSurvey.id,
+            name: groupName.trim(),
+            description: groupDescription.trim() || undefined,
+            parentGroupId: parentGroupIdForNew,
+          });
+        } catch (error) {
+          console.error("그룹 생성 실패:", error);
+          alert("그룹 생성에 실패했습니다. 다시 시도해주세요.");
+          return;
+        }
+      }
+
+      // 로컬 스토어 업데이트
       addGroup(groupName.trim(), groupDescription.trim() || undefined, parentGroupIdForNew);
       setGroupName("");
       setGroupDescription("");
