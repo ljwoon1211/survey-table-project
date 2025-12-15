@@ -34,6 +34,7 @@ import { InteractiveTableResponse } from "./interactive-table-response";
 import { TablePreview } from "./table-preview";
 import { NoticeRenderer } from "./notice-renderer";
 import { GroupHeader } from "./group-header";
+import { convertHtmlImageUrlsToProxy } from "@/lib/image-utils";
 import {
   GripVertical,
   Settings,
@@ -189,7 +190,7 @@ function SortableQuestion({
                 [&_table_th]:font-normal [&_table_th]:bg-transparent
                 [&_table_p]:m-0
                 [&_p]:min-h-[1.6em]"
-              dangerouslySetInnerHTML={{ __html: question.description }}
+              dangerouslySetInnerHTML={{ __html: convertHtmlImageUrlsToProxy(question.description) }}
             />
           )}
         </div>
@@ -305,7 +306,7 @@ function QuestionTestCard({ question, index }: { question: Question; index: numb
               [&_table_th]:font-normal [&_table_th]:bg-transparent
               [&_table_p]:m-0
               [&_p]:min-h-[1.6em]"
-            dangerouslySetInnerHTML={{ __html: question.description }}
+            dangerouslySetInnerHTML={{ __html: convertHtmlImageUrlsToProxy(question.description) }}
           />
         )}
       </div>

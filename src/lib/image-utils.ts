@@ -136,13 +136,13 @@ export async function optimizeImage(
  * @returns 검증 결과
  */
 export function validateImageFile(file: File): { valid: boolean; error?: string } {
-  const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/svg+xml"];
+  const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/svg+xml", "image/bmp"];
   const maxSize = 10 * 1024 * 1024; // 10MB
 
   if (!allowedTypes.includes(file.type)) {
     return {
       valid: false,
-      error: "지원하지 않는 파일 형식입니다. JPG, PNG, GIF, WebP, SVG만 업로드 가능합니다.",
+      error: "지원하지 않는 파일 형식입니다. JPG, PNG, GIF, WebP, SVG, BMP만 업로드 가능합니다.",
     };
   }
 
@@ -154,4 +154,55 @@ export function validateImageFile(file: File): { valid: boolean; error?: string 
   }
 
   return { valid: true };
+}
+
+/**
+ * 이미지 URL을 프록시 URL로 변환합니다.
+ * R2 직접 URL을 숨기고 CORS 문제를 해결합니다.
+ * @param imageUrl 원본 이미지 URL
+ * @returns 프록시 URL 또는 원본 URL (프록시가 필요 없는 경우)
+ */
+export function getProxiedImageUrl(imageUrl: string | undefined | null): string {
+  if (!imageUrl) {
+    return "";
+  }
+
+  // 이미 프록시 URL인 경우 그대로 반환
+  if (imageUrl.includes("/api/image/proxy")) {
+    return imageUrl;
+  }
+
+  // R2 URL 패턴 감지 (r2.cloudflarestorage.com 포함)
+  // R2 URL인 경우 프록시 URL로 변환하여 CORS 문제 해결 및 보안 강화
+  const isR2Url = imageUrl.includes("r2.cloudflarestorage.com");
+
+  if (isR2Url) {
+    // URL 인코딩하여 프록시 URL 생성
+    const encodedUrl = encodeURIComponent(imageUrl);
+    return `/api/image/proxy?url=${encodedUrl}`;
+  }
+
+  // 외부 URL이거나 프록시가 필요 없는 경우 원본 반환
+  return imageUrl;
+}
+
+/**
+ * HTML 문자열 내부의 이미지 URL을 프록시 URL로 변환합니다.
+ * dangerouslySetInnerHTML로 렌더링되는 HTML 내부의 이미지도 프록시를 통해 로드되도록 합니다.
+ * @param html HTML 문자열
+ * @returns 이미지 URL이 프록시 URL로 변환된 HTML 문자열
+ */
+export function convertHtmlImageUrlsToProxy(html: string): string {
+  if (!html) {
+    return html;
+  }
+
+  // HTML 내부의 img 태그의 src 속성을 찾아서 변환
+  return html.replace(
+    /<img([^>]*)\ssrc=["']([^"']+)["']([^>]*)>/gi,
+    (match, before, src, after) => {
+      const proxiedSrc = getProxiedImageUrl(src);
+      return `<img${before} src="${proxiedSrc}"${after}>`;
+    }
+  );
 }

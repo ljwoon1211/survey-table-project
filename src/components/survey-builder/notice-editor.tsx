@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { useState, useMemo, useRef, useCallback } from "react";
 import { createEditorExtensions } from "./editor-extensions";
-import { optimizeImage, validateImageFile } from "@/lib/image-utils";
+import { optimizeImage, validateImageFile, getProxiedImageUrl } from "@/lib/image-utils";
 
 interface NoticeEditorProps {
   content: string;
@@ -200,11 +200,12 @@ export function NoticeEditor({
 
       const imageUrl = await uploadPromise;
 
-      // 에디터에 이미지 추가
+      // 에디터에 이미지 추가 (프록시 URL 사용)
       // tiptap 라이브러리 타입 호환성 문제로 인해 any 타입 사용
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ed = editor as any;
-      ed.chain().focus().setImage({ src: imageUrl }).run();
+      const proxiedUrl = getProxiedImageUrl(imageUrl);
+      ed.chain().focus().setImage({ src: proxiedUrl }).run();
 
       // 상태 초기화
       setSelectedFile(null);
@@ -563,7 +564,7 @@ export function NoticeEditor({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/svg+xml"
+                accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/svg+xml,image/bmp"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
@@ -604,7 +605,11 @@ export function NoticeEditor({
               </div>
               <div className="border rounded-lg overflow-hidden bg-white">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={previewUrl} alt="미리보기" className="w-full max-h-48 object-contain" />
+                <img
+                  src={getProxiedImageUrl(previewUrl || "")}
+                  alt="미리보기"
+                  className="w-full max-h-48 object-contain"
+                />
               </div>
               <div className="flex gap-2">
                 <Button type="button" size="sm" onClick={handleImageUpload} className="flex-1">
@@ -634,7 +639,7 @@ export function NoticeEditor({
                 <div className="border rounded-lg overflow-hidden bg-white">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={previewUrl}
+                    src={getProxiedImageUrl(previewUrl)}
                     alt="업로드 중"
                     className="w-full max-h-32 object-contain opacity-50"
                   />

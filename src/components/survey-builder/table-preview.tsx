@@ -3,6 +3,7 @@
 import { TableColumn, TableRow } from "@/types/survey";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Image, Video, FileText } from "lucide-react";
+import { getProxiedImageUrl } from "@/lib/image-utils";
 
 interface TablePreviewProps {
   tableTitle?: string;
@@ -99,7 +100,7 @@ export function TablePreview({
         return cell.imageUrl ? (
           <div className="flex flex-col items-center gap-2">
             <img
-              src={cell.imageUrl}
+              src={getProxiedImageUrl(cell.imageUrl)}
               alt="셀 이미지"
               className="max-w-full max-h-32 object-contain rounded"
               onError={(e) => {

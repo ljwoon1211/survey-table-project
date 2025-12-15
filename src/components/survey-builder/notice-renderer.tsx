@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Label } from "@/components/ui/label";
+import { convertHtmlImageUrlsToProxy } from "@/lib/image-utils";
 
 interface NoticeRendererProps {
   content: string;
@@ -36,7 +37,7 @@ export function NoticeRenderer({
           [&_table_th]:font-normal [&_table_th]:bg-transparent
           [&_table_p]:m-0
           [&_p]:min-h-[1.6em]"
-        dangerouslySetInnerHTML={{ __html: content }}
+        dangerouslySetInnerHTML={{ __html: convertHtmlImageUrlsToProxy(content) }}
         style={{
           // TipTap 스타일 재정의
           fontSize: "14px",

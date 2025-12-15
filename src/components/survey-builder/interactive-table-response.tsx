@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Image, Video, FileText, ChevronRight, ChevronLeft, CheckCircle2 } from "lucide-react";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
+import { getProxiedImageUrl } from "@/lib/image-utils";
 
 interface InteractiveTableResponseProps {
   questionId: string;
@@ -415,7 +416,7 @@ export function InteractiveTableResponse({
         return cell.imageUrl ? (
           <div className="flex flex-col items-center gap-2">
             <img
-              src={cell.imageUrl}
+              src={getProxiedImageUrl(cell.imageUrl)}
               alt="셀 이미지"
               className="max-w-full max-h-32 object-contain rounded"
               onError={(e) => {

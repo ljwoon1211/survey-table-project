@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
 import { BranchRuleEditor } from "./branch-rule-editor";
-import { optimizeImage, validateImageFile } from "@/lib/image-utils";
+import { optimizeImage, validateImageFile, getProxiedImageUrl } from "@/lib/image-utils";
 
 interface CellContentModalProps {
   isOpen: boolean;
@@ -468,7 +468,7 @@ export function CellContentModal({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/svg+xml"
+                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/svg+xml,image/bmp"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
@@ -510,7 +510,11 @@ export function CellContentModal({
                   </Button>
                 </div>
                 <div className="border rounded-lg overflow-hidden bg-white">
-                  <img src={previewUrl} alt="미리보기" className="w-full max-h-48 object-contain" />
+                  <img
+                    src={getProxiedImageUrl(previewUrl || "")}
+                    alt="미리보기"
+                    className="w-full max-h-48 object-contain"
+                  />
                 </div>
                 <Button type="button" size="sm" onClick={handleImageUpload} className="w-full">
                   업로드
@@ -534,7 +538,7 @@ export function CellContentModal({
                 {previewUrl && (
                   <div className="border rounded-lg overflow-hidden bg-white">
                     <img
-                      src={previewUrl}
+                      src={getProxiedImageUrl(previewUrl)}
                       alt="업로드 중"
                       className="w-full max-h-48 object-contain opacity-50"
                     />
@@ -572,7 +576,7 @@ export function CellContentModal({
                 </div>
                 <div className="border rounded-lg overflow-hidden bg-gray-50">
                   <img
-                    src={imageUrl}
+                    src={getProxiedImageUrl(imageUrl)}
                     alt="셀 내용 이미지 미리보기"
                     className="w-full max-h-48 object-contain"
                     onError={(e) => {
@@ -597,7 +601,7 @@ export function CellContentModal({
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/svg+xml"
+                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/svg+xml,image/bmp"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {

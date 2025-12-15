@@ -5,6 +5,7 @@ import { Table } from "@tiptap/extension-table";
 import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
+import { getProxiedImageUrl } from "@/lib/image-utils";
 
 // 배경색 속성 추가 함수
 const addBackgroundColorAttribute = () => ({
@@ -48,10 +49,21 @@ export function createEditorExtensions() {
     },
   });
 
+  // 이미지 프록시 URL을 사용하는 Image 확장
+  const ImageWithProxy = Image.extend({
+    renderHTML({ HTMLAttributes }) {
+      // src 속성이 있으면 프록시 URL로 변환
+      if (HTMLAttributes.src) {
+        HTMLAttributes.src = getProxiedImageUrl(HTMLAttributes.src);
+      }
+      return ["img", HTMLAttributes];
+    },
+  });
+
   return [
     // StarterKit을 매번 새로 생성하여 플러그인 충돌 방지
     StarterKit.configure({}),
-    Image.configure({
+    ImageWithProxy.configure({
       inline: true,
       allowBase64: true,
     }),
@@ -70,4 +82,5 @@ export function createEditorExtensions() {
     TableHeaderWithBackground,
   ];
 }
+
 
