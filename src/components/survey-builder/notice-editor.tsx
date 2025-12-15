@@ -234,19 +234,29 @@ export function NoticeEditor({
 
       const imageUrl = await uploadPromise;
 
+      // 새 이미지 업로드 전에 현재 에디터의 이미지 확인
+      const currentHtml = editor.getHTML();
+      const currentImages = extractImageUrlsFromHtml(currentHtml);
+
+      // 교체될 이미지 찾기 (현재 이미지 중 하나가 교체될 수 있음)
+      // setImage는 선택된 이미지를 교체하므로, 교체될 이미지는 onUpdate에서 감지됨
+      // 하지만 명시적으로 처리하기 위해 현재 이미지를 추적 목록에 추가
+      currentImages.forEach((url) => {
+        uploadedImageUrlsRef.current.add(url);
+      });
+
       // 업로드된 이미지 URL 추적 (원본 URL 저장)
       uploadedImageUrlsRef.current.add(imageUrl);
-      previousContentRef.current = editor.getHTML();
+      previousContentRef.current = currentHtml;
 
-      // 에디터에 이미지 추가 (프록시 URL 사용)
+      // 에디터에 이미지 추가/교체 (프록시 URL 사용)
       // tiptap 라이브러리 타입 호환성 문제로 인해 any 타입 사용
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ed = editor as any;
       const proxiedUrl = getProxiedImageUrl(imageUrl);
       ed.chain().focus().setImage({ src: proxiedUrl }).run();
 
-      // 업데이트 후 현재 HTML 저장
-      previousContentRef.current = editor.getHTML();
+      // 업데이트 후 현재 HTML 저장 (onUpdate에서 자동으로 처리됨)
 
       // 상태 초기화
       setSelectedFile(null);

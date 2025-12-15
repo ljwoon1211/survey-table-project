@@ -251,14 +251,57 @@ export async function updateQuestionGroup(
 export async function deleteQuestionGroup(groupId: string) {
   await requireAuth();
 
-  // 하위 그룹도 함께 삭제됨 (cascade)
-  await db.delete(questionGroups).where(eq(questionGroups.id, groupId));
+  // 재귀적으로 하위 그룹들의 ID를 수집
+  const collectChildGroupIds = async (parentId: string): Promise<string[]> => {
+    const childGroups = await db.query.questionGroups.findMany({
+      where: eq(questionGroups.parentGroupId, parentId),
+    });
+    
+    let allIds = [parentId];
+    for (const child of childGroups) {
+      const childIds = await collectChildGroupIds(child.id);
+      allIds = [...allIds, ...childIds];
+    }
+    return allIds;
+  };
+
+  const allGroupIdsToDelete = await collectChildGroupIds(groupId);
+
+  // 모든 그룹에 속한 질문들의 groupId를 null로 설정
+  // DB 스키마에 onDelete: 'set null'이 있지만, 명시적으로 처리하여 안전하게 처리
+  for (const gId of allGroupIdsToDelete) {
+    await db
+      .update(questions)
+      .set({ groupId: null, updatedAt: new Date() })
+      .where(eq(questions.groupId, gId));
+  }
+
+  // 하위 그룹부터 역순으로 삭제 (부모 그룹이 먼저 삭제되면 외래키 제약으로 인한 오류 방지)
+  // 하지만 실제로는 cascade로 처리되므로, 최상위 그룹만 삭제해도 하위 그룹이 자동 삭제됨
+  // 안전을 위해 하위 그룹부터 역순으로 삭제
+  const deleteGroups = async (gId: string) => {
+    // 먼저 하위 그룹들을 삭제
+    const childGroups = await db.query.questionGroups.findMany({
+      where: eq(questionGroups.parentGroupId, gId),
+    });
+    
+    for (const child of childGroups) {
+      await deleteGroups(child.id);
+    }
+    
+    // 하위 그룹 삭제 후 현재 그룹 삭제
+    await db.delete(questionGroups).where(eq(questionGroups.id, gId));
+  };
+
+  await deleteGroups(groupId);
 }
 
-// 그룹 순서 변경
+// 그룹 순서 변경 (최상위 그룹만)
 export async function reorderGroups(surveyId: string, groupIds: string[]) {
   await requireAuth();
 
+  // 최상위 그룹(parentGroupId가 null인 그룹)만 순서 변경
+  // 각 그룹의 order를 인덱스로 설정
   for (let i = 0; i < groupIds.length; i++) {
     await db
       .update(questionGroups)

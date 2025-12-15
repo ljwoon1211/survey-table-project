@@ -365,6 +365,19 @@ export function CellContentModal({
 
       const uploadedImageUrl = await uploadPromise;
 
+      // 이미지를 교체하는 경우 이전 이미지 삭제
+      const previousImageUrl = imageUrl || cell.imageUrl;
+      if (
+        previousImageUrl &&
+        previousImageUrl !== uploadedImageUrl &&
+        previousImageUrl !== cell.imageUrl
+      ) {
+        // 이전에 업로드했지만 저장되지 않은 이미지 삭제
+        deleteImagesFromR2([previousImageUrl]).catch((error) => {
+          console.error("이전 이미지 삭제 실패:", error);
+        });
+      }
+
       // 업로드된 이미지 URL 추적
       uploadedImageUrlRef.current = uploadedImageUrl;
 
@@ -384,7 +397,7 @@ export function CellContentModal({
       setIsUploading(false);
       uploadAbortController.current = null;
     }
-  }, [selectedFile]);
+  }, [selectedFile, imageUrl, cell.imageUrl]);
 
   // 업로드 취소
   const handleCancelUpload = useCallback(() => {
@@ -426,7 +439,8 @@ export function CellContentModal({
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, [imageUrl, cell.imageUrl]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // cell.imageUrl과 imageUrl은 변경될 수 있지만, 이 함수는 이미지 삭제만 담당하므로 의존성 제외
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleCancel()}>
