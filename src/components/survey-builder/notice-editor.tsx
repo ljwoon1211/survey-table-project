@@ -25,9 +25,15 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { createEditorExtensions } from "./editor-extensions";
-import { optimizeImage, validateImageFile, getProxiedImageUrl } from "@/lib/image-utils";
+import {
+  optimizeImage,
+  validateImageFile,
+  getProxiedImageUrl,
+  deleteImagesFromR2,
+} from "@/lib/image-utils";
+import { extractImageUrlsFromHtml } from "@/lib/image-extractor";
 
 interface NoticeEditorProps {
   content: string;
@@ -53,6 +59,10 @@ export function NoticeEditor({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadAbortController = useRef<AbortController | null>(null);
   const [, forceUpdate] = useState({});
+
+  // 업로드된 이미지 URL 추적 (원본 URL로 저장)
+  const uploadedImageUrlsRef = useRef<Set<string>>(new Set());
+  const previousContentRef = useRef<string>(content || "");
 
   // 각 에디터 인스턴스마다 고유한 확장 배열 생성
   const extensions = useMemo(() => createEditorExtensions(), []);
@@ -101,7 +111,31 @@ export function NoticeEditor({
     content: content || "",
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
+      const currentHtml = editor.getHTML();
+
+      // 이미지 삭제 감지 및 정리
+      const previousImages = extractImageUrlsFromHtml(previousContentRef.current);
+      const currentImages = extractImageUrlsFromHtml(currentHtml);
+
+      // 삭제된 이미지 찾기 (업로드한 이미지만 삭제)
+      const deletedImages = previousImages.filter(
+        (url) => !currentImages.includes(url) && uploadedImageUrlsRef.current.has(url),
+      );
+
+      // 삭제된 이미지가 있으면 R2에서 삭제
+      if (deletedImages.length > 0) {
+        deleteImagesFromR2(deletedImages).catch((error) => {
+          console.error("이미지 삭제 실패:", error);
+        });
+
+        // 추적 목록에서 제거
+        deletedImages.forEach((url) => {
+          uploadedImageUrlsRef.current.delete(url);
+        });
+      }
+
+      previousContentRef.current = currentHtml;
+      onChange(currentHtml);
     },
     onSelectionUpdate: () => {
       // 선택이 변경될 때마다 컴포넌트 리렌더링
@@ -200,12 +234,19 @@ export function NoticeEditor({
 
       const imageUrl = await uploadPromise;
 
+      // 업로드된 이미지 URL 추적 (원본 URL 저장)
+      uploadedImageUrlsRef.current.add(imageUrl);
+      previousContentRef.current = editor.getHTML();
+
       // 에디터에 이미지 추가 (프록시 URL 사용)
       // tiptap 라이브러리 타입 호환성 문제로 인해 any 타입 사용
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ed = editor as any;
       const proxiedUrl = getProxiedImageUrl(imageUrl);
       ed.chain().focus().setImage({ src: proxiedUrl }).run();
+
+      // 업데이트 후 현재 HTML 저장
+      previousContentRef.current = editor.getHTML();
 
       // 상태 초기화
       setSelectedFile(null);
@@ -243,6 +284,40 @@ export function NoticeEditor({
     handleCancelUpload();
     setShowImageUpload(false);
   }, [handleCancelUpload]);
+
+  // 초기 content에서 이미지 URL 추출 및 추적
+  useEffect(() => {
+    if (content) {
+      const initialImages = extractImageUrlsFromHtml(content);
+      initialImages.forEach((url) => {
+        uploadedImageUrlsRef.current.add(url);
+      });
+      previousContentRef.current = content;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 초기 마운트 시에만 실행
+
+  // 컴포넌트 언마운트 시 사용되지 않은 이미지 정리
+  useEffect(() => {
+    // cleanup 함수에서 사용할 ref 값 복사
+    const uploadedUrls = uploadedImageUrlsRef.current;
+    const editorInstance = editor;
+
+    return () => {
+      // 컴포넌트가 언마운트될 때 현재 에디터의 이미지와 비교하여 사용되지 않은 이미지 삭제
+      if (editorInstance && uploadedUrls.size > 0) {
+        const currentHtml = editorInstance.getHTML();
+        const currentImages = extractImageUrlsFromHtml(currentHtml);
+        const unusedImages = Array.from(uploadedUrls).filter((url) => !currentImages.includes(url));
+
+        if (unusedImages.length > 0) {
+          deleteImagesFromR2(unusedImages).catch((error) => {
+            console.error("언마운트 시 이미지 삭제 실패:", error);
+          });
+        }
+      }
+    };
+  }, [editor]);
 
   if (!editor) {
     return null;

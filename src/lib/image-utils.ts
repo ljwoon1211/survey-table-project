@@ -206,3 +206,32 @@ export function convertHtmlImageUrlsToProxy(html: string): string {
     }
   );
 }
+
+/**
+ * R2에서 이미지를 삭제합니다.
+ * @param urls 삭제할 이미지 URL 배열
+ * @returns 삭제 성공 여부
+ */
+export async function deleteImagesFromR2(urls: string[]): Promise<boolean> {
+  if (!urls || urls.length === 0) {
+    return true;
+  }
+
+  try {
+    const response = await fetch("/api/upload/image/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ urls }),
+    });
+
+    if (!response.ok) {
+      console.error("이미지 삭제 실패:", await response.text());
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("이미지 삭제 중 오류:", error);
+    return false;
+  }
+}

@@ -30,7 +30,12 @@ import {
 } from "lucide-react";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
 import { BranchRuleEditor } from "./branch-rule-editor";
-import { optimizeImage, validateImageFile, getProxiedImageUrl } from "@/lib/image-utils";
+import {
+  optimizeImage,
+  validateImageFile,
+  getProxiedImageUrl,
+  deleteImagesFromR2,
+} from "@/lib/image-utils";
 
 interface CellContentModalProps {
   isOpen: boolean;
@@ -63,6 +68,8 @@ export function CellContentModal({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadAbortController = useRef<AbortController | null>(null);
+  // 업로드된 이미지 URL 추적 (원본 셀의 이미지와 새로 업로드한 이미지 구분)
+  const uploadedImageUrlRef = useRef<string | null>(null);
   const [checkboxOptions, setCheckboxOptions] = useState<CheckboxOption[]>(
     cell.checkboxOptions || [],
   );
@@ -170,6 +177,25 @@ export function CellContentModal({
   };
 
   const handleSave = () => {
+    // 이전 이미지와 다른 경우 이전 이미지 삭제
+    const previousImageUrl = cell.imageUrl;
+    const newImageUrl = contentType === "image" ? imageUrl : undefined;
+
+    // 이전 이미지가 있고 새 이미지가 다르거나 없으면 이전 이미지 삭제
+    if (previousImageUrl && previousImageUrl !== newImageUrl) {
+      deleteImagesFromR2([previousImageUrl]).catch((error) => {
+        console.error("이전 이미지 삭제 실패:", error);
+      });
+    }
+
+    // 업로드했지만 저장되지 않은 이미지 정리
+    if (uploadedImageUrlRef.current && uploadedImageUrlRef.current !== newImageUrl) {
+      deleteImagesFromR2([uploadedImageUrlRef.current]).catch((error) => {
+        console.error("미사용 이미지 삭제 실패:", error);
+      });
+      uploadedImageUrlRef.current = null;
+    }
+
     const updatedCell: TableCell = {
       ...cell,
       type: contentType,
@@ -191,13 +217,25 @@ export function CellContentModal({
       colspan: isMergeEnabled && typeof colspan === "number" && colspan > 1 ? colspan : undefined,
     };
 
+    // 저장된 이미지로 업데이트
+    if (newImageUrl) {
+      uploadedImageUrlRef.current = null; // 저장되었으므로 추적 해제
+    }
+
     onSave(updatedCell);
   };
 
   const handleCancel = () => {
+    // 업로드했지만 저장하지 않은 이미지 삭제
+    if (uploadedImageUrlRef.current) {
+      deleteImagesFromR2([uploadedImageUrlRef.current]).catch((error) => {
+        console.error("취소 시 이미지 삭제 실패:", error);
+      });
+      uploadedImageUrlRef.current = null;
+    }
+
     // 원래 값으로 되돌리기
     setContentType(cell.type || "text");
-    setTextContent(cell.content || "");
     setImageUrl(cell.imageUrl || "");
     setVideoUrl(cell.videoUrl || "");
     setPreviewUrl(cell.imageUrl && cell.type === "image" ? cell.imageUrl : null);
@@ -327,6 +365,9 @@ export function CellContentModal({
 
       const uploadedImageUrl = await uploadPromise;
 
+      // 업로드된 이미지 URL 추적
+      uploadedImageUrlRef.current = uploadedImageUrl;
+
       // 이미지 URL 설정
       setImageUrl(uploadedImageUrl);
       setPreviewUrl(uploadedImageUrl);
@@ -366,6 +407,18 @@ export function CellContentModal({
 
   // 이미지 삭제
   const handleRemoveImage = useCallback(() => {
+    const imageToDelete = imageUrl || uploadedImageUrlRef.current;
+
+    // R2에서 이미지 삭제 (원본 셀의 이미지가 아닌 경우만)
+    if (imageToDelete && imageToDelete !== cell.imageUrl) {
+      deleteImagesFromR2([imageToDelete]).catch((error) => {
+        console.error("이미지 삭제 실패:", error);
+      });
+    }
+
+    // 추적 중인 이미지 URL 초기화
+    uploadedImageUrlRef.current = null;
+
     setImageUrl("");
     setPreviewUrl(null);
     setSelectedFile(null);
@@ -373,7 +426,7 @@ export function CellContentModal({
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, []);
+  }, [imageUrl, cell.imageUrl]);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleCancel()}>

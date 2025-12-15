@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Question, QuestionOption, SelectLevel } from "@/types/survey";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
+import { extractImageUrlsFromQuestion } from "@/lib/image-extractor";
+import { deleteImagesFromR2 } from "@/lib/image-utils";
 import { UserDefinedMultiSelectPreview } from "./user-defined-multi-select";
 import { DynamicTableEditor } from "./dynamic-table-editor";
 import { TablePreview } from "./table-preview";
@@ -105,6 +107,25 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
 
     setIsSaving(true);
     try {
+      // 저장 전: 현재 질문에서 사용 중인 이미지 추출
+      const updatedQuestion = {
+        ...question,
+        ...formData,
+      } as Question;
+      const usedImages = extractImageUrlsFromQuestion(updatedQuestion);
+      
+      // 저장된 질문의 이미지와 비교하여 사용되지 않은 이미지 삭제
+      if (question) {
+        const previousImages = extractImageUrlsFromQuestion(question);
+        const unusedImages = previousImages.filter(
+          (url) => !usedImages.includes(url)
+        );
+        
+        if (unusedImages.length > 0) {
+          await deleteImagesFromR2(unusedImages);
+        }
+      }
+      
       updateQuestion(questionId, formData);
       onClose();
     } catch (error) {
@@ -112,7 +133,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
     } finally {
       setIsSaving(false);
     }
-  }, [questionId, validateForm, updateQuestion, formData, onClose]);
+  }, [questionId, validateForm, updateQuestion, formData, onClose, question]);
 
   // 키보드 이벤트 핸들러
   const handleKeyDown = useCallback(
