@@ -256,7 +256,7 @@ export async function deleteQuestionGroup(groupId: string) {
     const childGroups = await db.query.questionGroups.findMany({
       where: eq(questionGroups.parentGroupId, parentId),
     });
-    
+
     let allIds = [parentId];
     for (const child of childGroups) {
       const childIds = await collectChildGroupIds(child.id);
@@ -284,11 +284,11 @@ export async function deleteQuestionGroup(groupId: string) {
     const childGroups = await db.query.questionGroups.findMany({
       where: eq(questionGroups.parentGroupId, gId),
     });
-    
+
     for (const child of childGroups) {
       await deleteGroups(child.id);
     }
-    
+
     // 하위 그룹 삭제 후 현재 그룹 삭제
     await db.delete(questionGroups).where(eq(questionGroups.id, gId));
   };
@@ -490,9 +490,42 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
   // 그룹 ID 매핑 (클라이언트 ID -> DB ID)
   const groupIdMap = new Map<string, string>();
 
-  // 질문 그룹 저장
+  // 질문 그룹 저장 (상위 그룹부터 하위 그룹 순으로 정렬하여 저장)
   if (surveyData.groups && surveyData.groups.length > 0) {
-    for (const group of surveyData.groups) {
+    // 그룹을 상위 그룹부터 하위 그룹 순으로 정렬
+    // 1. parentGroupId가 null인 그룹들 (최상위 그룹)을 order 순으로 정렬
+    // 2. 그 다음 각 상위 그룹의 하위 그룹들을 order 순으로 정렬
+    const sortedGroups: typeof surveyData.groups = [];
+    const processedGroupIds = new Set<string>();
+
+    // 최상위 그룹들 (parentGroupId가 null)을 order 순으로 정렬하여 추가
+    const topLevelGroups = surveyData.groups
+      .filter((g) => !g.parentGroupId)
+      .sort((a, b) => a.order - b.order);
+    sortedGroups.push(...topLevelGroups);
+    topLevelGroups.forEach((g) => processedGroupIds.add(g.id));
+
+    // 하위 그룹들을 재귀적으로 추가
+    const addSubGroups = (parentId: string) => {
+      const subGroups = surveyData.groups
+        .filter((g) => g.parentGroupId === parentId && !processedGroupIds.has(g.id))
+        .sort((a, b) => a.order - b.order);
+
+      subGroups.forEach((g) => {
+        sortedGroups.push(g);
+        processedGroupIds.add(g.id);
+        // 재귀적으로 하위 그룹 추가
+        addSubGroups(g.id);
+      });
+    };
+
+    // 각 최상위 그룹의 하위 그룹들을 추가
+    topLevelGroups.forEach((group) => {
+      addSubGroups(group.id);
+    });
+
+    // 정렬된 순서대로 그룹 저장
+    for (const group of sortedGroups) {
       const [newGroup] = await db
         .insert(questionGroups)
         .values({

@@ -98,11 +98,12 @@ export function TablePreview({
 
       case "image":
         return cell.imageUrl ? (
-          <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-col items-center gap-2 w-full h-full">
             <img
               src={getProxiedImageUrl(cell.imageUrl)}
               alt="셀 이미지"
-              className="max-w-full max-h-32 object-contain rounded"
+              className="w-full h-auto max-h-full object-contain rounded"
+              style={{ maxWidth: "100%", maxHeight: "100%" }}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = "none";

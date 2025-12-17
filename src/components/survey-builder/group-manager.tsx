@@ -209,7 +209,7 @@ function SortableGroupItem({
 }
 
 export function GroupManager({ className }: GroupManagerProps) {
-  const { currentSurvey, addGroup, updateGroup, deleteGroup, reorderGroups } =
+  const { currentSurvey, addGroup, updateGroup, deleteGroup, reorderGroups, setSurvey } =
     useSurveyBuilderStore();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -247,16 +247,19 @@ export function GroupManager({ className }: GroupManagerProps) {
 
   const handleCreateGroup = async () => {
     if (groupName.trim()) {
+      let createdGroupId: string | undefined;
+
       // DB에 그룹 저장
       if (currentSurvey.id && isUUID(currentSurvey.id)) {
         try {
           const { createQuestionGroup } = await import("@/actions/survey-actions");
-          await createQuestionGroup({
+          const createdGroup = await createQuestionGroup({
             surveyId: currentSurvey.id,
             name: groupName.trim(),
             description: groupDescription.trim() || undefined,
             parentGroupId: parentGroupIdForNew,
           });
+          createdGroupId = createdGroup.id;
         } catch (error) {
           console.error("그룹 생성 실패:", error);
           alert("그룹 생성에 실패했습니다. 다시 시도해주세요.");
@@ -265,7 +268,42 @@ export function GroupManager({ className }: GroupManagerProps) {
       }
 
       // 로컬 스토어 업데이트
-      addGroup(groupName.trim(), groupDescription.trim() || undefined, parentGroupIdForNew);
+      if (createdGroupId && isUUID(createdGroupId)) {
+        // DB에서 생성된 그룹의 UUID를 사용하여 직접 추가
+        const groups = currentSurvey.groups || [];
+        const siblingGroups = groups.filter((g) => g.parentGroupId === parentGroupIdForNew);
+        const maxOrder =
+          siblingGroups.length > 0 ? Math.max(...siblingGroups.map((g) => g.order)) : -1;
+
+        const newGroup: QuestionGroup = {
+          id: createdGroupId,
+          surveyId: currentSurvey.id!,
+          name: groupName.trim(),
+          description: groupDescription.trim() || null,
+          order: maxOrder + 1,
+          parentGroupId: parentGroupIdForNew || null,
+          color: null,
+          collapsed: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        // 스토어에 직접 추가 (updateGroup을 사용하여 그룹 추가)
+        // updateGroup은 기존 그룹을 업데이트하므로, 직접 스토어 상태 업데이트
+        const { currentSurvey: current } = useSurveyBuilderStore.getState();
+        useSurveyBuilderStore.setState({
+          currentSurvey: {
+            ...current,
+            groups: [...(current.groups || []), newGroup],
+            updatedAt: new Date(),
+          },
+          isDirty: true,
+        });
+      } else {
+        // UUID가 없으면 임시 그룹으로 추가
+        addGroup(groupName.trim(), groupDescription.trim() || undefined, parentGroupIdForNew);
+      }
+
       setGroupName("");
       setGroupDescription("");
       setParentGroupIdForNew(undefined);
@@ -327,6 +365,12 @@ export function GroupManager({ className }: GroupManagerProps) {
 
       // 상위 그룹이 변경된 경우
       if (oldParentGroupId !== newParentGroupId) {
+        // 순환 참조 체크: newParentGroupId가 editingGroup의 하위 그룹이 될 수 있는지 확인
+        if (newParentGroupId && !canBeParentOf(newParentGroupId, editingGroup.id)) {
+          alert("순환 참조 방지: 선택한 그룹을 상위 그룹으로 설정할 수 없습니다.");
+          return;
+        }
+
         // 새로운 상위 그룹의 하위 그룹들 중 마지막 순서 계산
         let newOrder = 0;
         if (newParentGroupId) {
@@ -350,8 +394,13 @@ export function GroupManager({ className }: GroupManagerProps) {
           order: newOrder,
         });
 
-        // DB에 저장
-        if (currentSurvey.id && isUUID(currentSurvey.id)) {
+        // DB에 저장 (그룹 ID가 UUID인 경우에만)
+        if (
+          currentSurvey.id &&
+          isUUID(currentSurvey.id) &&
+          isUUID(editingGroup.id) &&
+          (!newParentGroupId || isUUID(newParentGroupId))
+        ) {
           try {
             const { updateQuestionGroup } = await import("@/actions/survey-actions");
             await updateQuestionGroup(editingGroup.id, {
@@ -376,8 +425,8 @@ export function GroupManager({ className }: GroupManagerProps) {
           description: groupDescription.trim() || undefined,
         });
 
-        // DB에 저장
-        if (currentSurvey.id && isUUID(currentSurvey.id)) {
+        // DB에 저장 (그룹 ID가 UUID인 경우에만)
+        if (currentSurvey.id && isUUID(currentSurvey.id) && isUUID(editingGroup.id)) {
           try {
             const { updateQuestionGroup } = await import("@/actions/survey-actions");
             await updateQuestionGroup(editingGroup.id, {
@@ -438,29 +487,48 @@ export function GroupManager({ className }: GroupManagerProps) {
       const draggedGroup = groups.find((g) => g.id === event.active.id);
       const targetGroup = groups.find((g) => g.id === overIdValue);
 
-      // 하위 그룹이 다른 하위 그룹의 하위로 들어갈 수 없음
-      if (draggedGroup?.parentGroupId && targetGroup?.parentGroupId) {
+      if (!draggedGroup || !targetGroup) {
         setIsNestingMode(false);
         return;
       }
 
-      const targetElement = document.querySelector(`[data-group-id="${overIdValue}"]`);
-      const activeElement = document.querySelector(`[data-group-id="${event.active.id}"]`);
+      // 대분류는 대분류끼리만 이동 가능
+      if (!draggedGroup.parentGroupId && !targetGroup.parentGroupId) {
+        // 대분류끼리는 하위 그룹으로 만들 수 있음 (대분류를 소분류로 만들기)
+        const targetElement = document.querySelector(`[data-group-id="${overIdValue}"]`);
+        const activeElement = document.querySelector(`[data-group-id="${event.active.id}"]`);
 
-      if (targetElement && activeElement) {
-        const targetRect = targetElement.getBoundingClientRect();
-        const activeRect = activeElement.getBoundingClientRect();
+        if (targetElement && activeElement) {
+          const targetRect = targetElement.getBoundingClientRect();
+          const activeRect = activeElement.getBoundingClientRect();
 
-        // 드래그된 아이템의 중심 X 좌표
-        const activeCenterX = activeRect.left + activeRect.width / 2;
-        // 타겟 그룹의 중심 X 좌표 (50% 기준점)
-        const targetCenterX = targetRect.left + targetRect.width / 1.5;
+          // 드래그된 아이템의 중심 X 좌표
+          const activeCenterX = activeRect.left + activeRect.width / 2;
+          // 타겟 그룹의 중심 X 좌표 (50% 기준점)
+          const targetCenterX = targetRect.left + targetRect.width / 1.5;
 
-        // 드래그된 아이템의 중심이 타겟 그룹의 오른쪽 50% 영역에 있으면 하위 그룹으로
-        setIsNestingMode(activeCenterX > targetCenterX);
-      } else {
-        setIsNestingMode(false);
+          // 드래그된 아이템의 중심이 타겟 그룹의 오른쪽 50% 영역에 있으면 하위 그룹으로
+          setIsNestingMode(activeCenterX > targetCenterX);
+        } else {
+          setIsNestingMode(false);
+        }
+        return;
       }
+
+      // 소분류는 같은 대분류 내의 소분류끼리만 이동 가능
+      if (draggedGroup.parentGroupId && targetGroup.parentGroupId) {
+        // 같은 대분류 내의 소분류인지 확인
+        if (draggedGroup.parentGroupId === targetGroup.parentGroupId) {
+          setIsNestingMode(false);
+          return;
+        }
+        // 다른 대분류의 소분류로는 이동 불가
+        setIsNestingMode(false);
+        return;
+      }
+
+      // 대분류와 소분류 간 이동 불가
+      setIsNestingMode(false);
     } else {
       setIsNestingMode(false);
     }
@@ -486,59 +554,49 @@ export function GroupManager({ className }: GroupManagerProps) {
     // 자기 자신을 하위 그룹으로 만들 수 없음
     if (draggedGroup.id === targetGroup.id) return;
 
-    // 순환 참조 방지: 타겟 그룹이 드래그된 그룹의 하위 그룹이면 안됨
-    const isTargetDescendant = (targetId: string, parentId: string): boolean => {
-      const target = groups.find((g) => g.id === targetId);
-      if (!target || !target.parentGroupId) return false;
-      if (target.parentGroupId === parentId) return true;
-      return isTargetDescendant(target.parentGroupId, parentId);
-    };
-
-    if (isTargetDescendant(targetGroup.id, draggedGroup.id)) {
-      return; // 순환 참조 방지
-    }
-
-    // 하위 그룹을 최상위로 올리는 경우
-    if (draggedGroup.parentGroupId && !targetGroup.parentGroupId) {
-      // 하위 그룹을 최상위로 이동
-      const topLevelGroups = groups
-        .filter((g) => !g.parentGroupId && g.id !== draggedGroup.id)
-        .sort((a, b) => a.order - b.order);
-      const targetIndex = topLevelGroups.findIndex((g) => g.id === targetGroup.id);
-      const newOrder = [...topLevelGroups];
-      newOrder.splice(targetIndex, 0, draggedGroup);
-
-      const newGroupIds = newOrder.map((g) => g.id);
-      reorderGroups(newGroupIds);
-
-      updateGroup(draggedGroup.id, {
-        parentGroupId: undefined,
-      });
-
-      // DB에 저장
-      if (currentSurvey.id && isUUID(currentSurvey.id)) {
-        try {
-          const { updateQuestionGroup, reorderGroups: reorderGroupsAction } = await import(
-            "@/actions/survey-actions"
-          );
-          await updateQuestionGroup(draggedGroup.id, {
-            parentGroupId: null,
-          });
-          await reorderGroupsAction(currentSurvey.id, newGroupIds);
-        } catch (error) {
-          console.error("그룹 최상위 이동 저장 실패:", error);
+    // 대분류는 대분류끼리만 이동 가능
+    if (!draggedGroup.parentGroupId && !targetGroup.parentGroupId) {
+      if (shouldNest) {
+        // 순환 참조 체크: targetGroup이 draggedGroup의 하위 그룹이 될 수 있는지 확인
+        if (!canBeParentOf(targetGroup.id, draggedGroup.id)) {
+          console.warn("순환 참조 방지: 그룹을 하위 그룹으로 만들 수 없습니다.");
+          return;
         }
-      }
-    } else {
-      // 같은 레벨의 그룹인 경우 위치에 따라 결정
-      const isSameTopLevel = !draggedGroup.parentGroupId && !targetGroup.parentGroupId;
-      const isSameSubLevel =
-        draggedGroup.parentGroupId &&
-        targetGroup.parentGroupId &&
-        draggedGroup.parentGroupId === targetGroup.parentGroupId;
 
-      if (isSameTopLevel && !shouldNest) {
-        // 같은 최상위 레벨에서 왼쪽 50%에 드롭: 순서만 변경 (피드백 없음)
+        // 대분류를 소분류로 만들기 (오른쪽 50%에 드롭)
+        const targetSubGroups = groups
+          .filter((g) => g.parentGroupId === targetGroup.id && g.id !== draggedGroup.id)
+          .sort((a, b) => a.order - b.order);
+        const maxOrder =
+          targetSubGroups.length > 0 ? Math.max(...targetSubGroups.map((g) => g.order)) : -1;
+
+        updateGroup(draggedGroup.id, {
+          parentGroupId: targetGroup.id,
+          order: maxOrder + 1,
+        });
+
+        // DB에 저장 (그룹 ID가 UUID인 경우에만)
+        if (
+          currentSurvey.id &&
+          isUUID(currentSurvey.id) &&
+          isUUID(draggedGroup.id) &&
+          isUUID(targetGroup.id)
+        ) {
+          try {
+            const { updateQuestionGroup } = await import("@/actions/survey-actions");
+            await updateQuestionGroup(draggedGroup.id, {
+              parentGroupId: targetGroup.id,
+              order: maxOrder + 1,
+            });
+          } catch (error) {
+            console.error("그룹 하위 그룹 변경 저장 실패:", error);
+          }
+        }
+
+        // 하위 그룹으로 변경되면 해당 그룹을 펼침
+        setExpandedGroups((prev) => new Set(prev).add(targetGroup.id));
+      } else {
+        // 대분류끼리 순서만 변경 (왼쪽 50%에 드롭)
         const sameLevelGroups = groups
           .filter((g) => !g.parentGroupId)
           .sort((a, b) => a.order - b.order);
@@ -551,17 +609,30 @@ export function GroupManager({ className }: GroupManagerProps) {
           const newGroupIds = newOrder.map((g) => g.id);
           reorderGroups(newGroupIds);
 
-          // DB에 저장
+          // DB에 저장 (UUID인 그룹 ID만 필터링)
           if (currentSurvey.id && isUUID(currentSurvey.id)) {
             try {
-              await reorderGroupsAction(currentSurvey.id, newGroupIds);
+              const { reorderGroups: reorderGroupsAction } = await import(
+                "@/actions/survey-actions"
+              );
+              const uuidGroupIds = newGroupIds.filter((id) => isUUID(id));
+              if (uuidGroupIds.length > 0) {
+                await reorderGroupsAction(currentSurvey.id, uuidGroupIds);
+              }
             } catch (error) {
               console.error("그룹 순서 저장 실패:", error);
             }
           }
         }
-      } else if (isSameSubLevel && !shouldNest) {
-        // 같은 하위 그룹 레벨에서 왼쪽 50%에 드롭: 순서만 변경 (피드백 없음)
+      }
+      return;
+    }
+
+    // 소분류는 같은 대분류 내의 소분류끼리만 이동 가능
+    if (draggedGroup.parentGroupId && targetGroup.parentGroupId) {
+      // 같은 대분류 내의 소분류인지 확인
+      if (draggedGroup.parentGroupId === targetGroup.parentGroupId) {
+        // 같은 대분류 내의 소분류끼리 순서만 변경
         const sameLevelGroups = groups
           .filter((g) => g.parentGroupId === draggedGroup.parentGroupId)
           .sort((a, b) => a.order - b.order);
@@ -579,58 +650,30 @@ export function GroupManager({ className }: GroupManagerProps) {
             });
           });
 
-          // DB에 저장
+          // DB에 저장 (그룹 ID가 UUID인 경우에만)
           if (currentSurvey.id && isUUID(currentSurvey.id)) {
             try {
               const { updateQuestionGroup } = await import("@/actions/survey-actions");
               await Promise.all(
-                newOrder.map((group, index) =>
-                  updateQuestionGroup(group.id, {
-                    order: index,
-                  }),
-                ),
+                newOrder
+                  .filter((group) => isUUID(group.id))
+                  .map((group, index) =>
+                    updateQuestionGroup(group.id, {
+                      order: index,
+                    }),
+                  ),
               );
             } catch (error) {
               console.error("하위 그룹 순서 저장 실패:", error);
             }
           }
         }
-      } else {
-        // 하위 그룹으로 변경 (오른쪽 50%에 드롭 또는 다른 레벨)
-        // 하위 그룹이 다른 하위 그룹의 하위로 들어갈 수 없음
-        if (draggedGroup.parentGroupId && targetGroup.parentGroupId) {
-          // 하위 그룹끼리는 순서만 변경 가능하므로 아무것도 하지 않음
-          return;
-        }
-
-        const targetSubGroups = groups
-          .filter((g) => g.parentGroupId === targetGroup.id && g.id !== draggedGroup.id)
-          .sort((a, b) => a.order - b.order);
-        const maxOrder =
-          targetSubGroups.length > 0 ? Math.max(...targetSubGroups.map((g) => g.order)) : -1;
-
-        updateGroup(draggedGroup.id, {
-          parentGroupId: targetGroup.id,
-          order: maxOrder + 1,
-        });
-
-        // DB에 저장
-        if (currentSurvey.id && isUUID(currentSurvey.id)) {
-          try {
-            const { updateQuestionGroup } = await import("@/actions/survey-actions");
-            await updateQuestionGroup(draggedGroup.id, {
-              parentGroupId: targetGroup.id,
-              order: maxOrder + 1,
-            });
-          } catch (error) {
-            console.error("그룹 하위 그룹 변경 저장 실패:", error);
-          }
-        }
-
-        // 하위 그룹으로 변경되면 해당 그룹을 펼침
-        setExpandedGroups((prev) => new Set(prev).add(targetGroup.id));
       }
+      // 다른 대분류의 소분류로는 이동 불가 (아무것도 하지 않음)
+      return;
     }
+
+    // 대분류와 소분류 간 이동 불가 (아무것도 하지 않음)
   };
 
   return (
