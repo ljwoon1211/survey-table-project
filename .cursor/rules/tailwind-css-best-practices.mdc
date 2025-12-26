@@ -1,6 +1,6 @@
 ---
 description: Best practices for using Tailwind CSS in Next.js 15 and React 19 applications, including responsive design, custom configurations, and performance optimization.
-globs: app/**/*
+globs: src/app/**/*
 ---
 
 - Use Tailwind's utility-first approach for consistent styling.

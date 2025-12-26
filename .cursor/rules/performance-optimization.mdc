@@ -1,6 +1,6 @@
 ---
 description: Performance optimization strategies for Next.js 15 and React 19 applications, including bundle optimization, caching, and rendering strategies.
-globs: app/**/*
+globs: src/app/**/*
 ---
 
 - Use React Server Components (RSC) by default for better server-side rendering performance.

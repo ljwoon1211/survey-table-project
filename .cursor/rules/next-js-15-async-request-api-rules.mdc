@@ -1,6 +1,6 @@
 ---
 description: Dictates how asynchronous requests should be handled within Next.js 15, specifically concerning runtime APIs.
-globs: app/**/*
+globs: src/app/**/*
 ---
 
 - Always use async versions of runtime APIs:

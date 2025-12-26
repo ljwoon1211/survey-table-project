@@ -1,6 +1,6 @@
 ---
 description: Testing guidelines for Next.js 15 and React 19 applications, including unit testing, integration testing, and end-to-end testing strategies.
-globs: app/**/*
+globs: src/app/**/*
 ---
 
 - Use Jest for unit testing React components and utility functions.

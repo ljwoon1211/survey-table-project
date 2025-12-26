@@ -10,6 +10,7 @@ import { Question, QuestionOption, SelectLevel } from "@/types/survey";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
 import { extractImageUrlsFromQuestion } from "@/lib/image-extractor";
 import { deleteImagesFromR2 } from "@/lib/image-utils";
+import { updateQuestion as updateQuestionAction } from "@/actions/survey-actions";
 import { UserDefinedMultiSelectPreview } from "./user-defined-multi-select";
 import { DynamicTableEditor } from "./dynamic-table-editor";
 import { TablePreview } from "./table-preview";
@@ -113,27 +114,37 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         ...formData,
       } as Question;
       const usedImages = extractImageUrlsFromQuestion(updatedQuestion);
-      
+
       // 저장된 질문의 이미지와 비교하여 사용되지 않은 이미지 삭제
       if (question) {
         const previousImages = extractImageUrlsFromQuestion(question);
-        const unusedImages = previousImages.filter(
-          (url) => !usedImages.includes(url)
-        );
-        
+        const unusedImages = previousImages.filter((url) => !usedImages.includes(url));
+
         if (unusedImages.length > 0) {
           await deleteImagesFromR2(unusedImages);
         }
       }
-      
+
+      // 로컬 스토어 업데이트
       updateQuestion(questionId, formData);
+
+      // 서버에 개별 질문 업데이트 API 호출
+      if (currentSurvey.id && questionId) {
+        try {
+          await updateQuestionAction(questionId, formData);
+        } catch (error) {
+          console.error("질문 업데이트 실패:", error);
+          // 업데이트 실패해도 모달은 닫음 (로컬 상태는 이미 업데이트됨)
+        }
+      }
+
       onClose();
     } catch (error) {
       console.error("저장 중 오류가 발생했습니다:", error);
     } finally {
       setIsSaving(false);
     }
-  }, [questionId, validateForm, updateQuestion, formData, onClose, question]);
+  }, [questionId, validateForm, updateQuestion, formData, onClose, question, currentSurvey.id]);
 
   // 키보드 이벤트 핸들러
   const handleKeyDown = useCallback(
@@ -353,7 +364,15 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        // 배경 클릭으로 닫히는 것 방지, X 버튼이나 ESC만 닫기 가능
+        if (!open && !isSaving) {
+          onClose();
+        }
+      }}
+    >
       <DialogContent className={`${modalSize} max-h-[95vh] flex flex-col p-0`}>
         {/* 고정 헤더 */}
         <DialogHeader className="flex-shrink-0 px-6 py-4 border-b border-gray-200">

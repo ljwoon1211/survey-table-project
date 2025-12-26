@@ -1,6 +1,7 @@
 ---
 description: Error handling patterns for Next.js 15 and React 19 applications, including error boundaries, API error handling, and graceful degradation strategies.
-globs: app/**/*
+globs: src/app/**/*
+alwaysApply: false
 ---
 
 - Use React Error Boundaries to catch rendering errors in component trees.

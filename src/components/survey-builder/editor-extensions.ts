@@ -1,5 +1,5 @@
 import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
+import ImageResize from "tiptap-extension-resize-image";
 import Link from "@tiptap/extension-link";
 import { Table } from "@tiptap/extension-table";
 import { TableRow } from "@tiptap/extension-table-row";
@@ -49,21 +49,61 @@ export function createEditorExtensions() {
     },
   });
 
-  // 이미지 프록시 URL을 사용하는 Image 확장
-  const ImageWithProxy = Image.extend({
+  // 이미지 프록시 URL을 사용하는 ImageResize 확장
+  // tiptap-extension-resize-image는 드래그 리사이즈와 정렬 기능을 제공
+  const ImageResizeWithProxy = ImageResize.extend({
     renderHTML({ HTMLAttributes }) {
       // src 속성이 있으면 프록시 URL로 변환
       if (HTMLAttributes.src) {
         HTMLAttributes.src = getProxiedImageUrl(HTMLAttributes.src);
       }
+
+      // 인라인 스타일에서 width가 있으면 max-width도 함께 설정
+      if (HTMLAttributes.style) {
+        const styleStr = HTMLAttributes.style as string;
+        if (styleStr.includes('width') && !styleStr.includes('max-width')) {
+          HTMLAttributes.style = `${styleStr}; max-width: 100%;`;
+        }
+      }
+
       return ["img", HTMLAttributes];
+    },
+    addAttributes() {
+      return {
+        ...this.parent?.(),
+        style: {
+          default: null,
+          parseHTML: (element: HTMLElement) => {
+            const style = element.getAttribute("style") || "";
+            // width가 있으면 max-width도 추가
+            if (style.includes("width") && !style.includes("max-width")) {
+              return `${style}; max-width: 100%;`;
+            }
+            return style || null;
+          },
+          renderHTML: (attributes: { style?: string | null }) => {
+            if (!attributes.style) {
+              return {};
+            }
+            // width가 있으면 max-width도 추가
+            if (attributes.style.includes("width") && !attributes.style.includes("max-width")) {
+              return {
+                style: `${attributes.style}; max-width: 100%;`,
+              };
+            }
+            return {
+              style: attributes.style,
+            };
+          },
+        },
+      };
     },
   });
 
   return [
     // StarterKit을 매번 새로 생성하여 플러그인 충돌 방지
     StarterKit.configure({}),
-    ImageWithProxy.configure({
+    ImageResizeWithProxy.configure({
       inline: true,
       allowBase64: true,
     }),

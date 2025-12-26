@@ -24,6 +24,9 @@ import {
   Upload,
   Loader2,
   AlertCircle,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
 } from "lucide-react";
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { createEditorExtensions } from "./editor-extensions";
@@ -144,7 +147,7 @@ export function NoticeEditor({
     editorProps: {
       attributes: {
         class: compact
-          ? "prose prose-sm max-w-none focus:outline-none min-h-[80px] p-3 border border-gray-200 rounded-lg " +
+          ? "prose prose-sm max-w-none focus:outline-none min-h-[80px] p-3 border border-gray-200 rounded-lg overflow-x-auto " +
             "[&_table]:border-collapse [&_table]:table-fixed [&_table]:w-full [&_table]:my-2 [&_table]:overflow-hidden [&_table]:border-2 [&_table]:border-gray-300 " +
             "[&_table_td]:min-w-[1em] [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-2 [&_table_td]:py-1 [&_table_td]:align-top [&_table_td]:box-border [&_table_td]:relative [&_table_td]:cursor-pointer " +
             "[&_table_th]:min-w-[1em] [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-2 [&_table_th]:py-1 [&_table_th]:align-top [&_table_th]:box-border [&_table_th]:relative [&_table_th]:cursor-pointer " +
@@ -152,8 +155,9 @@ export function NoticeEditor({
             "[&_table_.selectedCell]:bg-blue-100 [&_table_.selectedCell]:border-2 [&_table_.selectedCell]:border-blue-500 " +
             "[&_table_.selected]:bg-blue-50 " +
             "[&_table:hover]:border-blue-500 " +
-            "[&_table_p]:m-0"
-          : "prose prose-sm max-w-none focus:outline-none min-h-[300px] p-4 border border-gray-200 rounded-lg " +
+            "[&_table_p]:m-0 " +
+            "[&_img]:inline-block [&_img]:!m-0 [&_img]:align-top"
+          : "prose prose-sm max-w-none focus:outline-none min-h-[300px] p-4 border border-gray-200 rounded-lg overflow-x-auto " +
             "[&_table]:border-collapse [&_table]:table-fixed [&_table]:w-full [&_table]:my-4 [&_table]:overflow-hidden [&_table]:border-2 [&_table]:border-gray-300 " +
             "[&_table_td]:min-w-[1em] [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2 [&_table_td]:align-top [&_table_td]:box-border [&_table_td]:relative [&_table_td]:cursor-pointer " +
             "[&_table_th]:min-w-[1em] [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-3 [&_table_th]:py-2 [&_table_th]:align-top [&_table_th]:box-border [&_table_th]:relative [&_table_th]:cursor-pointer " +
@@ -161,7 +165,8 @@ export function NoticeEditor({
             "[&_table_.selectedCell]:bg-blue-100 [&_table_.selectedCell]:border-2 [&_table_.selectedCell]:border-blue-500 " +
             "[&_table_.selected]:bg-blue-50 " +
             "[&_table:hover]:border-blue-500 " +
-            "[&_table_p]:m-0",
+            "[&_table_p]:m-0 " +
+            "[&_img]:inline-block [&_img]:!m-0 [&_img]:align-top",
       },
       handleDOMEvents: {
         mousedown: (view, event) => {
@@ -510,6 +515,152 @@ export function NoticeEditor({
           </Button>
         </div>
 
+        {/* 이미지 편집 버튼 - 이미지가 선택되었을 때만 표시 */}
+        {ed.isActive("image") && (
+          <>
+            <div className="w-px h-6 bg-gray-300" />
+
+            {/* 이미지 정렬 버튼 */}
+            <div className="flex gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const container = document.querySelector(".ProseMirror img[src]")?.parentElement;
+                  if (container) {
+                    container.setAttribute(
+                      "style",
+                      `${container.style.cssText.replace(
+                        /margin:[^;]+;?/g,
+                        "",
+                      )} margin: 0 auto 0 0;`,
+                    );
+                  }
+                }}
+                title="왼쪽 정렬"
+              >
+                <AlignLeft className="w-4 h-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const container = document.querySelector(".ProseMirror img[src]")?.parentElement;
+                  if (container) {
+                    container.setAttribute(
+                      "style",
+                      `${container.style.cssText.replace(/margin:[^;]+;?/g, "")} margin: 0 auto;`,
+                    );
+                  }
+                }}
+                title="가운데 정렬"
+              >
+                <AlignCenter className="w-4 h-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const container = document.querySelector(".ProseMirror img[src]")?.parentElement;
+                  if (container) {
+                    container.setAttribute(
+                      "style",
+                      `${container.style.cssText.replace(
+                        /margin:[^;]+;?/g,
+                        "",
+                      )} margin: 0 0 0 auto;`,
+                    );
+                  }
+                }}
+                title="오른쪽 정렬"
+              >
+                <AlignRight className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="w-px h-6 bg-gray-300" />
+
+            {/* 이미지 크기 버튼 */}
+            <div className="flex gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const container = document.querySelector(".ProseMirror img[src]")?.parentElement;
+                  if (container) {
+                    container.setAttribute(
+                      "style",
+                      container.style.cssText.replace(/width:\s*[^;]+;?/g, "") + " width: 25%;",
+                    );
+                  }
+                }}
+                title="25% 크기"
+                className="text-xs px-2"
+              >
+                25%
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const container = document.querySelector(".ProseMirror img[src]")?.parentElement;
+                  if (container) {
+                    container.setAttribute(
+                      "style",
+                      container.style.cssText.replace(/width:\s*[^;]+;?/g, "") + " width: 50%;",
+                    );
+                  }
+                }}
+                title="50% 크기"
+                className="text-xs px-2"
+              >
+                50%
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const container = document.querySelector(".ProseMirror img[src]")?.parentElement;
+                  if (container) {
+                    container.setAttribute(
+                      "style",
+                      container.style.cssText.replace(/width:\s*[^;]+;?/g, "") + " width: 75%;",
+                    );
+                  }
+                }}
+                title="75% 크기"
+                className="text-xs px-2"
+              >
+                75%
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const container = document.querySelector(".ProseMirror img[src]")?.parentElement;
+                  if (container) {
+                    container.setAttribute(
+                      "style",
+                      container.style.cssText.replace(/width:\s*[^;]+;?/g, "") + " width: 100%;",
+                    );
+                  }
+                }}
+                title="100% 크기"
+                className="text-xs px-2"
+              >
+                100%
+              </Button>
+            </div>
+          </>
+        )}
+
         {/* 표 편집 버튼 - 표가 선택되었을 때만 표시 */}
         {ed.can().deleteTable() && (
           <>
@@ -817,6 +968,8 @@ export function NoticeEditor({
             있습니다.
           </p>
           <p className="mt-1">• 이미지: 이미지 버튼 클릭 후 파일 업로드 (드래그 앤 드롭 지원)</p>
+          <p>• 이미지 크기 조절: 이미지 클릭 후 모서리 점을 드래그하거나 크기 버튼 사용</p>
+          <p>• 이미지 정렬: 이미지 클릭 후 정렬 버튼(왼쪽/가운데/오른쪽) 또는 상단 컨트롤러 사용</p>
           <p>• 링크: 텍스트 선택 후 링크 버튼 클릭</p>
           <p>• 표: 표 버튼 클릭으로 3x3 표 자동 생성</p>
           <p>• 표 편집: 표 내부 클릭 시 행/열 추가/삭제, 셀 병합/분할 버튼 표시</p>

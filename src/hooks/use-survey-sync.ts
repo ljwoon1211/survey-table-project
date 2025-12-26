@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useTransition } from 'react';
+import { useCallback, useTransition, useState } from 'react';
 import { useSurveyBuilderStore, useSurveyListStore, useSurveyResponseStore } from '@/stores';
 import {
   getSurveyWithDetails,
@@ -25,23 +25,40 @@ import type { Survey } from '@/types/survey';
  */
 export function useSurveySync() {
   const [isPending, startTransition] = useTransition();
-  const { currentSurvey, resetSurvey } = useSurveyBuilderStore();
+  const { currentSurvey, resetSurvey, markClean } = useSurveyBuilderStore();
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<Error | null>(null);
 
-  // 현재 설문을 DB에 저장
+  // 현재 설문을 DB에 저장 (중복 저장 방지 포함)
   const saveSurvey = useCallback(async () => {
     if (!currentSurvey.id) {
       console.error('설문 ID가 없습니다.');
       return null;
     }
 
+    // 이미 저장 중이면 중복 저장 방지
+    if (isSaving) {
+      console.log('이미 저장 중입니다. 중복 저장을 방지합니다.');
+      return null;
+    }
+
+    setIsSaving(true);
+    setSaveError(null);
+
     try {
       const result = await saveSurveyWithDetails(currentSurvey);
+      // 저장 성공 시 dirty 플래그 초기화
+      markClean();
       return result;
     } catch (error) {
-      console.error('설문 저장 실패:', error);
-      throw error;
+      const err = error instanceof Error ? error : new Error('설문 저장 실패');
+      console.error('설문 저장 실패:', err);
+      setSaveError(err);
+      throw err;
+    } finally {
+      setIsSaving(false);
     }
-  }, [currentSurvey]);
+  }, [currentSurvey, isSaving, markClean]);
 
   // DB에서 설문 불러오기
   const loadSurvey = useCallback(async (surveyId: string) => {
@@ -87,6 +104,8 @@ export function useSurveySync() {
 
   return {
     isPending,
+    isSaving,
+    saveError,
     saveSurvey,
     loadSurvey,
     createNewSurvey,

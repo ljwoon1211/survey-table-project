@@ -1,6 +1,6 @@
 ---
 description: Guidelines for leveraging React 19 specific features in Next.js 15 applications, including new hooks, compiler optimizations, and improved server components.
-globs: app/**/*
+globs: src/app/**/*
 ---
 
 - Use `use` hook for consuming Promises and Context directly in components.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -30,12 +30,8 @@ import {
 } from "lucide-react";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
 import { BranchRuleEditor } from "./branch-rule-editor";
-import {
-  optimizeImage,
-  validateImageFile,
-  getProxiedImageUrl,
-  deleteImagesFromR2,
-} from "@/lib/image-utils";
+import { optimizeImage, validateImageFile, getProxiedImageUrl } from "@/lib/image-utils";
+import { updateQuestion as updateQuestionAction } from "@/actions/survey-actions";
 
 interface CellContentModalProps {
   isOpen: boolean;
@@ -53,6 +49,7 @@ export function CellContentModal({
   currentQuestionId = "",
 }: CellContentModalProps) {
   const { currentSurvey } = useSurveyBuilderStore();
+  const [isSaving, setIsSaving] = useState(false);
   const [contentType, setContentType] = useState<
     "text" | "image" | "video" | "checkbox" | "radio" | "select" | "input"
   >(cell.type || "text");
@@ -66,10 +63,14 @@ export function CellContentModal({
     cell.imageUrl && contentType === "image" ? cell.imageUrl : null,
   );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imageError, setImageError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadAbortController = useRef<AbortController | null>(null);
-  // 업로드된 이미지 URL 추적 (원본 셀의 이미지와 새로 업로드한 이미지 구분)
-  const uploadedImageUrlRef = useRef<string | null>(null);
+
+  // imageUrl이 바뀔 때 에러 상태 리셋
+  useEffect(() => {
+    setImageError(false);
+  }, [imageUrl]);
   const [checkboxOptions, setCheckboxOptions] = useState<CheckboxOption[]>(
     cell.checkboxOptions || [],
   );
@@ -176,66 +177,62 @@ export function CellContentModal({
     }
   };
 
-  const handleSave = () => {
-    // 이전 이미지와 다른 경우 이전 이미지 삭제
-    const previousImageUrl = cell.imageUrl;
-    const newImageUrl = contentType === "image" ? imageUrl : undefined;
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const updatedCell: TableCell = {
+        ...cell,
+        type: contentType,
+        content: contentType === "text" ? textContent : "",
+        imageUrl: contentType === "image" ? imageUrl : undefined,
+        videoUrl: contentType === "video" ? videoUrl : undefined,
+        checkboxOptions: contentType === "checkbox" ? checkboxOptions : undefined,
+        radioOptions: contentType === "radio" ? radioOptions : undefined,
+        radioGroupName: contentType === "radio" ? radioGroupName : undefined,
+        selectOptions: contentType === "select" ? selectOptions : undefined,
+        allowOtherOption: ["checkbox", "radio", "select"].includes(contentType)
+          ? allowOtherOption
+          : undefined,
+        placeholder: contentType === "input" ? inputPlaceholder : undefined,
+        inputMaxLength:
+          contentType === "input" && typeof inputMaxLength === "number"
+            ? inputMaxLength
+            : undefined,
+        // 셀 병합 속성 추가
+        rowspan: isMergeEnabled && typeof rowspan === "number" && rowspan > 1 ? rowspan : undefined,
+        colspan: isMergeEnabled && typeof colspan === "number" && colspan > 1 ? colspan : undefined,
+      };
 
-    // 이전 이미지가 있고 새 이미지가 다르거나 없으면 이전 이미지 삭제
-    if (previousImageUrl && previousImageUrl !== newImageUrl) {
-      deleteImagesFromR2([previousImageUrl]).catch((error) => {
-        console.error("이전 이미지 삭제 실패:", error);
-      });
+      // 로컬 스토어 업데이트 (셀 저장)
+      onSave(updatedCell);
+
+      // 서버에 질문 업데이트 (테이블 셀이 변경되었으므로 질문의 tableRowsData 업데이트)
+      if (currentQuestionId && currentSurvey.id) {
+        const question = currentSurvey.questions.find((q) => q.id === currentQuestionId);
+        if (question && question.tableRowsData) {
+          // tableRowsData에서 해당 셀을 찾아 업데이트
+          const updatedRowsData = question.tableRowsData.map((row) => ({
+            ...row,
+            cells: row.cells.map((c) => (c.id === cell.id ? updatedCell : c)),
+          }));
+
+          await updateQuestionAction(currentQuestionId, {
+            tableRowsData: updatedRowsData,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("셀 저장 실패:", error);
+    } finally {
+      setIsSaving(false);
+      onClose();
     }
-
-    // 업로드했지만 저장되지 않은 이미지 정리
-    if (uploadedImageUrlRef.current && uploadedImageUrlRef.current !== newImageUrl) {
-      deleteImagesFromR2([uploadedImageUrlRef.current]).catch((error) => {
-        console.error("미사용 이미지 삭제 실패:", error);
-      });
-      uploadedImageUrlRef.current = null;
-    }
-
-    const updatedCell: TableCell = {
-      ...cell,
-      type: contentType,
-      content: contentType === "text" ? textContent : "",
-      imageUrl: contentType === "image" ? imageUrl : undefined,
-      videoUrl: contentType === "video" ? videoUrl : undefined,
-      checkboxOptions: contentType === "checkbox" ? checkboxOptions : undefined,
-      radioOptions: contentType === "radio" ? radioOptions : undefined,
-      radioGroupName: contentType === "radio" ? radioGroupName : undefined,
-      selectOptions: contentType === "select" ? selectOptions : undefined,
-      allowOtherOption: ["checkbox", "radio", "select"].includes(contentType)
-        ? allowOtherOption
-        : undefined,
-      placeholder: contentType === "input" ? inputPlaceholder : undefined,
-      inputMaxLength:
-        contentType === "input" && typeof inputMaxLength === "number" ? inputMaxLength : undefined,
-      // 셀 병합 속성 추가
-      rowspan: isMergeEnabled && typeof rowspan === "number" && rowspan > 1 ? rowspan : undefined,
-      colspan: isMergeEnabled && typeof colspan === "number" && colspan > 1 ? colspan : undefined,
-    };
-
-    // 저장된 이미지로 업데이트
-    if (newImageUrl) {
-      uploadedImageUrlRef.current = null; // 저장되었으므로 추적 해제
-    }
-
-    onSave(updatedCell);
   };
 
   const handleCancel = () => {
-    // 업로드했지만 저장하지 않은 이미지 삭제
-    if (uploadedImageUrlRef.current) {
-      deleteImagesFromR2([uploadedImageUrlRef.current]).catch((error) => {
-        console.error("취소 시 이미지 삭제 실패:", error);
-      });
-      uploadedImageUrlRef.current = null;
-    }
-
     // 원래 값으로 되돌리기
     setContentType(cell.type || "text");
+    setTextContent(cell.content || "");
     setImageUrl(cell.imageUrl || "");
     setVideoUrl(cell.videoUrl || "");
     setPreviewUrl(cell.imageUrl && cell.type === "image" ? cell.imageUrl : null);
@@ -365,22 +362,6 @@ export function CellContentModal({
 
       const uploadedImageUrl = await uploadPromise;
 
-      // 이미지를 교체하는 경우 이전 이미지 삭제
-      const previousImageUrl = imageUrl || cell.imageUrl;
-      if (
-        previousImageUrl &&
-        previousImageUrl !== uploadedImageUrl &&
-        previousImageUrl !== cell.imageUrl
-      ) {
-        // 이전에 업로드했지만 저장되지 않은 이미지 삭제
-        deleteImagesFromR2([previousImageUrl]).catch((error) => {
-          console.error("이전 이미지 삭제 실패:", error);
-        });
-      }
-
-      // 업로드된 이미지 URL 추적
-      uploadedImageUrlRef.current = uploadedImageUrl;
-
       // 이미지 URL 설정
       setImageUrl(uploadedImageUrl);
       setPreviewUrl(uploadedImageUrl);
@@ -397,7 +378,7 @@ export function CellContentModal({
       setIsUploading(false);
       uploadAbortController.current = null;
     }
-  }, [selectedFile, imageUrl, cell.imageUrl]);
+  }, [selectedFile]);
 
   // 업로드 취소
   const handleCancelUpload = useCallback(() => {
@@ -420,18 +401,6 @@ export function CellContentModal({
 
   // 이미지 삭제
   const handleRemoveImage = useCallback(() => {
-    const imageToDelete = imageUrl || uploadedImageUrlRef.current;
-
-    // R2에서 이미지 삭제 (원본 셀의 이미지가 아닌 경우만)
-    if (imageToDelete && imageToDelete !== cell.imageUrl) {
-      deleteImagesFromR2([imageToDelete]).catch((error) => {
-        console.error("이미지 삭제 실패:", error);
-      });
-    }
-
-    // 추적 중인 이미지 URL 초기화
-    uploadedImageUrlRef.current = null;
-
     setImageUrl("");
     setPreviewUrl(null);
     setSelectedFile(null);
@@ -439,11 +408,18 @@ export function CellContentModal({
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // cell.imageUrl과 imageUrl은 변경될 수 있지만, 이 함수는 이미지 삭제만 담당하므로 의존성 제외
+  }, []);
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && handleCancel()}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        // 배경 클릭으로 닫히는 것 방지, X 버튼이나 ESC만 닫기 가능
+        if (!open && !isSaving) {
+          handleCancel();
+        }
+      }}
+    >
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>셀 내용 편집</DialogTitle>
@@ -555,7 +531,7 @@ export function CellContentModal({
             )}
 
             {/* 선택된 파일 미리보기 (업로드 전) */}
-            {selectedFile && previewUrl && !isUploading && !imageUrl && (
+            {selectedFile && previewUrl && !isUploading && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
@@ -578,6 +554,7 @@ export function CellContentModal({
                 </div>
                 <div className="border rounded-lg overflow-hidden bg-white">
                   <img
+                    key={previewUrl}
                     src={getProxiedImageUrl(previewUrl || "")}
                     alt="미리보기"
                     className="w-full max-h-48 object-contain"
@@ -605,6 +582,7 @@ export function CellContentModal({
                 {previewUrl && (
                   <div className="border rounded-lg overflow-hidden bg-white">
                     <img
+                      key={previewUrl}
                       src={getProxiedImageUrl(previewUrl)}
                       alt="업로드 중"
                       className="w-full max-h-48 object-contain opacity-50"
@@ -642,22 +620,20 @@ export function CellContentModal({
                   </Button>
                 </div>
                 <div className="border rounded-lg overflow-hidden bg-gray-50">
-                  <img
-                    src={getProxiedImageUrl(imageUrl)}
-                    alt="셀 내용 이미지 미리보기"
-                    className="w-full max-h-48 object-contain"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = "none";
-                      const errorMsg = target.parentElement?.querySelector(".error-message");
-                      if (errorMsg) {
-                        errorMsg.textContent = "이미지를 불러올 수 없습니다.";
-                      }
-                    }}
-                  />
-                  <p className="text-red-500 text-sm hidden error-message p-3 text-center">
-                    이미지를 불러올 수 없습니다.
-                  </p>
+                  <div key={imageUrl}>
+                    {imageError ? (
+                      <div className="p-3 text-center">
+                        <p className="text-red-500 text-sm">이미지를 불러올 수 없습니다.</p>
+                      </div>
+                    ) : (
+                      <img
+                        src={getProxiedImageUrl(imageUrl)}
+                        alt="셀 내용 이미지 미리보기"
+                        className="w-full max-h-48 object-contain"
+                        onError={() => setImageError(true)}
+                      />
+                    )}
+                  </div>
                 </div>
                 <div
                   className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-blue-400 transition-colors cursor-pointer"
@@ -1398,10 +1374,19 @@ export function CellContentModal({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleCancel}>
+          <Button variant="outline" onClick={handleCancel} disabled={isSaving}>
             취소
           </Button>
-          <Button onClick={handleSave}>저장</Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? (
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>저장 중...</span>
+              </div>
+            ) : (
+              "저장"
+            )}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

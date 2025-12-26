@@ -1,6 +1,6 @@
 ---
 description: Accessibility guidelines for Next.js 15 and React 19 applications to ensure inclusive design and compliance with WCAG standards.
-globs: app/**/*
+globs: src/app/**/*
 ---
 
 - Use semantic HTML elements for proper document structure.

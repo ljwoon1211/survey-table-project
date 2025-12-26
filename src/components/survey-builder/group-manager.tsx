@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/select";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
 import { QuestionGroup } from "@/types/survey";
-import { reorderGroups as reorderGroupsAction } from "@/actions/survey-actions";
 import { isUUID } from "@/lib/survey-url";
 import {
   FolderPlus,
@@ -27,12 +26,6 @@ import {
   Plus,
   MoreVertical,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   DndContext,
   closestCenter,
@@ -68,7 +61,6 @@ interface SortableGroupItemProps {
   onAddSubGroup: (parentGroupId: string) => void;
   isDragOver?: boolean;
   isDragging?: boolean;
-  isNestingMode?: boolean;
 }
 
 function SortableGroupItem({
@@ -82,7 +74,6 @@ function SortableGroupItem({
   onAddSubGroup,
   isDragOver = false,
   isDragging: isDraggingProp = false,
-  isNestingMode = false,
 }: SortableGroupItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: group.id,
@@ -95,29 +86,13 @@ function SortableGroupItem({
   };
 
   const hasSubGroups = subGroups.length > 0;
-  const showDropZone = isDragOver && !isDraggingProp;
-
-  // 하위 그룹으로 만들기 (오른쪽 50% 영역에 드래그할 때만 피드백 표시)
-  const isNesting = showDropZone && isNestingMode;
 
   return (
     <div ref={setNodeRef} style={style} className={`${isDragging ? "z-50 shadow-lg" : ""}`}>
       <div
         data-group-id={group.id}
-        className={`flex items-center justify-between p-2 rounded-lg transition-all relative ${
-          isNesting
-            ? "bg-green-100 border-2 border-green-500 border-dashed shadow-md"
-            : "bg-gray-50 hover:bg-gray-100"
-        }`}
+        className="flex items-center justify-between p-2 rounded-lg transition-all relative bg-gray-50 hover:bg-gray-100"
       >
-        {/* 오른쪽 50% 영역 표시 (하위 그룹으로 만들기 영역) */}
-        <div className="absolute inset-0 pointer-events-none">
-          {/* 50% 기준선 (항상 표시) */}
-          {/* 오른쪽 50% 영역 (하위 그룹으로 만들기) */}
-          {isNesting && (
-            <div className="absolute right-0 top-0 bottom-0  bg-green-200/30 border-l-2 border-green-400 border-dashed" />
-          )}
-        </div>
         <div className="flex items-center space-x-2 flex-1 min-w-0">
           {hasSubGroups && (
             <button
@@ -148,11 +123,6 @@ function SortableGroupItem({
               {questionCount}개 질문
               {hasSubGroups && ` • ${subGroups.length}개 하위그룹`}
             </p>
-            {isNesting && (
-              <p className="text-xs text-green-700 font-medium mt-1">
-                여기에 드롭하여 하위 그룹으로 만들기
-              </p>
-            )}
           </div>
         </div>
         <Popover>
@@ -209,7 +179,7 @@ function SortableGroupItem({
 }
 
 export function GroupManager({ className }: GroupManagerProps) {
-  const { currentSurvey, addGroup, updateGroup, deleteGroup, reorderGroups, setSurvey } =
+  const { currentSurvey, addGroup, updateGroup, deleteGroup, reorderGroups } =
     useSurveyBuilderStore();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -221,7 +191,6 @@ export function GroupManager({ className }: GroupManagerProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
-  const [isNestingMode, setIsNestingMode] = useState<boolean>(false); // true: 하위 그룹으로, false: 순서 변경
 
   const groups = currentSurvey.groups || [];
 
@@ -279,13 +248,11 @@ export function GroupManager({ className }: GroupManagerProps) {
           id: createdGroupId,
           surveyId: currentSurvey.id!,
           name: groupName.trim(),
-          description: groupDescription.trim() || null,
+          description: groupDescription.trim() || undefined,
           order: maxOrder + 1,
-          parentGroupId: parentGroupIdForNew || null,
-          color: null,
+          parentGroupId: parentGroupIdForNew || undefined,
+          color: undefined,
           collapsed: false,
-          createdAt: new Date(),
-          updatedAt: new Date(),
         };
 
         // 스토어에 직접 추가 (updateGroup을 사용하여 그룹 추가)
@@ -308,6 +275,7 @@ export function GroupManager({ className }: GroupManagerProps) {
       setGroupDescription("");
       setParentGroupIdForNew(undefined);
       setIsCreateModalOpen(false);
+      // 그룹 생성은 이미 createQuestionGroup API로 저장됨
     }
   };
 
@@ -405,8 +373,8 @@ export function GroupManager({ className }: GroupManagerProps) {
             const { updateQuestionGroup } = await import("@/actions/survey-actions");
             await updateQuestionGroup(editingGroup.id, {
               name: groupName.trim(),
-              description: groupDescription.trim() || null,
-              parentGroupId: newParentGroupId || null,
+              description: groupDescription.trim() || undefined,
+              parentGroupId: newParentGroupId ?? null,
               order: newOrder,
             });
           } catch (error) {
@@ -431,7 +399,7 @@ export function GroupManager({ className }: GroupManagerProps) {
             const { updateQuestionGroup } = await import("@/actions/survey-actions");
             await updateQuestionGroup(editingGroup.id, {
               name: groupName.trim(),
-              description: groupDescription.trim() || null,
+              description: groupDescription.trim() || undefined,
             });
           } catch (error) {
             console.error("그룹 업데이트 저장 실패:", error);
@@ -444,6 +412,7 @@ export function GroupManager({ className }: GroupManagerProps) {
       setGroupDescription("");
       setParentGroupIdForEdit(undefined);
       setIsEditModalOpen(false);
+      // 그룹 수정은 이미 updateQuestionGroup API로 저장됨
     }
   };
 
@@ -470,6 +439,7 @@ export function GroupManager({ className }: GroupManagerProps) {
 
       // 로컬 스토어 업데이트 (deleteGroup이 질문들의 groupId도 undefined로 설정)
       deleteGroup(groupId);
+      // 그룹 삭제는 이미 deleteQuestionGroup API로 저장됨
     }
   };
 
@@ -480,69 +450,13 @@ export function GroupManager({ className }: GroupManagerProps) {
   const handleDragOver = (event: DragOverEvent) => {
     const overIdValue = (event.over?.id as string) || null;
     setOverId(overIdValue);
-
-    // 드래그 위치에 따라 하위 그룹으로 만들지 순서 변경할지 결정
-    // 오른쪽 50% 영역으로 드래그하면 하위 그룹으로
-    if (overIdValue && event.active && event.over) {
-      const draggedGroup = groups.find((g) => g.id === event.active.id);
-      const targetGroup = groups.find((g) => g.id === overIdValue);
-
-      if (!draggedGroup || !targetGroup) {
-        setIsNestingMode(false);
-        return;
-      }
-
-      // 대분류는 대분류끼리만 이동 가능
-      if (!draggedGroup.parentGroupId && !targetGroup.parentGroupId) {
-        // 대분류끼리는 하위 그룹으로 만들 수 있음 (대분류를 소분류로 만들기)
-        const targetElement = document.querySelector(`[data-group-id="${overIdValue}"]`);
-        const activeElement = document.querySelector(`[data-group-id="${event.active.id}"]`);
-
-        if (targetElement && activeElement) {
-          const targetRect = targetElement.getBoundingClientRect();
-          const activeRect = activeElement.getBoundingClientRect();
-
-          // 드래그된 아이템의 중심 X 좌표
-          const activeCenterX = activeRect.left + activeRect.width / 2;
-          // 타겟 그룹의 중심 X 좌표 (50% 기준점)
-          const targetCenterX = targetRect.left + targetRect.width / 1.5;
-
-          // 드래그된 아이템의 중심이 타겟 그룹의 오른쪽 50% 영역에 있으면 하위 그룹으로
-          setIsNestingMode(activeCenterX > targetCenterX);
-        } else {
-          setIsNestingMode(false);
-        }
-        return;
-      }
-
-      // 소분류는 같은 대분류 내의 소분류끼리만 이동 가능
-      if (draggedGroup.parentGroupId && targetGroup.parentGroupId) {
-        // 같은 대분류 내의 소분류인지 확인
-        if (draggedGroup.parentGroupId === targetGroup.parentGroupId) {
-          setIsNestingMode(false);
-          return;
-        }
-        // 다른 대분류의 소분류로는 이동 불가
-        setIsNestingMode(false);
-        return;
-      }
-
-      // 대분류와 소분류 간 이동 불가
-      setIsNestingMode(false);
-    } else {
-      setIsNestingMode(false);
-    }
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
 
-    // isNestingMode 값을 초기화하기 전에 저장
-    const shouldNest = isNestingMode;
-
     setActiveId(null);
     setOverId(null);
-    setIsNestingMode(false);
 
     if (!over || active.id === over.id) return;
 
@@ -551,79 +465,36 @@ export function GroupManager({ className }: GroupManagerProps) {
 
     if (!draggedGroup || !targetGroup) return;
 
-    // 자기 자신을 하위 그룹으로 만들 수 없음
+    // 자기 자신으로는 이동 불가
     if (draggedGroup.id === targetGroup.id) return;
 
-    // 대분류는 대분류끼리만 이동 가능
+    // 대분류는 대분류끼리만 순서 변경 가능
     if (!draggedGroup.parentGroupId && !targetGroup.parentGroupId) {
-      if (shouldNest) {
-        // 순환 참조 체크: targetGroup이 draggedGroup의 하위 그룹이 될 수 있는지 확인
-        if (!canBeParentOf(targetGroup.id, draggedGroup.id)) {
-          console.warn("순환 참조 방지: 그룹을 하위 그룹으로 만들 수 없습니다.");
-          return;
-        }
+      const sameLevelGroups = groups
+        .filter((g) => !g.parentGroupId)
+        .sort((a, b) => a.order - b.order);
 
-        // 대분류를 소분류로 만들기 (오른쪽 50%에 드롭)
-        const targetSubGroups = groups
-          .filter((g) => g.parentGroupId === targetGroup.id && g.id !== draggedGroup.id)
-          .sort((a, b) => a.order - b.order);
-        const maxOrder =
-          targetSubGroups.length > 0 ? Math.max(...targetSubGroups.map((g) => g.order)) : -1;
+      const oldIndex = sameLevelGroups.findIndex((g) => g.id === draggedGroup.id);
+      const newIndex = sameLevelGroups.findIndex((g) => g.id === targetGroup.id);
 
-        updateGroup(draggedGroup.id, {
-          parentGroupId: targetGroup.id,
-          order: maxOrder + 1,
-        });
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newOrder = arrayMove(sameLevelGroups, oldIndex, newIndex);
+        const newGroupIds = newOrder.map((g) => g.id);
+        reorderGroups(newGroupIds);
 
-        // DB에 저장 (그룹 ID가 UUID인 경우에만)
-        if (
-          currentSurvey.id &&
-          isUUID(currentSurvey.id) &&
-          isUUID(draggedGroup.id) &&
-          isUUID(targetGroup.id)
-        ) {
+        // DB에 저장 (UUID인 그룹 ID만 필터링)
+        if (currentSurvey.id && isUUID(currentSurvey.id)) {
           try {
-            const { updateQuestionGroup } = await import("@/actions/survey-actions");
-            await updateQuestionGroup(draggedGroup.id, {
-              parentGroupId: targetGroup.id,
-              order: maxOrder + 1,
-            });
-          } catch (error) {
-            console.error("그룹 하위 그룹 변경 저장 실패:", error);
-          }
-        }
-
-        // 하위 그룹으로 변경되면 해당 그룹을 펼침
-        setExpandedGroups((prev) => new Set(prev).add(targetGroup.id));
-      } else {
-        // 대분류끼리 순서만 변경 (왼쪽 50%에 드롭)
-        const sameLevelGroups = groups
-          .filter((g) => !g.parentGroupId)
-          .sort((a, b) => a.order - b.order);
-
-        const oldIndex = sameLevelGroups.findIndex((g) => g.id === draggedGroup.id);
-        const newIndex = sameLevelGroups.findIndex((g) => g.id === targetGroup.id);
-
-        if (oldIndex !== -1 && newIndex !== -1) {
-          const newOrder = arrayMove(sameLevelGroups, oldIndex, newIndex);
-          const newGroupIds = newOrder.map((g) => g.id);
-          reorderGroups(newGroupIds);
-
-          // DB에 저장 (UUID인 그룹 ID만 필터링)
-          if (currentSurvey.id && isUUID(currentSurvey.id)) {
-            try {
-              const { reorderGroups: reorderGroupsAction } = await import(
-                "@/actions/survey-actions"
-              );
-              const uuidGroupIds = newGroupIds.filter((id) => isUUID(id));
-              if (uuidGroupIds.length > 0) {
-                await reorderGroupsAction(currentSurvey.id, uuidGroupIds);
-              }
-            } catch (error) {
-              console.error("그룹 순서 저장 실패:", error);
+            const { reorderGroups: reorderGroupsAction } = await import("@/actions/survey-actions");
+            const uuidGroupIds = newGroupIds.filter((id) => isUUID(id));
+            if (uuidGroupIds.length > 0) {
+              await reorderGroupsAction(currentSurvey.id, uuidGroupIds);
             }
+          } catch (error) {
+            console.error("그룹 순서 저장 실패:", error);
           }
         }
+        // 그룹 순서 변경은 이미 reorderGroups API로 저장됨
       }
       return;
     }
@@ -667,6 +538,7 @@ export function GroupManager({ className }: GroupManagerProps) {
               console.error("하위 그룹 순서 저장 실패:", error);
             }
           }
+          // 하위 그룹 순서 변경은 이미 updateQuestionGroup API로 저장됨
         }
       }
       // 다른 대분류의 소분류로는 이동 불가 (아무것도 하지 않음)
@@ -706,7 +578,10 @@ export function GroupManager({ className }: GroupManagerProps) {
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
           >
-            <SortableContext items={groups.map((g) => g.id)} strategy={verticalListSortingStrategy}>
+            <SortableContext
+              items={topLevelGroups.map((g) => g.id)}
+              strategy={verticalListSortingStrategy}
+            >
               <div className="space-y-2">
                 {topLevelGroups.map((group) => {
                   const subGroups = getSubGroups(group.id);
@@ -727,36 +602,39 @@ export function GroupManager({ className }: GroupManagerProps) {
                         onAddSubGroup={handleOpenCreateModal}
                         isDragOver={isDragOver}
                         isDragging={isDragging}
-                        isNestingMode={isNestingMode}
                       />
 
                       {/* 하위 그룹 렌더링 */}
                       {isExpanded && subGroups.length > 0 && (
-                        <div className="ml-6 mt-2 space-y-2 border-l-2 border-gray-200 pl-3">
-                          {subGroups.map((subGroup) => {
-                            const isSubDragOver =
-                              overId === subGroup.id && activeId !== subGroup.id;
-                            const isSubDragging = activeId === subGroup.id;
+                        <SortableContext
+                          items={subGroups.map((g) => g.id)}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          <div className="ml-6 mt-2 space-y-2 border-l-2 border-gray-200 pl-3">
+                            {subGroups.map((subGroup) => {
+                              const isSubDragOver =
+                                overId === subGroup.id && activeId !== subGroup.id;
+                              const isSubDragging = activeId === subGroup.id;
 
-                            return (
-                              <div key={subGroup.id}>
-                                <SortableGroupItem
-                                  group={subGroup}
-                                  questionCount={getQuestionCount(subGroup.id)}
-                                  subGroups={[]}
-                                  isExpanded={false}
-                                  onEdit={handleEditGroup}
-                                  onDelete={handleDeleteGroup}
-                                  onToggleExpand={handleToggleExpand}
-                                  onAddSubGroup={handleOpenCreateModal}
-                                  isDragOver={isSubDragOver}
-                                  isDragging={isSubDragging}
-                                  isNestingMode={isNestingMode}
-                                />
-                              </div>
-                            );
-                          })}
-                        </div>
+                              return (
+                                <div key={subGroup.id}>
+                                  <SortableGroupItem
+                                    group={subGroup}
+                                    questionCount={getQuestionCount(subGroup.id)}
+                                    subGroups={[]}
+                                    isExpanded={false}
+                                    onEdit={handleEditGroup}
+                                    onDelete={handleDeleteGroup}
+                                    onToggleExpand={handleToggleExpand}
+                                    onAddSubGroup={handleOpenCreateModal}
+                                    isDragOver={isSubDragOver}
+                                    isDragging={isSubDragging}
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </SortableContext>
                       )}
                     </div>
                   );
@@ -768,7 +646,15 @@ export function GroupManager({ className }: GroupManagerProps) {
       </div>
 
       {/* 그룹 생성 모달 */}
-      <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+      <Dialog
+        open={isCreateModalOpen}
+        onOpenChange={(open) => {
+          // 배경 클릭으로 닫히는 것 방지, X 버튼만 닫기 가능
+          if (!open) {
+            setIsCreateModalOpen(false);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -817,7 +703,15 @@ export function GroupManager({ className }: GroupManagerProps) {
       </Dialog>
 
       {/* 그룹 편집 모달 */}
-      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+      <Dialog
+        open={isEditModalOpen}
+        onOpenChange={(open) => {
+          // 배경 클릭으로 닫히는 것 방지, X 버튼만 닫기 가능
+          if (!open) {
+            setIsEditModalOpen(false);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>그룹 편집</DialogTitle>

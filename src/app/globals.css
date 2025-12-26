@@ -67,3 +67,160 @@ html {
   backdrop-filter: blur(20px) saturate(180%);
   background-color: rgba(255, 255, 255, 0.8);
 }
+
+/* ==========================================
+   TipTap 이미지 리사이즈 스타일
+   ========================================== */
+
+/* 에디터 기본 설정 - 가로 스크롤 허용 */
+.ProseMirror {
+  overflow-x: auto;
+  overflow-y: hidden;
+  word-wrap: break-word;
+  position: relative;
+}
+
+/* 이미지 기본 스타일 - 리사이즈 가능하도록 설정 */
+.ProseMirror img {
+  height: auto !important;
+  max-width: 100% !important;
+  cursor: pointer;
+  vertical-align: top;
+  display: inline-block;
+  object-fit: contain;
+  box-sizing: border-box !important;
+}
+
+/* 인라인 스타일로 고정된 width가 있어도 max-width로 제한 */
+/* 인라인 스타일의 우선순위가 높으므로, 부모 컨테이너에서 제한 */
+.ProseMirror div[style*="cursor: pointer"] img {
+  max-width: 100% !important;
+  width: auto !important;
+  height: auto !important;
+}
+
+/* 이미지 래퍼 컨테이너도 크기 제한 */
+.ProseMirror div[style*="cursor: pointer"] {
+  max-width: 100% !important;
+  overflow: hidden;
+}
+
+/* tiptap-extension-resize-image 컨테이너 스타일 */
+/* 이미지를 감싸는 div 컨테이너 - max-width 제한 */
+.ProseMirror div[style*="cursor: pointer"] {
+  position: relative !important;
+  box-sizing: border-box !important;
+  display: inline-block !important;
+  vertical-align: top !important;
+  max-width: 100% !important;
+}
+
+/* 인라인 스타일로 고정된 width가 있어도 max-width로 제한 */
+.ProseMirror div[style*="cursor: pointer"][style*="width"] {
+  max-width: 100% !important;
+  width: auto !important;
+}
+
+/* 이미지 래퍼 - 인라인 배치 지원 */
+.ProseMirror div[style*="display: inline-block"] {
+  vertical-align: top !important;
+}
+
+/* float 스타일이 적용된 이미지 래퍼 - 크기 제한 해제 */
+.ProseMirror div[style*="float: left"] {
+  margin-right: 8px !important;
+}
+
+.ProseMirror div[style*="float: right"] {
+  margin-left: 8px !important;
+}
+
+/* 이미지 선택 시 하이라이트 */
+.ProseMirror img.ProseMirror-selectednode {
+  outline: 2px solid #007aff;
+  outline-offset: 2px;
+}
+
+/* prose 클래스에서 이미지 관련 스타일 오버라이드 */
+.prose img,
+.prose-sm img {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  display: inline-block !important;
+}
+
+/* 문단 내 이미지 인라인 배치 - flexbox 사용 */
+.ProseMirror p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+/* 텍스트만 있는 문단은 block으로 */
+.ProseMirror p:not(:has(img)):not(:has(div[style*="cursor: pointer"])) {
+  display: block;
+}
+
+.ProseMirror p img,
+.ProseMirror p div[style*="cursor: pointer"] {
+  display: inline-block;
+  vertical-align: top;
+  flex-shrink: 0;
+}
+
+/* 이미지 정렬 컨트롤러가 에디터 밖으로 나가지 않도록 */
+.ProseMirror div[style*="position: absolute"] {
+  z-index: 10;
+}
+
+/* 리사이즈 핸들 스타일 개선 */
+.ProseMirror div[style*="border-radius: 50%"] {
+  z-index: 20 !important;
+}
+
+/* ==========================================
+   테이블 내 이미지 가로 스크롤 처리
+   ========================================== */
+
+/* prose 클래스 내부의 테이블 - 내용에 맞게 크기 조정 */
+.prose table,
+.prose-sm table {
+  display: table;
+  width: auto;
+  min-width: 100%;
+  table-layout: auto;
+}
+
+/* 테이블 셀 스타일 */
+.prose table td,
+.prose table th,
+.prose-sm table td,
+.prose-sm table th {
+  word-wrap: break-word;
+  white-space: normal;
+  vertical-align: top;
+}
+
+/* 테이블 내 이미지는 원본 크기 유지 (가로 스크롤로 처리) */
+.prose table img,
+.prose-sm table img,
+.prose table td img,
+.prose-sm table td img,
+.prose table th img,
+.prose-sm table th img {
+  max-width: none;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+/* 이미지를 감싸는 div 컨테이너도 원본 크기 유지 */
+.prose table td div[style*="cursor: pointer"],
+.prose-sm table td div[style*="cursor: pointer"],
+.prose table th div[style*="cursor: pointer"],
+.prose-sm table th div[style*="cursor: pointer"] {
+  max-width: none;
+  width: auto;
+}

@@ -54,6 +54,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSurvey, useSaveSurvey } from "@/hooks/queries/use-surveys";
 import { isSlugAvailable as checkSlugAvailable } from "@/actions/query-actions";
+import { createQuestion as createQuestionAction } from "@/actions/survey-actions";
 
 const questionTypes = [
   {
@@ -317,8 +318,38 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   };
 
   // 라이브러리에서 질문 추가
-  const handleAddFromLibrary = (question: Question) => {
+  const handleAddFromLibrary = async (question: Question) => {
+    // 로컬 스토어에 추가
     addPreparedQuestion(question);
+
+    // 서버에 질문 생성 API 호출
+    if (currentSurvey.id) {
+      try {
+        await createQuestionAction({
+          surveyId: currentSurvey.id,
+          groupId: question.groupId,
+          type: question.type,
+          title: question.title,
+          description: question.description,
+          required: question.required,
+          order: question.order,
+          options: question.options,
+          selectLevels: question.selectLevels,
+          tableTitle: question.tableTitle,
+          tableColumns: question.tableColumns,
+          tableRowsData: question.tableRowsData,
+          imageUrl: question.imageUrl,
+          videoUrl: question.videoUrl,
+          allowOtherOption: question.allowOtherOption,
+          noticeContent: question.noticeContent,
+          requiresAcknowledgment: question.requiresAcknowledgment,
+          tableValidationRules: question.tableValidationRules,
+          displayCondition: question.displayCondition,
+        });
+      } catch (error) {
+        console.error("라이브러리에서 질문 추가 실패:", error);
+      }
+    }
   };
 
   // 로딩 상태
@@ -433,7 +464,43 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                       <Card
                         key={questionType.type}
                         className="p-4 cursor-pointer hover-lift border-gray-200 hover:border-blue-200 transition-all duration-200"
-                        onClick={() => addQuestion(questionType.type)}
+                        onClick={async () => {
+                          // 로컬 스토어에 추가
+                          addQuestion(questionType.type);
+
+                          // 서버에 질문 생성 API 호출
+                          if (currentSurvey.id) {
+                            const newQuestion =
+                              currentSurvey.questions[currentSurvey.questions.length - 1];
+                            if (newQuestion) {
+                              try {
+                                await createQuestionAction({
+                                  surveyId: currentSurvey.id,
+                                  groupId: newQuestion.groupId,
+                                  type: newQuestion.type,
+                                  title: newQuestion.title,
+                                  description: newQuestion.description,
+                                  required: newQuestion.required,
+                                  order: newQuestion.order,
+                                  options: newQuestion.options,
+                                  selectLevels: newQuestion.selectLevels,
+                                  tableTitle: newQuestion.tableTitle,
+                                  tableColumns: newQuestion.tableColumns,
+                                  tableRowsData: newQuestion.tableRowsData,
+                                  imageUrl: newQuestion.imageUrl,
+                                  videoUrl: newQuestion.videoUrl,
+                                  allowOtherOption: newQuestion.allowOtherOption,
+                                  noticeContent: newQuestion.noticeContent,
+                                  requiresAcknowledgment: newQuestion.requiresAcknowledgment,
+                                  tableValidationRules: newQuestion.tableValidationRules,
+                                  displayCondition: newQuestion.displayCondition,
+                                });
+                              } catch (error) {
+                                console.error("질문 생성 실패:", error);
+                              }
+                            }
+                          }
+                        }}
                       >
                         <div className="flex items-start space-x-3">
                           <div
@@ -557,7 +624,45 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                     왼쪽에서 원하는 질문 유형을 클릭하거나 보관함에서 불러올 수 있습니다.
                   </p>
                   <div className="flex gap-2 justify-center">
-                    <Button onClick={() => addQuestion("text")}>
+                    <Button
+                      onClick={async () => {
+                        // 로컬 스토어에 추가
+                        addQuestion("text");
+
+                        // 서버에 질문 생성 API 호출
+                        if (currentSurvey.id) {
+                          const newQuestion =
+                            currentSurvey.questions[currentSurvey.questions.length - 1];
+                          if (newQuestion) {
+                            try {
+                              await createQuestionAction({
+                                surveyId: currentSurvey.id,
+                                groupId: newQuestion.groupId,
+                                type: newQuestion.type,
+                                title: newQuestion.title,
+                                description: newQuestion.description,
+                                required: newQuestion.required,
+                                order: newQuestion.order,
+                                options: newQuestion.options,
+                                selectLevels: newQuestion.selectLevels,
+                                tableTitle: newQuestion.tableTitle,
+                                tableColumns: newQuestion.tableColumns,
+                                tableRowsData: newQuestion.tableRowsData,
+                                imageUrl: newQuestion.imageUrl,
+                                videoUrl: newQuestion.videoUrl,
+                                allowOtherOption: newQuestion.allowOtherOption,
+                                noticeContent: newQuestion.noticeContent,
+                                requiresAcknowledgment: newQuestion.requiresAcknowledgment,
+                                tableValidationRules: newQuestion.tableValidationRules,
+                                displayCondition: newQuestion.displayCondition,
+                              });
+                            } catch (error) {
+                              console.error("질문 생성 실패:", error);
+                            }
+                          }
+                        }
+                      }}
+                    >
                       <Plus className="w-4 h-4 mr-2" />첫 번째 질문 추가
                     </Button>
                     <Button variant="outline" onClick={() => setLeftSidebarTab("library")}>

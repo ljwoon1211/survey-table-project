@@ -27,6 +27,11 @@ import { Input } from "@/components/ui/input";
 import { Question } from "@/types/survey";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
 import { QuestionEditModal } from "./question-edit-modal";
+import {
+  deleteQuestion as deleteQuestionAction,
+  reorderQuestions as reorderQuestionsAction,
+  createQuestion as createQuestionAction,
+} from "@/actions/survey-actions";
 import { UserDefinedMultiLevelSelectPreview } from "./user-defined-multi-level-select";
 import { MultiLevelSelect } from "./multi-level-select";
 import { UserDefinedMultiLevelSelect } from "./user-defined-multi-level-select";
@@ -190,7 +195,9 @@ function SortableQuestion({
                 [&_table_th]:font-normal [&_table_th]:bg-transparent
                 [&_table_p]:m-0
                 [&_p]:min-h-[1.6em]"
-              dangerouslySetInnerHTML={{ __html: convertHtmlImageUrlsToProxy(question.description) }}
+              dangerouslySetInnerHTML={{
+                __html: convertHtmlImageUrlsToProxy(question.description),
+              }}
             />
           )}
         </div>
@@ -593,8 +600,17 @@ export function SortableQuestionList({
 
       if (oldIndex !== -1 && newIndex !== -1) {
         const newOrder = arrayMove(orderedQuestions, oldIndex, newIndex);
-        // 그룹 정보를 유지하면서 순서만 업데이트
-        reorderQuestions(newOrder.map((q) => q.id));
+        const questionIds = newOrder.map((q) => q.id);
+
+        // 로컬 스토어 업데이트
+        reorderQuestions(questionIds);
+
+        // 서버에 질문 순서 변경 API 호출
+        if (currentSurvey.id) {
+          reorderQuestionsAction(questionIds).catch((error) => {
+            console.error("질문 순서 변경 실패:", error);
+          });
+        }
       }
     }
 
@@ -606,13 +622,21 @@ export function SortableQuestionList({
     setEditingQuestionId(questionId);
   };
 
-  const handleDelete = (questionId: string) => {
+  const handleDelete = async (questionId: string) => {
     if (confirm("이 질문을 삭제하시겠습니까?")) {
+      // 로컬 스토어에서 삭제
       deleteQuestion(questionId);
+
+      // 서버에 질문 삭제 API 호출
+      try {
+        await deleteQuestionAction(questionId);
+      } catch (error) {
+        console.error("질문 삭제 실패:", error);
+      }
     }
   };
 
-  const handleDuplicate = (questionId: string) => {
+  const handleDuplicate = async (questionId: string) => {
     const questionToDuplicate = questions.find((q) => q.id === questionId);
     if (questionToDuplicate) {
       // 새로운 ID를 가진 완전한 복사본 생성
@@ -678,8 +702,37 @@ export function SortableQuestionList({
           : undefined,
       };
 
-      // 준비된 질문을 추가
+      // 로컬 스토어에 추가
       useSurveyBuilderStore.getState().addPreparedQuestion(newQuestion);
+
+      // 서버에 질문 생성 API 호출
+      if (currentSurvey.id) {
+        try {
+          await createQuestionAction({
+            surveyId: currentSurvey.id,
+            groupId: newQuestion.groupId,
+            type: newQuestion.type,
+            title: newQuestion.title,
+            description: newQuestion.description,
+            required: newQuestion.required,
+            order: newQuestion.order,
+            options: newQuestion.options,
+            selectLevels: newQuestion.selectLevels,
+            tableTitle: newQuestion.tableTitle,
+            tableColumns: newQuestion.tableColumns,
+            tableRowsData: newQuestion.tableRowsData,
+            imageUrl: newQuestion.imageUrl,
+            videoUrl: newQuestion.videoUrl,
+            allowOtherOption: newQuestion.allowOtherOption,
+            noticeContent: newQuestion.noticeContent,
+            requiresAcknowledgment: newQuestion.requiresAcknowledgment,
+            tableValidationRules: newQuestion.tableValidationRules,
+            displayCondition: newQuestion.displayCondition,
+          });
+        } catch (error) {
+          console.error("질문 복제 실패:", error);
+        }
+      }
     }
   };
 
@@ -717,7 +770,6 @@ export function SortableQuestionList({
                   {/* 하위 그룹들 */}
                   {subGroups.map((subGroup) => {
                     const subGroupQuestions = questionsByGroup[subGroup.id] || [];
-                    if (subGroupQuestions.length === 0) return null;
 
                     return (
                       <div key={subGroup.id} className="ml-4 space-y-4">
@@ -813,7 +865,6 @@ export function SortableQuestionList({
                       {/* 하위 그룹들 */}
                       {subGroups.map((subGroup) => {
                         const subGroupQuestions = questionsByGroup[subGroup.id] || [];
-                        if (subGroupQuestions.length === 0) return null;
 
                         return (
                           <div key={subGroup.id} className="ml-4 space-y-4">

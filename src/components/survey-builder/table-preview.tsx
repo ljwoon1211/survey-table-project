@@ -1,9 +1,42 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { TableColumn, TableRow } from "@/types/survey";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Image, Video, FileText } from "lucide-react";
 import { getProxiedImageUrl } from "@/lib/image-utils";
+
+// 이미지 셀 컴포넌트 (에러 상태 관리)
+function ImageCell({ imageUrl, content }: { imageUrl: string; content?: string }) {
+  const [error, setError] = useState(false);
+
+  // key가 바뀔 때 (= imageUrl이 바뀔 때) 에러 상태 리셋
+  useEffect(() => {
+    setError(false);
+  }, [imageUrl]);
+
+  return (
+    <div className="flex flex-col items-center gap-2 w-full h-full">
+      <div key={imageUrl}>
+        {error ? (
+          <div className="flex items-center gap-1 text-red-500 text-sm">
+            <Image className="w-4 h-4" />
+            <span>이미지 오류</span>
+          </div>
+        ) : (
+          <img
+            src={getProxiedImageUrl(imageUrl)}
+            alt="셀 이미지"
+            className="w-full h-auto max-h-full object-contain rounded"
+            style={{ maxWidth: "100%", maxHeight: "100%" }}
+            onError={() => setError(true)}
+          />
+        )}
+      </div>
+      {content && <div className="text-sm text-gray-700 mt-2 text-left">{content}</div>}
+    </div>
+  );
+}
 
 interface TablePreviewProps {
   tableTitle?: string;
@@ -98,28 +131,7 @@ export function TablePreview({
 
       case "image":
         return cell.imageUrl ? (
-          <div className="flex flex-col items-center gap-2 w-full h-full">
-            <img
-              src={getProxiedImageUrl(cell.imageUrl)}
-              alt="셀 이미지"
-              className="w-full h-auto max-h-full object-contain rounded"
-              style={{ maxWidth: "100%", maxHeight: "100%" }}
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = "none";
-                if (target.nextElementSibling) {
-                  target.nextElementSibling.classList.remove("hidden");
-                }
-              }}
-            />
-            <div className="hidden items-center gap-1 text-red-500 text-sm">
-              <Image className="w-4 h-4" />
-              <span>이미지 오류</span>
-            </div>
-            {cell.content && (
-              <div className="text-sm text-gray-700 mt-2 text-center">{cell.content}</div>
-            )}
-          </div>
+          <ImageCell imageUrl={cell.imageUrl} content={cell.content} />
         ) : (
           <div className="flex items-center gap-2 text-gray-500">
             <Image className="w-4 h-4" />
@@ -167,7 +179,7 @@ export function TablePreview({
               </div>
             )}
             {cell.content && (
-              <div className="text-sm text-gray-700 mt-2 text-center">{cell.content}</div>
+              <div className="text-sm text-gray-700 mt-2 text-left">{cell.content}</div>
             )}
           </div>
         ) : (
@@ -197,7 +209,9 @@ export function TablePreview({
 
       default:
         return cell.content ? (
-          <div className="whitespace-pre-wrap text-sm">{cell.content}</div>
+          <div className="whitespace-pre-wrap text-sm text-left leading-relaxed break-words">
+            {cell.content}
+          </div>
         ) : (
           <span className="text-gray-400 text-sm"></span>
         );
@@ -261,7 +275,7 @@ export function TablePreview({
                     return (
                       <td
                         key={cell.id}
-                        className="border border-gray-300 p-3 text-center align-middle"
+                        className="border border-gray-300 p-3 text-left align-top"
                         rowSpan={cell.rowspan || 1}
                         colSpan={cell.colspan || 1}
                       >

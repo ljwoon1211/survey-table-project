@@ -30,8 +30,9 @@ export function NoticeRenderer({
     <div className="space-y-4">
       {/* Rich Text Content Display */}
       <div
-        className="prose prose-sm max-w-none p-6 bg-blue-50 border-2 border-blue-200 rounded-lg
+        className="prose prose-sm max-w-none p-6 bg-blue-50 border-2 border-blue-200 rounded-lg overflow-x-auto
           [&_table]:border-collapse [&_table]:w-full [&_table]:my-4 [&_table]:border-2 [&_table]:border-gray-300
+          [&_table]:min-w-full
           [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2
           [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-3 [&_table_th]:py-2
           [&_table_th]:font-normal [&_table_th]:bg-transparent
@@ -42,6 +43,7 @@ export function NoticeRenderer({
           // TipTap 스타일 재정의
           fontSize: "14px",
           lineHeight: "1.6",
+          WebkitOverflowScrolling: "touch",
         }}
       />
 

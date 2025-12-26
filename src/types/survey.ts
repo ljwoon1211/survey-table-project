@@ -145,6 +145,7 @@ export interface SelectLevel {
 // 질문 그룹 (2단계 계층 구조 지원)
 export interface QuestionGroup {
   id: string;
+  surveyId: string; // 소속 설문 ID
   name: string; // 그룹 이름 (예: "공통", "응답자 정보", "1번", "III. 지상파 직접 수신")
   description?: string; // 그룹 설명
   order: number; // 그룹 순서
