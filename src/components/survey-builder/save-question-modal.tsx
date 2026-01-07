@@ -28,8 +28,13 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Question } from "@/types/survey";
-import { useQuestionLibraryStore } from "@/stores/question-library-store";
+import { hasBranchLogic } from "@/stores/question-library-store";
 import { cn } from "@/lib/utils";
+import {
+  useSaveQuestion,
+  useCategories,
+  useCreateCategory,
+} from "@/hooks/queries/use-library";
 
 // 질문 타입 아이콘 매핑
 const questionTypeIcons: Record<string, React.ElementType> = {
@@ -68,7 +73,9 @@ export function SaveQuestionModal({
   question,
   onSaved,
 }: SaveQuestionModalProps) {
-  const { saveQuestion, categories, addCategory, hasBranchLogic } = useQuestionLibraryStore();
+  const { data: categories = [], refetch: refetchCategories } = useCategories();
+  const saveQuestionMutation = useSaveQuestion();
+  const createCategoryMutation = useCreateCategory();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -114,20 +121,28 @@ export function SaveQuestionModal({
   };
 
   // 새 카테고리 추가
-  const handleAddCategory = () => {
+  const handleAddCategory = async () => {
     const trimmedName = newCategoryName.trim();
     if (trimmedName) {
-      addCategory(trimmedName);
-      // 새로 추가된 카테고리의 ID를 찾아서 선택
-      const newCatId = `cat-${Date.now()}`;
-      setSelectedCategory(newCatId);
-      setNewCategoryName("");
-      setShowNewCategory(false);
+      try {
+        const newCategory = await createCategoryMutation.mutateAsync({
+          name: trimmedName,
+        });
+        // 새로 추가된 카테고리 선택
+        if (newCategory?.id) {
+          setSelectedCategory(newCategory.id);
+        }
+        setNewCategoryName("");
+        setShowNewCategory(false);
+        await refetchCategories();
+      } catch (error) {
+        console.error("카테고리 추가 실패:", error);
+      }
     }
   };
 
   // 저장 처리
-  const handleSave = () => {
+  const handleSave = async () => {
     // 유효성 검사
     const newErrors: { name?: string } = {};
     if (!name.trim()) {
@@ -141,15 +156,22 @@ export function SaveQuestionModal({
 
     if (!question) return;
 
-    saveQuestion(question, {
-      name: name.trim(),
-      description: description.trim() || undefined,
-      category: selectedCategory,
-      tags,
-    });
+    try {
+      await saveQuestionMutation.mutateAsync({
+        question,
+        metadata: {
+          name: name.trim(),
+          description: description.trim() || undefined,
+          category: selectedCategory,
+          tags,
+        },
+      });
 
-    onOpenChange(false);
-    onSaved?.();
+      onOpenChange(false);
+      onSaved?.();
+    } catch (error) {
+      console.error("질문 저장 실패:", error);
+    }
   };
 
   if (!question) return null;

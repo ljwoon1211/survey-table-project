@@ -107,6 +107,7 @@ export async function applyQuestion(id: string) {
     ...question,
     id: `question-${timestamp}-${random}`,
     order: 0,
+    groupId: undefined, // 보관함에서 추가할 때는 그룹 없이 추가
   };
 }
 

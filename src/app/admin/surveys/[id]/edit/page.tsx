@@ -148,6 +148,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   const [slugError, setSlugError] = useState("");
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [isEditingSlugInModal, setIsEditingSlugInModal] = useState(false);
+  const [addingQuestionIds, setAddingQuestionIds] = useState<Set<string>>(new Set());
   const [copySuccess, setCopySuccess] = useState(false);
 
   // 라이브러리 관련 상태
@@ -319,36 +320,51 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
 
   // 라이브러리에서 질문 추가
   const handleAddFromLibrary = async (question: Question) => {
-    // 로컬 스토어에 추가
-    addPreparedQuestion(question);
+    // 중복 실행 방지
+    if (addingQuestionIds.has(question.id)) {
+      return;
+    }
 
-    // 서버에 질문 생성 API 호출
-    if (currentSurvey.id) {
-      try {
-        await createQuestionAction({
-          surveyId: currentSurvey.id,
-          groupId: question.groupId,
-          type: question.type,
-          title: question.title,
-          description: question.description,
-          required: question.required,
-          order: question.order,
-          options: question.options,
-          selectLevels: question.selectLevels,
-          tableTitle: question.tableTitle,
-          tableColumns: question.tableColumns,
-          tableRowsData: question.tableRowsData,
-          imageUrl: question.imageUrl,
-          videoUrl: question.videoUrl,
-          allowOtherOption: question.allowOtherOption,
-          noticeContent: question.noticeContent,
-          requiresAcknowledgment: question.requiresAcknowledgment,
-          tableValidationRules: question.tableValidationRules,
-          displayCondition: question.displayCondition,
-        });
-      } catch (error) {
-        console.error("라이브러리에서 질문 추가 실패:", error);
+    setAddingQuestionIds((prev) => new Set(prev).add(question.id));
+    
+    try {
+      // 로컬 스토어에 추가
+      addPreparedQuestion(question);
+
+      // 서버에 질문 생성 API 호출
+      if (currentSurvey.id) {
+        try {
+          await createQuestionAction({
+            surveyId: currentSurvey.id,
+            groupId: question.groupId,
+            type: question.type,
+            title: question.title,
+            description: question.description,
+            required: question.required,
+            order: question.order,
+            options: question.options,
+            selectLevels: question.selectLevels,
+            tableTitle: question.tableTitle,
+            tableColumns: question.tableColumns,
+            tableRowsData: question.tableRowsData,
+            imageUrl: question.imageUrl,
+            videoUrl: question.videoUrl,
+            allowOtherOption: question.allowOtherOption,
+            noticeContent: question.noticeContent,
+            requiresAcknowledgment: question.requiresAcknowledgment,
+            tableValidationRules: question.tableValidationRules,
+            displayCondition: question.displayCondition,
+          });
+        } catch (error) {
+          console.error("라이브러리에서 질문 추가 실패:", error);
+        }
       }
+    } finally {
+      setAddingQuestionIds((prev) => {
+        const next = new Set(prev);
+        next.delete(question.id);
+        return next;
+      });
     }
   };
 

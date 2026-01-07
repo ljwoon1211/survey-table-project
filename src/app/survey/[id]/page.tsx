@@ -134,7 +134,12 @@ export default function SurveyResponsePage() {
       case "select":
         return response !== null && response !== undefined && response !== "";
       case "checkbox":
-        return Array.isArray(response) && response.length > 0;
+        if (!Array.isArray(response) || response.length === 0) return false;
+        // 최소 선택 개수 검증
+        if (question.minSelections !== undefined && question.minSelections > 0) {
+          return response.length >= question.minSelections;
+        }
+        return true;
       case "multiselect":
         return Array.isArray(response) && response.length > 0;
       case "table":
@@ -179,7 +184,15 @@ export default function SurveyResponsePage() {
       );
 
       if (unansweredRequired.length > 0) {
-        alert(`다음 필수 질문에 답해주세요: ${unansweredRequired.map((q) => q.title).join(", ")}`);
+        const errorMessages = unansweredRequired.map((q) => {
+          if (q.type === "checkbox" && q.minSelections !== undefined && q.minSelections > 0) {
+            const response = responses[q.id];
+            const count = Array.isArray(response) ? response.length : 0;
+            return `${q.title} (최소 ${q.minSelections}개 선택 필요, 현재 ${count}개 선택됨)`;
+          }
+          return q.title;
+        });
+        alert(`다음 필수 질문에 답해주세요:\n${errorMessages.join("\n")}`);
         setIsSubmitting(false);
         return;
       }
@@ -331,13 +344,16 @@ export default function SurveyResponsePage() {
                 </CardTitle>
                 {currentQuestion.description && (
                   <div
-                    className="text-sm text-gray-600 mt-2 prose prose-sm max-w-none
-                      [&_table]:border-collapse [&_table]:w-full [&_table]:my-2 [&_table]:border-2 [&_table]:border-gray-300
+                    className="text-sm text-gray-600 mt-2 prose prose-sm max-w-none overflow-x-auto
+                      [&_table]:border-collapse [&_table]:min-w-full [&_table]:my-2 [&_table]:border-2 [&_table]:border-gray-300
                       [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2
                       [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-3 [&_table_th]:py-2
                       [&_table_th]:font-normal [&_table_th]:bg-transparent
                       [&_table_p]:m-0
                       [&_p]:min-h-[1.6em]"
+                    style={{
+                      WebkitOverflowScrolling: "touch",
+                    }}
                     dangerouslySetInnerHTML={{ __html: currentQuestion.description }}
                   />
                 )}
@@ -413,7 +429,7 @@ function QuestionInput({
     case "text":
       return (
         <Input
-          placeholder="답변을 입력하세요..."
+          placeholder={question.placeholder || "답변을 입력하세요..."}
           value={value || ""}
           onChange={(e) => onChange(e.target.value)}
           className="w-full"
@@ -598,6 +614,16 @@ function CheckboxQuestion({
     const isOtherOption = optionId === "other-option";
 
     if (isChecked) {
+      // 최대 선택 개수 체크
+      const maxSelections = question.maxSelections;
+      if (maxSelections !== undefined && maxSelections > 0) {
+        const currentCount = newValues.length;
+        if (currentCount >= maxSelections) {
+          // 최대 개수 도달 시 추가 선택 불가
+          return;
+        }
+      }
+
       if (isOtherOption) {
         newValues.push({
           selectedValue: optionValue,
@@ -642,10 +668,25 @@ function CheckboxQuestion({
     });
   };
 
+  const currentCount = currentValues.length;
+  const maxSelections = question.maxSelections;
+  const minSelections = question.minSelections;
+  const isMaxReached =
+    maxSelections !== undefined && maxSelections > 0 && currentCount >= maxSelections;
+  const isMinNotMet =
+    minSelections !== undefined && minSelections > 0 && currentCount < minSelections;
+
+  const canSelect = (optionValue: string) => {
+    if (isChecked(optionValue)) return true; // 이미 선택된 것은 해제 가능
+    if (isMaxReached) return false; // 최대 개수 도달 시 추가 선택 불가
+    return true;
+  };
+
   return (
     <div className="space-y-3">
       {question.options?.map((option: any) => {
         const checked = isChecked(option.value);
+        const disabled = !canSelect(option.value);
 
         return (
           <div key={option.id} className="space-y-2">
@@ -654,12 +695,17 @@ function CheckboxQuestion({
                 type="checkbox"
                 id={`${question.id}-${option.id}`}
                 checked={checked}
+                disabled={disabled}
                 onChange={(e) => handleOptionChange(option.value, option.id, e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                className={`w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 ${
+                  disabled ? "opacity-50 cursor-not-allowed" : ""
+                }`}
               />
               <label
                 htmlFor={`${question.id}-${option.id}`}
-                className="text-sm text-gray-700 cursor-pointer flex-1"
+                className={`text-sm text-gray-700 flex-1 ${
+                  disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                }`}
               >
                 {option.label}
               </label>
@@ -677,6 +723,23 @@ function CheckboxQuestion({
           </div>
         );
       })}
+
+      {/* 선택 개수 표시 */}
+      {(maxSelections !== undefined || minSelections !== undefined) && (
+        <div className="pt-2 border-t border-gray-200">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-600">
+              {maxSelections !== undefined && maxSelections > 0
+                ? `${currentCount}/${maxSelections}개 선택됨`
+                : `${currentCount}개 선택됨`}
+            </span>
+            {isMinNotMet && (
+              <span className="text-orange-600">최소 {minSelections}개 이상 선택해주세요</span>
+            )}
+            {isMaxReached && <span className="text-blue-600">최대 선택 개수에 도달했습니다</span>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

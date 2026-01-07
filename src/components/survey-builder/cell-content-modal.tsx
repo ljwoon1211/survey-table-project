@@ -31,7 +31,11 @@ import {
 import { useSurveyBuilderStore } from "@/stores/survey-store";
 import { BranchRuleEditor } from "./branch-rule-editor";
 import { optimizeImage, validateImageFile, getProxiedImageUrl } from "@/lib/image-utils";
-import { updateQuestion as updateQuestionAction } from "@/actions/survey-actions";
+import {
+  updateQuestion as updateQuestionAction,
+  createQuestion as createQuestionAction,
+} from "@/actions/survey-actions";
+import { isValidUUID } from "@/lib/utils";
 
 interface CellContentModalProps {
   isOpen: boolean;
@@ -80,6 +84,8 @@ export function CellContentModal({
   const [allowOtherOption, setAllowOtherOption] = useState(cell.allowOtherOption || false);
   const [inputPlaceholder, setInputPlaceholder] = useState(cell.placeholder || "");
   const [inputMaxLength, setInputMaxLength] = useState<number | "">(cell.inputMaxLength || "");
+  const [minSelections, setMinSelections] = useState<number | undefined>(cell.minSelections);
+  const [maxSelections, setMaxSelections] = useState<number | undefined>(cell.maxSelections);
 
   // 조건부 분기 토글 상태
   const [showBranchSettings, setShowBranchSettings] = useState(false);
@@ -198,6 +204,9 @@ export function CellContentModal({
           contentType === "input" && typeof inputMaxLength === "number"
             ? inputMaxLength
             : undefined,
+        // 체크박스 선택 개수 제한 (체크박스 타입 전용)
+        minSelections: contentType === "checkbox" ? minSelections : undefined,
+        maxSelections: contentType === "checkbox" ? maxSelections : undefined,
         // 셀 병합 속성 추가
         rowspan: isMergeEnabled && typeof rowspan === "number" && rowspan > 1 ? rowspan : undefined,
         colspan: isMergeEnabled && typeof colspan === "number" && colspan > 1 ? colspan : undefined,
@@ -206,7 +215,7 @@ export function CellContentModal({
       // 로컬 스토어 업데이트 (셀 저장)
       onSave(updatedCell);
 
-      // 서버에 질문 업데이트 (테이블 셀이 변경되었으므로 질문의 tableRowsData 업데이트)
+      // 서버에 질문 저장/업데이트
       if (currentQuestionId && currentSurvey.id) {
         const question = currentSurvey.questions.find((q) => q.id === currentQuestionId);
         if (question && question.tableRowsData) {
@@ -216,9 +225,51 @@ export function CellContentModal({
             cells: row.cells.map((c) => (c.id === cell.id ? updatedCell : c)),
           }));
 
-          await updateQuestionAction(currentQuestionId, {
-            tableRowsData: updatedRowsData,
-          });
+          try {
+            if (isValidUUID(currentQuestionId)) {
+              // 이미 DB에 저장된 질문: 업데이트
+              await updateQuestionAction(currentQuestionId, {
+                tableRowsData: updatedRowsData,
+              });
+            } else {
+              // 임시 질문: 생성하고 반환된 UUID로 로컬 스토어의 질문 ID 업데이트
+              const createdQuestion = await createQuestionAction({
+                surveyId: currentSurvey.id,
+                groupId: question.groupId,
+                type: question.type,
+                title: question.title || "",
+                description: question.description,
+                required: question.required ?? false,
+                order: question.order ?? 0,
+                options: question.options,
+                selectLevels: question.selectLevels,
+                tableTitle: question.tableTitle,
+                tableColumns: question.tableColumns,
+                tableRowsData: updatedRowsData,
+                imageUrl: question.imageUrl,
+                videoUrl: question.videoUrl,
+                allowOtherOption: question.allowOtherOption,
+                noticeContent: question.noticeContent,
+                requiresAcknowledgment: question.requiresAcknowledgment,
+                tableValidationRules: question.tableValidationRules,
+                displayCondition: question.displayCondition,
+              });
+
+              // 반환된 UUID로 로컬 스토어의 질문 ID 업데이트
+              if (createdQuestion?.id) {
+                useSurveyBuilderStore.setState((state) => ({
+                  currentSurvey: {
+                    ...state.currentSurvey,
+                    questions: state.currentSurvey.questions.map((q) =>
+                      q.id === currentQuestionId ? { ...q, id: createdQuestion.id } : q,
+                    ),
+                  },
+                }));
+              }
+            }
+          } catch (error) {
+            console.error("질문 저장/업데이트 실패:", error);
+          }
         }
       }
     } catch (error) {
@@ -247,6 +298,8 @@ export function CellContentModal({
     setAllowOtherOption(cell.allowOtherOption || false);
     setInputPlaceholder(cell.placeholder || "");
     setInputMaxLength(cell.inputMaxLength || "");
+    setMinSelections(cell.minSelections);
+    setMaxSelections(cell.maxSelections);
     setIsMergeEnabled(
       (cell.rowspan && cell.rowspan > 1) || (cell.colspan && cell.colspan > 1) || false,
     );
@@ -414,13 +467,18 @@ export function CellContentModal({
     <Dialog
       open={isOpen}
       onOpenChange={(open) => {
-        // 배경 클릭으로 닫히는 것 방지, X 버튼이나 ESC만 닫기 가능
+        // X 버튼이나 ESC만 닫기 가능 (배경 클릭은 onInteractOutside에서 막음)
         if (!open && !isSaving) {
           handleCancel();
         }
       }}
     >
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-2xl max-h-[90vh] overflow-y-auto"
+        onInteractOutside={(e) => {
+          e.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>셀 내용 편집</DialogTitle>
         </DialogHeader>
@@ -951,6 +1009,93 @@ export function CellContentModal({
                 </div>
               )}
             </div>
+
+            {/* 선택 개수 제한 (체크박스 셀 전용) */}
+            {checkboxOptions.length > 0 && (
+              <div className="space-y-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                <Label className="text-base font-medium">선택 개수 제한</Label>
+                <p className="text-sm text-gray-600">
+                  사용자가 선택할 수 있는 최소/최대 개수를 설정할 수 있습니다.
+                </p>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="cell-min-selections" className="text-sm">
+                      최소 선택 개수
+                    </Label>
+                    <Input
+                      id="cell-min-selections"
+                      type="number"
+                      min="1"
+                      max={checkboxOptions.length}
+                      value={minSelections || ""}
+                      onChange={(e) => {
+                        const value =
+                          e.target.value === "" ? undefined : parseInt(e.target.value, 10);
+                        setMinSelections(value);
+                        // 최소값이 최대값보다 크면 최대값 조정
+                        if (
+                          value !== undefined &&
+                          maxSelections !== undefined &&
+                          value > maxSelections
+                        ) {
+                          setMaxSelections(value);
+                        }
+                      }}
+                      placeholder="제한 없음"
+                      className="w-full"
+                    />
+                    <p className="text-xs text-gray-500">
+                      {checkboxOptions.length}개 옵션 중 최소 선택 개수
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cell-max-selections" className="text-sm">
+                      최대 선택 개수
+                    </Label>
+                    <Input
+                      id="cell-max-selections"
+                      type="number"
+                      min={minSelections ? minSelections : 1}
+                      max={checkboxOptions.length}
+                      value={maxSelections || ""}
+                      onChange={(e) => {
+                        const value =
+                          e.target.value === "" ? undefined : parseInt(e.target.value, 10);
+                        setMaxSelections(value);
+                      }}
+                      placeholder="제한 없음"
+                      className="w-full"
+                    />
+                    <p className="text-xs text-gray-500">
+                      {checkboxOptions.length}개 옵션 중 최대 선택 개수
+                    </p>
+                  </div>
+                </div>
+
+                {minSelections !== undefined &&
+                  maxSelections !== undefined &&
+                  minSelections > maxSelections && (
+                    <p className="text-sm text-red-500">
+                      최소 선택 개수는 최대 선택 개수보다 작거나 같아야 합니다.
+                    </p>
+                  )}
+
+                {minSelections !== undefined && minSelections > checkboxOptions.length && (
+                  <p className="text-sm text-red-500">
+                    최소 선택 개수는 옵션 개수보다 작거나 같아야 합니다.
+                  </p>
+                )}
+
+                {maxSelections !== undefined && maxSelections > checkboxOptions.length && (
+                  <p className="text-sm text-red-500">
+                    최대 선택 개수는 옵션 개수보다 작거나 같아야 합니다.
+                  </p>
+                )}
+              </div>
+            )}
+
             {checkboxOptions.length > 0 && (
               <div className="space-y-2">
                 <Label>미리보기</Label>

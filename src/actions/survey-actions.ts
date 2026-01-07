@@ -18,6 +18,7 @@ import {
   getQuestionsBySurvey,
 } from '@/data/surveys';
 import { requireAuth } from '@/lib/auth';
+import { isValidUUID } from '@/lib/utils';
 
 // ========================
 // 설문 변경 액션 (Mutations)
@@ -172,6 +173,7 @@ export async function duplicateSurvey(surveyId: string) {
       allowOtherOption: question.allowOtherOption,
       noticeContent: question.noticeContent,
       requiresAcknowledgment: question.requiresAcknowledgment,
+      placeholder: question.placeholder,
       tableValidationRules: question.tableValidationRules,
       displayCondition: question.displayCondition,
     });
@@ -300,13 +302,16 @@ export async function deleteQuestionGroup(groupId: string) {
 export async function reorderGroups(surveyId: string, groupIds: string[]) {
   await requireAuth();
 
+  // UUID 형식인 그룹 ID만 필터링 (임시 ID는 DB에 없으므로 제외)
+  const validGroupIds = groupIds.filter(id => isValidUUID(id));
+
   // 최상위 그룹(parentGroupId가 null인 그룹)만 순서 변경
   // 각 그룹의 order를 인덱스로 설정
-  for (let i = 0; i < groupIds.length; i++) {
+  for (let i = 0; i < validGroupIds.length; i++) {
     await db
       .update(questionGroups)
       .set({ order: i, updatedAt: new Date() })
-      .where(eq(questionGroups.id, groupIds[i]));
+      .where(eq(questionGroups.id, validGroupIds[i]));
   }
 
   revalidatePath(`/admin/surveys/${surveyId}`);
@@ -335,6 +340,7 @@ export async function createQuestion(data: {
   allowOtherOption?: boolean;
   noticeContent?: string;
   requiresAcknowledgment?: boolean;
+  placeholder?: string;
   tableValidationRules?: QuestionType['tableValidationRules'];
   displayCondition?: QuestionType['displayCondition'];
 }) {
@@ -365,6 +371,7 @@ export async function createQuestion(data: {
     allowOtherOption: data.allowOtherOption,
     noticeContent: data.noticeContent,
     requiresAcknowledgment: data.requiresAcknowledgment,
+    placeholder: data.placeholder,
     tableValidationRules: data.tableValidationRules as NewQuestion['tableValidationRules'],
     displayCondition: data.displayCondition as NewQuestion['displayCondition'],
   };
@@ -395,6 +402,7 @@ export async function updateQuestion(
     allowOtherOption: boolean;
     noticeContent: string;
     requiresAcknowledgment: boolean;
+    placeholder: string;
     tableValidationRules: QuestionType['tableValidationRules'];
     displayCondition: QuestionType['displayCondition'];
   }>
@@ -424,11 +432,14 @@ export async function deleteQuestion(questionId: string) {
 export async function reorderQuestions(questionIds: string[]) {
   await requireAuth();
 
-  for (let i = 0; i < questionIds.length; i++) {
+  // UUID 형식인 질문 ID만 필터링 (임시 ID는 DB에 없으므로 제외)
+  const validQuestionIds = questionIds.filter(id => isValidUUID(id));
+
+  for (let i = 0; i < validQuestionIds.length; i++) {
     await db
       .update(questions)
       .set({ order: i, updatedAt: new Date() })
-      .where(eq(questions.id, questionIds[i]));
+      .where(eq(questions.id, validQuestionIds[i]));
   }
 }
 

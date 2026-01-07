@@ -147,6 +147,26 @@ html {
   margin-top: 0 !important;
   margin-bottom: 0 !important;
   display: inline-block !important;
+  max-width: 100% !important;
+  height: auto !important;
+  object-fit: contain !important;
+}
+
+/* TipTap 이미지 래퍼 컨테이너 - 반응형 처리 */
+.prose div[style*="cursor: pointer"],
+.prose-sm div[style*="cursor: pointer"] {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+/* TipTap 이미지 래퍼 내부 이미지 - 반응형 처리 */
+.prose div[style*="cursor: pointer"] img,
+.prose-sm div[style*="cursor: pointer"] img {
+  max-width: 100% !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain !important;
 }
 
 /* 문단 내 이미지 인라인 배치 - flexbox 사용 */

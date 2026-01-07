@@ -10,7 +10,11 @@ import { Question, QuestionOption, SelectLevel } from "@/types/survey";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
 import { extractImageUrlsFromQuestion } from "@/lib/image-extractor";
 import { deleteImagesFromR2 } from "@/lib/image-utils";
-import { updateQuestion as updateQuestionAction } from "@/actions/survey-actions";
+import {
+  updateQuestion as updateQuestionAction,
+  createQuestion as createQuestionAction,
+} from "@/actions/survey-actions";
+import { isValidUUID } from "@/lib/utils";
 import { UserDefinedMultiSelectPreview } from "./user-defined-multi-select";
 import { DynamicTableEditor } from "./dynamic-table-editor";
 import { TablePreview } from "./table-preview";
@@ -66,8 +70,11 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         tableColumns: question.tableColumns ? [...question.tableColumns] : [],
         tableRowsData: question.tableRowsData ? [...question.tableRowsData] : [],
         allowOtherOption: question.allowOtherOption || false,
+        minSelections: question.minSelections,
+        maxSelections: question.maxSelections,
         noticeContent: question.noticeContent || "",
         requiresAcknowledgment: question.requiresAcknowledgment || false,
+        placeholder: question.placeholder || "",
         tableValidationRules: question.tableValidationRules || [],
         displayCondition: question.displayCondition,
       });
@@ -128,13 +135,53 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
       // 로컬 스토어 업데이트
       updateQuestion(questionId, formData);
 
-      // 서버에 개별 질문 업데이트 API 호출
+      // 서버에 질문 저장/업데이트 API 호출
       if (currentSurvey.id && questionId) {
         try {
-          await updateQuestionAction(questionId, formData);
+          if (isValidUUID(questionId)) {
+            // 이미 DB에 저장된 질문: 업데이트
+            await updateQuestionAction(questionId, formData);
+          } else {
+            // 임시 질문: 생성하고 반환된 UUID로 로컬 스토어의 질문 ID 업데이트
+            const createdQuestion = await createQuestionAction({
+              surveyId: currentSurvey.id,
+              groupId: question?.groupId,
+              type: formData.type || question?.type || "text",
+              title: formData.title || question?.title || "",
+              description: formData.description || question?.description,
+              required: formData.required ?? question?.required ?? false,
+              order: question?.order ?? 0,
+              options: formData.options || question?.options,
+              selectLevels: formData.selectLevels || question?.selectLevels,
+              tableTitle: formData.tableTitle || question?.tableTitle,
+              tableColumns: formData.tableColumns || question?.tableColumns,
+              tableRowsData: formData.tableRowsData || question?.tableRowsData,
+              imageUrl: formData.imageUrl || question?.imageUrl,
+              videoUrl: formData.videoUrl || question?.videoUrl,
+              allowOtherOption: formData.allowOtherOption ?? question?.allowOtherOption,
+              noticeContent: formData.noticeContent || question?.noticeContent,
+              requiresAcknowledgment:
+                formData.requiresAcknowledgment ?? question?.requiresAcknowledgment,
+              placeholder: formData.placeholder || question?.placeholder,
+              tableValidationRules: formData.tableValidationRules || question?.tableValidationRules,
+              displayCondition: formData.displayCondition || question?.displayCondition,
+            });
+
+            // 반환된 UUID로 로컬 스토어의 질문 ID 업데이트
+            if (createdQuestion?.id) {
+              useSurveyBuilderStore.setState((state) => ({
+                currentSurvey: {
+                  ...state.currentSurvey,
+                  questions: state.currentSurvey.questions.map((q) =>
+                    q.id === questionId ? { ...q, id: createdQuestion.id } : q,
+                  ),
+                },
+              }));
+            }
+          }
         } catch (error) {
-          console.error("질문 업데이트 실패:", error);
-          // 업데이트 실패해도 모달은 닫음 (로컬 상태는 이미 업데이트됨)
+          console.error("질문 저장/업데이트 실패:", error);
+          // 저장 실패해도 모달은 닫음 (로컬 상태는 이미 업데이트됨)
         }
       }
 
@@ -367,13 +414,18 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
     <Dialog
       open={isOpen}
       onOpenChange={(open) => {
-        // 배경 클릭으로 닫히는 것 방지, X 버튼이나 ESC만 닫기 가능
+        // X 버튼이나 ESC만 닫기 가능 (배경 클릭은 onInteractOutside에서 막음)
         if (!open && !isSaving) {
           onClose();
         }
       }}
     >
-      <DialogContent className={`${modalSize} max-h-[95vh] flex flex-col p-0`}>
+      <DialogContent
+        className={`${modalSize} max-h-[95vh] flex flex-col p-0`}
+        onInteractOutside={(e) => {
+          e.preventDefault();
+        }}
+      >
         {/* 고정 헤더 */}
         <DialogHeader className="flex-shrink-0 px-6 py-4 border-b border-gray-200">
           <DialogTitle className="flex items-center justify-between">
@@ -512,6 +564,25 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                   />
                   <Label htmlFor="required">필수 질문</Label>
                 </div>
+
+                {/* 단답형 질문용 placeholder 설정 */}
+                {question.type === "text" && (
+                  <div>
+                    <Label htmlFor="placeholder">안내 문구 (Placeholder)</Label>
+                    <Input
+                      id="placeholder"
+                      value={formData.placeholder || ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, placeholder: e.target.value }))
+                      }
+                      placeholder="예: 이름을 입력하세요"
+                      className="mt-2"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      입력 필드에 표시될 안내 문구를 입력하세요
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* 옵션 설정 (radio, checkbox, select) */}
@@ -637,6 +708,94 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                       </p>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* 선택 개수 제한 (checkbox 타입 전용) */}
+              {question?.type === "checkbox" && (
+                <div className="space-y-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                  <Label className="text-base font-medium">선택 개수 제한</Label>
+                  <p className="text-sm text-gray-600">
+                    사용자가 선택할 수 있는 최소/최대 개수를 설정할 수 있습니다.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="min-selections" className="text-sm">
+                        최소 선택 개수
+                      </Label>
+                      <Input
+                        id="min-selections"
+                        type="number"
+                        min="1"
+                        max={formData.options?.length || 0}
+                        value={formData.minSelections || ""}
+                        onChange={(e) => {
+                          const value =
+                            e.target.value === "" ? undefined : parseInt(e.target.value, 10);
+                          setFormData((prev) => ({ ...prev, minSelections: value }));
+                          // 최소값이 최대값보다 크면 최대값 조정
+                          if (
+                            value !== undefined &&
+                            formData.maxSelections !== undefined &&
+                            value > formData.maxSelections
+                          ) {
+                            setFormData((prev) => ({ ...prev, maxSelections: value }));
+                          }
+                        }}
+                        placeholder="제한 없음"
+                        className="w-full"
+                      />
+                      <p className="text-xs text-gray-500">
+                        {formData.options?.length || 0}개 옵션 중 최소 선택 개수
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="max-selections" className="text-sm">
+                        최대 선택 개수
+                      </Label>
+                      <Input
+                        id="max-selections"
+                        type="number"
+                        min={formData.minSelections ? formData.minSelections : 1}
+                        max={formData.options?.length || 0}
+                        value={formData.maxSelections || ""}
+                        onChange={(e) => {
+                          const value =
+                            e.target.value === "" ? undefined : parseInt(e.target.value, 10);
+                          setFormData((prev) => ({ ...prev, maxSelections: value }));
+                        }}
+                        placeholder="제한 없음"
+                        className="w-full"
+                      />
+                      <p className="text-xs text-gray-500">
+                        {formData.options?.length || 0}개 옵션 중 최대 선택 개수
+                      </p>
+                    </div>
+                  </div>
+
+                  {formData.minSelections !== undefined &&
+                    formData.maxSelections !== undefined &&
+                    formData.minSelections > formData.maxSelections && (
+                      <p className="text-sm text-red-500">
+                        최소 선택 개수는 최대 선택 개수보다 작거나 같아야 합니다.
+                      </p>
+                    )}
+
+                  {formData.minSelections !== undefined &&
+                    formData.minSelections > (formData.options?.length || 0) && (
+                      <p className="text-sm text-red-500">
+                        최소 선택 개수는 옵션 개수보다 작거나 같아야 합니다.
+                      </p>
+                    )}
+
+                  {formData.maxSelections !== undefined &&
+                    formData.maxSelections > (formData.options?.length || 0) && (
+                      <p className="text-sm text-red-500">
+                        최대 선택 개수는 옵션 개수보다 작거나 같아야 합니다.
+                      </p>
+                    )}
                 </div>
               )}
 

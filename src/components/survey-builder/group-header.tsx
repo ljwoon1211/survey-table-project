@@ -7,10 +7,11 @@ import { ChevronDown, ChevronRight, FolderOpen } from "lucide-react";
 interface GroupHeaderProps {
   group: QuestionGroup;
   questionCount: number;
+  subGroupCount?: number;
   className?: string;
 }
 
-export function GroupHeader({ group, questionCount, className }: GroupHeaderProps) {
+export function GroupHeader({ group, questionCount, subGroupCount = 0, className }: GroupHeaderProps) {
   const { toggleGroupCollapse } = useSurveyBuilderStore();
 
   const handleToggle = () => {
@@ -40,7 +41,7 @@ export function GroupHeader({ group, questionCount, className }: GroupHeaderProp
       </div>
       <div className="flex items-center space-x-2">
         <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded-full">
-          {questionCount}개 질문
+          {questionCount}개 질문{subGroupCount > 0 && ` • ${subGroupCount}개 하위그룹`}
         </span>
       </div>
     </div>

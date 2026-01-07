@@ -71,8 +71,8 @@ export function DynamicTableEditor({
     columns.length > 0
       ? columns
       : [
-          { id: "col-1", label: "열 1", width: 150, minWidth: 60 },
-          { id: "col-2", label: "열 2", width: 150, minWidth: 60 },
+          { id: "col-1", label: "열 1", width: 150 },
+          { id: "col-2", label: "열 2", width: 150 },
         ],
   );
   const [currentRows, setCurrentRows] = useState<TableRow[]>(() => {
@@ -144,7 +144,7 @@ export function DynamicTableEditor({
   const handleColumnWidthChange = useCallback(
     (columnIndex: number, width: number) => {
       const updatedColumns = currentColumns.map((col, index) =>
-        index === columnIndex ? { ...col, width: Math.max(60, width) } : col,
+        index === columnIndex ? { ...col, width: Math.max(0, width) } : col,
       );
 
       setCurrentColumns(updatedColumns);
@@ -216,7 +216,6 @@ export function DynamicTableEditor({
       id: `col-${Date.now()}`,
       label: `열 ${currentColumns.length + 1}`,
       width: 150, // 기본 너비
-      minWidth: 60, // 최소 너비
     };
 
     const updatedColumns = [...currentColumns, newColumn];
@@ -333,9 +332,35 @@ export function DynamicTableEditor({
   const deleteRow = (rowIndex: number) => {
     if (currentRows.length <= 1) return; // 최소 1개 행 유지
 
-    const updatedRows = currentRows.filter((_, index) => index !== rowIndex);
-    setCurrentRows(updatedRows);
-    notifyChange(currentTitle, currentColumns, updatedRows);
+    // 행 삭제 전에, 삭제되는 행에 병합된 셀이 있는지 확인하고 rowspan 조정
+    const updatedRows = currentRows
+      .map((row, rIndex) => {
+        // 삭제되는 행 위쪽의 행들에서 rowspan 조정
+        if (rIndex < rowIndex) {
+          return {
+            ...row,
+            cells: row.cells.map((cell) => {
+              const rowspan = cell.rowspan || 1;
+              // rowspan이 삭제되는 행까지 미치는 경우 조정
+              if (rIndex + rowspan > rowIndex) {
+                const newRowspan = Math.max(1, rowspan - 1);
+                return {
+                  ...cell,
+                  rowspan: newRowspan > 1 ? newRowspan : undefined,
+                };
+              }
+              return cell;
+            }),
+          };
+        }
+        return row;
+      })
+      .filter((_, index) => index !== rowIndex); // 삭제되는 행 제거
+
+    // 병합된 셀로 인해 숨겨져야 하는 셀들을 재계산
+    const finalRows = recalculateHiddenCells(updatedRows);
+    setCurrentRows(finalRows);
+    notifyChange(currentTitle, currentColumns, finalRows);
   };
 
   // 행 제목 업데이트
@@ -491,7 +516,7 @@ export function DynamicTableEditor({
         );
       case "radio":
         return cell.radioOptions && cell.radioOptions.length > 0 ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center gap-2">
             <Circle className="w-4 h-4 text-purple-500" />
             <span className="text-sm text-gray-600 truncate">
               라디오 ({cell.radioOptions.length}개)
@@ -660,7 +685,6 @@ export function DynamicTableEditor({
                       className="border border-gray-300 p-2 bg-gray-50 relative"
                       style={{
                         width: column.width ? `${column.width}px` : "150px",
-                        minWidth: column.minWidth ? `${column.minWidth}px` : "60px",
                       }}
                     >
                       <div className="space-y-2">
@@ -688,7 +712,7 @@ export function DynamicTableEditor({
                             <div className="flex items-center gap-1">
                               <Input
                                 type="number"
-                                min={60}
+                                min={0}
                                 value={editingColumnWidth.value}
                                 onChange={(e) => {
                                   setEditingColumnWidth({
@@ -698,7 +722,7 @@ export function DynamicTableEditor({
                                 }}
                                 onBlur={() => {
                                   const width = parseInt(editingColumnWidth.value);
-                                  if (!isNaN(width) && width >= 60) {
+                                  if (!isNaN(width) && width >= 0) {
                                     handleColumnWidthChange(columnIndex, width);
                                   }
                                   setEditingColumnWidth(null);
@@ -706,7 +730,7 @@ export function DynamicTableEditor({
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter") {
                                     const width = parseInt(editingColumnWidth.value);
-                                    if (!isNaN(width) && width >= 60) {
+                                    if (!isNaN(width) && width >= 0) {
                                       handleColumnWidthChange(columnIndex, width);
                                     }
                                     setEditingColumnWidth(null);
@@ -743,7 +767,11 @@ export function DynamicTableEditor({
               {/* 데이터 행들 */}
               <tbody>
                 {currentRows.map((row, rowIndex) => (
-                  <tr key={row.id} style={{ height: row.height ? `${row.height}px` : "60px" }}>
+                  <tr
+                    key={row.id}
+                    style={{ height: row.height ? `${row.height}px` : "60px" }}
+                    className="group/row"
+                  >
                     {/* 셀들 */}
                     {row.cells.map((cell, cellIndex) => {
                       // 숨겨진 셀은 렌더링하지 않음
@@ -757,7 +785,9 @@ export function DynamicTableEditor({
                       return (
                         <td
                           key={cell.id}
-                          className="border border-gray-300 p-2 relative"
+                          className={`border border-gray-300 p-2 relative ${
+                            cell.type === "radio" ? "text-center" : ""
+                          }`}
                           style={{
                             width: column?.width ? `${column.width}px` : "150px",
                             maxWidth: column?.width ? `${column.width}px` : "150px",
@@ -767,15 +797,38 @@ export function DynamicTableEditor({
                           colSpan={colspan}
                         >
                           <div
-                            className="h-full group cursor-pointer hover:bg-gray-50 rounded p-2 transition-colors flex flex-col"
+                            className={`h-full group cursor-pointer hover:bg-gray-50 rounded p-2 transition-colors flex flex-col relative ${
+                              cell.type === "radio" ? "items-center justify-center" : ""
+                            }`}
                             onClick={() => setSelectedCell({ rowId: row.id, cellId: cell.id })}
                             style={{
                               minHeight: row.minHeight ? `${row.minHeight - 16}px` : "40px",
                             }}
                           >
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex-1">{renderCellContent(cell)}</div>
+                            <div
+                              className={`flex items-start justify-between mb-2 ${
+                                cell.type === "radio" ? "w-full justify-center" : ""
+                              }`}
+                            >
+                              <div className={cell.type === "radio" ? "" : "flex-1"}>
+                                {renderCellContent(cell)}
+                              </div>
                               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {/* 행 삭제 버튼 - 첫 번째 셀에만 표시 */}
+                                {cellIndex === 0 && currentRows.length > 1 && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deleteRow(rowIndex);
+                                    }}
+                                    title="행 삭제"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                )}
                                 <Button
                                   size="sm"
                                   variant="ghost"

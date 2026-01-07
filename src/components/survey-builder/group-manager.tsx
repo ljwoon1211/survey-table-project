@@ -61,6 +61,7 @@ interface SortableGroupItemProps {
   onAddSubGroup: (parentGroupId: string) => void;
   isDragOver?: boolean;
   isDragging?: boolean;
+  totalSubGroupCount?: number;
 }
 
 function SortableGroupItem({
@@ -74,6 +75,7 @@ function SortableGroupItem({
   onAddSubGroup,
   isDragOver = false,
   isDragging: isDraggingProp = false,
+  totalSubGroupCount = 0,
 }: SortableGroupItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: group.id,
@@ -121,7 +123,7 @@ function SortableGroupItem({
             <p className="text-sm font-medium text-gray-900 truncate">{group.name}</p>
             <p className="text-xs text-gray-500">
               {questionCount}개 질문
-              {hasSubGroups && ` • ${subGroups.length}개 하위그룹`}
+              {totalSubGroupCount > 0 && ` • ${totalSubGroupCount}개 하위그룹`}
             </p>
           </div>
         </div>
@@ -209,9 +211,29 @@ export function GroupManager({ className }: GroupManagerProps) {
     }),
   );
 
-  // 각 그룹에 속한 질문 개수 계산
-  const getQuestionCount = (groupId: string) => {
+  // 각 그룹에 직접 속한 질문 개수 계산
+  const getDirectQuestionCount = (groupId: string) => {
     return currentSurvey.questions.filter((q) => q.groupId === groupId).length;
+  };
+
+  // 재귀적으로 그룹과 모든 하위 그룹의 질문 개수 합계 계산
+  const getTotalQuestionCount = (groupId: string): number => {
+    const directCount = getDirectQuestionCount(groupId);
+    const subGroups = getSubGroups(groupId);
+    const subGroupsCount = subGroups.reduce((sum, subGroup) => {
+      return sum + getTotalQuestionCount(subGroup.id);
+    }, 0);
+    return directCount + subGroupsCount;
+  };
+
+  // 재귀적으로 모든 하위 그룹 개수 계산 (직접 하위 + 하위의 하위)
+  const getTotalSubGroupCount = (groupId: string): number => {
+    const directSubGroups = getSubGroups(groupId);
+    const directCount = directSubGroups.length;
+    const nestedCount = directSubGroups.reduce((sum, subGroup) => {
+      return sum + getTotalSubGroupCount(subGroup.id);
+    }, 0);
+    return directCount + nestedCount;
   };
 
   const handleCreateGroup = async () => {
@@ -593,7 +615,7 @@ export function GroupManager({ className }: GroupManagerProps) {
                     <div key={group.id}>
                       <SortableGroupItem
                         group={group}
-                        questionCount={getQuestionCount(group.id)}
+                        questionCount={getTotalQuestionCount(group.id)}
                         subGroups={subGroups}
                         isExpanded={isExpanded}
                         onEdit={handleEditGroup}
@@ -602,6 +624,7 @@ export function GroupManager({ className }: GroupManagerProps) {
                         onAddSubGroup={handleOpenCreateModal}
                         isDragOver={isDragOver}
                         isDragging={isDragging}
+                        totalSubGroupCount={getTotalSubGroupCount(group.id)}
                       />
 
                       {/* 하위 그룹 렌더링 */}
@@ -620,7 +643,7 @@ export function GroupManager({ className }: GroupManagerProps) {
                                 <div key={subGroup.id}>
                                   <SortableGroupItem
                                     group={subGroup}
-                                    questionCount={getQuestionCount(subGroup.id)}
+                                    questionCount={getTotalQuestionCount(subGroup.id)}
                                     subGroups={[]}
                                     isExpanded={false}
                                     onEdit={handleEditGroup}
@@ -629,6 +652,7 @@ export function GroupManager({ className }: GroupManagerProps) {
                                     onAddSubGroup={handleOpenCreateModal}
                                     isDragOver={isSubDragOver}
                                     isDragging={isSubDragging}
+                                    totalSubGroupCount={getTotalSubGroupCount(subGroup.id)}
                                   />
                                 </div>
                               );

@@ -40,6 +40,7 @@ import { TablePreview } from "./table-preview";
 import { NoticeRenderer } from "./notice-renderer";
 import { GroupHeader } from "./group-header";
 import { convertHtmlImageUrlsToProxy } from "@/lib/image-utils";
+import { isValidUUID } from "@/lib/utils";
 import {
   GripVertical,
   Settings,
@@ -214,7 +215,13 @@ function SortableQuestion({
 function QuestionPreview({ question }: { question: Question }) {
   switch (question.type) {
     case "text":
-      return <Input placeholder="답변을 입력하세요..." disabled className="bg-white" />;
+      return (
+        <Input
+          placeholder={question.placeholder || "답변을 입력하세요..."}
+          disabled
+          className="bg-white"
+        />
+      );
 
     case "textarea":
       return (
@@ -343,7 +350,7 @@ function QuestionTestInput({
     case "text":
       return (
         <Input
-          placeholder="답변을 입력하세요..."
+          placeholder={question.placeholder || "답변을 입력하세요..."}
           value={value || ""}
           onChange={(e) => onChange(e.target.value)}
           className="w-full"
@@ -386,32 +393,56 @@ function QuestionTestInput({
       );
 
     case "checkbox":
+      const currentValues = Array.isArray(value) ? value : [];
+      const currentCount = currentValues.length;
+      const maxSelections = question.maxSelections;
+      const minSelections = question.minSelections;
+      const isMaxReached = maxSelections !== undefined && maxSelections > 0 && currentCount >= maxSelections;
+      const isMinNotMet = minSelections !== undefined && minSelections > 0 && currentCount < minSelections;
+
+      const canSelect = (optionValue: string) => {
+        if (currentValues.includes(optionValue)) return true; // 이미 선택된 것은 해제 가능
+        if (isMaxReached) return false; // 최대 개수 도달 시 추가 선택 불가
+        return true;
+      };
+
       return (
         <div className="space-y-3">
           {question.options?.map((option) => {
-            const currentValues = Array.isArray(value) ? value : [];
             const isChecked = currentValues.includes(option.value);
+            const disabled = !canSelect(option.value);
 
             return (
               <div key={option.id} className="flex items-center space-x-3">
                 <input
                   type="checkbox"
                   checked={isChecked}
+                  disabled={disabled}
                   onChange={(e) => {
-                    const newValues = e.target.checked
-                      ? [...currentValues, option.value]
-                      : currentValues.filter((v) => v !== option.value);
-                    onChange(newValues);
+                    if (e.target.checked) {
+                      // 최대 선택 개수 체크
+                      if (isMaxReached) return;
+                      onChange([...currentValues, option.value]);
+                    } else {
+                      onChange(currentValues.filter((v) => v !== option.value));
+                    }
                   }}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  className={`w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 ${
+                    disabled ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
                 />
                 <label
-                  className="text-sm text-gray-700 cursor-pointer flex-1"
+                  className={`text-sm text-gray-700 flex-1 ${
+                    disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                  }`}
                   onClick={() => {
-                    const newValues = isChecked
-                      ? currentValues.filter((v) => v !== option.value)
-                      : [...currentValues, option.value];
-                    onChange(newValues);
+                    if (disabled) return;
+                    if (isChecked) {
+                      onChange(currentValues.filter((v) => v !== option.value));
+                    } else {
+                      if (isMaxReached) return;
+                      onChange([...currentValues, option.value]);
+                    }
                   }}
                 >
                   {option.label}
@@ -419,6 +450,29 @@ function QuestionTestInput({
               </div>
             );
           })}
+          
+          {/* 선택 개수 표시 */}
+          {(maxSelections !== undefined || minSelections !== undefined) && (
+            <div className="pt-2 border-t border-gray-200">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">
+                  {maxSelections !== undefined && maxSelections > 0
+                    ? `${currentCount}/${maxSelections}개 선택됨`
+                    : `${currentCount}개 선택됨`}
+                </span>
+                {isMinNotMet && (
+                  <span className="text-orange-600">
+                    최소 {minSelections}개 이상 선택해주세요
+                  </span>
+                )}
+                {isMaxReached && (
+                  <span className="text-blue-600">
+                    최대 선택 개수에 도달했습니다
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       );
 
@@ -547,6 +601,26 @@ export function SortableQuestionList({
     return acc;
   }, {} as Record<string, Question[]>);
 
+  // 재귀적으로 그룹과 모든 하위 그룹의 질문 개수 합계 계산
+  const getTotalQuestionCount = (groupId: string): number => {
+    const directCount = (questionsByGroup[groupId] || []).length;
+    const subGroups = getSubGroups(groupId);
+    const subGroupsCount = subGroups.reduce((sum, subGroup) => {
+      return sum + getTotalQuestionCount(subGroup.id);
+    }, 0);
+    return directCount + subGroupsCount;
+  };
+
+  // 재귀적으로 모든 하위 그룹 개수 계산 (직접 하위 + 하위의 하위)
+  const getTotalSubGroupCount = (groupId: string): number => {
+    const directSubGroups = getSubGroups(groupId);
+    const directCount = directSubGroups.length;
+    const nestedCount = directSubGroups.reduce((sum, subGroup) => {
+      return sum + getTotalSubGroupCount(subGroup.id);
+    }, 0);
+    return directCount + nestedCount;
+  };
+
   // 그룹 없는 질문들
   const ungroupedQuestions = questionsByGroup["ungrouped"] || [];
 
@@ -627,11 +701,13 @@ export function SortableQuestionList({
       // 로컬 스토어에서 삭제
       deleteQuestion(questionId);
 
-      // 서버에 질문 삭제 API 호출
-      try {
-        await deleteQuestionAction(questionId);
-      } catch (error) {
-        console.error("질문 삭제 실패:", error);
+      // UUID 형식인 경우에만 서버에 질문 삭제 API 호출 (임시 질문은 DB에 없으므로 호출 불필요)
+      if (isValidUUID(questionId)) {
+        try {
+          await deleteQuestionAction(questionId);
+        } catch (error) {
+          console.error("질문 삭제 실패:", error);
+        }
       }
     }
   };
@@ -751,7 +827,11 @@ export function SortableQuestionList({
 
           return (
             <div key={group.id} className="space-y-4">
-              <GroupHeader group={group} questionCount={groupQuestions.length} />
+              <GroupHeader 
+                group={group} 
+                questionCount={getTotalQuestionCount(group.id)}
+                subGroupCount={getTotalSubGroupCount(group.id)}
+              />
               {!group.collapsed && (
                 <>
                   {/* 최상위 그룹의 질문들 */}
@@ -773,7 +853,11 @@ export function SortableQuestionList({
 
                     return (
                       <div key={subGroup.id} className="ml-4 space-y-4">
-                        <GroupHeader group={subGroup} questionCount={subGroupQuestions.length} />
+                        <GroupHeader 
+                          group={subGroup} 
+                          questionCount={getTotalQuestionCount(subGroup.id)}
+                          subGroupCount={getTotalSubGroupCount(subGroup.id)}
+                        />
                         {!subGroup.collapsed && (
                           <div className="space-y-4 pl-4">
                             {subGroupQuestions.map((question) => (
@@ -835,7 +919,11 @@ export function SortableQuestionList({
 
               return (
                 <div key={group.id} className="space-y-4">
-                  <GroupHeader group={group} questionCount={groupQuestions.length} />
+                  <GroupHeader 
+                    group={group} 
+                    questionCount={getTotalQuestionCount(group.id)}
+                    subGroupCount={getTotalSubGroupCount(group.id)}
+                  />
                   {!group.collapsed && (
                     <>
                       {/* 최상위 그룹의 질문들 */}
@@ -870,7 +958,8 @@ export function SortableQuestionList({
                           <div key={subGroup.id} className="ml-4 space-y-4">
                             <GroupHeader
                               group={subGroup}
-                              questionCount={subGroupQuestions.length}
+                              questionCount={getTotalQuestionCount(subGroup.id)}
+                              subGroupCount={getTotalSubGroupCount(subGroup.id)}
                             />
                             {!subGroup.collapsed && (
                               <div className="space-y-4 pl-4">

@@ -75,9 +75,16 @@ export const questions = pgTable('questions', {
   // 기타 옵션
   allowOtherOption: boolean('allow_other_option').default(false),
 
+  // 체크박스 선택 개수 제한 (checkbox 타입 전용)
+  minSelections: integer('min_selections'),
+  maxSelections: integer('max_selections'),
+
   // 공지사항용
   noticeContent: text('notice_content'),
   requiresAcknowledgment: boolean('requires_acknowledgment').default(false),
+
+  // 단답형(text) 타입용
+  placeholder: text('placeholder'),
 
   // 검증 규칙 및 조건부 표시
   tableValidationRules: jsonb('table_validation_rules').$type<TableValidationRule[]>(),
@@ -201,6 +208,8 @@ interface TableCell {
   allowOtherOption?: boolean;
   placeholder?: string;
   inputMaxLength?: number;
+  minSelections?: number;
+  maxSelections?: number;
   rowspan?: number;
   colspan?: number;
   isHidden?: boolean;
@@ -275,8 +284,11 @@ interface QuestionData {
   videoUrl?: string;
   order: number;
   allowOtherOption?: boolean;
+  minSelections?: number;
+  maxSelections?: number;
   noticeContent?: string;
   requiresAcknowledgment?: boolean;
+  placeholder?: string;
   tableValidationRules?: TableValidationRule[];
   displayCondition?: QuestionConditionGroup;
 }

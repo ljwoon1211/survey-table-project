@@ -143,12 +143,27 @@ export function InteractiveTableResponse({
   };
 
   // 체크박스 변경 핸들러
-  const handleCheckboxChange = (cellId: string, optionId: string, checked: boolean) => {
+  const handleCheckboxChange = (
+    cellId: string,
+    optionId: string,
+    checked: boolean,
+    cell: TableCell,
+  ) => {
     const currentCellResponse = currentResponse[cellId] || [];
     let updatedResponse;
     const isOtherOption = optionId === "other-option";
 
     if (checked) {
+      // 최대 선택 개수 체크
+      const maxSelections = cell.maxSelections;
+      if (maxSelections !== undefined && maxSelections > 0) {
+        const currentCount = currentCellResponse.length;
+        if (currentCount >= maxSelections) {
+          // 최대 개수 도달 시 추가 선택 불가
+          return;
+        }
+      }
+
       if (isOtherOption) {
         updatedResponse = [
           ...currentCellResponse,
@@ -263,27 +278,55 @@ export function InteractiveTableResponse({
 
     switch (cell.type) {
       case "checkbox":
-        return cell.checkboxOptions && cell.checkboxOptions.length > 0 ? (
+        if (!cell.checkboxOptions || cell.checkboxOptions.length === 0) {
+          return (
+            <div className="flex items-center gap-2 text-gray-500">
+              <span className="text-sm">체크박스 없음</span>
+            </div>
+          );
+        }
+
+        const cellResponseArray = Array.isArray(cellResponse) ? cellResponse : [];
+        const currentCount = cellResponseArray.length;
+        const maxSelections = cell.maxSelections;
+        const minSelections = cell.minSelections;
+        const isMaxReached =
+          maxSelections !== undefined && maxSelections > 0 && currentCount >= maxSelections;
+        const isMinNotMet =
+          minSelections !== undefined && minSelections > 0 && currentCount < minSelections;
+
+        const canSelect = (optionId: string) => {
+          const isChecked = cellResponseArray.some((item: string | object) => {
+            if (typeof item === "object" && item !== null && "optionId" in item) {
+              return (item as { optionId: string }).optionId === optionId;
+            }
+            return item === optionId;
+          });
+          if (isChecked) return true; // 이미 선택된 것은 해제 가능
+          if (isMaxReached) return false; // 최대 개수 도달 시 추가 선택 불가
+          return true;
+        };
+
+        return (
           <div className="space-y-2">
             {cell.checkboxOptions.map((option) => {
-              const isChecked =
-                Array.isArray(cellResponse) &&
-                cellResponse.some((item: string | object) => {
-                  if (typeof item === "object" && item !== null && "optionId" in item) {
-                    return (item as { optionId: string }).optionId === option.id;
-                  }
-                  return item === option.id;
-                });
+              const isChecked = cellResponseArray.some((item: string | object) => {
+                if (typeof item === "object" && item !== null && "optionId" in item) {
+                  return (item as { optionId: string }).optionId === option.id;
+                }
+                return item === option.id;
+              });
 
-              const otherValue = Array.isArray(cellResponse)
-                ? cellResponse.find(
-                    (item: string | object) =>
-                      typeof item === "object" &&
-                      item !== null &&
-                      "optionId" in item &&
-                      (item as { optionId: string; otherValue?: string }).optionId === option.id,
-                  )?.otherValue || ""
-                : "";
+              const otherValue =
+                cellResponseArray.find(
+                  (item: string | object) =>
+                    typeof item === "object" &&
+                    item !== null &&
+                    "optionId" in item &&
+                    (item as { optionId: string; otherValue?: string }).optionId === option.id,
+                )?.otherValue || "";
+
+              const disabled = !canSelect(option.id);
 
               return (
                 <div key={option.id} className="space-y-1">
@@ -292,12 +335,19 @@ export function InteractiveTableResponse({
                       type="checkbox"
                       id={`${cell.id}-${option.id}`}
                       checked={isChecked}
-                      onChange={(e) => handleCheckboxChange(cell.id, option.id, e.target.checked)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      disabled={disabled}
+                      onChange={(e) =>
+                        handleCheckboxChange(cell.id, option.id, e.target.checked, cell)
+                      }
+                      className={`rounded border-gray-300 text-blue-600 focus:ring-blue-500 ${
+                        disabled ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
                     />
                     <label
                       htmlFor={`${cell.id}-${option.id}`}
-                      className="text-sm cursor-pointer select-none"
+                      className={`text-sm select-none ${
+                        disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                      }`}
                     >
                       {option.label}
                     </label>
@@ -315,10 +365,23 @@ export function InteractiveTableResponse({
                 </div>
               );
             })}
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 text-gray-500">
-            <span className="text-sm">체크박스 없음</span>
+
+            {/* 선택 개수 표시 */}
+            {(maxSelections !== undefined || minSelections !== undefined) && (
+              <div className="pt-2 border-t border-gray-200 mt-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-600">
+                    {maxSelections !== undefined && maxSelections > 0
+                      ? `${currentCount}/${maxSelections}개 선택됨`
+                      : `${currentCount}개 선택됨`}
+                  </span>
+                  {isMinNotMet && (
+                    <span className="text-orange-600">최소 {minSelections}개 이상</span>
+                  )}
+                  {isMaxReached && <span className="text-blue-600">최대 도달</span>}
+                </div>
+              </div>
+            )}
           </div>
         );
 

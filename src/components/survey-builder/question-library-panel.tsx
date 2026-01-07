@@ -121,6 +121,8 @@ export function QuestionLibraryPanel({
   const [previewQuestion, setPreviewQuestion] = useState<SavedQuestion | null>(null);
   const [showBranchWarning, setShowBranchWarning] = useState(false);
   const [pendingQuestion, setPendingQuestion] = useState<SavedQuestion | null>(null);
+  const [isAddingMultiple, setIsAddingMultiple] = useState(false);
+  const [addingQuestionIds, setAddingQuestionIds] = useState<Set<string>>(new Set());
 
   // 검색 쿼리 (enabled 옵션으로 검색어가 있을 때만 실행)
   const { data: searchResults = [] } = useSearchQuestions(searchQuery.trim());
@@ -167,6 +169,11 @@ export function QuestionLibraryPanel({
 
   // 질문 추가 처리
   const handleAddQuestion = async (savedQuestion: SavedQuestion, removeBranch: boolean = false) => {
+    // 중복 실행 방지
+    if (addingQuestionIds.has(savedQuestion.id)) {
+      return;
+    }
+
     // 분기 로직 체크
     if (!removeBranch && hasBranchLogic(savedQuestion.question)) {
       setPendingQuestion(savedQuestion);
@@ -174,9 +181,17 @@ export function QuestionLibraryPanel({
       return;
     }
 
+    setAddingQuestionIds((prev) => new Set(prev).add(savedQuestion.id));
     try {
       let questionToAdd = await applyQuestion(savedQuestion.id);
-      if (!questionToAdd) return;
+      if (!questionToAdd) {
+        setAddingQuestionIds((prev) => {
+          const next = new Set(prev);
+          next.delete(savedQuestion.id);
+          return next;
+        });
+        return;
+      }
 
       // 분기 로직 제거 옵션
       if (removeBranch) {
@@ -197,23 +212,43 @@ export function QuestionLibraryPanel({
       });
     } catch (error) {
       console.error("질문 추가 실패:", error);
+    } finally {
+      setAddingQuestionIds((prev) => {
+        const next = new Set(prev);
+        next.delete(savedQuestion.id);
+        return next;
+      });
     }
   };
 
   // 선택된 질문들 일괄 추가
   const handleAddSelectedQuestions = async () => {
+    // 중복 실행 방지
+    if (isAddingMultiple || selectedQuestions.size === 0) {
+      return;
+    }
+
+    setIsAddingMultiple(true);
     try {
-      const questions = await applyMultipleQuestions(Array.from(selectedQuestions));
-      questions.forEach((q) => {
-        if (onAddQuestion) {
-          onAddQuestion(q);
-        } else {
-          addPreparedQuestion(q);
-        }
-      });
+      const questionIds = Array.from(selectedQuestions);
+      const questions = await applyMultipleQuestions(questionIds);
+      
+      // 중복 방지를 위해 한 번만 추가
+      if (questions && questions.length > 0) {
+        questions.forEach((q) => {
+          if (onAddQuestion) {
+            onAddQuestion(q);
+          } else {
+            addPreparedQuestion(q);
+          }
+        });
+      }
+      
       setSelectedQuestions(new Set());
     } catch (error) {
       console.error("일괄 질문 추가 실패:", error);
+    } finally {
+      setIsAddingMultiple(false);
     }
   };
 
@@ -416,9 +451,14 @@ export function QuestionLibraryPanel({
             >
               취소
             </Button>
-            <Button size="sm" className="h-7 text-xs" onClick={handleAddSelectedQuestions}>
+            <Button 
+              size="sm" 
+              className="h-7 text-xs" 
+              onClick={handleAddSelectedQuestions}
+              disabled={isAddingMultiple || selectedQuestions.size === 0}
+            >
               <Plus className="w-3 h-3 mr-1" />
-              모두 추가
+              {isAddingMultiple ? "추가 중..." : "모두 추가"}
             </Button>
           </div>
         </div>
@@ -585,20 +625,29 @@ export function QuestionLibraryPanel({
                 variant="outline"
                 className="w-full justify-start"
                 onClick={async () => {
-                  if (pendingQuestion) {
-                    try {
-                      // 분기 로직 유지
-                      const question = await applyQuestion(pendingQuestion.id);
-                      if (question) {
-                        if (onAddQuestion) {
-                          onAddQuestion(question);
-                        } else {
-                          addPreparedQuestion(question);
-                        }
+                  if (!pendingQuestion || addingQuestionIds.has(pendingQuestion.id)) {
+                    return;
+                  }
+                  
+                  setAddingQuestionIds((prev) => new Set(prev).add(pendingQuestion.id));
+                  try {
+                    // 분기 로직 유지
+                    const question = await applyQuestion(pendingQuestion.id);
+                    if (question) {
+                      if (onAddQuestion) {
+                        onAddQuestion(question);
+                      } else {
+                        addPreparedQuestion(question);
                       }
-                    } catch (error) {
-                      console.error("질문 적용 실패:", error);
                     }
+                  } catch (error) {
+                    console.error("질문 적용 실패:", error);
+                  } finally {
+                    setAddingQuestionIds((prev) => {
+                      const next = new Set(prev);
+                      next.delete(pendingQuestion.id);
+                      return next;
+                    });
                   }
                   setShowBranchWarning(false);
                   setPendingQuestion(null);

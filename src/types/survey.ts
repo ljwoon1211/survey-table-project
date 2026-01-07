@@ -93,6 +93,9 @@ export interface TableCell {
   // input 관련 속성
   placeholder?: string; // 단문형 입력 필드 placeholder
   inputMaxLength?: number; // 단문형 입력 필드 최대 길이
+  // 체크박스 선택 개수 제한 (체크박스 타입 셀 전용)
+  minSelections?: number; // 최소 선택 개수
+  maxSelections?: number; // 최대 선택 개수
   // 셀 병합 관련 속성
   rowspan?: number; // 행 병합 (세로)
   colspan?: number; // 열 병합 (가로)
@@ -173,9 +176,14 @@ export interface Question {
   videoUrl?: string;
   order: number;
   allowOtherOption?: boolean; // 기타 옵션 허용 여부 (radio, checkbox, select용)
+  // 체크박스 선택 개수 제한 (checkbox 타입 전용)
+  minSelections?: number; // 최소 선택 개수
+  maxSelections?: number; // 최대 선택 개수
   // 공지사항(notice) 타입용
   noticeContent?: string; // TipTap HTML 콘텐츠
   requiresAcknowledgment?: boolean; // 이해했다는 체크 필요 여부
+  // 단답형(text) 타입용
+  placeholder?: string; // 입력 필드 placeholder
   // 테이블 검증 규칙 (테이블 타입 전용)
   tableValidationRules?: TableValidationRule[];
   // 질문 표시 조건 (이 질문을 표시하기 위한 조건)
