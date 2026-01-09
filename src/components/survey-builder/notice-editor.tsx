@@ -420,8 +420,8 @@ export function NoticeEditor({
     // 첫 번째 행에서 열 수 계산
     let colCount = 0;
     const firstRow = tableNode.firstChild;
-    if (firstRow) {
-      firstRow.forEach((cell) => {
+    if (firstRow && firstRow.content) {
+      firstRow.content.forEach((cell: { attrs: { colspan?: number } }) => {
         const colspan = cell.attrs.colspan || 1;
         colCount += colspan;
       });
@@ -437,7 +437,7 @@ export function NoticeEditor({
     const { tr } = state;
     let modified = false;
 
-    tableNode.descendants((node, pos) => {
+    tableNode.descendants((node: { type: { name: string }; attrs: { colspan?: number; colwidth?: number[] } }, pos: number) => {
       if (node.type.name === "tableCell" || node.type.name === "tableHeader") {
         const colspan = node.attrs.colspan || 1;
         const newColwidth = Array(colspan).fill(equalWidth);

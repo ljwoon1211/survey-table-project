@@ -118,7 +118,10 @@ export function hasBranchLogic(question: Question): boolean {
 }
 
 export function removeBranchLogic(question: Question): Question {
-  const cleanedQuestion = { ...question };
+  const cleanedQuestion: Question = { 
+    ...question,
+    groupId: undefined, // 라이브러리에서 가져온 질문은 그룹 ID를 제거
+  };
 
   if (cleanedQuestion.options) {
     cleanedQuestion.options = cleanedQuestion.options.map(opt => {

@@ -198,6 +198,12 @@ export function QuestionLibraryPanel({
         questionToAdd = removeBranchLogic(questionToAdd);
       }
 
+      // 라이브러리에서 가져온 질문은 그룹 ID를 제거
+      questionToAdd = {
+        ...questionToAdd,
+        groupId: undefined,
+      };
+
       if (onAddQuestion) {
         onAddQuestion(questionToAdd);
       } else {

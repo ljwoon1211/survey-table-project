@@ -443,7 +443,7 @@ export const QuestionConditionEditor = forwardRef<
                                   );
                                 })}
                               </div>
-                              {condition.tableConditions?.rowIds.length === 0 && (
+                              {(condition.tableConditions?.rowIds?.length ?? 0) === 0 && (
                                 <p className="text-xs text-red-600">
                                   최소 1개 이상의 행을 선택해주세요
                                 </p>
@@ -507,7 +507,8 @@ export const QuestionConditionEditor = forwardRef<
                             </div>
 
                             {/* 확인할 옵션 선택 (검증 규칙과 동일한 로직) */}
-                            {condition.tableConditions?.rowIds.length > 0 &&
+                            {condition.tableConditions?.rowIds &&
+                              condition.tableConditions.rowIds.length > 0 &&
                               condition.tableConditions?.cellColumnIndex !== undefined &&
                               sourceQuestion && (
                                 <TableOptionSelector
@@ -625,8 +626,8 @@ export const QuestionConditionEditor = forwardRef<
                                     <TableOptionSelector
                                       question={sourceQuestion}
                                       rowIds={
-                                        condition.tableConditions?.rowIds.length > 0
-                                          ? condition.tableConditions.rowIds
+                                        (condition.tableConditions?.rowIds?.length ?? 0) > 0
+                                          ? condition.tableConditions?.rowIds ?? []
                                           : sourceQuestion.tableRowsData?.map((r) => r.id) || []
                                       }
                                       colIndex={condition.additionalConditions.cellColumnIndex}
@@ -641,8 +642,8 @@ export const QuestionConditionEditor = forwardRef<
                                       }}
                                       helpText="선택한 옵션들 중 하나가 선택되었는지 확인합니다. 비워두면 아무거나 선택되었는지만 확인합니다."
                                       multipleRows={
-                                        (condition.tableConditions?.rowIds.length || 0) > 1 ||
-                                        !condition.tableConditions?.rowIds.length
+                                        (condition.tableConditions?.rowIds?.length ?? 0) > 1 ||
+                                        (condition.tableConditions?.rowIds?.length ?? 0) === 0
                                       }
                                     />
                                   )}

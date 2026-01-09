@@ -71,7 +71,8 @@ export async function GET(request: NextRequest) {
     const contentType = response.ContentType || "image/webp";
 
     // 적절한 헤더와 함께 이미지 반환
-    return new NextResponse(imageBuffer, {
+    // Buffer를 Uint8Array로 변환하여 BodyInit 타입 요구사항 충족
+    return new NextResponse(new Uint8Array(imageBuffer), {
       status: 200,
       headers: {
         "Content-Type": contentType,
