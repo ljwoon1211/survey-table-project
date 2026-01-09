@@ -7,6 +7,7 @@ import {
   jsonb,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
 
 // 설문 테이블
 export const surveys = pgTable('surveys', {
@@ -144,6 +145,50 @@ export const questionCategories = pgTable('question_categories', {
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ========================
+// Relations 정의
+// ========================
+
+export const surveysRelations = relations(surveys, ({ many }) => ({
+  questions: many(questions),
+  groups: many(questionGroups),
+  responses: many(surveyResponses),
+}));
+
+export const questionsRelations = relations(questions, ({ one }) => ({
+  survey: one(surveys, {
+    fields: [questions.surveyId],
+    references: [surveys.id],
+  }),
+  group: one(questionGroups, {
+    fields: [questions.groupId],
+    references: [questionGroups.id],
+  }),
+}));
+
+export const questionGroupsRelations = relations(questionGroups, ({ one, many }) => ({
+  survey: one(surveys, {
+    fields: [questionGroups.surveyId],
+    references: [surveys.id],
+  }),
+  parentGroup: one(questionGroups, {
+    fields: [questionGroups.parentGroupId],
+    references: [questionGroups.id],
+    relationName: 'childGroups',
+  }),
+  childGroups: many(questionGroups, {
+    relationName: 'childGroups',
+  }),
+  questions: many(questions),
+}));
+
+export const surveyResponsesRelations = relations(surveyResponses, ({ one }) => ({
+  survey: one(surveys, {
+    fields: [surveyResponses.surveyId],
+    references: [surveys.id],
+  }),
+}));
 
 // ========================
 // TypeScript 타입 정의
@@ -332,4 +377,3 @@ export type NewSavedQuestion = typeof savedQuestions.$inferInsert;
 
 export type QuestionCategory = typeof questionCategories.$inferSelect;
 export type NewQuestionCategory = typeof questionCategories.$inferInsert;
-

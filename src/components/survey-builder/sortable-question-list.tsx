@@ -1016,12 +1016,25 @@ export function SortableQuestionList({
   const handleDuplicate = async (questionId: string) => {
     const questionToDuplicate = questions.find((q) => q.id === questionId);
     if (questionToDuplicate) {
+      // 먼저 컬럼을 복제하여 새 컬럼 ID들을 확보
+      const newTableColumns = questionToDuplicate.tableColumns
+        ? questionToDuplicate.tableColumns.map((col) => ({
+            ...col,
+            id: generateId(),
+          }))
+        : undefined;
+
+      // 기존 질문들의 최대 order를 찾아서 +1 (없으면 1부터 시작)
+      const maxOrder = questions.length > 0 
+        ? Math.max(...questions.map(q => q.order), 0)
+        : 0;
+      
       // 새로운 ID를 가진 완전한 복사본 생성
       const newQuestion: Question = {
         ...questionToDuplicate,
         id: generateId(),
         title: `${questionToDuplicate.title} (복사본)`,
-        order: questions.length,
+        order: maxOrder + 1, // 1부터 시작하는 실제 질문 번호
         // options 복사 (새 ID 부여)
         options: questionToDuplicate.options
           ? questionToDuplicate.options.map((opt) => ({
@@ -1040,42 +1053,46 @@ export function SortableQuestionList({
               })),
             }))
           : undefined,
-        // tableColumns 복사 (새 ID 부여)
-        tableColumns: questionToDuplicate.tableColumns
-          ? questionToDuplicate.tableColumns.map((col) => ({
-              ...col,
-              id: generateId(),
-            }))
-          : undefined,
-        // tableRowsData 복사 (새 ID 부여)
+        // tableColumns 복사 (위에서 생성한 새 컬럼 사용)
+        tableColumns: newTableColumns,
+        // tableRowsData 복사 (새 ID 부여 및 셀 ID 규칙 적용)
         tableRowsData: questionToDuplicate.tableRowsData
-          ? questionToDuplicate.tableRowsData.map((row) => ({
-              ...row,
-              id: generateId(),
-              cells: row.cells.map((cell) => ({
-                ...cell,
-                id: generateId(),
-                // 셀 내부의 옵션들도 복사
-                checkboxOptions: cell.checkboxOptions
-                  ? cell.checkboxOptions.map((opt) => ({
-                      ...opt,
-                      id: generateId(),
-                    }))
-                  : undefined,
-                radioOptions: cell.radioOptions
-                  ? cell.radioOptions.map((opt) => ({
-                      ...opt,
-                      id: generateId(),
-                    }))
-                  : undefined,
-                selectOptions: cell.selectOptions
-                  ? cell.selectOptions.map((opt) => ({
-                      ...opt,
-                      id: generateId(),
-                    }))
-                  : undefined,
-              })),
-            }))
+          ? questionToDuplicate.tableRowsData.map((row) => {
+              const newRowId = generateId();
+              return {
+                ...row,
+                id: newRowId,
+                cells: row.cells.map((cell, cellIndex) => {
+                  // 해당 셀의 새 컬럼 ID 찾기
+                  const newColId = newTableColumns?.[cellIndex]?.id;
+                  const newCellId = newColId ? `cell-${newRowId}-${newColId}` : generateId();
+
+                  return {
+                    ...cell,
+                    id: newCellId,
+                    // 셀 내부의 옵션들도 복사
+                    checkboxOptions: cell.checkboxOptions
+                      ? cell.checkboxOptions.map((opt) => ({
+                          ...opt,
+                          id: generateId(),
+                        }))
+                      : undefined,
+                    radioOptions: cell.radioOptions
+                      ? cell.radioOptions.map((opt) => ({
+                          ...opt,
+                          id: generateId(),
+                        }))
+                      : undefined,
+                    selectOptions: cell.selectOptions
+                      ? cell.selectOptions.map((opt) => ({
+                          ...opt,
+                          id: generateId(),
+                        }))
+                      : undefined,
+                  };
+                }),
+              };
+            })
           : undefined,
       };
 

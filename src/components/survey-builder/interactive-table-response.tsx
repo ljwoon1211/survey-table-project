@@ -167,8 +167,8 @@ export function InteractiveTableResponse({
               <div className={`p-4 border-b ${completed ? "bg-green-100/50" : "bg-gray-50/80"}`}>
                 <div className="flex items-center justify-between">
                   <div className="font-semibold text-lg text-gray-900">
-                    {/* 첫 번째 셀의 내용을 타이틀로 표시 */}
-                    {firstCell.content || `항목 ${rowIndex + 1}`}
+                    {/* 행 라벨을 타이틀로 표시 */}
+                    {row.label || `항목 ${rowIndex + 1}`}
                   </div>
                   {completed && (
                     <div className="flex items-center gap-1.5 text-green-600 text-sm font-medium bg-green-100 px-2 py-1 rounded-full">
@@ -180,11 +180,11 @@ export function InteractiveTableResponse({
               </div>
 
               <CardContent className="p-4 space-y-6 divide-y divide-dashed divide-gray-200">
-                {/* 첫 번째 셀(제목)을 제외한 나머지 셀들을 렌더링 */}
-                {restCells.map((cell, index) => {
+                {/* 모든 셀들을 렌더링 */}
+                {row.cells.map((cell, index) => {
                   if (cell.isHidden) return null;
-                  // 인덱스 + 1을 하여 원래 컬럼의 라벨을 가져옴
-                  const columnLabel = columns[index + 1]?.label || `질문 ${index + 1}`;
+                  // 인덱스를 사용하여 컬럼 라벨 가져옴
+                  const columnLabel = columns[index]?.label || `질문 ${index + 1}`;
 
                   return (
                     <div
@@ -315,11 +315,7 @@ export function InteractiveTableResponse({
                 {columns.map((column, colIndex) => (
                   <th
                     key={column.id}
-                    className={`border-b border-r border-gray-300 px-4 py-3 font-semibold text-gray-800 text-center align-middle h-full ${
-                      colIndex === 0
-                        ? "sticky left-0 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] bg-gray-100"
-                        : ""
-                    }`}
+                    className="border-b border-r border-gray-300 px-4 py-3 font-semibold text-gray-800 text-center align-middle h-full"
                     style={{ width: `${column.width || 150}px` }}
                   >
                     {column.label || <span className="text-gray-400 italic text-sm"></span>}
@@ -356,21 +352,11 @@ export function InteractiveTableResponse({
                         <td
                           key={cell.id}
                           className={`border-b border-r border-gray-300 p-3 ${verticalAlignClass} relative transition-colors duration-200 ${
-                            cellIndex === 0
-                              ? "sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] bg-white"
-                              : ""
-                          } ${completed ? "!bg-green-50/40" : ""} ${
-                             // 첫 번째 열(행 헤더)이면서 완료된 경우 배경색 조정
-                             completed && cellIndex === 0 ? "!bg-green-50" : ""
+                            completed ? "!bg-green-50/40" : ""
                           }`}
                           rowSpan={cell.rowspan || 1}
                           colSpan={cell.colspan || 1}
                         >
-                          {completed && cellIndex === 0 && (
-                            <div className="absolute top-2 right-2">
-                              <CheckCircle2 className="w-4 h-4 text-green-500" />
-                            </div>
-                          )}
                           <div
                             className={`w-full flex flex-col ${
                               cell.verticalAlign === "top"

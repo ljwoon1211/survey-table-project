@@ -509,10 +509,11 @@ export async function reorderQuestions(questionIds: string[]) {
   // UUID 형식인 질문 ID만 필터링 (임시 ID는 DB에 없으므로 제외)
   const validQuestionIds = questionIds.filter(id => isValidUUID(id));
 
+  // 1부터 시작하는 실제 질문 번호로 재정렬
   for (let i = 0; i < validQuestionIds.length; i++) {
     await db
       .update(questions)
-      .set({ order: i, updatedAt: new Date() })
+      .set({ order: i + 1, updatedAt: new Date() })
       .where(eq(questions.id, validQuestionIds[i]));
   }
 }

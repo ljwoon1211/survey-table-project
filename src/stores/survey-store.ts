@@ -267,12 +267,18 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
         })),
 
       addQuestion: (type: QuestionType, groupId?: string) => {
+        const questions = get().currentSurvey.questions;
+        // 기존 질문들의 최대 order를 찾아서 +1 (없으면 1부터 시작)
+        const maxOrder = questions.length > 0 
+          ? Math.max(...questions.map(q => q.order), 0)
+          : 0;
+        
         const newQuestion: Question = {
           id: generateId(),
           type,
           title: getDefaultQuestionTitle(type),
           required: false,
-          order: get().currentSurvey.questions.length,
+          order: maxOrder + 1, // 1부터 시작하는 실제 질문 번호
           groupId,
           ...(needsOptions(type) && {
             options: [
@@ -300,9 +306,15 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
       },
 
       addPreparedQuestion: (question: Question) => {
+        const questions = get().currentSurvey.questions;
+        // 기존 질문들의 최대 order를 찾아서 +1 (없으면 1부터 시작)
+        const maxOrder = questions.length > 0 
+          ? Math.max(...questions.map(q => q.order), 0)
+          : 0;
+        
         const questionWithOrder = {
           ...question,
-          order: get().currentSurvey.questions.length
+          order: maxOrder + 1 // 1부터 시작하는 실제 질문 번호
         };
 
         set((state) => ({
@@ -345,7 +357,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           const reorderedQuestions = questionIds
             .map(id => questionsMap.get(id))
             .filter((q): q is Question => q !== undefined)
-            .map((q, index) => ({ ...q, order: index }));
+            .map((q, index) => ({ ...q, order: index + 1 })); // 1부터 시작하는 실제 질문 번호
 
           return {
             currentSurvey: {

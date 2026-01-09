@@ -1,3 +1,4 @@
+// src/lib/analytics/analyzer.ts
 import type { Question, QuestionType } from '@/types/survey';
 import type { SurveyResponse } from '@/db/schema';
 import type {
@@ -15,6 +16,45 @@ import type {
   CellAnalyticsRow,
   RowSummary,
 } from './types';
+
+// ========================
+// 유틸리티 함수
+// ========================
+
+/**
+ * 값을 문자열로 변환 (객체인 경우 내부 텍스트 추출)
+ */
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+
+  if (Array.isArray(value)) {
+    return value.map(formatValue).join(', ');
+  }
+
+  if (typeof value === 'object') {
+    const v = value as Record<string, unknown>;
+    // '기타' 옵션 입력값 등 구체적인 필드 우선 확인
+    if (v.inputValue && typeof v.inputValue === 'string') return v.inputValue;
+    if (v.text && typeof v.text === 'string') return v.text;
+    if (v.label && typeof v.label === 'string') return v.label;
+    if (v.value && (typeof v.value === 'string' || typeof v.value === 'number'))
+      return String(v.value);
+
+    // 마땅한 키가 없으면 첫 번째 값을 사용하거나 JSON 문자열로 변환
+    const firstVal = Object.values(v)[0];
+    if (
+      firstVal &&
+      (typeof firstVal === 'string' || typeof firstVal === 'number')
+    )
+      return String(firstVal);
+
+    return JSON.stringify(value);
+  }
+
+  return String(value);
+}
 
 // ========================
 // 질문 타입별 분석 함수
@@ -112,7 +152,7 @@ function analyzeSingleChoice(
   const counts: Record<string, number> = {};
 
   responses.forEach((r) => {
-    const value = String(r.value);
+    const value = formatValue(r.value);
     counts[value] = (counts[value] || 0) + 1;
   });
 
@@ -167,7 +207,7 @@ function analyzeMultipleChoice(
     const values = Array.isArray(r.value) ? r.value : [r.value];
     values.forEach((v) => {
       if (v) {
-        const value = String(v);
+        const value = formatValue(v);
         counts[value] = (counts[value] || 0) + 1;
         totalSelections++;
       }
@@ -222,7 +262,7 @@ function analyzeText(
 ): TextAnalytics {
   const textResponses = responses.map((r) => ({
     id: r.responseId,
-    value: String(r.value),
+    value: formatValue(r.value),
     submittedAt: r.submittedAt || undefined,
   }));
 
@@ -272,6 +312,15 @@ function analyzeTable(
   const rows = question.tableRowsData || [];
   const columns = question.tableColumns || [];
 
+  // Fallback Logic:
+  // Create a mapping of Row Label -> Row ID
+  const rowLabelMap = new Map<string, string>();
+  rows.forEach((row) => rowLabelMap.set(row.label, row.id));
+
+  // Note: We can only apply heuristics here as true ID mapping is impossible without old schema.
+  // We will assume that if `cell.id` lookup fails, we might check by index if needed.
+  // But for now, we will stick to ID lookup as the primary method.
+
   // 셀별 분석 데이터
   const cellAnalytics: CellAnalyticsRow[] = rows
     .filter((row) => !row.cells.some((cell) => cell.isHidden))
@@ -291,7 +340,11 @@ function analyzeTable(
             let checkedCount = 0;
             responses.forEach((r) => {
               const tableValue = r.value as Record<string, unknown>;
-              const cellValue = tableValue?.[cell.id];
+              let cellValue = tableValue?.[cell.id];
+
+              // Fallback: If cellValue is missing by ID, try to find it?
+              // (Heuristic skipped for safety to avoid false positives)
+
               if (Array.isArray(cellValue) && cellValue.length > 0) {
                 checkedCount++;
               }
@@ -305,8 +358,8 @@ function analyzeTable(
               const tableValue = r.value as Record<string, unknown>;
               const cellValue = tableValue?.[cell.id];
               if (cellValue) {
-                optionCounts[String(cellValue)] =
-                  (optionCounts[String(cellValue)] || 0) + 1;
+                const val = formatValue(cellValue);
+                optionCounts[val] = (optionCounts[val] || 0) + 1;
               }
             });
             analytics.optionDistribution = cell.radioOptions.map((opt) => ({
@@ -326,8 +379,8 @@ function analyzeTable(
               const tableValue = r.value as Record<string, unknown>;
               const cellValue = tableValue?.[cell.id];
               if (cellValue) {
-                optionCounts[String(cellValue)] =
-                  (optionCounts[String(cellValue)] || 0) + 1;
+                const val = formatValue(cellValue);
+                optionCounts[val] = (optionCounts[val] || 0) + 1;
               }
             });
             analytics.optionDistribution = cell.selectOptions.map((opt) => ({
@@ -345,7 +398,7 @@ function analyzeTable(
               const tableValue = r.value as Record<string, unknown>;
               const cellValue = tableValue?.[cell.id];
               if (cellValue && String(cellValue).trim()) {
-                textValues.push(String(cellValue));
+                textValues.push(formatValue(cellValue));
               }
             });
             analytics.textResponses = textValues;
@@ -364,6 +417,8 @@ function analyzeTable(
 
       responses.forEach((r) => {
         const tableValue = r.value as Record<string, unknown>;
+
+        // Find if any cell in this row has interaction
         const hasInteraction = row.cells.some((cell) => {
           const cellValue = tableValue?.[cell.id];
 
@@ -371,11 +426,11 @@ function analyzeTable(
             const isChecked =
               Array.isArray(cellValue) && cellValue.length > 0;
             if (isChecked) {
-              // 체크박스 체크됨
               return true;
             }
           } else if (cell.type === 'radio' && cellValue) {
             // 라디오 선택됨 - 상세 정보 기록
+            // Option ID Matching with Fallback to Value/Label Matching
             const optionLabel =
               cell.radioOptions?.find(
                 (o) => o.id === cellValue || o.value === cellValue

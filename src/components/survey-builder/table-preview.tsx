@@ -73,7 +73,13 @@ export function TablePreview({
     switch (cell.type) {
       case "checkbox":
         return cell.checkboxOptions && cell.checkboxOptions.length > 0 ? (
-          <div className="space-y-2">
+          <div className="space-y-2 w-full">
+            {/* 셀 텍스트 설명 (있는 경우) */}
+            {cell.content && cell.content.trim() && (
+              <div className="text-sm text-gray-700 mb-3 font-medium whitespace-pre-wrap break-words">
+                {cell.content}
+              </div>
+            )}
             {cell.checkboxOptions.map((option) => (
               <div key={option.id} className="flex items-center gap-2">
                 <input
@@ -94,7 +100,13 @@ export function TablePreview({
 
       case "radio":
         return cell.radioOptions && cell.radioOptions.length > 0 ? (
-          <div className="space-y-2">
+          <div className="space-y-2 w-full">
+            {/* 셀 텍스트 설명 (있는 경우) */}
+            {cell.content && cell.content.trim() && (
+              <div className="text-sm text-gray-700 mb-3 font-medium whitespace-pre-wrap break-words">
+                {cell.content}
+              </div>
+            )}
             {cell.radioOptions.map((option) => (
               <div key={option.id} className="flex items-center gap-2">
                 <input
@@ -115,14 +127,22 @@ export function TablePreview({
 
       case "select":
         return cell.selectOptions && cell.selectOptions.length > 0 ? (
-          <select className="w-full h-full p-2 text-sm border border-gray-300 rounded" disabled>
-            <option value="">선택하세요...</option>
-            {cell.selectOptions.map((option) => (
-              <option key={option.id} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <div className="w-full h-full flex flex-col space-y-2">
+            {/* 셀 텍스트 설명 (있는 경우) */}
+            {cell.content && cell.content.trim() && (
+              <div className="text-sm text-gray-700 font-medium whitespace-pre-wrap break-words">
+                {cell.content}
+              </div>
+            )}
+            <select className="w-full h-full p-2 text-sm border border-gray-300 rounded" disabled>
+              <option value="">선택하세요...</option>
+              {cell.selectOptions.map((option) => (
+                <option key={option.id} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
         ) : (
           <div className="flex items-center gap-2 text-gray-500">
             <span className="text-sm">선택 옵션 없음</span>
@@ -191,7 +211,13 @@ export function TablePreview({
 
       case "input":
         return (
-          <div className="w-full h-full flex flex-col">
+          <div className="w-full h-full flex flex-col space-y-2">
+            {/* 셀 텍스트 설명 (있는 경우) */}
+            {cell.content && cell.content.trim() && (
+              <div className="text-sm text-gray-700 font-medium whitespace-pre-wrap break-words">
+                {cell.content}
+              </div>
+            )}
             <input
               type="text"
               placeholder={cell.placeholder || "답변을 입력하세요..."}

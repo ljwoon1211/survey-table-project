@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TableCell, TableColumn, TableRow } from "@/types/survey";
-import { Plus, Trash2, Image, Video, CheckSquare, Circle, Copy, Clipboard } from "lucide-react";
+import { Plus, Trash2, Image, Video, CheckSquare, Circle, Copy, Clipboard, ArrowLeft, ArrowRight } from "lucide-react";
 import { CellContentModal } from "./cell-content-modal";
 import { generateId } from "@/lib/utils";
 
@@ -257,6 +257,10 @@ export function DynamicTableEditor({
   // 열 삭제
   const deleteColumn = (columnIndex: number) => {
     if (currentColumns.length <= 1) return; // 최소 1개 열 유지
+    
+    if (!window.confirm("정말 이 열을 삭제하시겠습니까?\n포함된 데이터가 모두 삭제되며, 복구할 수 없습니다.")) {
+      return;
+    }
 
     const updatedColumns = currentColumns.filter((_, index) => index !== columnIndex);
 
@@ -271,6 +275,38 @@ export function DynamicTableEditor({
     notifyChange(currentTitle, updatedColumns, updatedRows);
   };
 
+  // 열 이동
+  const moveColumn = (columnIndex: number, direction: "left" | "right") => {
+    if (direction === "left" && columnIndex === 0) return;
+    if (direction === "right" && columnIndex === currentColumns.length - 1) return;
+
+    const targetIndex = direction === "left" ? columnIndex - 1 : columnIndex + 1;
+
+    // 열 순서 변경
+    const updatedColumns = [...currentColumns];
+    [updatedColumns[columnIndex], updatedColumns[targetIndex]] = [
+      updatedColumns[targetIndex],
+      updatedColumns[columnIndex],
+    ];
+
+    // 행 데이터 내 셀 순서 변경
+    const updatedRows = currentRows.map((row) => {
+      const newCells = [...row.cells];
+      [newCells[columnIndex], newCells[targetIndex]] = [
+        newCells[targetIndex],
+        newCells[columnIndex],
+      ];
+      return { ...row, cells: newCells };
+    });
+    
+    // 병합된 셀 재계산 (이동 시 병합이 깨질 수 있으므로)
+    const finalRows = recalculateHiddenCells(updatedRows);
+
+    setCurrentColumns(updatedColumns);
+    setCurrentRows(finalRows);
+    notifyChange(currentTitle, updatedColumns, finalRows);
+  };
+
   // 열 제목 업데이트
   const updateColumnLabel = (columnIndex: number, label: string) => {
     const updatedColumns = currentColumns.map((col, index) =>
@@ -283,10 +319,21 @@ export function DynamicTableEditor({
 
   // 행 추가
   const addRow = () => {
-    const newRowIndex = currentRows.length;
+    // 현재 존재하는 행들의 라벨에서 숫자만 추출하여 가장 큰 수를 찾음
+    const existingNumbers = currentRows
+      .map((row) => {
+        const match = row.label.match(/행 (\d+)/);
+        return match ? parseInt(match[1], 10) : 0;
+      })
+      .filter((n) => !isNaN(n));
+
+    const maxNumber = Math.max(0, ...existingNumbers);
+    const nextNumber = maxNumber + 1;
+
+    const newRowId = generateId();
 
     // 새 행의 각 셀이 기존 병합 셀의 rowspan 영역에 포함되는지 확인
-    const cells = currentColumns.map((_col, colIndex) => {
+    const cells = currentColumns.map((col, colIndex) => {
       let shouldBeHidden = false;
 
       // 위쪽 행들을 확인하여 rowspan이 새 행까지 미치는지 체크
@@ -298,18 +345,34 @@ export function DynamicTableEditor({
         const colspan = cell.colspan || 1;
 
         // 이 셀의 rowspan이 새 행까지 미치고, colspan이 현재 열을 포함하는지 확인
-        if (r + rowspan > newRowIndex) {
-          // colspan 확인
-          const cellColIndex = currentRows[r].cells.findIndex((c) => c.id === cell.id);
-          if (colIndex >= cellColIndex && colIndex < cellColIndex + colspan) {
-            shouldBeHidden = true;
-            break;
+        if (r + rowspan > currentRows.length) {
+          // rowspan이 범위를 넘어가는 경우 (새 행이 추가되면서 포함됨)
+          // 사실 여기서는 기존 rowspan을 늘려주는 로직이 필요한게 아니라
+          // 그냥 새 셀이 숨겨져야 하는지만 체크하면 됨.
+          // 하지만 rowspan이 설정된 셀 아래에 새 행을 추가할 때
+          // 자동으로 rowspan을 늘려주지는 않음 (사용자가 직접 늘려야 함)
+          // 따라서 새 행의 셀은 기본적으로 보임.
+          
+          // 단, 이미 rowspan이 길게 설정되어 있어서 새 행 위치를 덮고 있다면 숨겨야 함.
+          // 하지만 현재 로직상 addRow는 항상 맨 끝에 추가하므로,
+          // 기존 행의 rowspan이 전체 row length보다 크지 않다면 겹칠 일은 없음.
+          // 만약 중간 삽입이 아니라 맨 끝 추가라면 크게 신경 쓸 필요 없음.
+          
+          // 여기서는 기존 로직 유지하되, 맨 끝 추가이므로 shouldBeHidden은 false일 가능성이 높음.
+          // 다만, 특정 셀의 rowspan이 매우 크게 설정되어 있었다면?
+          if (r + rowspan > currentRows.length) { // currentRows.length는 추가 전 인덱스 (=새 행의 인덱스)
+             // ... logic checks ...
+             const cellColIndex = currentRows[r].cells.findIndex((c) => c.id === cell.id);
+             if (colIndex >= cellColIndex && colIndex < cellColIndex + colspan) {
+               shouldBeHidden = true;
+               break;
+             }
           }
         }
       }
 
       return {
-        id: generateId(),
+        id: `cell-${newRowId}-${col.id}`,
         content: "",
         type: "text" as const,
         isHidden: shouldBeHidden,
@@ -317,8 +380,8 @@ export function DynamicTableEditor({
     });
 
     const newRow: TableRow = {
-      id: generateId(),
-      label: `행 ${currentRows.length + 1}`,
+      id: newRowId,
+      label: `행 ${nextNumber}`, // 중복 방지된 라벨 사용
       height: 60, // 기본 행 높이
       minHeight: 40, // 최소 행 높이
       cells,
@@ -332,6 +395,10 @@ export function DynamicTableEditor({
   // 행 삭제
   const deleteRow = (rowIndex: number) => {
     if (currentRows.length <= 1) return; // 최소 1개 행 유지
+
+    if (!window.confirm("정말 이 행을 삭제하시겠습니까?\n포함된 데이터가 모두 삭제되며, 복구할 수 없습니다.")) {
+      return;
+    }
 
     // 행 삭제 전에, 삭제되는 행에 병합된 셀이 있는지 확인하고 rowspan 조정
     const updatedRows = currentRows
@@ -360,6 +427,27 @@ export function DynamicTableEditor({
 
     // 병합된 셀로 인해 숨겨져야 하는 셀들을 재계산
     const finalRows = recalculateHiddenCells(updatedRows);
+    setCurrentRows(finalRows);
+    notifyChange(currentTitle, currentColumns, finalRows);
+  };
+
+  // 행 이동
+  const moveRow = (rowIndex: number, direction: "up" | "down") => {
+    if (direction === "up" && rowIndex === 0) return;
+    if (direction === "down" && rowIndex === currentRows.length - 1) return;
+
+    const targetIndex = direction === "up" ? rowIndex - 1 : rowIndex + 1;
+    const updatedRows = [...currentRows];
+
+    // 행 순서 교환
+    [updatedRows[rowIndex], updatedRows[targetIndex]] = [
+      updatedRows[targetIndex],
+      updatedRows[rowIndex],
+    ];
+
+    // 병합된 셀 재계산
+    const finalRows = recalculateHiddenCells(updatedRows);
+
     setCurrentRows(finalRows);
     notifyChange(currentTitle, currentColumns, finalRows);
   };
@@ -453,6 +541,24 @@ export function DynamicTableEditor({
     [copiedCell, currentRows, recalculateHiddenCells, currentTitle, currentColumns, notifyChange],
   );
 
+  // 셀 삭제 (내용 초기화)
+  const deleteCell = (rowIndex: number, cellIndex: number) => {
+    const cell = currentRows[rowIndex]?.cells[cellIndex];
+    if (!cell) return;
+
+    const emptyCell: TableCell = {
+      id: cell.id,
+      content: "",
+      type: "text",
+      rowspan: cell.rowspan,
+      colspan: cell.colspan,
+      horizontalAlign: cell.horizontalAlign,
+      verticalAlign: cell.verticalAlign,
+    };
+
+    updateCell(rowIndex, cellIndex, emptyCell);
+  };
+
   // 셀 내용 업데이트
   const updateCell = (rowIndex: number, cellIndex: number, cell: TableCell) => {
     // 먼저 해당 셀을 업데이트
@@ -501,11 +607,319 @@ export function DynamicTableEditor({
     setSelectedCell(null);
   };
 
+  // 병합 가능 여부 확인
+  const canMerge = useCallback((direction: 'up' | 'down' | 'left' | 'right'): boolean => {
+    if (!selectedCell) return false;
+
+    const rowIndex = currentRows.findIndex(row => row.id === selectedCell.rowId);
+    const cellIndex = currentRows[rowIndex]?.cells.findIndex(cell => cell.id === selectedCell.cellId);
+
+    if (rowIndex === -1 || cellIndex === -1) return false;
+
+    const cell = currentRows[rowIndex].cells[cellIndex];
+    const rowspan = cell.rowspan || 1;
+    const colspan = cell.colspan || 1;
+
+    // 병합 대상 셀 찾기 및 유효성 검사
+    if (direction === 'down') {
+      // 아래쪽 끝이면 불가
+      if (rowIndex + rowspan >= currentRows.length) return false;
+      
+      const targetRowIndex = rowIndex + rowspan;
+      const targetCell = currentRows[targetRowIndex].cells[cellIndex];
+      
+      // 대상 셀이 이미 병합되어 숨겨진 상태라면, 그 숨김의 원인이 현재 셀이 아니면 불가
+      // (단, 현재 로직상 바로 아래 셀은 현재 셀 병합 영역 바로 다음이므로 다른 병합에 속해있을 수 있음)
+      if (targetCell.isHidden) return false;
+
+      // 직사각형 유지 조건: 너비(colspan)가 같아야 함
+      const targetColspan = targetCell.colspan || 1;
+      if (colspan !== targetColspan) return false;
+
+      return true;
+    } 
+    else if (direction === 'right') {
+      // 오른쪽 끝이면 불가
+      if (cellIndex + colspan >= currentColumns.length) return false;
+
+      const targetCellIndex = cellIndex + colspan;
+      const targetCell = currentRows[rowIndex].cells[targetCellIndex];
+
+      if (targetCell.isHidden) return false;
+
+      // 직사각형 유지 조건: 높이(rowspan)가 같아야 함
+      const targetRowspan = targetCell.rowspan || 1;
+      if (rowspan !== targetRowspan) return false;
+
+      return true;
+    }
+    else if (direction === 'up') {
+      // 위쪽 끝이면 불가
+      if (rowIndex === 0) return false;
+
+      // 바로 위 셀 찾기
+      // 주의: 바로 위 행의 같은 열 인덱스에 있는 셀이 병합되어 있을 수 있음
+      // 따라서 위쪽 행을 순회하며 현재 셀 바로 위에 걸쳐있는 셀을 찾아야 함
+      // 간단하게는 [rowIndex-1][cellIndex]를 확인하되, 그 셀이 isHidden일 수 있음
+      
+      // 위쪽으로 병합하려면 "위쪽 셀"이 기준이 되어야 함.
+      // 즉, 위쪽 셀의 colspan이 현재 셀의 colspan과 같아야 함.
+      // 또한 위쪽 셀이 이미 다른 셀과 병합되어 있을 수 있음 (rowspan > 1)
+      
+      // 현재 셀 바로 위의 셀을 찾기 위해 역추적 필요할 수 있으나,
+      // 간단한 구현을 위해 [rowIndex-1]의 셀을 확인.
+      // 만약 [rowIndex-1][cellIndex]가 hidden이라면, 그건 더 위의 셀에 병합된 것이므로
+      // 그 "더 위의 셀"과 병합해야 함. 이건 복잡하므로
+      // "바로 위 시각적 셀"과의 병합만 허용하거나,
+      // 혹은 [rowIndex-1] 행의 해당 열 셀이 hidden이 아니어야만(즉 병합의 시작점이어야만) 허용.
+      
+      // 여기서는 "직관적"인 병합을 위해, 바로 위 행의 해당 셀이 병합의 시작점일 때만 허용
+      const targetRowIndex = rowIndex - 1;
+      const targetCell = currentRows[targetRowIndex]?.cells[cellIndex];
+      
+      if (!targetCell || targetCell.isHidden) return false;
+      
+      // 너비 일치 확인
+      const targetColspan = targetCell.colspan || 1;
+      if (colspan !== targetColspan) return false;
+      
+      return true;
+    }
+    else if (direction === 'left') {
+      // 왼쪽 끝이면 불가
+      if (cellIndex === 0) return false;
+
+      const targetCellIndex = cellIndex - 1;
+      const targetCell = currentRows[rowIndex]?.cells[targetCellIndex];
+
+      if (!targetCell || targetCell.isHidden) return false;
+
+      // 높이 일치 확인
+      const targetRowspan = targetCell.rowspan || 1;
+      if (rowspan !== targetRowspan) return false;
+
+      return true;
+    }
+
+    return false;
+  }, [currentRows, currentColumns, selectedCell]);
+
+  // 병합 실행
+  const handleMerge = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
+    if (!selectedCell || !canMerge(direction)) return;
+
+    if (!window.confirm("병합되는 셀의 내용은 삭제됩니다. 계속하시겠습니까?\n(기준 셀의 내용만 유지됩니다)")) {
+      return;
+    }
+
+    const rowIndex = currentRows.findIndex(row => row.id === selectedCell.rowId);
+    const cellIndex = currentRows[rowIndex]?.cells.findIndex(cell => cell.id === selectedCell.cellId);
+    
+    // 깊은 복사
+    const newRows = JSON.parse(JSON.stringify(currentRows)) as TableRow[];
+    
+    // 기준 셀과 병합 대상 셀 결정
+    let baseRowIndex = rowIndex;
+    let baseCellIndex = cellIndex;
+    let targetRowIndex = -1;
+    let targetCellIndex = -1;
+
+    if (direction === 'down') {
+      // 기준: 현재 셀, 대상: 아래 셀
+      const cell = newRows[rowIndex].cells[cellIndex];
+      const currentRowspan = cell.rowspan || 1;
+      
+      targetRowIndex = rowIndex + currentRowspan; // 병합될 다음 행
+      targetCellIndex = cellIndex;
+      
+      // 기준 셀의 rowspan 증가
+      const targetCell = newRows[targetRowIndex].cells[cellIndex];
+      const targetRowspan = targetCell.rowspan || 1;
+      cell.rowspan = currentRowspan + targetRowspan;
+      
+      // 병합 대상 셀들의 데이터 삭제 및 초기화는 recalculateHiddenCells에서 처리되지 않으므로
+      // 여기서 명시적으로 처리해야 함.
+      // 병합 영역 내의 모든 셀을 찾아 데이터를 초기화 (기준 셀 제외)
+      // 하지만 아래의 recalculateHiddenCells가 isHidden을 처리하고,
+      // 데이터 삭제 정책에 따라 여기서 targetCell의 데이터를 지워야 함.
+      
+      // 대상 셀 초기화 (나중에 병합 풀었을 때 빈 셀이 되도록)
+      newRows[targetRowIndex].cells[cellIndex] = {
+        ...targetCell,
+        content: "",
+        type: "text",
+        checkboxOptions: undefined,
+        radioOptions: undefined,
+        selectOptions: undefined,
+        imageUrl: undefined,
+        videoUrl: undefined,
+        rowspan: undefined, // 병합되었으므로 속성 제거
+        colspan: undefined
+      };
+    }
+    else if (direction === 'right') {
+      // 기준: 현재 셀, 대상: 오른쪽 셀
+      const cell = newRows[rowIndex].cells[cellIndex];
+      const currentColspan = cell.colspan || 1;
+      
+      targetRowIndex = rowIndex;
+      targetCellIndex = cellIndex + currentColspan;
+      
+      // 기준 셀의 colspan 증가
+      const targetCell = newRows[rowIndex].cells[targetCellIndex];
+      const targetColspan = targetCell.colspan || 1;
+      cell.colspan = currentColspan + targetColspan;
+      
+      // 대상 셀 초기화
+      newRows[targetRowIndex].cells[targetCellIndex] = {
+        ...targetCell,
+        content: "",
+        type: "text",
+        checkboxOptions: undefined,
+        radioOptions: undefined,
+        selectOptions: undefined,
+        imageUrl: undefined,
+        videoUrl: undefined,
+        rowspan: undefined,
+        colspan: undefined
+      };
+    }
+    else if (direction === 'up') {
+      // 기준: 위쪽 셀, 대상: 현재 셀
+      // 위쪽 셀 찾기 (canMerge에서 검증됨)
+      baseRowIndex = rowIndex - 1;
+      baseCellIndex = cellIndex;
+      
+      const baseCell = newRows[baseRowIndex].cells[baseCellIndex];
+      const targetCell = newRows[rowIndex].cells[cellIndex]; // 현재 셀이 병합당함
+      
+      // 기준 셀(위쪽)의 rowspan 증가
+      const baseRowspan = baseCell.rowspan || 1;
+      const targetRowspan = targetCell.rowspan || 1;
+      baseCell.rowspan = baseRowspan + targetRowspan;
+      
+      // 대상 셀(현재 셀) 초기화
+      newRows[rowIndex].cells[cellIndex] = {
+        ...targetCell,
+        content: "",
+        type: "text",
+        checkboxOptions: undefined,
+        radioOptions: undefined,
+        selectOptions: undefined,
+        imageUrl: undefined,
+        videoUrl: undefined,
+        rowspan: undefined,
+        colspan: undefined
+      };
+      
+      // 선택된 셀 변경 (기준 셀로 이동)
+      setSelectedCell({
+        rowId: newRows[baseRowIndex].id,
+        cellId: baseCell.id
+      });
+    }
+    else if (direction === 'left') {
+      // 기준: 왼쪽 셀, 대상: 현재 셀
+      baseRowIndex = rowIndex;
+      baseCellIndex = cellIndex - 1;
+      
+      const baseCell = newRows[baseRowIndex].cells[baseCellIndex];
+      const targetCell = newRows[rowIndex].cells[cellIndex]; // 현재 셀이 병합당함
+      
+      // 기준 셀(왼쪽)의 colspan 증가
+      const baseColspan = baseCell.colspan || 1;
+      const targetColspan = targetCell.colspan || 1;
+      baseCell.colspan = baseColspan + targetColspan;
+      
+      // 대상 셀(현재 셀) 초기화
+      newRows[rowIndex].cells[cellIndex] = {
+        ...targetCell,
+        content: "",
+        type: "text",
+        checkboxOptions: undefined,
+        radioOptions: undefined,
+        selectOptions: undefined,
+        imageUrl: undefined,
+        videoUrl: undefined,
+        rowspan: undefined,
+        colspan: undefined
+      };
+      
+      // 선택된 셀 변경 (기준 셀로 이동)
+      setSelectedCell({
+        rowId: newRows[baseRowIndex].id,
+        cellId: baseCell.id
+      });
+    }
+
+    // 병합된 영역 내의 숨겨진 셀들도 모두 초기화가 필요할 수 있음
+    // (예: 2x2 병합 시, 대각선 아래 셀 등)
+    // 현재 로직은 '인접한 두 덩어리'를 합치는 것이므로,
+    // 각 덩어리의 '대표 셀(좌상단)'만 처리하면 recalculateHiddenCells가 나머지를 처리함.
+    // 단, "병합당하는 덩어리"의 숨겨진 셀들은 데이터를 지워야 함.
+    // 이는 recalculateHiddenCells가 isHidden을 재설정할 때 데이터까지 건드리지 않으므로,
+    // 엄밀히는 순회하며 지워야 하지만, UI상 안 보이고 통계에도 안 잡히므로(isHidden)
+    // 일단 대표 셀만 비우는 것으로 처리.
+    // (나중에 병합 풀 때 대표 셀이 비어있으면 그 하위 셀들도 비어있는 것으로 간주됨)
+
+    const finalRows = recalculateHiddenCells(newRows);
+    setCurrentRows(finalRows);
+    notifyChange(currentTitle, currentColumns, finalRows);
+
+  }, [selectedCell, currentRows, currentColumns, canMerge, recalculateHiddenCells, currentTitle, notifyChange]);
+
+  // 병합 해제
+  const handleUnmerge = useCallback(() => {
+    if (!selectedCell) return;
+
+    const rowIndex = currentRows.findIndex(row => row.id === selectedCell.rowId);
+    const cellIndex = currentRows[rowIndex]?.cells.findIndex(cell => cell.id === selectedCell.cellId);
+    
+    if (rowIndex === -1 || cellIndex === -1) return;
+
+    const cell = currentRows[rowIndex].cells[cellIndex];
+    const rowspan = cell.rowspan || 1;
+    const colspan = cell.colspan || 1;
+
+    // 병합된 상태가 아니면 리턴
+    if (rowspan <= 1 && colspan <= 1) return;
+
+    // 깊은 복사
+    const newRows = JSON.parse(JSON.stringify(currentRows)) as TableRow[];
+    const targetCell = newRows[rowIndex].cells[cellIndex];
+
+    // 병합 속성 초기화
+    targetCell.rowspan = 1;
+    targetCell.colspan = 1;
+
+    // recalculateHiddenCells가 호출되면
+    // 이 셀에 의해 숨겨졌던 셀들이 다시 나타남 (isHidden = false).
+    // 이때 그 셀들은 이미 위에서 merge할 때 데이터가 지워졌으므로 빈 셀로 나타남.
+    // 이는 의도된 동작("데이터 삭제 정책").
+
+    const finalRows = recalculateHiddenCells(newRows);
+    setCurrentRows(finalRows);
+    notifyChange(currentTitle, currentColumns, finalRows);
+    
+  }, [selectedCell, currentRows, recalculateHiddenCells, currentTitle, currentColumns, notifyChange]);
+
   // 셀 렌더링 함수
   const renderCellContent = (cell: TableCell) => {
+    const hasText = cell.content && cell.content.trim().length > 0;
+    
+    // 텍스트 콘텐츠가 있으면 상단에 렌더링 (모든 타입 공통)
+    const textContent = hasText ? (
+      <div className={`whitespace-pre-wrap text-sm break-words w-full mb-2 ${cell.type === "text" ? "" : "font-medium text-gray-700"}`}>
+        {cell.content}
+      </div>
+    ) : null;
+
+    // 타입별 콘텐츠 렌더링
+    let typeContent = null;
+
     switch (cell.type) {
       case "checkbox":
-        return cell.checkboxOptions && cell.checkboxOptions.length > 0 ? (
+        typeContent = cell.checkboxOptions && cell.checkboxOptions.length > 0 ? (
           <div className="flex items-center gap-2">
             <CheckSquare className="w-4 h-4 text-green-500" />
             <span className="text-sm text-gray-600 truncate">
@@ -515,8 +929,9 @@ export function DynamicTableEditor({
         ) : (
           <span className="text-gray-400 text-sm">체크박스 없음</span>
         );
+        break;
       case "radio":
-        return cell.radioOptions && cell.radioOptions.length > 0 ? (
+        typeContent = cell.radioOptions && cell.radioOptions.length > 0 ? (
           <div className="flex items-center justify-center gap-2">
             <Circle className="w-4 h-4 text-purple-500" />
             <span className="text-sm text-gray-600 truncate">
@@ -526,8 +941,9 @@ export function DynamicTableEditor({
         ) : (
           <span className="text-gray-400 text-sm">라디오 없음</span>
         );
+        break;
       case "image":
-        return cell.imageUrl ? (
+        typeContent = cell.imageUrl ? (
           <div className="flex items-center gap-2">
             <Image className="w-4 h-4 text-blue-500" aria-label="이미지 아이콘" />
             <span className="text-sm text-gray-600 truncate">이미지</span>
@@ -535,8 +951,9 @@ export function DynamicTableEditor({
         ) : (
           <span className="text-gray-400 text-sm">이미지 없음</span>
         );
+        break;
       case "video":
-        return cell.videoUrl ? (
+        typeContent = cell.videoUrl ? (
           <div className="flex items-center gap-2">
             <Video className="w-4 h-4 text-red-500" />
             <span className="text-sm text-gray-600 truncate">동영상</span>
@@ -544,16 +961,18 @@ export function DynamicTableEditor({
         ) : (
           <span className="text-gray-400 text-sm">동영상 없음</span>
         );
+        break;
       case "input":
-        return (
+        typeContent = (
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 truncate">
               {cell.placeholder ? `입력 필드: ${cell.placeholder}` : "단답형 입력"}
             </span>
           </div>
         );
+        break;
       case "select":
-        return cell.selectOptions && cell.selectOptions.length > 0 ? (
+        typeContent = cell.selectOptions && cell.selectOptions.length > 0 ? (
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 truncate">
               선택 ({cell.selectOptions.length}개)
@@ -562,13 +981,21 @@ export function DynamicTableEditor({
         ) : (
           <span className="text-gray-400 text-sm">선택 옵션 없음</span>
         );
+        break;
+      case "text":
+        // 텍스트 타입은 이미 위에서 처리했으므로 null 반환 (중복 방지)
+        typeContent = null;
+        break;
       default:
-        return cell.content ? (
-          <div className="whitespace-pre-wrap text-sm break-words w-full">{cell.content}</div>
-        ) : (
-          <span className="text-gray-400 text-sm"></span>
-        );
+        typeContent = <span className="text-gray-400 text-sm"></span>;
     }
+
+    return (
+      <div className="w-full">
+        {textContent}
+        {typeContent}
+      </div>
+    );
   };
 
   return (
@@ -676,6 +1103,8 @@ export function DynamicTableEditor({
             >
               {/* 열 너비 정의 */}
               <colgroup>
+                {/* 행 이름(라벨) 열 너비 */}
+                <col style={{ width: "50px" }} />
                 {currentColumns.map((column, index) => (
                   <col key={`col-${index}`} style={{ width: `${column.width || 150}px` }} />
                 ))}
@@ -684,6 +1113,13 @@ export function DynamicTableEditor({
               {/* 헤더 행 */}
               <thead>
                 <tr>
+                  {/* 행 이름(라벨) 헤더 */}
+                  <th className="border border-gray-300 p-2 bg-gray-100 w-[50px] min-w-[50px] sticky left-0 z-10">
+                    <div className="text-xs font-semibold text-gray-600 text-center truncate" title="행 이름 (분석용)">
+                      행
+                    </div>
+                  </th>
+                  
                   {currentColumns.map((column, columnIndex) => (
                     <th
                       key={column.id}
@@ -700,16 +1136,38 @@ export function DynamicTableEditor({
                             className="h-8 text-center border border-gray-200 bg-white text-sm"
                             placeholder="열 제목 (비워둘 수 있음)"
                           />
-                          {currentColumns.length > 1 && (
+                          <div className="flex items-center">
                             <Button
-                              onClick={() => deleteColumn(columnIndex)}
+                              onClick={() => moveColumn(columnIndex, "left")}
+                              disabled={columnIndex === 0}
                               size="sm"
                               variant="ghost"
-                              className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                              className="h-6 w-5 p-0 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                              title="왼쪽으로 이동"
                             >
-                              <Trash2 className="w-3 h-3" />
+                              <ArrowLeft className="w-3 h-3" />
                             </Button>
-                          )}
+                            <Button
+                              onClick={() => moveColumn(columnIndex, "right")}
+                              disabled={columnIndex === currentColumns.length - 1}
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-5 p-0 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                              title="오른쪽으로 이동"
+                            >
+                              <ArrowRight className="w-3 h-3" />
+                            </Button>
+                            {currentColumns.length > 1 && (
+                              <Button
+                                onClick={() => deleteColumn(columnIndex)}
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-6 p-0 text-red-500 hover:text-red-700 ml-1"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center justify-between text-xs text-gray-500">
                           <span>열 #{columnIndex + 1}</span>
@@ -777,6 +1235,17 @@ export function DynamicTableEditor({
                     style={{ height: row.height ? `${row.height}px` : "60px" }}
                     className="group/row"
                   >
+                    {/* 행 이름(라벨) 입력칸 */}
+                    <td className="border border-gray-300 p-1 bg-gray-50 sticky left-0 z-10 w-[50px] min-w-[50px]">
+                      <Input
+                        value={row.label}
+                        onChange={(e) => updateRowLabel(rowIndex, e.target.value)}
+                        className="h-8 text-xs bg-white px-1 text-center"
+                        placeholder="#"
+                        title={row.label} // 마우스 호버 시 전체 이름 표시
+                      />
+                    </td>
+
                     {/* 셀들 */}
                     {row.cells.map((cell, cellIndex) => {
                       // 숨겨진 셀은 렌더링하지 않음
@@ -837,21 +1306,49 @@ export function DynamicTableEditor({
                                 {renderCellContent(cell)}
                               </div>
                               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                {/* 행 삭제 버튼 - 첫 번째 셀에만 표시 */}
-                                {cellIndex === 0 && currentRows.length > 1 && (
+                                {/* 횡순서변경 (열 이동) */}
+                                <div className="flex items-center mr-1 border-r border-gray-200 pr-1">
                                   <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                                    className="h-6 w-5 p-0 text-gray-400 hover:text-gray-700 disabled:opacity-30"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      deleteRow(rowIndex);
+                                      moveColumn(cellIndex, "left");
                                     }}
-                                    title="행 삭제"
+                                    disabled={cellIndex === 0}
+                                    title="열 왼쪽으로 이동"
                                   >
-                                    <Trash2 className="w-3 h-3" />
+                                    <ArrowLeft className="w-3 h-3" />
                                   </Button>
-                                )}
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 w-5 p-0 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      moveColumn(cellIndex, "right");
+                                    }}
+                                    disabled={cellIndex === currentColumns.length - 1}
+                                    title="열 오른쪽으로 이동"
+                                  >
+                                    <ArrowRight className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                                {/* 삭제 */}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteCell(rowIndex, cellIndex);
+                                  }}
+                                  title="셀 삭제"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                                {/* 복사 */}
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -864,6 +1361,7 @@ export function DynamicTableEditor({
                                 >
                                   <Copy className="w-3 h-3" />
                                 </Button>
+                                {/* 붙여넣기 */}
                                 {copiedCell && (
                                   <Button
                                     size="sm"

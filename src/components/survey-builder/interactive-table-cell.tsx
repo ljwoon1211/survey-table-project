@@ -273,7 +273,14 @@ export function InteractiveTableCell({
       };
 
       return (
-        <div className="space-y-2">
+        <div className="space-y-2 w-full">
+          {/* 셀 텍스트 설명 (있는 경우) */}
+          {cell.content && cell.content.trim() && (
+            <div className="text-sm text-gray-700 mb-3 font-medium whitespace-pre-wrap break-words">
+              {cell.content}
+            </div>
+          )}
+          
           {cell.checkboxOptions.map((option) => {
             const isChecked = cellResponseArray.some((item) => {
               if (typeof item === "object" && item !== null && "optionId" in item) {
@@ -347,7 +354,14 @@ export function InteractiveTableCell({
 
     case "radio":
       return cell.radioOptions && cell.radioOptions.length > 0 ? (
-        <div className="space-y-2">
+        <div className="space-y-2 w-full">
+          {/* 셀 텍스트 설명 (있는 경우) */}
+          {cell.content && cell.content.trim() && (
+            <div className="text-sm text-gray-700 mb-3 font-medium whitespace-pre-wrap break-words">
+              {cell.content}
+            </div>
+          )}
+          
           {cell.radioOptions.map((option) => {
             const isSelected = (() => {
               if (typeof cellResponse === "object" && cellResponse?.optionId) {
@@ -404,6 +418,13 @@ export function InteractiveTableCell({
     case "select":
       return cell.selectOptions && cell.selectOptions.length > 0 ? (
         <div className="space-y-2 w-full flex flex-col">
+          {/* 셀 텍스트 설명 (있는 경우) */}
+          {cell.content && cell.content.trim() && (
+            <div className="text-sm text-gray-700 mb-2 font-medium whitespace-pre-wrap break-words">
+              {cell.content}
+            </div>
+          )}
+          
           <select
             value={
               typeof cellResponse === "object" && (cellResponse as { optionId?: string })?.optionId
@@ -512,6 +533,13 @@ export function InteractiveTableCell({
     case "input":
       return (
         <div className="space-y-1.5 w-full flex flex-col">
+          {/* 셀 텍스트 설명 (있는 경우) */}
+          {cell.content && cell.content.trim() && (
+            <div className="text-sm text-gray-700 mb-2 font-medium whitespace-pre-wrap break-words">
+              {cell.content}
+            </div>
+          )}
+          
           <Input
             type="text"
             value={(cellResponse as string) || ""}

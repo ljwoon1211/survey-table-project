@@ -77,6 +77,33 @@ export function CellContentModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadAbortController = useRef<AbortController | null>(null);
 
+  // 셀이 변경될 때 상태 동기화 (모달이 열릴 때마다 최신 셀 데이터 반영)
+  useEffect(() => {
+    if (isOpen && cell) {
+      setContentType(cell.type || "text");
+      setTextContent(cell.content || "");
+      setImageUrl(cell.imageUrl || "");
+      setVideoUrl(cell.videoUrl || "");
+      setPreviewUrl(cell.imageUrl && cell.type === "image" ? cell.imageUrl : null);
+      setCheckboxOptions(cell.checkboxOptions || []);
+      setRadioOptions(cell.radioOptions || []);
+      setRadioGroupName(cell.radioGroupName || "");
+      setSelectOptions(cell.selectOptions || []);
+      setAllowOtherOption(cell.allowOtherOption || false);
+      setInputPlaceholder(cell.placeholder || "");
+      setInputMaxLength(cell.inputMaxLength || "");
+      setMinSelections(cell.minSelections);
+      setMaxSelections(cell.maxSelections);
+      setIsMergeEnabled(
+        (cell.rowspan && cell.rowspan > 1) || (cell.colspan && cell.colspan > 1) || false,
+      );
+      setRowspan(cell.rowspan || 1);
+      setColspan(cell.colspan || 1);
+      setHorizontalAlign(cell.horizontalAlign || "left");
+      setVerticalAlign(cell.verticalAlign || "top");
+    }
+  }, [isOpen, cell]);
+
   // imageUrl이 바뀔 때 에러 상태 리셋
   useEffect(() => {
     setImageError(false);
@@ -203,7 +230,8 @@ export function CellContentModal({
       const updatedCell: TableCell = {
         ...cell,
         type: contentType,
-        content: contentType === "text" ? textContent : "",
+        // 모든 타입에서 텍스트 내용 저장 (라디오/체크박스/셀렉트에서도 설명 텍스트 표시 가능)
+        content: textContent || "",
         imageUrl: contentType === "image" ? imageUrl : undefined,
         videoUrl: contentType === "video" ? videoUrl : undefined,
         checkboxOptions: contentType === "checkbox" ? checkboxOptions : undefined,
@@ -502,6 +530,25 @@ export function CellContentModal({
           <DialogTitle>셀 내용 편집</DialogTitle>
         </DialogHeader>
 
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="common-text-content">셀 텍스트 내용</Label>
+            <Textarea
+              id="common-text-content"
+              value={textContent}
+              onChange={(e) => setTextContent(e.target.value)}
+              placeholder="셀에 표시할 텍스트를 입력하세요 (모든 타입에서 표시됨)"
+              rows={3}
+              className="resize-none"
+            />
+            {textContent && (
+              <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                미리보기: {textContent}
+              </div>
+            )}
+          </div>
+        </div>
+
         <Tabs
           value={contentType}
           onValueChange={(value) => {
@@ -555,24 +602,10 @@ export function CellContentModal({
 
           {/* 텍스트 탭 */}
           <TabsContent value="text" className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="text-content">텍스트 내용</Label>
-              <Textarea
-                id="text-content"
-                value={textContent}
-                onChange={(e) => setTextContent(e.target.value)}
-                placeholder="셀에 표시할 텍스트를 입력하세요"
-                rows={4}
-              />
+            <div className="p-4 bg-gray-50 rounded-lg border text-center text-sm text-gray-600">
+              <p>기본 텍스트 모드입니다.</p>
+              <p className="mt-1">상단의 &quot;셀 텍스트 내용&quot;에 입력한 텍스트만 표시됩니다.</p>
             </div>
-            {textContent && (
-              <div className="space-y-2">
-                <Label>미리보기</Label>
-                <div className="p-3 border rounded-md bg-gray-50">
-                  <p className="whitespace-pre-wrap">{textContent}</p>
-                </div>
-              </div>
-            )}
           </TabsContent>
 
           {/* 이미지 탭 */}
@@ -888,6 +921,12 @@ export function CellContentModal({
             <div className="space-y-2">
               <Label className="text-sm font-medium">미리보기</Label>
               <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                {/* 셀 텍스트 설명 (있는 경우) */}
+                {textContent && textContent.trim() && (
+                  <div className="text-sm text-gray-700 mb-3 font-medium whitespace-pre-wrap break-words border-b border-gray-200 pb-2">
+                    {textContent}
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Input
                     placeholder={inputPlaceholder || "답변을 입력하세요..."}
@@ -1119,6 +1158,12 @@ export function CellContentModal({
               <div className="space-y-2">
                 <Label>미리보기</Label>
                 <div className="p-3 border rounded-md bg-gray-50 max-h-[150px] overflow-y-auto">
+                  {/* 셀 텍스트 설명 (있는 경우) */}
+                  {textContent && textContent.trim() && (
+                    <div className="text-sm text-gray-700 mb-3 font-medium whitespace-pre-wrap break-words border-b border-gray-200 pb-2">
+                      {textContent}
+                    </div>
+                  )}
                   <div className="space-y-2">
                     {checkboxOptions.map((option) => (
                       <div key={option.id} className="flex items-center gap-2">
@@ -1280,6 +1325,12 @@ export function CellContentModal({
               <div className="space-y-2">
                 <Label>미리보기</Label>
                 <div className="p-3 border rounded-md bg-gray-50 max-h-[150px] overflow-y-auto">
+                  {/* 셀 텍스트 설명 (있는 경우) */}
+                  {textContent && textContent.trim() && (
+                    <div className="text-sm text-gray-700 mb-3 font-medium whitespace-pre-wrap break-words border-b border-gray-200 pb-2">
+                      {textContent}
+                    </div>
+                  )}
                   <div className="space-y-2">
                     {radioOptions.map((option) => (
                       <div key={option.id} className="flex items-center gap-2">
@@ -1417,6 +1468,12 @@ export function CellContentModal({
               <div className="space-y-2">
                 <Label>미리보기</Label>
                 <div className="p-3 border rounded-md bg-gray-50">
+                  {/* 셀 텍스트 설명 (있는 경우) */}
+                  {textContent && textContent.trim() && (
+                    <div className="text-sm text-gray-700 mb-3 font-medium whitespace-pre-wrap break-words border-b border-gray-200 pb-2">
+                      {textContent}
+                    </div>
+                  )}
                   <select className="w-full p-2 border rounded">
                     <option value="">선택하세요...</option>
                     {selectOptions.map((option) => (

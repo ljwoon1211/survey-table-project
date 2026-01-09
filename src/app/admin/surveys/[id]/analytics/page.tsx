@@ -9,6 +9,7 @@ import {
 } from "@/data/responses";
 import { AnalyticsDashboardClient } from "@/components/analytics";
 import { Button } from "@/components/ui/button";
+import { ExportDataModal } from "@/components/analytics/export-data-modal";
 
 interface AdminAnalyticsPageProps {
   params: Promise<{ id: string }>;
@@ -60,6 +61,7 @@ export default async function AdminSurveyAnalyticsPage({ params }: AdminAnalytic
           </div>
 
           <div className="flex items-center space-x-3">
+            <ExportDataModal surveyId={survey.id} surveyTitle={survey.title} />
             <Link href={`/admin/surveys/${id}/edit`}>
               <Button variant="outline" size="sm">
                 <Pencil className="w-4 h-4 mr-2" />
