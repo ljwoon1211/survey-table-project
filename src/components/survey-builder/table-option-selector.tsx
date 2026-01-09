@@ -25,7 +25,7 @@ export function TableOptionSelector({
   helpText = "선택한 옵션들 중 하나라도 체크/선택되었는지 확인합니다. 비워두면 아무거나 체크/선택되었는지만 확인합니다.",
   multipleRows = false,
 }: TableOptionSelectorProps) {
-  if (!colIndex) {
+  if (colIndex === undefined) {
     return <p className="text-sm text-gray-500">열을 선택해주세요</p>;
   }
 
