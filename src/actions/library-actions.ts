@@ -7,7 +7,7 @@ import {
   NewSavedQuestion,
   NewQuestionCategory,
 } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import type { Question } from '@/types/survey';
 import { getAllSavedQuestions, getAllCategories } from '@/data/library';
@@ -102,27 +102,25 @@ export async function deleteSavedQuestion(id: string) {
   revalidatePath('/admin/surveys');
 }
 
-// 질문 사용 (usageCount 증가)
+// 질문 사용 (usageCount 원자적 증가)
 export async function applyQuestion(id: string) {
   await requireAuth();
 
-  const saved = await db.query.savedQuestions.findFirst({
-    where: eq(savedQuestions.id, id),
-  });
-
-  if (!saved) return null;
-
-  // usageCount 증가
-  await db
+  // 🚀 원자적 증가 (Atomic Increment) - DB가 직접 계산
+  // Race Condition 방지: 동시에 여러 명이 사용해도 정확히 카운트됨
+  const [updated] = await db
     .update(savedQuestions)
     .set({
-      usageCount: saved.usageCount + 1,
+      usageCount: sql`${savedQuestions.usageCount} + 1`,
       updatedAt: new Date(),
     })
-    .where(eq(savedQuestions.id, id));
+    .where(eq(savedQuestions.id, id))
+    .returning();
+
+  if (!updated) return null;
 
   // 새 ID로 복제된 질문 반환
-  const question = saved.question as unknown as Question;
+  const question = updated.question as unknown as Question;
 
   return {
     ...question,
@@ -132,20 +130,38 @@ export async function applyQuestion(id: string) {
   };
 }
 
-// 여러 질문 사용
+// 여러 질문 사용 (일괄 처리 최적화)
 export async function applyMultipleQuestions(ids: string[]) {
   await requireAuth();
 
-  const questions: Question[] = [];
+  if (!ids.length) return [];
 
-  for (const id of ids) {
-    const question = await applyQuestion(id);
-    if (question) {
-      questions.push(question);
-    }
-  }
+  // 1. 일괄 조회 (1번 요청)
+  const savedItems = await db.query.savedQuestions.findMany({
+    where: inArray(savedQuestions.id, ids),
+  });
 
-  return questions;
+  if (!savedItems.length) return [];
+
+  // 2. 일괄 업데이트 (1번 요청) - usageCount를 SQL 레벨에서 1씩 증가
+  await db
+    .update(savedQuestions)
+    .set({
+      usageCount: sql`${savedQuestions.usageCount} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(inArray(savedQuestions.id, ids));
+
+  // 3. 메모리에서 데이터 가공 (새 ID 부여)
+  return savedItems.map((saved) => {
+    const question = saved.question as unknown as Question;
+    return {
+      ...question,
+      id: generateId(),
+      order: 0,
+      groupId: undefined,
+    };
+  });
 }
 
 // 라이브러리 내보내기

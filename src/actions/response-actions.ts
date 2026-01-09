@@ -2,7 +2,7 @@
 
 import { db } from '@/db';
 import { surveyResponses, NewSurveyResponse } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { requireAuth } from '@/lib/auth';
 
@@ -28,32 +28,30 @@ export async function startResponse(surveyId: string, sessionId?: string) {
   return response;
 }
 
-// 질문 응답 업데이트
+// 질문 응답 업데이트 (원자적 업데이트로 Race Condition 방지)
 export async function updateQuestionResponse(
   responseId: string,
   questionId: string,
   value: unknown
 ) {
-  // 현재 응답 조회
-  const current = await db.query.surveyResponses.findFirst({
-    where: eq(surveyResponses.id, responseId),
-  });
-
-  if (!current) {
-    throw new Error('응답을 찾을 수 없습니다.');
-  }
-
-  // 응답 데이터 업데이트
-  const updatedResponses = {
-    ...(current.questionResponses as Record<string, unknown>),
-    [questionId]: value,
-  };
-
+  // 🚀 SQL 레벨에서 JSON의 특정 경로만 원자적으로 업데이트
+  // PostgreSQL의 jsonb_set 함수 사용 (읽기-수정-쓰기 과정 없음)
   const [updated] = await db
     .update(surveyResponses)
-    .set({ questionResponses: updatedResponses })
+    .set({
+      questionResponses: sql`jsonb_set(
+        COALESCE(${surveyResponses.questionResponses}, '{}'::jsonb),
+        ${sql.array([questionId], 'text')},
+        ${JSON.stringify(value)}::jsonb,
+        true
+      )`,
+    })
     .where(eq(surveyResponses.id, responseId))
     .returning();
+
+  if (!updated) {
+    throw new Error('응답을 찾을 수 없습니다.');
+  }
 
   return updated;
 }

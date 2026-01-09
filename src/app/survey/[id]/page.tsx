@@ -515,7 +515,7 @@ export default function SurveyResponsePage() {
             </div>
           </CardHeader>
 
-          <CardContent className={isTableQuestion ? "" : "md:pl-18"}>
+          <CardContent className={isTableQuestion ? "" : "md:px-16"}>
             <div className="space-y-4">
               <QuestionInput
                 question={currentQuestion}

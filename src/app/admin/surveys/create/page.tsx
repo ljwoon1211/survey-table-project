@@ -156,35 +156,62 @@ export default function CreateSurveyPage() {
     setSlugInput("");
   }, [resetSurvey]);
 
-  // 슬러그 유효성 검사
+  // 슬러그 입력 핸들러 (입력값만 업데이트, 서버 호출은 제거)
   const handleSlugChange = useCallback(
-    async (value: string) => {
+    (value: string) => {
       setSlugInput(value);
+      updateSurveySlug(value); // 로컬 스토어 업데이트
 
+      // 빈 값이면 즉시 에러 초기화
       if (!value) {
         setSlugError("");
-        updateSurveySlug("");
         return;
       }
 
+      // 클라이언트 사이드 유효성 검사만 즉시 수행
       const validation = validateSlug(value);
       if (!validation.isValid) {
         setSlugError(validation.error || "");
         return;
       }
 
-      // 중복 검사 (비동기)
-      const available = await isSlugAvailable(value, currentSurvey.id);
-      if (!available) {
-        setSlugError("이미 사용 중인 URL입니다. 다른 URL을 입력해주세요.");
-        return;
-      }
-
-      setSlugError("");
-      updateSurveySlug(value);
+      // 서버 호출은 useEffect의 debounce가 담당
     },
-    [currentSurvey.id, updateSurveySlug],
+    [updateSurveySlug],
   );
+
+  // 슬러그 중복 검사 (Debounce 적용 - 500ms 지연)
+  useEffect(() => {
+    // 빈 값이거나 유효하지 않은 값이면 검사하지 않음
+    if (!slugInput) {
+      setSlugError("");
+      return;
+    }
+
+    const validation = validateSlug(slugInput);
+    if (!validation.isValid) {
+      // 클라이언트 사이드 검사는 이미 handleSlugChange에서 처리됨
+      return;
+    }
+
+    // 500ms 후에 서버 검사 수행
+    const timer = setTimeout(async () => {
+      try {
+        const available = await isSlugAvailable(slugInput, currentSurvey.id);
+        if (!available) {
+          setSlugError("이미 사용 중인 URL입니다. 다른 URL을 입력해주세요.");
+        } else {
+          setSlugError("");
+        }
+      } catch (error) {
+        console.error("슬러그 중복 검사 실패:", error);
+        // 에러 발생 시 에러 메시지 표시하지 않음 (사용자 경험 고려)
+      }
+    }, 500); // 0.5초 대기
+
+    // cleanup: 타이핑이 계속되면 이전 타이머 취소
+    return () => clearTimeout(timer);
+  }, [slugInput, currentSurvey.id]);
 
   // 제목에서 자동 슬러그 생성
   const handleAutoGenerateSlug = useCallback(async () => {
@@ -229,17 +256,21 @@ export default function CreateSurveyPage() {
     }
   };
 
-  // 스크롤 감지
+  // 스크롤 감지 (성능 최적화: requestAnimationFrame 사용)
   useEffect(() => {
+    let ticking = false;
+
     const handleScroll = () => {
-      if (window.scrollY > 200) {
-        setShowScrollButtons(true);
-      } else {
-        setShowScrollButtons(false);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          setShowScrollButtons(window.scrollY > 200);
+          ticking = false;
+        });
+        ticking = true;
       }
     };
 
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 

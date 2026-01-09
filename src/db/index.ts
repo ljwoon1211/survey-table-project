@@ -11,9 +11,13 @@ if (!connectionString) {
 
 // postgres.js 클라이언트 생성
 // Supabase의 경우 connection pooling을 사용하므로 prepare: false 설정
+// Vercel 서버리스 환경 최적화: 타임아웃 및 연결 풀링 설정
 const client = postgres(connectionString, {
   prepare: false,
-  max: 10, // 최대 연결 수
+  max: 1, // 서버리스 환경에서는 연결을 최소화 (각 요청마다 새 연결)
+  idle_timeout: 20, // 유휴 연결 타임아웃 (초)
+  connect_timeout: 10, // 연결 타임아웃 (초)
+  max_lifetime: 60 * 30, // 최대 연결 수명 (30분)
 });
 
 // Drizzle ORM 인스턴스 생성
