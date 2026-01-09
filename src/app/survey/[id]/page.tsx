@@ -442,7 +442,7 @@ export default function SurveyResponsePage() {
 
   // 현재 질문이 테이블 타입인지 확인
   const isTableQuestion = currentQuestion?.type === "table";
-  const containerMaxWidth = isTableQuestion ? "max-w-7xl" : "max-w-4xl";
+  const containerMaxWidth = "max-w-4xl";
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -475,7 +475,7 @@ export default function SurveyResponsePage() {
         <Card>
           <CardHeader className="pb-4">
             <div className="flex items-start gap-4">
-              <span className="flex-shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 text-sm font-semibold mt-0.5 shadow-sm">
+              <span className="hidden md:flex flex-shrink-0 items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 text-sm font-semibold mt-0.5 shadow-sm">
                 {currentVisibleNumber || 1}
               </span>
               <div className="flex-1 min-w-0">
@@ -489,7 +489,9 @@ export default function SurveyResponsePage() {
                 >
                   {currentQuestion.title}
                   {isQuestionRequired(currentQuestion) && (
-                    <span className="text-red-500 text-sm ml-1.5 align-top" aria-label="필수 질문">*</span>
+                    <span className="text-red-500 text-sm ml-1.5 align-top" aria-label="필수 질문">
+                      *
+                    </span>
                   )}
                 </CardTitle>
                 {currentQuestion.description && (
