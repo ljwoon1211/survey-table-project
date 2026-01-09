@@ -8,13 +8,19 @@ import type { Question } from "@/types/survey";
 export function extractImageUrlsFromQuestion(question: Question): string[] {
   const imageUrls: string[] = [];
 
-  // 1. noticeContent에서 이미지 URL 추출 (TipTap HTML)
+  // 1. description에서 이미지 URL 추출 (TipTap HTML)
+  if (question.description) {
+    const urls = extractImageUrlsFromHtml(question.description);
+    imageUrls.push(...urls);
+  }
+
+  // 2. noticeContent에서 이미지 URL 추출 (TipTap HTML)
   if (question.noticeContent) {
     const urls = extractImageUrlsFromHtml(question.noticeContent);
     imageUrls.push(...urls);
   }
 
-  // 2. 테이블 셀에서 이미지 URL 추출
+  // 3. 테이블 셀에서 이미지 URL 추출
   if (question.tableRowsData) {
     for (const row of question.tableRowsData) {
       for (const cell of row.cells) {

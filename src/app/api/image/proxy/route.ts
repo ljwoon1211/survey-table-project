@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import * as Sentry from "@sentry/nextjs";
 
 // Cloudflare R2는 S3 호환 API를 사용합니다
 const r2Client = new S3Client({
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
       Bucket: bucketName,
       Key: key,
     });
-
+    console.log("요청하려는 Key:", key);
     const response = await r2Client.send(command);
 
     if (!response.Body) {
@@ -81,6 +82,9 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("이미지 프록시 오류:", error);
+    Sentry.captureException(error, {
+      tags: { operation: "image_proxy" },
+    });
     return NextResponse.json(
       { error: "이미지 프록시 중 오류가 발생했습니다." },
       { status: 500 }

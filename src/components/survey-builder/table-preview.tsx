@@ -115,7 +115,7 @@ export function TablePreview({
 
       case "select":
         return cell.selectOptions && cell.selectOptions.length > 0 ? (
-          <select className="w-full p-2 text-sm border border-gray-300 rounded" disabled>
+          <select className="w-full h-full p-2 text-sm border border-gray-300 rounded" disabled>
             <option value="">선택하세요...</option>
             {cell.selectOptions.map((option) => (
               <option key={option.id} value={option.value}>
@@ -191,13 +191,13 @@ export function TablePreview({
 
       case "input":
         return (
-          <div className="w-full">
+          <div className="w-full h-full flex flex-col">
             <input
               type="text"
               placeholder={cell.placeholder || "답변을 입력하세요..."}
               maxLength={cell.inputMaxLength}
               disabled
-              className="w-full p-2 text-sm border border-gray-300 rounded bg-gray-50"
+              className="w-full h-full p-2 text-sm border border-gray-300 rounded bg-gray-50"
             />
             {cell.inputMaxLength && (
               <div className="text-xs text-gray-500 mt-1 text-right">
@@ -209,7 +209,7 @@ export function TablePreview({
 
       default:
         return cell.content ? (
-          <div className="whitespace-pre-wrap text-sm text-left leading-relaxed break-words">
+          <div className="whitespace-pre-wrap text-sm leading-relaxed break-words w-full">
             {cell.content}
           </div>
         ) : (
@@ -272,14 +272,42 @@ export function TablePreview({
                     // rowspan으로 숨겨진 셀은 렌더링하지 않음
                     if (cell.isHidden) return null;
 
+                    // 정렬 클래스 계산 (세로 정렬만 td에 적용)
+                    const verticalAlignClass =
+                      cell.verticalAlign === 'middle'
+                        ? 'align-middle'
+                        : cell.verticalAlign === 'bottom'
+                          ? 'align-bottom'
+                          : 'align-top';
+
                     return (
                       <td
                         key={cell.id}
-                        className="border border-gray-300 p-3 text-left align-top"
+                        className={`border border-gray-300 p-3 ${verticalAlignClass}`}
                         rowSpan={cell.rowspan || 1}
                         colSpan={cell.colspan || 1}
                       >
-                        {renderCellContent(cell)}
+                        <div
+                          className={`w-full h-full flex flex-col ${
+                            cell.verticalAlign === 'top'
+                              ? 'justify-start'
+                              : cell.verticalAlign === 'middle'
+                                ? 'justify-center'
+                                : 'justify-end'
+                          }`}
+                        >
+                          <div
+                            className={`w-full ${
+                              cell.horizontalAlign === 'left'
+                                ? 'flex justify-start items-start'
+                                : cell.horizontalAlign === 'center'
+                                  ? 'flex justify-center items-center'
+                                  : 'flex justify-end items-end'
+                            }`}
+                          >
+                            {renderCellContent(cell)}
+                          </div>
+                        </div>
                       </td>
                     );
                   })}

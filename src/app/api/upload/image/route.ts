@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
+import * as Sentry from "@sentry/nextjs";
 
 // Cloudflare R2는 S3 호환 API를 사용합니다
 const r2Client = new S3Client({
@@ -52,7 +53,9 @@ export async function POST(request: NextRequest) {
     const publicUrl = process.env.CLOUDFLARE_R2_PUBLIC_URL;
 
     if (!bucketName || !publicUrl) {
-      console.error("Cloudflare R2 환경 변수가 설정되지 않았습니다.");
+      const error = new Error("Cloudflare R2 환경 변수가 설정되지 않았습니다.");
+      console.error(error.message);
+      Sentry.captureException(error);
       return NextResponse.json({ error: "서버 설정 오류" }, { status: 500 });
     }
 
@@ -72,6 +75,10 @@ export async function POST(request: NextRequest) {
         fileExtension = "webp";
       } catch (conversionError) {
         console.error("WebP 변환 실패, 원본 저장:", conversionError);
+        Sentry.captureException(conversionError, {
+          tags: { operation: "image_conversion" },
+          level: "warning",
+        });
         // 변환 실패 시 원본 저장
         fileExtension = file.name.split(".").pop() || "jpg";
       }
@@ -101,6 +108,9 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error("이미지 업로드 오류:", error);
+    Sentry.captureException(error, {
+      tags: { operation: "image_upload" },
+    });
     return NextResponse.json(
       { error: "이미지 업로드 중 오류가 발생했습니다." },
       { status: 500 }

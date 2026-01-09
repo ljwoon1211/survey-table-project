@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { Survey, Question, QuestionType, SurveySettings, SelectLevel, TableColumn, TableRow, QuestionGroup } from '@/types/survey';
 import { generateSlugFromTitle, generatePrivateToken } from '@/lib/survey-url';
+import { generateId } from '@/lib/utils';
 
 interface SurveyBuilderState {
   // 현재 편집 중인 설문 (메모리에만 유지, TanStack Query로 서버와 동기화)
@@ -9,7 +10,6 @@ interface SurveyBuilderState {
 
   // UI 상태
   selectedQuestionId: string | null;
-  isPreviewMode: boolean;
   isTestMode: boolean;
   isDirty: boolean; // 변경사항 있음 표시
 
@@ -42,7 +42,6 @@ interface SurveyBuilderState {
   reorderQuestions: (questionIds: string[]) => void;
 
   selectQuestion: (questionId: string | null) => void;
-  togglePreviewMode: () => void;
   toggleTestMode: () => void;
 
   // 테스트 응답 관리
@@ -66,7 +65,7 @@ const defaultSurveySettings: SurveySettings = {
 };
 
 const createDefaultSurvey = (): Survey => ({
-  id: `survey-${Date.now()}`,
+  id: generateId(),
   title: '새 설문조사',
   description: '',
   slug: '',
@@ -83,7 +82,6 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
     (set, get) => ({
       currentSurvey: createDefaultSurvey(),
       selectedQuestionId: null,
-      isPreviewMode: false,
       isTestMode: false,
       isDirty: false,
       testResponses: {},
@@ -93,7 +91,6 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
         set(() => ({
           currentSurvey: survey,
           selectedQuestionId: null,
-          isPreviewMode: false,
           isTestMode: false,
           isDirty: false,
           testResponses: {},
@@ -171,7 +168,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           : -1;
 
         const newGroup: QuestionGroup = {
-          id: `group-${Date.now()}`,
+          id: generateId(),
           name,
           description,
           parentGroupId,
@@ -271,7 +268,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
 
       addQuestion: (type: QuestionType, groupId?: string) => {
         const newQuestion: Question = {
-          id: `question-${Date.now()}`,
+          id: generateId(),
           type,
           title: getDefaultQuestionTitle(type),
           required: false,
@@ -279,8 +276,8 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           groupId,
           ...(needsOptions(type) && {
             options: [
-              { id: `option-${Date.now()}-1`, label: '옵션 1', value: '옵션1' },
-              { id: `option-${Date.now()}-2`, label: '옵션 2', value: '옵션2' }
+              { id: generateId(), label: '옵션 1', value: '옵션1' },
+              { id: generateId(), label: '옵션 2', value: '옵션2' }
             ]
           }),
           ...(needsSelectLevels(type) && { selectLevels: getDefaultSelectLevels() }),
@@ -363,9 +360,6 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
       selectQuestion: (questionId: string | null) =>
         set(() => ({ selectedQuestionId: questionId })),
 
-      togglePreviewMode: () =>
-        set((state) => ({ isPreviewMode: !state.isPreviewMode })),
-
       toggleTestMode: () =>
         set((state) => ({
           isTestMode: !state.isTestMode,
@@ -397,7 +391,6 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
         set(() => ({
           currentSurvey: createDefaultSurvey(),
           selectedQuestionId: null,
-          isPreviewMode: false,
           isTestMode: false,
           isDirty: false,
           testResponses: {}
@@ -439,33 +432,35 @@ function needsTableData(type: QuestionType): boolean {
 }
 
 function getDefaultSelectLevels(): SelectLevel[] {
+  const level1Id = generateId();
+  const level2Id = generateId();
   return [
     {
-      id: 'level-1',
+      id: level1Id,
       label: '음식종류',
       placeholder: '음식종류를 선택하세요',
       order: 0,
       options: [
-        { id: 'cat1', label: '한식', value: '한식' },
-        { id: 'cat2', label: '중식', value: '중식' },
-        { id: 'cat3', label: '양식', value: '양식' }
+        { id: generateId(), label: '한식', value: '한식' },
+        { id: generateId(), label: '중식', value: '중식' },
+        { id: generateId(), label: '양식', value: '양식' }
       ]
     },
     {
-      id: 'level-2',
+      id: level2Id,
       label: '메뉴',
       placeholder: '메뉴를 선택하세요',
       order: 1,
       options: [
-        { id: 'sub1-1', label: '김치찌개', value: '한식-김치찌개' },
-        { id: 'sub1-2', label: '불고기', value: '한식-불고기' },
-        { id: 'sub1-3', label: '비빔밥', value: '한식-비빔밥' },
-        { id: 'sub2-1', label: '짜장면', value: '중식-짜장면' },
-        { id: 'sub2-2', label: '짬뽕', value: '중식-짬뽕' },
-        { id: 'sub2-3', label: '탕수육', value: '중식-탕수육' },
-        { id: 'sub3-1', label: '스테이크', value: '양식-스테이크' },
-        { id: 'sub3-2', label: '파스타', value: '양식-파스타' },
-        { id: 'sub3-3', label: '피자', value: '양식-피자' }
+        { id: generateId(), label: '김치찌개', value: '한식-김치찌개' },
+        { id: generateId(), label: '불고기', value: '한식-불고기' },
+        { id: generateId(), label: '비빔밥', value: '한식-비빔밥' },
+        { id: generateId(), label: '짜장면', value: '중식-짜장면' },
+        { id: generateId(), label: '짬뽕', value: '중식-짬뽕' },
+        { id: generateId(), label: '탕수육', value: '중식-탕수육' },
+        { id: generateId(), label: '스테이크', value: '양식-스테이크' },
+        { id: generateId(), label: '파스타', value: '양식-파스타' },
+        { id: generateId(), label: '피자', value: '양식-피자' }
       ]
     }
   ];
@@ -473,37 +468,39 @@ function getDefaultSelectLevels(): SelectLevel[] {
 
 function getDefaultTableColumns(): TableColumn[] {
   return [
-    { id: 'col-1', label: '매우 좋음' },
-    { id: 'col-2', label: '좋음' },
-    { id: 'col-3', label: '보통' },
-    { id: 'col-4', label: '나쁨' }
+    { id: generateId(), label: '매우 좋음' },
+    { id: generateId(), label: '좋음' },
+    { id: generateId(), label: '보통' },
+    { id: generateId(), label: '나쁨' }
   ];
 }
 
 function getDefaultTableRows(): TableRow[] {
+  const row1Id = generateId();
+  const row2Id = generateId();
   return [
     {
-      id: 'row-1',
+      id: row1Id,
       label: '행 1',
       height: 60,
       minHeight: 40,
       cells: [
-        { id: 'cell-1-1', content: '', type: 'text' },
-        { id: 'cell-1-2', content: '', type: 'text' },
-        { id: 'cell-1-3', content: '', type: 'text' },
-        { id: 'cell-1-4', content: '', type: 'text' }
+        { id: generateId(), content: '', type: 'text' },
+        { id: generateId(), content: '', type: 'text' },
+        { id: generateId(), content: '', type: 'text' },
+        { id: generateId(), content: '', type: 'text' }
       ]
     },
     {
-      id: 'row-2',
+      id: row2Id,
       label: '행 2',
       height: 60,
       minHeight: 40,
       cells: [
-        { id: 'cell-2-1', content: '', type: 'text' },
-        { id: 'cell-2-2', content: '', type: 'text' },
-        { id: 'cell-2-3', content: '', type: 'text' },
-        { id: 'cell-2-4', content: '', type: 'text' }
+        { id: generateId(), content: '', type: 'text' },
+        { id: generateId(), content: '', type: 'text' },
+        { id: generateId(), content: '', type: 'text' },
+        { id: generateId(), content: '', type: 'text' }
       ]
     }
   ];

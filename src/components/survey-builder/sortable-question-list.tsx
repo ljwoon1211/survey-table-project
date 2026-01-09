@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   DndContext,
   closestCenter,
@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Question } from "@/types/survey";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
 import { QuestionEditModal } from "./question-edit-modal";
+import { generateId } from "@/lib/utils";
 import {
   deleteQuestion as deleteQuestionAction,
   reorderQuestions as reorderQuestionsAction,
@@ -39,7 +40,8 @@ import { InteractiveTableResponse } from "./interactive-table-response";
 import { TablePreview } from "./table-preview";
 import { NoticeRenderer } from "./notice-renderer";
 import { GroupHeader } from "./group-header";
-import { convertHtmlImageUrlsToProxy } from "@/lib/image-utils";
+import { convertHtmlImageUrlsToProxy, deleteImagesFromR2 } from "@/lib/image-utils";
+import { extractImageUrlsFromQuestion } from "@/lib/image-extractor";
 import { isValidUUID } from "@/lib/utils";
 import {
   GripVertical,
@@ -189,13 +191,16 @@ function SortableQuestion({
           <h4 className="text-base font-medium text-gray-900 mb-2">{question.title}</h4>
           {question.description && (
             <div
-              className="text-sm text-gray-600 mb-3 prose prose-sm max-w-none
-                [&_table]:border-collapse [&_table]:w-full [&_table]:my-2 [&_table]:border-2 [&_table]:border-gray-300
+              className="text-sm text-gray-600 mb-3 prose prose-sm max-w-none overflow-x-auto
+                [&_table]:border-collapse [&_table]:table-fixed [&_table]:w-full [&_table]:my-2 [&_table]:border-2 [&_table]:border-gray-300
                 [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2
                 [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-3 [&_table_th]:py-2
                 [&_table_th]:font-normal [&_table_th]:bg-transparent
                 [&_table_p]:m-0
                 [&_p]:min-h-[1.6em]"
+              style={{
+                WebkitOverflowScrolling: "touch",
+              }}
               dangerouslySetInnerHTML={{
                 __html: convertHtmlImageUrlsToProxy(question.description),
               }}
@@ -297,8 +302,11 @@ function QuestionPreview({ question }: { question: Question }) {
 function QuestionTestCard({ question, index }: { question: Question; index: number }) {
   const { testResponses, updateTestResponse } = useSurveyBuilderStore();
 
-  const handleResponse = (value: any) => {
-    updateTestResponse(question.id, value);
+  const handleResponse = (value: unknown) => {
+    updateTestResponse(
+      question.id,
+      value as string | string[] | Record<string, string | string[] | object>,
+    );
   };
 
   return (
@@ -313,13 +321,16 @@ function QuestionTestCard({ question, index }: { question: Question; index: numb
         <h3 className="text-lg font-medium text-gray-900 mb-1">{question.title}</h3>
         {question.description && (
           <div
-            className="text-sm text-gray-600 mb-4 prose prose-sm max-w-none
-              [&_table]:border-collapse [&_table]:w-full [&_table]:my-2 [&_table]:border-2 [&_table]:border-gray-300
+            className="text-sm text-gray-600 mb-4 prose prose-sm max-w-none overflow-x-auto
+              [&_table]:border-collapse [&_table]:table-fixed [&_table]:w-full [&_table]:my-2 [&_table]:border-2 [&_table]:border-gray-300
               [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2
               [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-3 [&_table_th]:py-2
               [&_table_th]:font-normal [&_table_th]:bg-transparent
               [&_table_p]:m-0
               [&_p]:min-h-[1.6em]"
+            style={{
+              WebkitOverflowScrolling: "touch",
+            }}
             dangerouslySetInnerHTML={{ __html: convertHtmlImageUrlsToProxy(question.description) }}
           />
         )}
@@ -336,6 +347,377 @@ function QuestionTestCard({ question, index }: { question: Question; index: numb
   );
 }
 
+// 기타 옵션 관련 타입 정의
+type OtherChoiceValue = {
+  selectedValue: string;
+  otherValue?: string;
+  hasOther: true;
+};
+
+function isOtherChoiceValue(value: unknown): value is OtherChoiceValue {
+  if (!value || typeof value !== "object") return false;
+  return (
+    "selectedValue" in value &&
+    typeof (value as { selectedValue: unknown }).selectedValue === "string" &&
+    "hasOther" in value &&
+    (value as { hasOther: unknown }).hasOther === true
+  );
+}
+
+type SingleChoiceResponse = string | null | OtherChoiceValue;
+type MultiChoiceResponse = Array<string | OtherChoiceValue>;
+
+// 테스트 모드용 Radio 질문 컴포넌트
+function RadioTestInput({
+  question,
+  value,
+  onChange,
+}: {
+  question: Question;
+  value: SingleChoiceResponse;
+  onChange: (value: SingleChoiceResponse) => void;
+}) {
+  const [otherInput, setOtherInput] = useState("");
+
+  useEffect(() => {
+    if (isOtherChoiceValue(value) && value.otherValue) {
+      setOtherInput(value.otherValue);
+    } else {
+      setOtherInput("");
+    }
+  }, [value]);
+
+  const handleOptionChange = (optionValue: string, optionId: string) => {
+    const isOtherOption = optionId === "other-option";
+    const isSelected = isOtherChoiceValue(value)
+      ? value.selectedValue === optionValue
+      : value === optionValue;
+
+    if (isSelected) {
+      onChange(null);
+      return;
+    }
+
+    if (isOtherOption) {
+      onChange({
+        selectedValue: optionValue,
+        otherValue: otherInput,
+        hasOther: true,
+      });
+    } else {
+      onChange(optionValue);
+    }
+  };
+
+  const handleOtherInputChange = (inputValue: string) => {
+    setOtherInput(inputValue);
+    if (isOtherChoiceValue(value)) {
+      onChange({
+        ...value,
+        otherValue: inputValue,
+      });
+    }
+  };
+
+  const isSelected = (optionValue: string) => {
+    if (isOtherChoiceValue(value)) {
+      return value.selectedValue === optionValue;
+    }
+    return value === optionValue;
+  };
+
+  return (
+    <div className="space-y-3">
+      {question.options?.map((option) => (
+        <div key={option.id} className="space-y-2">
+          <div className="flex items-center space-x-3">
+            <input
+              type="radio"
+              id={`${question.id}-${option.id}`}
+              name={question.id}
+              value={option.value}
+              checked={isSelected(option.value)}
+              onChange={() => handleOptionChange(option.value, option.id)}
+              onClick={() => handleOptionChange(option.value, option.id)}
+              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
+            />
+            <label
+              htmlFor={`${question.id}-${option.id}`}
+              onClick={(e) => {
+                e.preventDefault();
+                handleOptionChange(option.value, option.id);
+              }}
+              className="text-sm text-gray-700 cursor-pointer flex-1"
+            >
+              {option.label}
+            </label>
+          </div>
+          {option.id === "other-option" && isSelected(option.value) && (
+            <div className="ml-7">
+              <Input
+                placeholder="기타 내용을 입력하세요..."
+                value={otherInput}
+                onChange={(e) => handleOtherInputChange(e.target.value)}
+                className="w-full"
+              />
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// 테스트 모드용 Checkbox 질문 컴포넌트
+function CheckboxTestInput({
+  question,
+  value,
+  onChange,
+}: {
+  question: Question;
+  value: MultiChoiceResponse;
+  onChange: (value: MultiChoiceResponse) => void;
+}) {
+  const [otherInputs, setOtherInputs] = useState<Record<string, string>>({});
+
+  const currentValues = useMemo<MultiChoiceResponse>(
+    () => (Array.isArray(value) ? (value as MultiChoiceResponse) : []),
+    [value],
+  );
+
+  useEffect(() => {
+    const newOtherInputs: Record<string, string> = {};
+    currentValues.forEach((val) => {
+      if (isOtherChoiceValue(val)) {
+        newOtherInputs[val.selectedValue] = val.otherValue || "";
+      }
+    });
+    setOtherInputs(newOtherInputs);
+  }, [currentValues]);
+
+  const handleOptionChange = (optionValue: string, optionId: string, isChecked: boolean) => {
+    let newValues = [...currentValues];
+    const isOtherOption = optionId === "other-option";
+
+    if (isChecked) {
+      // 최대 선택 개수 체크
+      const maxSelections = question.maxSelections;
+      if (maxSelections !== undefined && maxSelections > 0) {
+        const currentCount = newValues.length;
+        if (currentCount >= maxSelections) {
+          // 최대 개수 도달 시 추가 선택 불가
+          return;
+        }
+      }
+
+      if (isOtherOption) {
+        newValues.push({
+          selectedValue: optionValue,
+          otherValue: otherInputs[optionValue] || "",
+          hasOther: true,
+        });
+      } else {
+        newValues.push(optionValue);
+      }
+    } else {
+      newValues = newValues.filter((val) => {
+        if (isOtherChoiceValue(val)) {
+          return val.selectedValue !== optionValue;
+        }
+        return val !== optionValue;
+      });
+    }
+
+    onChange(newValues);
+  };
+
+  const handleOtherInputChange = (optionValue: string, inputValue: string) => {
+    const newOtherInputs = { ...otherInputs, [optionValue]: inputValue };
+    setOtherInputs(newOtherInputs);
+
+    const newValues = currentValues.map((val) => {
+      if (isOtherChoiceValue(val) && val.selectedValue === optionValue) {
+        return { ...val, otherValue: inputValue };
+      }
+      return val;
+    });
+
+    onChange(newValues);
+  };
+
+  const isChecked = (optionValue: string) => {
+    return currentValues.some((val) => {
+      if (isOtherChoiceValue(val)) {
+        return val.selectedValue === optionValue;
+      }
+      return val === optionValue;
+    });
+  };
+
+  const currentCount = currentValues.length;
+  const maxSelections = question.maxSelections;
+  const minSelections = question.minSelections;
+  const isMaxReached =
+    maxSelections !== undefined && maxSelections > 0 && currentCount >= maxSelections;
+  const isMinNotMet =
+    minSelections !== undefined && minSelections > 0 && currentCount < minSelections;
+
+  const canSelect = (optionValue: string) => {
+    if (isChecked(optionValue)) return true; // 이미 선택된 것은 해제 가능
+    if (isMaxReached) return false; // 최대 개수 도달 시 추가 선택 불가
+    return true;
+  };
+
+  return (
+    <div className="space-y-3">
+      {question.options?.map((option) => {
+        const checked = isChecked(option.value);
+        const disabled = !canSelect(option.value);
+
+        return (
+          <div key={option.id} className="space-y-2">
+            <div className="flex items-center space-x-3">
+              <input
+                type="checkbox"
+                id={`${question.id}-${option.id}`}
+                checked={checked}
+                disabled={disabled}
+                onChange={(e) => handleOptionChange(option.value, option.id, e.target.checked)}
+                className={`w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 ${
+                  disabled ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              />
+              <label
+                htmlFor={`${question.id}-${option.id}`}
+                className={`text-sm text-gray-700 flex-1 ${
+                  disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                }`}
+              >
+                {option.label}
+              </label>
+            </div>
+            {option.id === "other-option" && checked && (
+              <div className="ml-7">
+                <Input
+                  placeholder="기타 내용을 입력하세요..."
+                  value={otherInputs[option.value] || ""}
+                  onChange={(e) => handleOtherInputChange(option.value, e.target.value)}
+                  className="w-full"
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* 선택 개수 표시 */}
+      {(maxSelections !== undefined || minSelections !== undefined) && (
+        <div className="pt-2 border-t border-gray-200">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-600">
+              {maxSelections !== undefined && maxSelections > 0
+                ? `${currentCount}/${maxSelections}개 선택됨`
+                : `${currentCount}개 선택됨`}
+            </span>
+            {isMinNotMet && (
+              <span className="text-orange-600">최소 {minSelections}개 이상 선택해주세요</span>
+            )}
+            {isMaxReached && <span className="text-blue-600">최대 선택 개수에 도달했습니다</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 테스트 모드용 Select 질문 컴포넌트
+function SelectTestInput({
+  question,
+  value,
+  onChange,
+}: {
+  question: Question;
+  value: SingleChoiceResponse;
+  onChange: (value: SingleChoiceResponse) => void;
+}) {
+  const [otherInput, setOtherInput] = useState("");
+  const [selectedValue, setSelectedValue] = useState<string>("");
+
+  // value가 변경될 때 selectedValue와 otherInput 동기화
+  useEffect(() => {
+    if (isOtherChoiceValue(value)) {
+      setSelectedValue(value.selectedValue);
+      setOtherInput(value.otherValue || "");
+    } else {
+      setSelectedValue(value || "");
+      setOtherInput("");
+    }
+  }, [value]);
+
+  const handleSelectChange = (newValue: string) => {
+    setSelectedValue(newValue);
+    const selectedOption = question.options?.find((opt) => opt.value === newValue);
+
+    if (selectedOption?.id === "other-option") {
+      onChange({
+        selectedValue: newValue,
+        otherValue: otherInput,
+        hasOther: true,
+      });
+    } else {
+      onChange(newValue);
+    }
+  };
+
+  const handleOtherInputChange = (inputValue: string) => {
+    setOtherInput(inputValue);
+    if (selectedValue) {
+      const selectedOption = question.options?.find((opt) => opt.value === selectedValue);
+      if (selectedOption?.id === "other-option") {
+        onChange({
+          selectedValue,
+          otherValue: inputValue,
+          hasOther: true,
+        });
+      }
+    }
+  };
+
+  const showOtherInput = () => {
+    if (!selectedValue) return false;
+    const selectedOption = question.options?.find((opt) => opt.value === selectedValue);
+    return selectedOption?.id === "other-option";
+  };
+
+  return (
+    <div className="space-y-3">
+      <select
+        value={selectedValue}
+        onChange={(e) => handleSelectChange(e.target.value)}
+        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+      >
+        <option value="">선택하세요...</option>
+        {question.options?.map((option) => (
+          <option key={option.id} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+
+      {showOtherInput() && (
+        <div>
+          <Input
+            placeholder="기타 내용을 입력하세요..."
+            value={otherInput}
+            onChange={(e) => handleOtherInputChange(e.target.value)}
+            className="w-full"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // 질문 타입별 테스트 입력 컴포넌트
 function QuestionTestInput({
   question,
@@ -343,15 +725,15 @@ function QuestionTestInput({
   onChange,
 }: {
   question: Question;
-  value: any;
-  onChange: (value: any) => void;
+  value: unknown;
+  onChange: (value: unknown) => void;
 }) {
   switch (question.type) {
     case "text":
       return (
         <Input
           placeholder={question.placeholder || "답변을 입력하세요..."}
-          value={value || ""}
+          value={(value as string) || ""}
           onChange={(e) => onChange(e.target.value)}
           className="w-full"
         />
@@ -363,133 +745,36 @@ function QuestionTestInput({
           className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           rows={3}
           placeholder="답변을 입력하세요..."
-          value={value || ""}
+          value={(value as string) || ""}
           onChange={(e) => onChange(e.target.value)}
         />
       );
 
     case "radio":
       return (
-        <div className="space-y-3">
-          {question.options?.map((option) => (
-            <div key={option.id} className="flex items-center space-x-3">
-              <input
-                type="radio"
-                name={question.id}
-                value={option.value}
-                checked={value === option.value}
-                onChange={(e) => onChange(e.target.value)}
-                className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-              />
-              <label
-                className="text-sm text-gray-700 cursor-pointer flex-1"
-                onClick={() => onChange(option.value)}
-              >
-                {option.label}
-              </label>
-            </div>
-          ))}
-        </div>
+        <RadioTestInput
+          question={question}
+          value={value as SingleChoiceResponse}
+          onChange={onChange as (value: SingleChoiceResponse) => void}
+        />
       );
 
     case "checkbox":
-      const currentValues = Array.isArray(value) ? value : [];
-      const currentCount = currentValues.length;
-      const maxSelections = question.maxSelections;
-      const minSelections = question.minSelections;
-      const isMaxReached = maxSelections !== undefined && maxSelections > 0 && currentCount >= maxSelections;
-      const isMinNotMet = minSelections !== undefined && minSelections > 0 && currentCount < minSelections;
-
-      const canSelect = (optionValue: string) => {
-        if (currentValues.includes(optionValue)) return true; // 이미 선택된 것은 해제 가능
-        if (isMaxReached) return false; // 최대 개수 도달 시 추가 선택 불가
-        return true;
-      };
-
       return (
-        <div className="space-y-3">
-          {question.options?.map((option) => {
-            const isChecked = currentValues.includes(option.value);
-            const disabled = !canSelect(option.value);
-
-            return (
-              <div key={option.id} className="flex items-center space-x-3">
-                <input
-                  type="checkbox"
-                  checked={isChecked}
-                  disabled={disabled}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      // 최대 선택 개수 체크
-                      if (isMaxReached) return;
-                      onChange([...currentValues, option.value]);
-                    } else {
-                      onChange(currentValues.filter((v) => v !== option.value));
-                    }
-                  }}
-                  className={`w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 ${
-                    disabled ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
-                />
-                <label
-                  className={`text-sm text-gray-700 flex-1 ${
-                    disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-                  }`}
-                  onClick={() => {
-                    if (disabled) return;
-                    if (isChecked) {
-                      onChange(currentValues.filter((v) => v !== option.value));
-                    } else {
-                      if (isMaxReached) return;
-                      onChange([...currentValues, option.value]);
-                    }
-                  }}
-                >
-                  {option.label}
-                </label>
-              </div>
-            );
-          })}
-          
-          {/* 선택 개수 표시 */}
-          {(maxSelections !== undefined || minSelections !== undefined) && (
-            <div className="pt-2 border-t border-gray-200">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">
-                  {maxSelections !== undefined && maxSelections > 0
-                    ? `${currentCount}/${maxSelections}개 선택됨`
-                    : `${currentCount}개 선택됨`}
-                </span>
-                {isMinNotMet && (
-                  <span className="text-orange-600">
-                    최소 {minSelections}개 이상 선택해주세요
-                  </span>
-                )}
-                {isMaxReached && (
-                  <span className="text-blue-600">
-                    최대 선택 개수에 도달했습니다
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        <CheckboxTestInput
+          question={question}
+          value={value as MultiChoiceResponse}
+          onChange={onChange as (value: MultiChoiceResponse) => void}
+        />
       );
 
     case "select":
       return (
-        <select
-          value={value || ""}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        >
-          <option value="">선택하세요...</option>
-          {question.options?.map((option) => (
-            <option key={option.id} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+        <SelectTestInput
+          question={question}
+          value={value as SingleChoiceResponse}
+          onChange={onChange as (value: SingleChoiceResponse) => void}
+        />
       );
 
     case "multiselect":
@@ -509,6 +794,8 @@ function QuestionTestInput({
           tableTitle={question.tableTitle}
           columns={question.tableColumns}
           rows={question.tableRowsData}
+          value={typeof value === "object" && value !== null ? value : undefined}
+          onChange={onChange}
           isTestMode={true}
           className="border-0 shadow-none"
         />
@@ -521,7 +808,7 @@ function QuestionTestInput({
         <NoticeRenderer
           content={question.noticeContent || ""}
           requiresAcknowledgment={question.requiresAcknowledgment}
-          value={value || false}
+          value={typeof value === "boolean" ? value : false}
           onChange={onChange}
           isTestMode={true}
         />
@@ -698,6 +985,20 @@ export function SortableQuestionList({
 
   const handleDelete = async (questionId: string) => {
     if (confirm("이 질문을 삭제하시겠습니까?")) {
+      // 삭제 전 질문에서 이미지 추출 및 삭제
+      const questionToDelete = questions.find((q) => q.id === questionId);
+      if (questionToDelete) {
+        const images = extractImageUrlsFromQuestion(questionToDelete);
+        if (images.length > 0) {
+          try {
+            await deleteImagesFromR2(images);
+          } catch (error) {
+            console.error("질문 삭제 시 이미지 삭제 실패:", error);
+            // 이미지 삭제 실패해도 질문 삭제는 진행
+          }
+        }
+      }
+
       // 로컬 스토어에서 삭제
       deleteQuestion(questionId);
 
@@ -718,24 +1019,24 @@ export function SortableQuestionList({
       // 새로운 ID를 가진 완전한 복사본 생성
       const newQuestion: Question = {
         ...questionToDuplicate,
-        id: `question-${Date.now()}`,
+        id: generateId(),
         title: `${questionToDuplicate.title} (복사본)`,
         order: questions.length,
         // options 복사 (새 ID 부여)
         options: questionToDuplicate.options
           ? questionToDuplicate.options.map((opt) => ({
               ...opt,
-              id: `option-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              id: generateId(),
             }))
           : undefined,
         // selectLevels 복사 (새 ID 부여)
         selectLevels: questionToDuplicate.selectLevels
           ? questionToDuplicate.selectLevels.map((level) => ({
               ...level,
-              id: `level-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              id: generateId(),
               options: level.options.map((opt) => ({
                 ...opt,
-                id: `option-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                id: generateId(),
               })),
             }))
           : undefined,
@@ -743,34 +1044,34 @@ export function SortableQuestionList({
         tableColumns: questionToDuplicate.tableColumns
           ? questionToDuplicate.tableColumns.map((col) => ({
               ...col,
-              id: `col-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              id: generateId(),
             }))
           : undefined,
         // tableRowsData 복사 (새 ID 부여)
         tableRowsData: questionToDuplicate.tableRowsData
           ? questionToDuplicate.tableRowsData.map((row) => ({
               ...row,
-              id: `row-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              id: generateId(),
               cells: row.cells.map((cell) => ({
                 ...cell,
-                id: `cell-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                id: generateId(),
                 // 셀 내부의 옵션들도 복사
                 checkboxOptions: cell.checkboxOptions
                   ? cell.checkboxOptions.map((opt) => ({
                       ...opt,
-                      id: `checkbox-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                      id: generateId(),
                     }))
                   : undefined,
                 radioOptions: cell.radioOptions
                   ? cell.radioOptions.map((opt) => ({
                       ...opt,
-                      id: `radio-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                      id: generateId(),
                     }))
                   : undefined,
                 selectOptions: cell.selectOptions
                   ? cell.selectOptions.map((opt) => ({
                       ...opt,
-                      id: `select-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                      id: generateId(),
                     }))
                   : undefined,
               })),
@@ -827,8 +1128,8 @@ export function SortableQuestionList({
 
           return (
             <div key={group.id} className="space-y-4">
-              <GroupHeader 
-                group={group} 
+              <GroupHeader
+                group={group}
                 questionCount={getTotalQuestionCount(group.id)}
                 subGroupCount={getTotalSubGroupCount(group.id)}
               />
@@ -853,8 +1154,8 @@ export function SortableQuestionList({
 
                     return (
                       <div key={subGroup.id} className="ml-4 space-y-4">
-                        <GroupHeader 
-                          group={subGroup} 
+                        <GroupHeader
+                          group={subGroup}
                           questionCount={getTotalQuestionCount(subGroup.id)}
                           subGroupCount={getTotalSubGroupCount(subGroup.id)}
                         />
@@ -919,8 +1220,8 @@ export function SortableQuestionList({
 
               return (
                 <div key={group.id} className="space-y-4">
-                  <GroupHeader 
-                    group={group} 
+                  <GroupHeader
+                    group={group}
                     questionCount={getTotalQuestionCount(group.id)}
                     subGroupCount={getTotalSubGroupCount(group.id)}
                   />

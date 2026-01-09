@@ -1,31 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
-import { QuestionGroup } from "@/types/survey";
+import { QuestionGroup, QuestionConditionGroup } from "@/types/survey";
 import { isUUID } from "@/lib/survey-url";
-import {
-  FolderPlus,
-  Edit3,
-  Trash2,
-  GripVertical,
-  ChevronRight,
-  ChevronDown,
-  Plus,
-  MoreVertical,
-} from "lucide-react";
+import { FolderPlus } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -42,142 +22,14 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-  useSortable,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { SortableGroupItem } from "./group-manager/group-item";
+import { GroupCreateModal } from "./group-manager/group-create-modal";
+import { GroupEditModal } from "./group-manager/group-edit-modal";
+import { canBeParentOf } from "./group-manager/group-helpers";
 
 interface GroupManagerProps {
   className?: string;
-}
-
-interface SortableGroupItemProps {
-  group: QuestionGroup;
-  questionCount: number;
-  subGroups: QuestionGroup[];
-  isExpanded: boolean;
-  onEdit: (group: QuestionGroup) => void;
-  onDelete: (groupId: string) => void;
-  onToggleExpand: (groupId: string) => void;
-  onAddSubGroup: (parentGroupId: string) => void;
-  isDragOver?: boolean;
-  isDragging?: boolean;
-  totalSubGroupCount?: number;
-}
-
-function SortableGroupItem({
-  group,
-  questionCount,
-  subGroups,
-  isExpanded,
-  onEdit,
-  onDelete,
-  onToggleExpand,
-  onAddSubGroup,
-  isDragOver = false,
-  isDragging: isDraggingProp = false,
-  totalSubGroupCount = 0,
-}: SortableGroupItemProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: group.id,
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  const hasSubGroups = subGroups.length > 0;
-
-  return (
-    <div ref={setNodeRef} style={style} className={`${isDragging ? "z-50 shadow-lg" : ""}`}>
-      <div
-        data-group-id={group.id}
-        className="flex items-center justify-between p-2 rounded-lg transition-all relative bg-gray-50 hover:bg-gray-100"
-      >
-        <div className="flex items-center space-x-2 flex-1 min-w-0">
-          {hasSubGroups && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleExpand(group.id);
-              }}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              {isExpanded ? (
-                <ChevronDown className="w-4 h-4" />
-              ) : (
-                <ChevronRight className="w-4 h-4" />
-              )}
-            </button>
-          )}
-          {!hasSubGroups && <div className="w-4" />}
-          <div
-            className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
-            {...attributes}
-            {...listeners}
-          >
-            <GripVertical className="w-4 h-4" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">{group.name}</p>
-            <p className="text-xs text-gray-500">
-              {questionCount}개 질문
-              {totalSubGroupCount > 0 && ` • ${totalSubGroupCount}개 하위그룹`}
-            </p>
-          </div>
-        </div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={(e) => {
-                e.stopPropagation();
-              }}
-            >
-              <MoreVertical className="w-4 h-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-40 p-1" align="end" onClick={(e) => e.stopPropagation()}>
-            <div className="flex flex-col">
-              <button
-                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddSubGroup(group.id);
-                }}
-              >
-                <Plus className="w-4 h-4" />
-                하위 그룹 추가
-              </button>
-              <button
-                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit(group);
-                }}
-              >
-                <Edit3 className="w-4 h-4" />
-                수정
-              </button>
-              <button
-                className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(group.id);
-                }}
-              >
-                <Trash2 className="w-4 h-4" />
-                삭제
-              </button>
-            </div>
-          </PopoverContent>
-        </Popover>
-      </div>
-    </div>
-  );
 }
 
 export function GroupManager({ className }: GroupManagerProps) {
@@ -194,15 +46,41 @@ export function GroupManager({ className }: GroupManagerProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
 
-  const groups = currentSurvey.groups || [];
+  const groups = useMemo(() => currentSurvey.groups || [], [currentSurvey.groups]);
+
+  // 모달이 열려있는 동안 currentSurvey.groups가 업데이트되면 editingGroup도 업데이트
+  useEffect(() => {
+    if (isEditModalOpen && editingGroup?.id) {
+      const latestGroup = groups.find((g) => g.id === editingGroup.id);
+      if (latestGroup) {
+        // displayCondition이 다르거나 다른 필드가 업데이트된 경우
+        const hasChanges =
+          latestGroup.displayCondition !== editingGroup.displayCondition ||
+          latestGroup.name !== editingGroup.name ||
+          latestGroup.description !== editingGroup.description ||
+          latestGroup.parentGroupId !== editingGroup.parentGroupId;
+
+        if (hasChanges) {
+          setEditingGroup(latestGroup);
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditModalOpen, editingGroup?.id, groups]);
 
   // 최상위 그룹만 필터링 (parentGroupId가 없는 것들)
-  const topLevelGroups = groups.filter((g) => !g.parentGroupId).sort((a, b) => a.order - b.order);
+  const topLevelGroups = useMemo(
+    () => groups.filter((g) => !g.parentGroupId).sort((a, b) => a.order - b.order),
+    [groups],
+  );
 
   // 특정 그룹의 하위 그룹들 가져오기
-  const getSubGroups = (parentId: string) => {
-    return groups.filter((g) => g.parentGroupId === parentId).sort((a, b) => a.order - b.order);
-  };
+  const getSubGroups = useCallback(
+    (parentId: string) => {
+      return groups.filter((g) => g.parentGroupId === parentId).sort((a, b) => a.order - b.order);
+    },
+    [groups],
+  );
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -211,30 +89,63 @@ export function GroupManager({ className }: GroupManagerProps) {
     }),
   );
 
-  // 각 그룹에 직접 속한 질문 개수 계산
-  const getDirectQuestionCount = (groupId: string) => {
-    return currentSurvey.questions.filter((q) => q.groupId === groupId).length;
-  };
+  // 각 그룹에 직접 속한 질문 개수 계산 (메모이제이션)
+  const questionCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    groups.forEach((group) => {
+      const count = currentSurvey.questions.filter((q) => q.groupId === group.id).length;
+      map.set(group.id, count);
+    });
+    return map;
+  }, [groups, currentSurvey.questions]);
 
-  // 재귀적으로 그룹과 모든 하위 그룹의 질문 개수 합계 계산
-  const getTotalQuestionCount = (groupId: string): number => {
-    const directCount = getDirectQuestionCount(groupId);
-    const subGroups = getSubGroups(groupId);
-    const subGroupsCount = subGroups.reduce((sum, subGroup) => {
-      return sum + getTotalQuestionCount(subGroup.id);
-    }, 0);
-    return directCount + subGroupsCount;
-  };
+  // 재귀적으로 그룹과 모든 하위 그룹의 질문 개수 합계 계산 (메모이제이션)
+  const getTotalQuestionCount = useCallback(
+    (groupId: string): number => {
+      const directCount = questionCountMap.get(groupId) || 0;
+      const subGroups = getSubGroups(groupId);
+      const subGroupsCount = subGroups.reduce((sum, subGroup) => {
+        return sum + getTotalQuestionCount(subGroup.id);
+      }, 0);
+      return directCount + subGroupsCount;
+    },
+    [questionCountMap, getSubGroups],
+  );
 
-  // 재귀적으로 모든 하위 그룹 개수 계산 (직접 하위 + 하위의 하위)
-  const getTotalSubGroupCount = (groupId: string): number => {
-    const directSubGroups = getSubGroups(groupId);
-    const directCount = directSubGroups.length;
-    const nestedCount = directSubGroups.reduce((sum, subGroup) => {
-      return sum + getTotalSubGroupCount(subGroup.id);
-    }, 0);
-    return directCount + nestedCount;
-  };
+  // 재귀적으로 모든 하위 그룹 개수 계산 (직접 하위 + 하위의 하위) (메모이제이션)
+  const subGroupCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+
+    const calculateCount = (groupId: string): number => {
+      if (map.has(groupId)) {
+        return map.get(groupId)!;
+      }
+      const directSubGroups = getSubGroups(groupId);
+      const directCount = directSubGroups.length;
+      const nestedCount = directSubGroups.reduce((sum, subGroup) => {
+        return sum + calculateCount(subGroup.id);
+      }, 0);
+      const total = directCount + nestedCount;
+      map.set(groupId, total);
+      return total;
+    };
+
+    // 모든 그룹에 대해 계산
+    groups.forEach((group) => {
+      if (!map.has(group.id)) {
+        calculateCount(group.id);
+      }
+    });
+
+    return map;
+  }, [groups, getSubGroups]);
+
+  const getTotalSubGroupCount = useCallback(
+    (groupId: string): number => {
+      return subGroupCountMap.get(groupId) || 0;
+    },
+    [subGroupCountMap],
+  );
 
   const handleCreateGroup = async () => {
     if (groupName.trim()) {
@@ -319,33 +230,30 @@ export function GroupManager({ className }: GroupManagerProps) {
   };
 
   const handleEditGroup = (group: QuestionGroup) => {
-    setEditingGroup(group);
-    setGroupName(group.name);
-    setGroupDescription(group.description || "");
-    setParentGroupIdForEdit(group.parentGroupId);
+    // currentSurvey.groups에서 최신 그룹 정보 가져오기 (displayCondition 포함)
+    const latestGroup = groups.find((g) => g.id === group.id) || group;
+    setEditingGroup(latestGroup);
+    setGroupName(latestGroup.name);
+    setGroupDescription(latestGroup.description || "");
+    setParentGroupIdForEdit(latestGroup.parentGroupId);
     setIsEditModalOpen(true);
   };
 
-  // 순환 참조 방지: 특정 그룹이 다른 그룹의 상위로 설정 가능한지 확인
-  const canBeParentOf = (potentialParentId: string, childId: string): boolean => {
-    if (potentialParentId === childId) return false;
+  const handleGroupConditionUpdate = (conditionGroup: QuestionConditionGroup | undefined) => {
+    if (editingGroup) {
+      updateGroup(editingGroup.id, { displayCondition: conditionGroup });
 
-    // 잠재적 부모가 현재 그룹의 하위 그룹인지 확인
-    const checkDescendant = (targetId: string, ancestorId: string): boolean => {
-      const target = groups.find((g) => g.id === targetId);
-      if (!target || !target.parentGroupId) return false;
-      if (target.parentGroupId === ancestorId) return true;
-      return checkDescendant(target.parentGroupId, ancestorId);
-    };
-
-    return !checkDescendant(potentialParentId, childId);
-  };
-
-  // 편집 모달에서 선택 가능한 상위 그룹 목록
-  const getAvailableParentGroups = (currentGroupId: string) => {
-    return topLevelGroups.filter(
-      (g) => g.id !== currentGroupId && canBeParentOf(g.id, currentGroupId),
-    );
+      // DB에 저장 (그룹 ID가 UUID인 경우에만)
+      if (currentSurvey.id && isUUID(currentSurvey.id) && isUUID(editingGroup.id)) {
+        import("@/actions/survey-actions").then(({ updateQuestionGroup }) => {
+          updateQuestionGroup(editingGroup.id, {
+            displayCondition: conditionGroup,
+          }).catch((error) => {
+            console.error("그룹 표시 조건 저장 실패:", error);
+          });
+        });
+      }
+    }
   };
 
   const handleUpdateGroup = async () => {
@@ -353,10 +261,14 @@ export function GroupManager({ className }: GroupManagerProps) {
       const oldParentGroupId = editingGroup.parentGroupId;
       const newParentGroupId = parentGroupIdForEdit;
 
+      // currentSurvey.groups에서 최신 그룹 정보 확인
+      const latestGroup = groups.find((g) => g.id === editingGroup.id);
+      const finalDisplayCondition = latestGroup?.displayCondition;
+
       // 상위 그룹이 변경된 경우
       if (oldParentGroupId !== newParentGroupId) {
         // 순환 참조 체크: newParentGroupId가 editingGroup의 하위 그룹이 될 수 있는지 확인
-        if (newParentGroupId && !canBeParentOf(newParentGroupId, editingGroup.id)) {
+        if (newParentGroupId && !canBeParentOf(newParentGroupId, editingGroup.id, groups)) {
           alert("순환 참조 방지: 선택한 그룹을 상위 그룹으로 설정할 수 없습니다.");
           return;
         }
@@ -398,6 +310,7 @@ export function GroupManager({ className }: GroupManagerProps) {
               description: groupDescription.trim() || undefined,
               parentGroupId: newParentGroupId ?? null,
               order: newOrder,
+              displayCondition: finalDisplayCondition,
             });
           } catch (error) {
             console.error("그룹 업데이트 저장 실패:", error);
@@ -422,6 +335,7 @@ export function GroupManager({ className }: GroupManagerProps) {
             await updateQuestionGroup(editingGroup.id, {
               name: groupName.trim(),
               description: groupDescription.trim() || undefined,
+              displayCondition: finalDisplayCondition,
             });
           } catch (error) {
             console.error("그룹 업데이트 저장 실패:", error);
@@ -608,8 +522,6 @@ export function GroupManager({ className }: GroupManagerProps) {
                 {topLevelGroups.map((group) => {
                   const subGroups = getSubGroups(group.id);
                   const isExpanded = expandedGroups.has(group.id);
-                  const isDragOver = overId === group.id && activeId !== group.id;
-                  const isDragging = activeId === group.id;
 
                   return (
                     <div key={group.id}>
@@ -622,8 +534,6 @@ export function GroupManager({ className }: GroupManagerProps) {
                         onDelete={handleDeleteGroup}
                         onToggleExpand={handleToggleExpand}
                         onAddSubGroup={handleOpenCreateModal}
-                        isDragOver={isDragOver}
-                        isDragging={isDragging}
                         totalSubGroupCount={getTotalSubGroupCount(group.id)}
                       />
 
@@ -635,10 +545,6 @@ export function GroupManager({ className }: GroupManagerProps) {
                         >
                           <div className="ml-6 mt-2 space-y-2 border-l-2 border-gray-200 pl-3">
                             {subGroups.map((subGroup) => {
-                              const isSubDragOver =
-                                overId === subGroup.id && activeId !== subGroup.id;
-                              const isSubDragging = activeId === subGroup.id;
-
                               return (
                                 <div key={subGroup.id}>
                                   <SortableGroupItem
@@ -650,8 +556,6 @@ export function GroupManager({ className }: GroupManagerProps) {
                                     onDelete={handleDeleteGroup}
                                     onToggleExpand={handleToggleExpand}
                                     onAddSubGroup={handleOpenCreateModal}
-                                    isDragOver={isSubDragOver}
-                                    isDragging={isSubDragging}
                                     totalSubGroupCount={getTotalSubGroupCount(subGroup.id)}
                                   />
                                 </div>
@@ -670,144 +574,46 @@ export function GroupManager({ className }: GroupManagerProps) {
       </div>
 
       {/* 그룹 생성 모달 */}
-      <Dialog
-        open={isCreateModalOpen}
-        onOpenChange={(open) => {
-          // 배경 클릭으로 닫히는 것 방지, X 버튼만 닫기 가능
-          if (!open) {
-            setIsCreateModalOpen(false);
-          }
+      <GroupCreateModal
+        isOpen={isCreateModalOpen}
+        onClose={() => {
+          setIsCreateModalOpen(false);
+          setGroupName("");
+          setGroupDescription("");
+          setParentGroupIdForNew(undefined);
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {parentGroupIdForNew
-                ? `하위 그룹 만들기 (${groups.find((g) => g.id === parentGroupIdForNew)?.name})`
-                : "새 그룹 만들기"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-4">
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">
-                그룹 이름 <span className="text-red-500">*</span>
-              </label>
-              <Input
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                placeholder="예: 응답자 정보, 1. TV보유 현황"
-                onKeyPress={(e) => {
-                  if (e.key === "Enter") {
-                    handleCreateGroup();
-                  }
-                }}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">
-                그룹 설명 (선택)
-              </label>
-              <Textarea
-                value={groupDescription}
-                onChange={(e) => setGroupDescription(e.target.value)}
-                placeholder="그룹에 대한 간단한 설명을 입력하세요"
-                rows={3}
-              />
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>
-                취소
-              </Button>
-              <Button onClick={handleCreateGroup} disabled={!groupName.trim()}>
-                생성
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+        onSubmit={handleCreateGroup}
+        groupName={groupName}
+        setGroupName={setGroupName}
+        groupDescription={groupDescription}
+        setGroupDescription={setGroupDescription}
+        parentGroupId={parentGroupIdForNew}
+        groups={groups}
+      />
 
       {/* 그룹 편집 모달 */}
-      <Dialog
-        open={isEditModalOpen}
-        onOpenChange={(open) => {
-          // 배경 클릭으로 닫히는 것 방지, X 버튼만 닫기 가능
-          if (!open) {
-            setIsEditModalOpen(false);
-          }
+      <GroupEditModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingGroup(null);
+          setGroupName("");
+          setGroupDescription("");
+          setParentGroupIdForEdit(undefined);
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>그룹 편집</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-4">
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">
-                그룹 이름 <span className="text-red-500">*</span>
-              </label>
-              <Input
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                placeholder="예: 응답자 정보, 1. TV보유 현황"
-                onKeyPress={(e) => {
-                  if (e.key === "Enter") {
-                    handleUpdateGroup();
-                  }
-                }}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">
-                그룹 설명 (선택)
-              </label>
-              <Textarea
-                value={groupDescription}
-                onChange={(e) => setGroupDescription(e.target.value)}
-                placeholder="그룹에 대한 간단한 설명을 입력하세요"
-                rows={3}
-              />
-            </div>
-            {/* 상위 그룹 선택 */}
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">
-                상위 그룹 (선택)
-              </label>
-              <Select
-                value={parentGroupIdForEdit || "none"}
-                onValueChange={(value) =>
-                  setParentGroupIdForEdit(value === "none" ? undefined : value)
-                }
-              >
-                <SelectTrigger className="bg-white">
-                  <SelectValue placeholder="상위 그룹 선택" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[200px] overflow-y-auto bg-white">
-                  <SelectItem value="none" className="bg-gray-50 hover:bg-gray-100">
-                    없음 (최상위 그룹)
-                  </SelectItem>
-                  {editingGroup &&
-                    getAvailableParentGroups(editingGroup.id).map((g) => (
-                      <SelectItem key={g.id} value={g.id} className="hover:bg-blue-50">
-                        {g.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-gray-500 mt-1">
-                다른 그룹의 하위 그룹으로 설정하려면 상위 그룹을 선택하세요
-              </p>
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
-                취소
-              </Button>
-              <Button onClick={handleUpdateGroup} disabled={!groupName.trim()}>
-                저장
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+        onSubmit={handleUpdateGroup}
+        editingGroup={editingGroup}
+        groupName={groupName}
+        setGroupName={setGroupName}
+        groupDescription={groupDescription}
+        setGroupDescription={setGroupDescription}
+        parentGroupId={parentGroupIdForEdit}
+        setParentGroupId={setParentGroupIdForEdit}
+        topLevelGroups={topLevelGroups}
+        allGroups={groups}
+        allQuestions={currentSurvey.questions}
+        onConditionUpdate={handleGroupConditionUpdate}
+      />
     </div>
   );
 }

@@ -27,6 +27,12 @@ import {
   X,
   Loader2,
   AlertCircle,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignVerticalJustifyStart,
+  AlignVerticalJustifyCenter,
+  AlignVerticalJustifyEnd,
 } from "lucide-react";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
 import { BranchRuleEditor } from "./branch-rule-editor";
@@ -35,7 +41,7 @@ import {
   updateQuestion as updateQuestionAction,
   createQuestion as createQuestionAction,
 } from "@/actions/survey-actions";
-import { isValidUUID } from "@/lib/utils";
+import { isValidUUID, generateId } from "@/lib/utils";
 
 interface CellContentModalProps {
   isOpen: boolean;
@@ -86,6 +92,14 @@ export function CellContentModal({
   const [inputMaxLength, setInputMaxLength] = useState<number | "">(cell.inputMaxLength || "");
   const [minSelections, setMinSelections] = useState<number | undefined>(cell.minSelections);
   const [maxSelections, setMaxSelections] = useState<number | undefined>(cell.maxSelections);
+
+  // 정렬 관련 state
+  const [horizontalAlign, setHorizontalAlign] = useState<"left" | "center" | "right">(
+    cell.horizontalAlign || "left",
+  );
+  const [verticalAlign, setVerticalAlign] = useState<"top" | "middle" | "bottom">(
+    cell.verticalAlign || "top",
+  );
 
   // 조건부 분기 토글 상태
   const [showBranchSettings, setShowBranchSettings] = useState(false);
@@ -210,6 +224,9 @@ export function CellContentModal({
         // 셀 병합 속성 추가
         rowspan: isMergeEnabled && typeof rowspan === "number" && rowspan > 1 ? rowspan : undefined,
         colspan: isMergeEnabled && typeof colspan === "number" && colspan > 1 ? colspan : undefined,
+        // 정렬 속성 추가
+        horizontalAlign: horizontalAlign !== "left" ? horizontalAlign : undefined,
+        verticalAlign: verticalAlign !== "top" ? verticalAlign : undefined,
       };
 
       // 로컬 스토어 업데이트 (셀 저장)
@@ -305,6 +322,8 @@ export function CellContentModal({
     );
     setRowspan(cell.rowspan || 1);
     setColspan(cell.colspan || 1);
+    setHorizontalAlign(cell.horizontalAlign || "left");
+    setVerticalAlign(cell.verticalAlign || "top");
     onClose();
   };
 
@@ -986,7 +1005,7 @@ export function CellContentModal({
                 variant="outline"
                 onClick={() => {
                   const newOption: CheckboxOption = {
-                    id: `checkbox-${Date.now()}`,
+                    id: generateId(),
                     label: "새 옵션",
                     value: `option-${checkboxOptions.length + 1}`,
                     checked: false,
@@ -1234,7 +1253,7 @@ export function CellContentModal({
                 variant="outline"
                 onClick={() => {
                   const newOption: RadioOption = {
-                    id: `radio-${Date.now()}`,
+                    id: generateId(),
                     label: "새 옵션",
                     value: `option-${radioOptions.length + 1}`,
                     selected: false,
@@ -1372,7 +1391,7 @@ export function CellContentModal({
                 variant="outline"
                 onClick={() => {
                   const newOption: QuestionOption = {
-                    id: `select-${Date.now()}`,
+                    id: generateId(),
                     label: "새 옵션",
                     value: `option-${selectOptions.length + 1}`,
                   };
@@ -1516,6 +1535,111 @@ export function CellContentModal({
               )}
             </>
           )}
+        </div>
+
+        {/* 셀 컨텐츠 정렬 설정 */}
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <h3 className="text-sm font-medium text-gray-900 mb-4">📐 컨텐츠 정렬</h3>
+
+          <div className="space-y-4">
+            {/* 가로 정렬 */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">가로 정렬</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={horizontalAlign === "left" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setHorizontalAlign("left")}
+                  className="flex-1"
+                >
+                  <AlignLeft className="w-4 h-4 mr-2" />
+                  왼쪽
+                </Button>
+                <Button
+                  type="button"
+                  variant={horizontalAlign === "center" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setHorizontalAlign("center")}
+                  className="flex-1"
+                >
+                  <AlignCenter className="w-4 h-4 mr-2" />
+                  가운데
+                </Button>
+                <Button
+                  type="button"
+                  variant={horizontalAlign === "right" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setHorizontalAlign("right")}
+                  className="flex-1"
+                >
+                  <AlignRight className="w-4 h-4 mr-2" />
+                  오른쪽
+                </Button>
+              </div>
+            </div>
+
+            {/* 세로 정렬 */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">세로 정렬</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={verticalAlign === "top" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setVerticalAlign("top")}
+                  className="flex-1"
+                >
+                  <AlignVerticalJustifyStart className="w-4 h-4 mr-2" />
+                  위쪽
+                </Button>
+                <Button
+                  type="button"
+                  variant={verticalAlign === "middle" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setVerticalAlign("middle")}
+                  className="flex-1"
+                >
+                  <AlignVerticalJustifyCenter className="w-4 h-4 mr-2" />
+                  가운데
+                </Button>
+                <Button
+                  type="button"
+                  variant={verticalAlign === "bottom" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setVerticalAlign("bottom")}
+                  className="flex-1"
+                >
+                  <AlignVerticalJustifyEnd className="w-4 h-4 mr-2" />
+                  아래쪽
+                </Button>
+              </div>
+            </div>
+
+            {/* 미리보기 */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">정렬 미리보기</Label>
+              <div className="p-4 border rounded-lg bg-gray-50">
+                <div
+                  className={`w-full h-32 border-2 border-dashed border-gray-300 rounded flex ${
+                    horizontalAlign === "left"
+                      ? "justify-start"
+                      : horizontalAlign === "center"
+                      ? "justify-center"
+                      : "justify-end"
+                  } ${
+                    verticalAlign === "top"
+                      ? "items-start"
+                      : verticalAlign === "middle"
+                      ? "items-center"
+                      : "items-end"
+                  }`}
+                >
+                  <div className="bg-blue-500 text-white px-4 py-2 rounded text-sm">컨텐츠</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <DialogFooter>

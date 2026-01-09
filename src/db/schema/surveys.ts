@@ -40,6 +40,7 @@ export const questionGroups = pgTable('question_groups', {
   parentGroupId: uuid('parent_group_id'),
   color: text('color'),
   collapsed: boolean('collapsed').default(false),
+  displayCondition: jsonb('display_condition').$type<QuestionConditionGroup>(),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -213,6 +214,8 @@ interface TableCell {
   rowspan?: number;
   colspan?: number;
   isHidden?: boolean;
+  horizontalAlign?: 'left' | 'center' | 'right';
+  verticalAlign?: 'top' | 'middle' | 'bottom';
 }
 
 // 테이블 행
@@ -243,14 +246,22 @@ interface TableValidationRule {
     cellColumnIndex?: number;
     expectedValues?: string[];
   };
+  additionalConditions?: {
+    cellColumnIndex: number;
+    checkType: 'checkbox' | 'radio' | 'select' | 'input';
+    rowIds?: string[];
+    expectedValues?: string[];
+  };
   action: 'goto' | 'end';
   targetQuestionId?: string;
+  targetQuestionMap?: Record<string, string>;
   errorMessage?: string;
 }
 
 // 질문 표시 조건
 interface QuestionCondition {
   id: string;
+  name?: string;
   sourceQuestionId: string;
   conditionType: 'value-match' | 'table-cell-check' | 'custom';
   requiredValues?: string[];
@@ -258,8 +269,16 @@ interface QuestionCondition {
     rowIds: string[];
     cellColumnIndex?: number;
     checkType: 'any' | 'all' | 'none';
+    expectedValues?: string[];
+  };
+  additionalConditions?: {
+    cellColumnIndex: number;
+    checkType: 'checkbox' | 'radio' | 'select' | 'input';
+    rowIds?: string[];
+    expectedValues?: string[];
   };
   logicType: 'AND' | 'OR' | 'NOT';
+  enabled?: boolean;
 }
 
 interface QuestionConditionGroup {

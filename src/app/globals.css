@@ -200,10 +200,12 @@ html {
 }
 
 /* ==========================================
-   테이블 내 이미지 가로 스크롤 처리
+   테이블 내 이미지 - 수동 리사이즈 지원 (E 방식)
+   에디터에서 설정한 크기를 존중하고, 셀을 넘지 않도록만 제한
    ========================================== */
 
-/* prose 클래스 내부의 테이블 - 내용에 맞게 크기 조정 */
+/* 테이블 기본 스타일 - 에디터 & 렌더러 통합 */
+.ProseMirror table,
 .prose table,
 .prose-sm table {
   display: table;
@@ -212,7 +214,9 @@ html {
   table-layout: auto;
 }
 
-/* 테이블 셀 스타일 */
+/* 테이블 셀 스타일 - 에디터 & 렌더러 통합 */
+.ProseMirror table td,
+.ProseMirror table th,
 .prose table td,
 .prose table th,
 .prose-sm table td,
@@ -220,27 +224,57 @@ html {
   word-wrap: break-word;
   white-space: normal;
   vertical-align: top;
+  overflow: hidden !important;
 }
 
-/* 테이블 내 이미지는 원본 크기 유지 (가로 스크롤로 처리) */
-.prose table img,
-.prose-sm table img,
-.prose table td img,
-.prose-sm table td img,
-.prose table th img,
-.prose-sm table th img {
-  max-width: none;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  display: block;
-}
-
-/* 이미지를 감싸는 div 컨테이너도 원본 크기 유지 */
+/* 테이블 셀 내 이미지 래퍼 - 리사이즈 값 존중 */
+/* tiptap-extension-resize-image 래퍼의 인라인 스타일(width)을 존중 */
+.ProseMirror table td div[style*="cursor: pointer"],
+.ProseMirror table th div[style*="cursor: pointer"],
 .prose table td div[style*="cursor: pointer"],
 .prose-sm table td div[style*="cursor: pointer"],
 .prose table th div[style*="cursor: pointer"],
 .prose-sm table th div[style*="cursor: pointer"] {
-  max-width: none;
-  width: auto;
+  max-width: 100% !important;  /* 셀을 넘지 않도록만 제한 */
+  /* width는 인라인 스타일 값 사용 (리사이즈 값 존중) */
+  display: inline-block !important;
+  box-sizing: border-box !important;
+  margin: 0 auto;  /* 가로 중앙 정렬 */
+}
+
+/* 테이블 셀 내 이미지 - 리사이즈 값 존중 */
+.ProseMirror table td img,
+.ProseMirror table th img,
+.prose table td img,
+.prose-sm table td img,
+.prose table th img,
+.prose-sm table th img {
+  max-width: 100% !important;  /* 셀을 넘지 않도록만 제한 */
+  /* width는 인라인 스타일 값 사용 (리사이즈 값 존중) */
+  height: auto !important;
+  object-fit: contain !important;
+  display: block !important;
+  border-radius: 4px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* 테이블 셀 - 이미지 가로 중앙 정렬을 위한 text-align */
+.ProseMirror table td,
+.ProseMirror table th,
+.prose table td,
+.prose table th,
+.prose-sm table td,
+.prose-sm table th {
+  text-align: center;
+}
+
+/* 테이블 셀 내 이미지 호버 효과 - 에디터 & 렌더러 통합 */
+.ProseMirror table td img:hover,
+.ProseMirror table th img:hover,
+.prose table td img:hover,
+.prose-sm table td img:hover,
+.prose table th img:hover,
+.prose-sm table th img:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }

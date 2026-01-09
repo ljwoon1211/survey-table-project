@@ -30,8 +30,11 @@ export function useSurveySync() {
   const [saveError, setSaveError] = useState<Error | null>(null);
 
   // 현재 설문을 DB에 저장 (중복 저장 방지 포함)
-  const saveSurvey = useCallback(async () => {
-    if (!currentSurvey.id) {
+  const saveSurvey = useCallback(async (surveyData?: Survey) => {
+    // surveyData가 제공되면 그것을 사용, 아니면 currentSurvey 사용
+    const surveyToSave = surveyData || currentSurvey;
+
+    if (!surveyToSave.id) {
       console.error('설문 ID가 없습니다.');
       return null;
     }
@@ -46,7 +49,11 @@ export function useSurveySync() {
     setSaveError(null);
 
     try {
-      const result = await saveSurveyWithDetails(currentSurvey);
+      // 저장 전에 최신 currentSurvey 상태 가져오기 (그룹의 displayCondition 포함)
+      const latestSurvey = useSurveyBuilderStore.getState().currentSurvey;
+      const finalSurvey = surveyData || latestSurvey;
+
+      const result = await saveSurveyWithDetails(finalSurvey);
       // 저장 성공 시 dirty 플래그 초기화
       markClean();
       return result;
@@ -69,7 +76,6 @@ export function useSurveySync() {
         useSurveyBuilderStore.setState({
           currentSurvey: survey,
           selectedQuestionId: null,
-          isPreviewMode: false,
           isTestMode: false,
           testResponses: {},
         });

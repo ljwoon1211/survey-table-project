@@ -19,9 +19,25 @@ DATABASE_URL="postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pool
 
 # Session mode (마이그레이션용 - port 5432)
 DATABASE_URL_DIRECT="postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres"
+
+# Sentry 에러 모니터링 (선택사항)
+# Sentry 프로젝트에서 DSN을 가져올 수 있습니다.
+# https://docs.sentry.io/product/sentry-basics/dsn-explainer/
+NEXT_PUBLIC_SENTRY_DSN="https://[KEY]@[ORG].ingest.sentry.io/[PROJECT_ID]"
+
+# Sentry 소스맵 업로드용 (선택사항, 빌드 시 필요)
+# 프로덕션 빌드에서 소스맵을 업로드하려면 설정합니다.
+# https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/#upload-source-maps
+SENTRY_ORG="[YOUR_ORG]"
+SENTRY_PROJECT="[YOUR_PROJECT]"
+SENTRY_AUTH_TOKEN="[YOUR_AUTH_TOKEN]"
 ```
 
 > ⚠️ `[PASSWORD]`는 Supabase 프로젝트 생성 시 설정한 데이터베이스 비밀번호입니다.
+> 
+> ⚠️ Sentry 설정은 선택사항입니다. 프로덕션 환경에서 에러 모니터링이 필요한 경우에만 설정하세요.
+> 
+> ⚠️ `NEXT_PUBLIC_SENTRY_DSN`이 설정되지 않은 경우, Sentry는 자동으로 비활성화됩니다.
 
 ### 3. 데이터베이스 마이그레이션
 

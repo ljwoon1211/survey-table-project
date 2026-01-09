@@ -27,6 +27,7 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
+  Equal,
 } from "lucide-react";
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { createEditorExtensions } from "./editor-extensions";
@@ -148,24 +149,25 @@ export function NoticeEditor({
       attributes: {
         class: compact
           ? "prose prose-sm max-w-none focus:outline-none min-h-[80px] p-3 border border-gray-200 rounded-lg overflow-x-auto " +
-            "[&_table]:border-collapse [&_table]:table-fixed [&_table]:w-full [&_table]:my-2 [&_table]:overflow-hidden [&_table]:border-2 [&_table]:border-gray-300 " +
-            "[&_table_td]:min-w-[1em] [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-2 [&_table_td]:py-1 [&_table_td]:align-top [&_table_td]:box-border [&_table_td]:relative [&_table_td]:cursor-pointer " +
-            "[&_table_th]:min-w-[1em] [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-2 [&_table_th]:py-1 [&_table_th]:align-top [&_table_th]:box-border [&_table_th]:relative [&_table_th]:cursor-pointer " +
+            "[&_table]:border-collapse [&_table]:table-auto [&_table]:w-full [&_table]:my-2 [&_table]:border-2 [&_table]:border-gray-300 " +
+            "[&_table_td]:min-w-[1em] [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-2 [&_table_td]:py-1 [&_table_td]:align-top [&_table_td]:box-border [&_table_td]:relative [&_table_td]:cursor-pointer [&_table_td]:overflow-hidden " +
+            "[&_table_th]:min-w-[1em] [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-2 [&_table_th]:py-1 [&_table_th]:align-top [&_table_th]:box-border [&_table_th]:relative [&_table_th]:cursor-pointer [&_table_th]:overflow-hidden " +
             "[&_table_th]:font-normal [&_table_th]:text-left [&_table_th]:bg-transparent " +
             "[&_table_.selectedCell]:bg-blue-100 [&_table_.selectedCell]:border-2 [&_table_.selectedCell]:border-blue-500 " +
             "[&_table_.selected]:bg-blue-50 " +
             "[&_table:hover]:border-blue-500 " +
             "[&_table_p]:m-0 " +
             "[&_img]:inline-block [&_img]:!m-0 [&_img]:align-top"
-          : "prose prose-sm max-w-none focus:outline-none min-h-[300px] p-4 border border-gray-200 rounded-lg overflow-x-auto " +
-            "[&_table]:border-collapse [&_table]:table-fixed [&_table]:w-full [&_table]:my-4 [&_table]:overflow-hidden [&_table]:border-2 [&_table]:border-gray-300 " +
-            "[&_table_td]:min-w-[1em] [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2 [&_table_td]:align-top [&_table_td]:box-border [&_table_td]:relative [&_table_td]:cursor-pointer " +
-            "[&_table_th]:min-w-[1em] [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-3 [&_table_th]:py-2 [&_table_th]:align-top [&_table_th]:box-border [&_table_th]:relative [&_table_th]:cursor-pointer " +
+          : "prose prose-sm max-w-none focus:outline-none min-h-[300px] p-6 bg-blue-50 border-2 border-blue-200 rounded-lg overflow-x-auto text-[14px] leading-[1.6] " +
+            "[&_table]:border-collapse [&_table]:table-auto [&_table]:w-full [&_table]:min-w-full [&_table]:my-4 [&_table]:border-2 [&_table]:border-gray-300 " +
+            "[&_table_td]:min-w-[1em] [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2 [&_table_td]:align-top [&_table_td]:box-border [&_table_td]:relative [&_table_td]:cursor-pointer [&_table_td]:overflow-hidden " +
+            "[&_table_th]:min-w-[1em] [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-3 [&_table_th]:py-2 [&_table_th]:align-top [&_table_th]:box-border [&_table_th]:relative [&_table_th]:cursor-pointer [&_table_th]:overflow-hidden " +
             "[&_table_th]:font-normal [&_table_th]:text-left [&_table_th]:bg-transparent " +
             "[&_table_.selectedCell]:bg-blue-100 [&_table_.selectedCell]:border-2 [&_table_.selectedCell]:border-blue-500 " +
             "[&_table_.selected]:bg-blue-50 " +
             "[&_table:hover]:border-blue-500 " +
             "[&_table_p]:m-0 " +
+            "[&_p]:min-h-[1.6em] " +
             "[&_img]:inline-block [&_img]:!m-0 [&_img]:align-top",
       },
       handleDOMEvents: {
@@ -390,6 +392,68 @@ export function NoticeEditor({
         backgroundColor: null,
       })
       .run();
+  };
+
+  // 테이블 열 너비 균등 분배
+  const equalizeColumnWidths = () => {
+    if (!ed) return;
+
+    const { state } = ed;
+    const { selection } = state;
+    const { $from } = selection;
+
+    // 현재 위치에서 테이블 노드 찾기
+    let tableNode = null;
+    let tablePos = -1;
+
+    for (let depth = $from.depth; depth >= 0; depth--) {
+      const node = $from.node(depth);
+      if (node.type.name === "table") {
+        tableNode = node;
+        tablePos = $from.before(depth);
+        break;
+      }
+    }
+
+    if (!tableNode || tablePos < 0) return;
+
+    // 첫 번째 행에서 열 수 계산
+    let colCount = 0;
+    const firstRow = tableNode.firstChild;
+    if (firstRow) {
+      firstRow.forEach((cell) => {
+        const colspan = cell.attrs.colspan || 1;
+        colCount += colspan;
+      });
+    }
+
+    if (colCount === 0) return;
+
+    // 균등한 너비 계산 (테이블 기본 너비를 열 수로 나눔)
+    const tableWidth = 600; // 기본 테이블 너비
+    const equalWidth = Math.floor(tableWidth / colCount);
+
+    // 트랜잭션으로 모든 셀의 colwidth 업데이트
+    const { tr } = state;
+    let modified = false;
+
+    tableNode.descendants((node, pos) => {
+      if (node.type.name === "tableCell" || node.type.name === "tableHeader") {
+        const colspan = node.attrs.colspan || 1;
+        const newColwidth = Array(colspan).fill(equalWidth);
+        const absolutePos = tablePos + 1 + pos;
+
+        tr.setNodeMarkup(absolutePos, undefined, {
+          ...node.attrs,
+          colwidth: newColwidth,
+        });
+        modified = true;
+      }
+    });
+
+    if (modified) {
+      ed.view.dispatch(tr);
+    }
   };
 
   return (
@@ -780,6 +844,20 @@ export function NoticeEditor({
                   <Paintbrush className="w-4 h-4" />
                   <X className="w-2.5 h-2.5 absolute -top-0.5 -right-0.5" />
                 </div>
+              </Button>
+            </div>
+
+            <div className="w-px h-6 bg-gray-300" />
+
+            <div className="flex gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={equalizeColumnWidths}
+                title="열 너비 균등 분배"
+              >
+                <Equal className="w-4 h-4" />
               </Button>
             </div>
           </>

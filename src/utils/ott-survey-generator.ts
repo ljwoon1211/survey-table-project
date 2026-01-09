@@ -1,4 +1,5 @@
 import { Question, TableColumn, TableRow, TableCell, CheckboxOption, RadioOption } from '@/types/survey';
+import { generateId } from '@/lib/utils';
 
 // OTT 서비스 데이터
 const ottServices = [
@@ -199,7 +200,7 @@ export function generateOTTSurvey(): Question {
 
   // 최종 질문 객체 생성
   const ottQuestion: Question = {
-    id: `ott-survey-${Date.now()}`,
+    id: generateId(),
     type: 'table',
     title: 'OTT 서비스 이용 현황 조사',
     description: '',

@@ -1,0 +1,1 @@
+ALTER TABLE "question_groups" ADD COLUMN "display_condition" jsonb;

@@ -14,7 +14,6 @@ import { generateOTTSurvey } from "@/utils/ott-survey-generator";
 import { Question } from "@/types/survey";
 import {
   FileText,
-  Eye,
   Share2,
   Save,
   ArrowLeft,
@@ -124,13 +123,11 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   const {
     currentSurvey,
     selectedQuestionId,
-    isPreviewMode,
     isTestMode,
     updateSurveyTitle,
     addQuestion,
     addPreparedQuestion,
     selectQuestion,
-    togglePreviewMode,
     toggleTestMode,
     updateSurveySettings,
     updateSurveySlug,
@@ -326,7 +323,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
     }
 
     setAddingQuestionIds((prev) => new Set(prev).add(question.id));
-    
+
     try {
       // 로컬 스토어에 추가
       addPreparedQuestion(question);
@@ -426,10 +423,6 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
           </div>
 
           <div className="flex items-center space-x-3">
-            <Button variant="outline" size="sm" onClick={togglePreviewMode}>
-              <Eye className="w-4 h-4 mr-2" />
-              {isPreviewMode ? "편집" : "미리보기"}
-            </Button>
             <Button
               variant={isTestMode ? "default" : "outline"}
               size="sm"
@@ -600,14 +593,14 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <h3 className="text-lg font-semibold text-gray-900">
-                    {isTestMode ? "질문 테스트" : isPreviewMode ? "미리보기" : "설문 편집"}
+                    {isTestMode ? "질문 테스트" : "설문 편집"}
                   </h3>
                   {isTestMode && (
                     <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
                       테스트 모드
                     </span>
                   )}
-                  {!isTestMode && !isPreviewMode && currentSurvey.questions.length > 0 && (
+                  {!isTestMode && currentSurvey.questions.length > 0 && (
                     <div className="flex items-center space-x-2">
                       <Input
                         type="number"

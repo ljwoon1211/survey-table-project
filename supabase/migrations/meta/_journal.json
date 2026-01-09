@@ -15,6 +15,13 @@
       "when": 1767681081704,
       "tag": "0002_add_placeholder",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1767797819414,
+      "tag": "0003_add_group_display_condition",
+      "breakpoints": true
     }
   ]
 }

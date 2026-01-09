@@ -38,8 +38,15 @@ export interface TableValidationRule {
     cellColumnIndex?: number; // 체크할 열 인덱스 (선택사항, 없으면 모든 열 확인)
     expectedValues?: string[]; // 기대하는 값들 (select, radio, input용)
   };
+  additionalConditions?: {
+    cellColumnIndex: number; // 추가로 확인할 열 인덱스
+    checkType: 'checkbox' | 'radio' | 'select' | 'input';
+    rowIds?: string[]; // 특정 행만 확인 (없으면 메인 조건의 체크된 행 사용)
+    expectedValues?: string[]; // 기대하는 값들
+  };
   action: BranchAction;
-  targetQuestionId?: string;
+  targetQuestionId?: string; // 기본 타겟 (targetQuestionMap이 없을 때 사용)
+  targetQuestionMap?: Record<string, string>; // { "디지털 TV": "question-id-1", "UHD TV": "question-id-2" }
   errorMessage?: string; // 조건 미충족 시 표시할 메시지
 }
 
@@ -49,6 +56,7 @@ export type ConditionLogicType = 'AND' | 'OR' | 'NOT';
 // 질문 표시 조건
 export interface QuestionCondition {
   id: string;
+  name?: string; // 조건 이름 (선택사항)
   sourceQuestionId: string; // 조건을 확인할 질문 ID
   conditionType: 'value-match' | 'table-cell-check' | 'custom'; // 조건 타입
   // value-match: 특정 값과 일치하는지 확인 (radio, select 등)
@@ -58,8 +66,16 @@ export interface QuestionCondition {
     rowIds: string[]; // 체크 확인할 행 ID들
     cellColumnIndex?: number; // 체크할 열 인덱스
     checkType: 'any' | 'all' | 'none'; // any: 하나라도, all: 모두, none: 모두 아님
+    expectedValues?: string[]; // 기대하는 값들 (checkbox, radio, select 옵션의 value)
+  };
+  additionalConditions?: {
+    cellColumnIndex: number; // 추가로 확인할 열 인덱스
+    checkType: 'checkbox' | 'radio' | 'select' | 'input';
+    rowIds?: string[]; // 특정 행만 확인 (없으면 메인 조건의 체크된 행 사용)
+    expectedValues?: string[]; // 기대하는 값들
   };
   logicType: ConditionLogicType; // 여러 조건 결합 시
+  enabled?: boolean; // 조건 활성화 여부 (기본값: true)
 }
 
 // 질문 표시 조건 그룹 (여러 조건 조합)
@@ -100,6 +116,9 @@ export interface TableCell {
   rowspan?: number; // 행 병합 (세로)
   colspan?: number; // 열 병합 (가로)
   isHidden?: boolean; // rowspan/colspan으로 인해 숨겨진 셀인지 여부
+  // 셀 컨텐츠 정렬 관련 속성
+  horizontalAlign?: 'left' | 'center' | 'right'; // 가로 정렬 (기본값: left)
+  verticalAlign?: 'top' | 'middle' | 'bottom'; // 세로 정렬 (기본값: top)
 }
 
 export interface CheckboxOption {
@@ -155,6 +174,7 @@ export interface QuestionGroup {
   parentGroupId?: string; // 상위 그룹 ID (하위 그룹인 경우)
   color?: string; // 그룹 색상 (UI용)
   collapsed?: boolean; // 접힘 상태 (UI용)
+  displayCondition?: QuestionConditionGroup; // 그룹 표시 조건
 }
 
 export interface Question {

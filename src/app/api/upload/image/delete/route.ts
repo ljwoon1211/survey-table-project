@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import * as Sentry from "@sentry/nextjs";
 
 // Cloudflare R2는 S3 호환 API를 사용합니다
 const r2Client = new S3Client({
@@ -23,7 +24,9 @@ export async function POST(request: NextRequest) {
     // 환경 변수 확인
     const bucketName = process.env.CLOUDFLARE_R2_BUCKET;
     if (!bucketName) {
-      console.error("Cloudflare R2 환경 변수가 설정되지 않았습니다.");
+      const error = new Error("Cloudflare R2 환경 변수가 설정되지 않았습니다.");
+      console.error(error.message);
+      Sentry.captureException(error);
       return NextResponse.json({ error: "서버 설정 오류" }, { status: 500 });
     }
 
@@ -59,6 +62,10 @@ export async function POST(request: NextRequest) {
         deletedUrls.push(url);
       } catch (error) {
         console.error(`이미지 삭제 실패 (${url}):`, error);
+        Sentry.captureException(error, {
+          tags: { operation: "image_delete", url },
+          level: "warning",
+        });
         failedUrls.push(url);
       }
     }
@@ -73,6 +80,9 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error("이미지 삭제 오류:", error);
+    Sentry.captureException(error, {
+      tags: { operation: "image_batch_delete" },
+    });
     return NextResponse.json(
       { error: "이미지 삭제 중 오류가 발생했습니다." },
       { status: 500 }

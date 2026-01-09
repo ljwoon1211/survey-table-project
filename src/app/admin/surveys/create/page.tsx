@@ -16,7 +16,6 @@ import { generateOTTSurvey } from "@/utils/ott-survey-generator";
 import { Question } from "@/types/survey";
 import {
   FileText,
-  Eye,
   Share2,
   Save,
   ArrowLeft,
@@ -46,6 +45,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { generateSlugFromTitle, validateSlug } from "@/lib/survey-url";
+import { generateId } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -120,13 +120,11 @@ export default function CreateSurveyPage() {
   const {
     currentSurvey,
     selectedQuestionId,
-    isPreviewMode,
     isTestMode,
     updateSurveyTitle,
     addQuestion,
     addPreparedQuestion,
     selectQuestion,
-    togglePreviewMode,
     toggleTestMode,
     updateSurveySettings,
     updateSurveySlug,
@@ -159,31 +157,34 @@ export default function CreateSurveyPage() {
   }, [resetSurvey]);
 
   // 슬러그 유효성 검사
-  const handleSlugChange = useCallback(async (value: string) => {
-    setSlugInput(value);
+  const handleSlugChange = useCallback(
+    async (value: string) => {
+      setSlugInput(value);
 
-    if (!value) {
+      if (!value) {
+        setSlugError("");
+        updateSurveySlug("");
+        return;
+      }
+
+      const validation = validateSlug(value);
+      if (!validation.isValid) {
+        setSlugError(validation.error || "");
+        return;
+      }
+
+      // 중복 검사 (비동기)
+      const available = await isSlugAvailable(value, currentSurvey.id);
+      if (!available) {
+        setSlugError("이미 사용 중인 URL입니다. 다른 URL을 입력해주세요.");
+        return;
+      }
+
       setSlugError("");
-      updateSurveySlug("");
-      return;
-    }
-
-    const validation = validateSlug(value);
-    if (!validation.isValid) {
-      setSlugError(validation.error || "");
-      return;
-    }
-
-    // 중복 검사 (비동기)
-    const available = await isSlugAvailable(value, currentSurvey.id);
-    if (!available) {
-      setSlugError("이미 사용 중인 URL입니다. 다른 URL을 입력해주세요.");
-      return;
-    }
-
-    setSlugError("");
-    updateSurveySlug(value);
-  }, [currentSurvey.id, updateSurveySlug]);
+      updateSurveySlug(value);
+    },
+    [currentSurvey.id, updateSurveySlug],
+  );
 
   // 제목에서 자동 슬러그 생성
   const handleAutoGenerateSlug = useCallback(async () => {
@@ -259,9 +260,7 @@ export default function CreateSurveyPage() {
   // 설문 저장
   const handleSaveSurvey = async () => {
     // ID가 없으면 새로 생성
-    const surveyToSave = currentSurvey.id
-      ? currentSurvey
-      : { ...currentSurvey, id: `survey-${Date.now()}` };
+    const surveyToSave = currentSurvey.id ? currentSurvey : { ...currentSurvey, id: generateId() };
 
     // 공개 설문인데 슬러그가 없으면 자동 생성
     if (surveyToSave.settings.isPublic && !slugInput) {
@@ -343,10 +342,6 @@ export default function CreateSurveyPage() {
           </div>
 
           <div className="flex items-center space-x-3">
-            <Button variant="outline" size="sm" onClick={togglePreviewMode}>
-              <Eye className="w-4 h-4 mr-2" />
-              {isPreviewMode ? "편집" : "미리보기"}
-            </Button>
             <Button
               variant={isTestMode ? "default" : "outline"}
               size="sm"
@@ -476,14 +471,14 @@ export default function CreateSurveyPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <h3 className="text-lg font-semibold text-gray-900">
-                    {isTestMode ? "질문 테스트" : isPreviewMode ? "미리보기" : "설문 편집"}
+                    {isTestMode ? "질문 테스트" : "설문 편집"}
                   </h3>
                   {isTestMode && (
                     <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
                       테스트 모드
                     </span>
                   )}
-                  {!isTestMode && !isPreviewMode && currentSurvey.questions.length > 0 && (
+                  {!isTestMode && currentSurvey.questions.length > 0 && (
                     <div className="flex items-center space-x-2">
                       <Input
                         type="number"

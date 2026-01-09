@@ -14,7 +14,7 @@ import {
   updateQuestion as updateQuestionAction,
   createQuestion as createQuestionAction,
 } from "@/actions/survey-actions";
-import { isValidUUID } from "@/lib/utils";
+import { isValidUUID, generateId } from "@/lib/utils";
 import { UserDefinedMultiSelectPreview } from "./user-defined-multi-select";
 import { DynamicTableEditor } from "./dynamic-table-editor";
 import { TablePreview } from "./table-preview";
@@ -59,12 +59,24 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
 
   useEffect(() => {
     if (question) {
+      // options의 각 항목과 branchRule을 깊은 복사
+      const optionsWithDeepBranchRule = question.options
+        ? question.options.map((option) => ({
+            ...option,
+            branchRule: option.branchRule
+              ? {
+                  ...option.branchRule,
+                }
+              : undefined,
+          }))
+        : [];
+
       setFormData({
         title: question.title,
         description: question.description,
         required: question.required,
         groupId: question.groupId,
-        options: question.options ? [...question.options] : [],
+        options: optionsWithDeepBranchRule,
         selectLevels: question.selectLevels ? [...question.selectLevels] : [],
         tableTitle: question.tableTitle,
         tableColumns: question.tableColumns ? [...question.tableColumns] : [],
@@ -78,6 +90,10 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         tableValidationRules: question.tableValidationRules || [],
         displayCondition: question.displayCondition,
       });
+
+      // 옵션들 중 하나라도 branchRule이 있으면 조건부 분기 설정 표시
+      const hasBranchRule = question.options?.some((option) => option.branchRule) || false;
+      setShowBranchSettings(hasBranchRule);
     }
   }, [question]);
 
@@ -140,7 +156,13 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         try {
           if (isValidUUID(questionId)) {
             // 이미 DB에 저장된 질문: 업데이트
-            await updateQuestionAction(questionId, formData);
+            // placeholder는 빈 문자열도 저장할 수 있도록 명시적으로 전달
+            const updateData = {
+              ...formData,
+              placeholder:
+                formData.placeholder !== undefined ? formData.placeholder : question?.placeholder,
+            };
+            await updateQuestionAction(questionId, updateData);
           } else {
             // 임시 질문: 생성하고 반환된 UUID로 로컬 스토어의 질문 ID 업데이트
             const createdQuestion = await createQuestionAction({
@@ -162,7 +184,8 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
               noticeContent: formData.noticeContent || question?.noticeContent,
               requiresAcknowledgment:
                 formData.requiresAcknowledgment ?? question?.requiresAcknowledgment,
-              placeholder: formData.placeholder || question?.placeholder,
+              placeholder:
+                formData.placeholder !== undefined ? formData.placeholder : question?.placeholder,
               tableValidationRules: formData.tableValidationRules || question?.tableValidationRules,
               displayCondition: formData.displayCondition || question?.displayCondition,
             });
@@ -264,7 +287,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
 
   const addOption = () => {
     const newOption: QuestionOption = {
-      id: `option-${Date.now()}`,
+      id: generateId(),
       label: `옵션 ${(formData.options?.length || 0) + 1}`,
       value: `옵션${(formData.options?.length || 0) + 1}`,
     };
@@ -292,7 +315,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
 
   const addSelectLevel = () => {
     const newLevel: SelectLevel = {
-      id: `level-${Date.now()}`,
+      id: generateId(),
       label: `레벨 ${(formData.selectLevels?.length || 0) + 1}`,
       placeholder: "",
       order: formData.selectLevels?.length || 0,
@@ -330,7 +353,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
     const optionCount = level.options?.length || 0;
 
     const newOption: QuestionOption = {
-      id: `${levelId}-option-${Date.now()}`,
+      id: generateId(),
       label: `옵션 ${optionCount + 1}`,
       value: levelIndex === 0 ? `옵션${optionCount + 1}` : `상위옵션-옵션${optionCount + 1}`, // 기본값, 나중에 상위 선택으로 업데이트됨
     };
@@ -1159,9 +1182,20 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
             <TabsContent value="display-condition" className="px-6 py-4">
               <QuestionConditionEditor
                 question={question}
-                onUpdate={(conditionGroup) =>
-                  setFormData((prev) => ({ ...prev, displayCondition: conditionGroup }))
-                }
+                onUpdate={async (conditionGroup) => {
+                  setFormData((prev) => ({ ...prev, displayCondition: conditionGroup }));
+
+                  // 조건 변경 시 즉시 DB에 저장 (질문 ID가 UUID인 경우에만)
+                  if (questionId && currentSurvey.id && isValidUUID(questionId)) {
+                    try {
+                      await updateQuestionAction(questionId, {
+                        displayCondition: conditionGroup,
+                      });
+                    } catch (error) {
+                      console.error("조건 저장 실패:", error);
+                    }
+                  }
+                }}
                 allQuestions={currentSurvey.questions}
               />
             </TabsContent>

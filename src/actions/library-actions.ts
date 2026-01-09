@@ -12,6 +12,9 @@ import { revalidatePath } from 'next/cache';
 import type { Question } from '@/types/survey';
 import { getAllSavedQuestions, getAllCategories } from '@/data/library';
 import { requireAuth } from '@/lib/auth';
+import { generateId } from '@/lib/utils';
+import { extractImageUrlsFromQuestion } from '@/lib/image-extractor';
+import { deleteImagesFromR2Server } from '@/lib/image-utils-server';
 
 // ========================
 // 질문 보관함 변경 액션 (Mutations)
@@ -75,6 +78,26 @@ export async function updateSavedQuestion(
 export async function deleteSavedQuestion(id: string) {
   await requireAuth();
 
+  // 삭제 전 저장된 질문 조회
+  const savedQuestion = await db.query.savedQuestions.findFirst({
+    where: eq(savedQuestions.id, id),
+  });
+
+  if (savedQuestion) {
+    // questionData에서 질문 객체 추출
+    const question = savedQuestion.question as unknown as Question;
+    const images = extractImageUrlsFromQuestion(question);
+
+    if (images.length > 0) {
+      try {
+        await deleteImagesFromR2Server(images);
+      } catch (error) {
+        console.error("라이브러리 질문 삭제 시 이미지 삭제 실패:", error);
+        // 이미지 삭제 실패해도 질문 삭제는 진행
+      }
+    }
+  }
+
   await db.delete(savedQuestions).where(eq(savedQuestions.id, id));
   revalidatePath('/admin/surveys');
 }
@@ -100,12 +123,10 @@ export async function applyQuestion(id: string) {
 
   // 새 ID로 복제된 질문 반환
   const question = saved.question as unknown as Question;
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substr(2, 9);
 
   return {
     ...question,
-    id: `question-${timestamp}-${random}`,
+    id: generateId(),
     order: 0,
     groupId: undefined, // 보관함에서 추가할 때는 그룹 없이 추가
   };

@@ -9,16 +9,19 @@ import {
   NewQuestion,
   NewQuestionGroup,
 } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import type { Survey as SurveyType, Question as QuestionType, QuestionGroup as QuestionGroupType } from '@/types/survey';
+import type { Survey as SurveyType, Question as QuestionType, QuestionConditionGroup } from '@/types/survey';
 import {
   getSurveyById,
   getQuestionGroupsBySurvey,
   getQuestionsBySurvey,
 } from '@/data/surveys';
 import { requireAuth } from '@/lib/auth';
-import { isValidUUID } from '@/lib/utils';
+import { isValidUUID, generateId } from '@/lib/utils';
+import { extractImageUrlsFromQuestion, extractImageUrlsFromQuestions } from '@/lib/image-extractor';
+import { deleteImagesFromR2Server } from '@/lib/image-utils-server';
+import type { Question } from '@/types/survey';
 
 // ========================
 // 설문 변경 액션 (Mutations)
@@ -91,6 +94,26 @@ export async function updateSurvey(
 export async function deleteSurvey(surveyId: string) {
   await requireAuth();
 
+  // 삭제 전 설문의 모든 질문 조회
+  const surveyQuestions = await db.query.questions.findMany({
+    where: eq(questions.surveyId, surveyId),
+  });
+
+  // 모든 질문에서 이미지 추출 및 삭제
+  if (surveyQuestions.length > 0) {
+    const allImages = extractImageUrlsFromQuestions(
+      surveyQuestions as Question[]
+    );
+    if (allImages.length > 0) {
+      try {
+        await deleteImagesFromR2Server(allImages);
+      } catch (error) {
+        console.error("설문 삭제 시 이미지 삭제 실패:", error);
+        // 이미지 삭제 실패해도 설문 삭제는 진행
+      }
+    }
+  }
+
   await db.delete(surveys).where(eq(surveys.id, surveyId));
   revalidatePath('/admin/surveys');
 }
@@ -135,11 +158,13 @@ export async function duplicateSurvey(surveyId: string) {
   // 그룹 ID 매핑 (원본 ID -> 새 ID)
   const groupIdMap = new Map<string, string>();
 
-  // 질문 그룹 복제
+  // 질문 그룹 복제 (새 UUID 생성)
   for (const group of originalGroups) {
-    const [newGroup] = await db
+    const newGroupId = generateId();
+    await db
       .insert(questionGroups)
       .values({
+        id: newGroupId,
         surveyId: newSurvey.id,
         name: group.name,
         description: group.description,
@@ -147,15 +172,22 @@ export async function duplicateSurvey(surveyId: string) {
         parentGroupId: group.parentGroupId ? groupIdMap.get(group.parentGroupId) : null,
         color: group.color,
         collapsed: group.collapsed,
-      })
-      .returning();
+        displayCondition: group.displayCondition as NewQuestionGroup['displayCondition'],
+      });
 
-    groupIdMap.set(group.id, newGroup.id);
+    groupIdMap.set(group.id, newGroupId);
   }
 
-  // 질문 복제
+  // 질문 ID 매핑 (원본 ID -> 새 ID) - 복제 시 참조 관계 업데이트용
+  const questionIdMap = new Map<string, string>();
+
+  // 질문 복제 (새 UUID 생성)
   for (const question of originalQuestions) {
+    const newQuestionId = generateId();
+    questionIdMap.set(question.id, newQuestionId);
+
     await db.insert(questions).values({
+      id: newQuestionId,
       surveyId: newSurvey.id,
       groupId: question.groupId ? groupIdMap.get(question.groupId) : null,
       type: question.type,
@@ -190,6 +222,7 @@ export async function duplicateSurvey(surveyId: string) {
 // 질문 그룹 생성
 export async function createQuestionGroup(data: {
   surveyId: string;
+  id?: string; // 클라이언트에서 제공한 UUID (선택사항)
   name: string;
   description?: string;
   parentGroupId?: string;
@@ -209,6 +242,7 @@ export async function createQuestionGroup(data: {
     : -1;
 
   const newGroup: NewQuestionGroup = {
+    id: data.id || generateId(), // 클라이언트에서 제공한 ID 또는 새로 생성
     surveyId: data.surveyId,
     name: data.name,
     description: data.description,
@@ -233,6 +267,7 @@ export async function updateQuestionGroup(
     parentGroupId: string | null;
     color: string;
     collapsed: boolean;
+    displayCondition: QuestionConditionGroup | undefined;
   }>
 ) {
   await requireAuth();
@@ -268,6 +303,26 @@ export async function deleteQuestionGroup(groupId: string) {
   };
 
   const allGroupIdsToDelete = await collectChildGroupIds(groupId);
+
+  // 모든 그룹에 속한 질문들 조회 (이미지 삭제용)
+  const questionsInGroups = await db.query.questions.findMany({
+    where: inArray(questions.groupId, allGroupIdsToDelete),
+  });
+
+  // 질문들에서 이미지 추출 및 삭제
+  if (questionsInGroups.length > 0) {
+    const allImages = extractImageUrlsFromQuestions(
+      questionsInGroups as Question[]
+    );
+    if (allImages.length > 0) {
+      try {
+        await deleteImagesFromR2Server(allImages);
+      } catch (error) {
+        console.error("그룹 삭제 시 이미지 삭제 실패:", error);
+        // 이미지 삭제 실패해도 그룹 삭제는 진행
+      }
+    }
+  }
 
   // 모든 그룹에 속한 질문들의 groupId를 null로 설정
   // DB 스키마에 onDelete: 'set null'이 있지만, 명시적으로 처리하여 안전하게 처리
@@ -324,6 +379,7 @@ export async function reorderGroups(surveyId: string, groupIds: string[]) {
 // 질문 생성
 export async function createQuestion(data: {
   surveyId: string;
+  id?: string; // 클라이언트에서 제공한 UUID (선택사항)
   groupId?: string;
   type: string;
   title: string;
@@ -354,6 +410,7 @@ export async function createQuestion(data: {
     : -1;
 
   const newQuestion: NewQuestion = {
+    id: data.id || generateId(), // 클라이언트에서 제공한 ID 또는 새로 생성
     surveyId: data.surveyId,
     groupId: data.groupId,
     type: data.type,
@@ -425,6 +482,23 @@ export async function updateQuestion(
 export async function deleteQuestion(questionId: string) {
   await requireAuth();
 
+  // 삭제 전 질문 조회 및 이미지 추출
+  const question = await db.query.questions.findFirst({
+    where: eq(questions.id, questionId),
+  });
+
+  if (question) {
+    const images = extractImageUrlsFromQuestion(question as Question);
+    if (images.length > 0) {
+      try {
+        await deleteImagesFromR2Server(images);
+      } catch (error) {
+        console.error("질문 삭제 시 이미지 삭제 실패:", error);
+        // 이미지 삭제 실패해도 질문 삭제는 진행
+      }
+    }
+  }
+
   await db.delete(questions).where(eq(questions.id, questionId));
 }
 
@@ -472,7 +546,51 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
     });
     surveyId = surveyData.id;
 
-    // 기존 그룹과 질문 삭제
+    // 그룹 삭제 전에 DB에서 최신 그룹 정보 가져오기 (displayCondition 포함)
+    const existingGroups = await db.query.questionGroups.findMany({
+      where: eq(questionGroups.surveyId, surveyId),
+    });
+
+    // surveyData.groups의 displayCondition을 업데이트
+    // 우선순위: 1) surveyData.groups의 값 (최신 스토어 상태) 2) DB의 값 (fallback)
+    const updatedGroups = (surveyData.groups || []).map((group) => {
+      const existingGroup = existingGroups.find((g) => g.id === group.id);
+
+      // surveyData.groups에 displayCondition이 있으면 그것을 우선 사용 (최신 스토어 상태)
+      if (group.displayCondition) {
+        return group;
+      }
+
+      // surveyData.groups에 displayCondition이 없고, DB에 있으면 DB의 값을 사용
+      if (existingGroup?.displayCondition) {
+        return {
+          ...group,
+          displayCondition: existingGroup.displayCondition as NonNullable<SurveyType['groups']>[0]['displayCondition'],
+        };
+      }
+
+      // 둘 다 없으면 그대로 반환
+      return group;
+    });
+
+    // surveyData를 업데이트된 그룹으로 교체
+    surveyData = {
+      ...surveyData,
+      groups: updatedGroups,
+    };
+
+    // 데이터 검증: questions와 groups가 배열인지 확인
+    if (!Array.isArray(surveyData.questions)) {
+      console.error('surveyData.questions가 배열이 아닙니다:', surveyData.questions);
+      throw new Error('질문 데이터가 올바르지 않습니다.');
+    }
+    if (!Array.isArray(surveyData.groups)) {
+      console.error('surveyData.groups가 배열이 아닙니다:', surveyData.groups);
+      throw new Error('그룹 데이터가 올바르지 않습니다.');
+    }
+
+    // 기존 그룹과 질문 삭제 (새 데이터로 교체하기 위해)
+    // 주의: 이 로직은 전체 삭제 후 재생성 방식이므로, surveyData에 모든 데이터가 포함되어 있어야 함
     await db.delete(questionGroups).where(eq(questionGroups.surveyId, surveyId));
     await db.delete(questions).where(eq(questions.surveyId, surveyId));
   } else {
@@ -498,10 +616,15 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
     surveyId = newSurvey.id;
   }
 
-  // 그룹 ID 매핑 (클라이언트 ID -> DB ID)
-  const groupIdMap = new Map<string, string>();
+  // 안전장치: questions와 groups가 없으면 빈 배열로 설정
+  if (!surveyData.questions) {
+    surveyData.questions = [];
+  }
+  if (!surveyData.groups) {
+    surveyData.groups = [];
+  }
 
-  // 질문 그룹 저장 (상위 그룹부터 하위 그룹 순으로 정렬하여 저장)
+  // 질문 그룹 저장 (상위 그룹부터 하위 그룹 순으로 정렬하여 저장) - 질문보다 먼저 저장해야 함
   if (surveyData.groups && surveyData.groups.length > 0) {
     // 그룹을 상위 그룹부터 하위 그룹 순으로 정렬
     // 1. parentGroupId가 null인 그룹들 (최상위 그룹)을 order 순으로 정렬
@@ -518,7 +641,7 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
 
     // 하위 그룹들을 재귀적으로 추가
     const addSubGroups = (parentId: string) => {
-      const subGroups = surveyData.groups
+      const subGroups = (surveyData.groups || [])
         .filter((g) => g.parentGroupId === parentId && !processedGroupIds.has(g.id))
         .sort((a, b) => a.order - b.order);
 
@@ -535,48 +658,51 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
       addSubGroups(group.id);
     });
 
-    // 정렬된 순서대로 그룹 저장
+    // 정렬된 순서대로 그룹 저장 (클라이언트에서 제공한 UUID 그대로 사용)
     for (const group of sortedGroups) {
-      const [newGroup] = await db
+      await db
         .insert(questionGroups)
         .values({
+          id: group.id, // 클라이언트 UUID 그대로 사용
           surveyId,
           name: group.name,
           description: group.description,
           order: group.order,
-          parentGroupId: group.parentGroupId ? groupIdMap.get(group.parentGroupId) : null,
+          parentGroupId: group.parentGroupId || null,
           color: group.color,
           collapsed: group.collapsed,
-        })
-        .returning();
-
-      groupIdMap.set(group.id, newGroup.id);
+          displayCondition: group.displayCondition as NewQuestionGroup['displayCondition'],
+        });
     }
   }
 
-  // 질문 저장
+  // 질문 저장 (클라이언트에서 제공한 UUID 그대로 사용) - 그룹 저장 후에 실행
   for (const question of surveyData.questions) {
-    await db.insert(questions).values({
-      surveyId,
-      groupId: question.groupId ? groupIdMap.get(question.groupId) : null,
-      type: question.type,
-      title: question.title,
-      description: question.description,
-      required: question.required,
-      order: question.order,
-      options: question.options as NewQuestion['options'],
-      selectLevels: question.selectLevels as NewQuestion['selectLevels'],
-      tableTitle: question.tableTitle,
-      tableColumns: question.tableColumns as NewQuestion['tableColumns'],
-      tableRowsData: question.tableRowsData as NewQuestion['tableRowsData'],
-      imageUrl: question.imageUrl,
-      videoUrl: question.videoUrl,
-      allowOtherOption: question.allowOtherOption,
-      noticeContent: question.noticeContent,
-      requiresAcknowledgment: question.requiresAcknowledgment,
-      tableValidationRules: question.tableValidationRules as NewQuestion['tableValidationRules'],
-      displayCondition: question.displayCondition as NewQuestion['displayCondition'],
-    });
+    await db
+      .insert(questions)
+      .values({
+        id: question.id, // 클라이언트 UUID 그대로 사용
+        surveyId,
+        groupId: question.groupId || null,
+        type: question.type,
+        title: question.title,
+        description: question.description,
+        required: question.required,
+        order: question.order,
+        options: question.options as NewQuestion['options'],
+        selectLevels: question.selectLevels as NewQuestion['selectLevels'],
+        tableTitle: question.tableTitle,
+        tableColumns: question.tableColumns as NewQuestion['tableColumns'],
+        tableRowsData: question.tableRowsData as NewQuestion['tableRowsData'],
+        imageUrl: question.imageUrl,
+        videoUrl: question.videoUrl,
+        allowOtherOption: question.allowOtherOption,
+        noticeContent: question.noticeContent,
+        requiresAcknowledgment: question.requiresAcknowledgment,
+        placeholder: question.placeholder,
+        tableValidationRules: question.tableValidationRules as NewQuestion['tableValidationRules'],
+        displayCondition: question.displayCondition as NewQuestion['displayCondition'],
+      });
   }
 
   revalidatePath('/admin/surveys');

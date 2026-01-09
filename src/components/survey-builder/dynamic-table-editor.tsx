@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TableCell, TableColumn, TableRow } from "@/types/survey";
 import { Plus, Trash2, Image, Video, CheckSquare, Circle, Copy, Clipboard } from "lucide-react";
 import { CellContentModal } from "./cell-content-modal";
+import { generateId } from "@/lib/utils";
 
 interface DynamicTableEditorProps {
   tableTitle?: string;
@@ -213,7 +214,7 @@ export function DynamicTableEditor({
   // 열 추가
   const addColumn = () => {
     const newColumn: TableColumn = {
-      id: `col-${Date.now()}`,
+      id: generateId(),
       label: `열 ${currentColumns.length + 1}`,
       width: 150, // 기본 너비
     };
@@ -308,7 +309,7 @@ export function DynamicTableEditor({
       }
 
       return {
-        id: `cell-${Date.now()}-${colIndex}`,
+        id: generateId(),
         content: "",
         type: "text" as const,
         isHidden: shouldBeHidden,
@@ -316,7 +317,7 @@ export function DynamicTableEditor({
     });
 
     const newRow: TableRow = {
-      id: `row-${Date.now()}`,
+      id: generateId(),
       label: `행 ${currentRows.length + 1}`,
       height: 60, // 기본 행 높이
       minHeight: 40, // 최소 행 높이
@@ -562,7 +563,11 @@ export function DynamicTableEditor({
           <span className="text-gray-400 text-sm">선택 옵션 없음</span>
         );
       default:
-        return cell.content || <span className="text-gray-400 text-sm"></span>;
+        return cell.content ? (
+          <div className="whitespace-pre-wrap text-sm break-words w-full">{cell.content}</div>
+        ) : (
+          <span className="text-gray-400 text-sm"></span>
+        );
     }
   };
 
@@ -782,12 +787,18 @@ export function DynamicTableEditor({
                       const colspan = cell.colspan || 1;
                       const isMerged = rowspan > 1 || colspan > 1;
 
+                      // 정렬 클래스 계산 (세로 정렬만 td에 적용)
+                      const verticalAlignClass =
+                        cell.verticalAlign === "middle"
+                          ? "align-middle"
+                          : cell.verticalAlign === "bottom"
+                          ? "align-bottom"
+                          : "align-top";
+
                       return (
                         <td
                           key={cell.id}
-                          className={`border border-gray-300 p-2 relative ${
-                            cell.type === "radio" ? "text-center" : ""
-                          }`}
+                          className={`border border-gray-300 p-2 relative ${verticalAlignClass}`}
                           style={{
                             width: column?.width ? `${column.width}px` : "150px",
                             maxWidth: column?.width ? `${column.width}px` : "150px",
@@ -798,7 +809,11 @@ export function DynamicTableEditor({
                         >
                           <div
                             className={`h-full group cursor-pointer hover:bg-gray-50 rounded p-2 transition-colors flex flex-col relative ${
-                              cell.type === "radio" ? "items-center justify-center" : ""
+                              cell.verticalAlign === "top"
+                                ? "justify-start"
+                                : cell.verticalAlign === "middle"
+                                ? "justify-center"
+                                : "justify-end"
                             }`}
                             onClick={() => setSelectedCell({ rowId: row.id, cellId: cell.id })}
                             style={{
@@ -810,7 +825,15 @@ export function DynamicTableEditor({
                                 cell.type === "radio" ? "w-full justify-center" : ""
                               }`}
                             >
-                              <div className={cell.type === "radio" ? "" : "flex-1"}>
+                              <div
+                                className={`${cell.type === "radio" ? "" : "flex-1 w-full"} ${
+                                  cell.horizontalAlign === "left"
+                                    ? "flex justify-start items-start"
+                                    : cell.horizontalAlign === "center"
+                                    ? "flex justify-center items-center"
+                                    : "flex justify-end items-end"
+                                }`}
+                              >
                                 {renderCellContent(cell)}
                               </div>
                               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

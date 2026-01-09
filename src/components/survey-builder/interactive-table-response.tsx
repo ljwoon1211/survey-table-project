@@ -1,44 +1,11 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
-import { TableColumn, TableRow, TableCell } from "@/types/survey";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { TableColumn, TableRow } from "@/types/survey";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Image, Video, FileText, ChevronRight, ChevronLeft, CheckCircle2 } from "lucide-react";
+import { FileText, ChevronRight, ChevronLeft, CheckCircle2 } from "lucide-react";
 import { useSurveyBuilderStore } from "@/stores/survey-store";
-import { getProxiedImageUrl } from "@/lib/image-utils";
-
-// 이미지 셀 컴포넌트 (에러 상태 관리)
-function ImageCell({ imageUrl, content }: { imageUrl: string; content?: string }) {
-  const [error, setError] = useState(false);
-
-  // key가 바뀔 때 (= imageUrl이 바뀔 때) 에러 상태 리셋
-  useEffect(() => {
-    setError(false);
-  }, [imageUrl]);
-
-  return (
-    <div className="flex flex-col items-center gap-2 w-full h-full">
-      <div key={imageUrl}>
-        {error ? (
-          <div className="flex items-center gap-1 text-red-500 text-sm">
-            <Image className="w-4 h-4" />
-            <span>이미지 오류</span>
-          </div>
-        ) : (
-          <img
-            src={getProxiedImageUrl(imageUrl)}
-            alt="셀 이미지"
-            className="w-full h-auto max-h-full object-contain rounded"
-            style={{ maxWidth: "100%", maxHeight: "100%" }}
-            onError={() => setError(true)}
-          />
-        )}
-      </div>
-      {content && <div className="text-sm text-gray-700 mt-2 text-left">{content}</div>}
-    </div>
-  );
-}
+import { InteractiveTableCell } from "./interactive-table-cell";
 
 interface InteractiveTableResponseProps {
   questionId: string;
@@ -61,20 +28,25 @@ export function InteractiveTableResponse({
   className,
   isTestMode = false,
 }: InteractiveTableResponseProps) {
-  const { updateTestResponse, testResponses } = useSurveyBuilderStore();
+  // Zustand 선택적 구독으로 변경
+  // testResponses 전체를 구독하여 testResponses[questionId] 내부의 속성 변경도 감지
+  const updateTestResponse = useSurveyBuilderStore((state) => state.updateTestResponse);
+  const testResponses = useSurveyBuilderStore((state) => state.testResponses);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftShadow, setShowLeftShadow] = useState(false);
   const [showRightShadow, setShowRightShadow] = useState(false);
 
   // 현재 질문의 응답 데이터 가져오기
-  // 테스트 모드일 때는 testResponses, 실제 응답 모드일 때는 value 사용
-  const currentResponse = (
-    isTestMode
-      ? typeof testResponses[questionId] === "object"
-        ? testResponses[questionId]
-        : {}
-      : value || {}
-  ) as Record<string, any>;
+  // 테스트 모드일 때는 testResponses 전체를 의존성으로 사용하여 testResponses[questionId] 내부 변경도 감지
+  const currentResponse = useMemo(() => {
+    if (isTestMode) {
+      const response = testResponses[questionId];
+      return typeof response === "object" && response !== null
+        ? (response as Record<string, any>)
+        : {};
+    }
+    return (value || {}) as Record<string, any>;
+  }, [isTestMode, questionId, testResponses, value]);
 
   // 스크롤 인디케이터 업데이트
   useEffect(() => {
@@ -128,133 +100,35 @@ export function InteractiveTableResponse({
     });
   };
 
-  // 응답 업데이트 함수
-  const updateResponse = (cellId: string, cellValue: string | string[] | object) => {
-    const updatedResponse = {
-      ...currentResponse,
-      [cellId]: cellValue,
-    };
-
-    if (isTestMode) {
-      updateTestResponse(questionId, updatedResponse);
-    } else if (onChange) {
-      onChange(updatedResponse);
-    }
-  };
-
-  // 체크박스 변경 핸들러
-  const handleCheckboxChange = (
-    cellId: string,
-    optionId: string,
-    checked: boolean,
-    cell: TableCell,
-  ) => {
-    const currentCellResponse = currentResponse[cellId] || [];
-    let updatedResponse;
-    const isOtherOption = optionId === "other-option";
-
-    if (checked) {
-      // 최대 선택 개수 체크
-      const maxSelections = cell.maxSelections;
-      if (maxSelections !== undefined && maxSelections > 0) {
-        const currentCount = currentCellResponse.length;
-        if (currentCount >= maxSelections) {
-          // 최대 개수 도달 시 추가 선택 불가
-          return;
-        }
+  // 응답 업데이트 함수 - 스토어에서 직접 최신 상태를 가져와서 클로저 문제 방지
+  const updateResponse = useCallback(
+    (cellId: string, cellValue: string | string[] | object) => {
+      if (isTestMode) {
+        // 테스트 모드: 스토어에서 직접 최신 상태를 가져옴
+        const currentState = useSurveyBuilderStore.getState();
+        const latestTestResponses = currentState.testResponses;
+        const latestResponse =
+          typeof latestTestResponses[questionId] === "object"
+            ? latestTestResponses[questionId]
+            : {};
+        const updatedResponse = {
+          ...(latestResponse as Record<string, any>),
+          [cellId]: cellValue,
+        };
+        updateTestResponse(questionId, updatedResponse);
+      } else if (onChange) {
+        // 일반 모드: 현재 value를 기반으로 업데이트
+        const latestValue = value || {};
+        const updatedResponse = {
+          ...(latestValue as Record<string, any>),
+          [cellId]: cellValue,
+        };
+        onChange(updatedResponse);
       }
+    },
+    [isTestMode, questionId, updateTestResponse, onChange, value],
+  );
 
-      if (isOtherOption) {
-        updatedResponse = [
-          ...currentCellResponse,
-          {
-            optionId,
-            otherValue: "",
-            hasOther: true,
-          },
-        ];
-      } else {
-        updatedResponse = [...currentCellResponse, optionId];
-      }
-    } else {
-      updatedResponse = currentCellResponse.filter((item: string | object) => {
-        if (typeof item === "object" && item !== null && "optionId" in item) {
-          return (item as { optionId: string }).optionId !== optionId;
-        }
-        return item !== optionId;
-      });
-    }
-
-    updateResponse(cellId, updatedResponse);
-  };
-
-  // 라디오 버튼 변경 핸들러
-  const handleRadioChange = (cellId: string, optionId: string, isSelected?: boolean) => {
-    // 이미 선택된 항목을 다시 클릭하면 선택 취소
-    if (isSelected) {
-      updateResponse(cellId, "");
-      return;
-    }
-
-    const isOtherOption = optionId === "other-option";
-    if (isOtherOption) {
-      updateResponse(cellId, {
-        optionId,
-        otherValue: "",
-        hasOther: true,
-      });
-    } else {
-      updateResponse(cellId, optionId);
-    }
-  };
-
-  // select 변경 핸들러
-  const handleSelectChange = (cellId: string, optionId: string) => {
-    const isOtherOption = optionId === "other-option";
-    if (isOtherOption) {
-      updateResponse(cellId, {
-        optionId,
-        otherValue: "",
-        hasOther: true,
-      });
-    } else {
-      updateResponse(cellId, optionId);
-    }
-  };
-
-  // 기타 옵션 입력 변경 핸들러
-  const handleOtherInputChange = (cellId: string, optionId: string, otherValue: string) => {
-    const currentCellResponse = currentResponse[cellId];
-
-    if (Array.isArray(currentCellResponse)) {
-      // 체크박스의 경우
-      const updatedResponse = currentCellResponse.map((item: string | object) => {
-        if (
-          typeof item === "object" &&
-          item !== null &&
-          "optionId" in item &&
-          (item as { optionId: string }).optionId === optionId
-        ) {
-          return { ...item, otherValue };
-        }
-        return item;
-      });
-      updateResponse(cellId, updatedResponse);
-    } else if (
-      typeof currentCellResponse === "object" &&
-      currentCellResponse !== null &&
-      "optionId" in currentCellResponse &&
-      (currentCellResponse as { optionId: string }).optionId === optionId
-    ) {
-      // 라디오의 경우
-      updateResponse(cellId, { ...currentCellResponse, otherValue });
-    }
-  };
-
-  // 텍스트 입력 변경 핸들러
-  const handleTextChange = (cellId: string, value: string) => {
-    updateResponse(cellId, value);
-  };
 
   // 테이블이 비어있는 경우
   if (columns.length === 0 || rows.length === 0) {
@@ -270,345 +144,6 @@ export function InteractiveTableResponse({
     );
   }
 
-  // 셀 내용 렌더링 함수
-  const renderInteractiveCell = (cell: TableCell) => {
-    if (!cell) return <span className="text-gray-400 text-sm">-</span>;
-
-    const cellResponse = currentResponse[cell.id];
-
-    switch (cell.type) {
-      case "checkbox":
-        if (!cell.checkboxOptions || cell.checkboxOptions.length === 0) {
-          return (
-            <div className="flex items-center gap-2 text-gray-500">
-              <span className="text-sm">체크박스 없음</span>
-            </div>
-          );
-        }
-
-        const cellResponseArray = Array.isArray(cellResponse) ? cellResponse : [];
-        const currentCount = cellResponseArray.length;
-        const maxSelections = cell.maxSelections;
-        const minSelections = cell.minSelections;
-        const isMaxReached =
-          maxSelections !== undefined && maxSelections > 0 && currentCount >= maxSelections;
-        const isMinNotMet =
-          minSelections !== undefined && minSelections > 0 && currentCount < minSelections;
-
-        const canSelect = (optionId: string) => {
-          const isChecked = cellResponseArray.some((item: string | object) => {
-            if (typeof item === "object" && item !== null && "optionId" in item) {
-              return (item as { optionId: string }).optionId === optionId;
-            }
-            return item === optionId;
-          });
-          if (isChecked) return true; // 이미 선택된 것은 해제 가능
-          if (isMaxReached) return false; // 최대 개수 도달 시 추가 선택 불가
-          return true;
-        };
-
-        return (
-          <div className="space-y-2">
-            {cell.checkboxOptions.map((option) => {
-              const isChecked = cellResponseArray.some((item: string | object) => {
-                if (typeof item === "object" && item !== null && "optionId" in item) {
-                  return (item as { optionId: string }).optionId === option.id;
-                }
-                return item === option.id;
-              });
-
-              const otherValue =
-                cellResponseArray.find(
-                  (item: string | object) =>
-                    typeof item === "object" &&
-                    item !== null &&
-                    "optionId" in item &&
-                    (item as { optionId: string; otherValue?: string }).optionId === option.id,
-                )?.otherValue || "";
-
-              const disabled = !canSelect(option.id);
-
-              return (
-                <div key={option.id} className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id={`${cell.id}-${option.id}`}
-                      checked={isChecked}
-                      disabled={disabled}
-                      onChange={(e) =>
-                        handleCheckboxChange(cell.id, option.id, e.target.checked, cell)
-                      }
-                      className={`rounded border-gray-300 text-blue-600 focus:ring-blue-500 ${
-                        disabled ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
-                    />
-                    <label
-                      htmlFor={`${cell.id}-${option.id}`}
-                      className={`text-sm select-none ${
-                        disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-                      }`}
-                    >
-                      {option.label}
-                    </label>
-                  </div>
-                  {option.id === "other-option" && isChecked && (
-                    <div className="ml-6">
-                      <Input
-                        placeholder="기타 내용 입력..."
-                        value={otherValue}
-                        onChange={(e) => handleOtherInputChange(cell.id, option.id, e.target.value)}
-                        className="text-xs h-8"
-                      />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            {/* 선택 개수 표시 */}
-            {(maxSelections !== undefined || minSelections !== undefined) && (
-              <div className="pt-2 border-t border-gray-200 mt-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-600">
-                    {maxSelections !== undefined && maxSelections > 0
-                      ? `${currentCount}/${maxSelections}개 선택됨`
-                      : `${currentCount}개 선택됨`}
-                  </span>
-                  {isMinNotMet && (
-                    <span className="text-orange-600">최소 {minSelections}개 이상</span>
-                  )}
-                  {isMaxReached && <span className="text-blue-600">최대 도달</span>}
-                </div>
-              </div>
-            )}
-          </div>
-        );
-
-      case "radio":
-        return cell.radioOptions && cell.radioOptions.length > 0 ? (
-          <div className="space-y-2">
-            {cell.radioOptions.map((option) => {
-              const isSelected = (() => {
-                if (typeof cellResponse === "object" && cellResponse?.optionId) {
-                  return cellResponse.optionId === option.id;
-                }
-                return cellResponse === option.id;
-              })();
-
-              const otherValue =
-                typeof cellResponse === "object" && cellResponse?.optionId === option.id
-                  ? cellResponse.otherValue || ""
-                  : "";
-
-              return (
-                <div key={option.id} className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      id={`${cell.id}-${option.id}`}
-                      name={cell.id}
-                      checked={isSelected}
-                      onChange={() => handleRadioChange(cell.id, option.id, isSelected)}
-                      onClick={() => handleRadioChange(cell.id, option.id, isSelected)}
-                      className="border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                    />
-                    <label
-                      htmlFor={`${cell.id}-${option.id}`}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleRadioChange(cell.id, option.id, isSelected);
-                      }}
-                      className="text-sm cursor-pointer select-none"
-                    >
-                      {option.label}
-                    </label>
-                  </div>
-                  {option.id === "other-option" && isSelected && (
-                    <div className="ml-6">
-                      <Input
-                        placeholder="기타 내용 입력..."
-                        value={otherValue}
-                        onChange={(e) => handleOtherInputChange(cell.id, option.id, e.target.value)}
-                        className="text-xs h-8"
-                      />
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 text-gray-500">
-            <span className="text-sm">라디오 버튼 없음</span>
-          </div>
-        );
-
-      case "select":
-        return cell.selectOptions && cell.selectOptions.length > 0 ? (
-          <div className="space-y-2">
-            <select
-              value={
-                typeof cellResponse === "object" && cellResponse?.optionId
-                  ? cellResponse.optionId
-                  : cellResponse || ""
-              }
-              onChange={(e) => handleSelectChange(cell.id, e.target.value)}
-              className="w-full p-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">선택하세요...</option>
-              {cell.selectOptions.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            {(() => {
-              const selectedValue =
-                typeof cellResponse === "object" && cellResponse?.optionId
-                  ? cellResponse.optionId
-                  : cellResponse;
-              const isOtherSelected = selectedValue === "other-option";
-              const otherValue =
-                typeof cellResponse === "object" && cellResponse?.otherValue
-                  ? cellResponse.otherValue
-                  : "";
-
-              return (
-                isOtherSelected && (
-                  <div>
-                    <Input
-                      placeholder="기타 내용 입력..."
-                      value={otherValue}
-                      onChange={(e) =>
-                        handleOtherInputChange(cell.id, "other-option", e.target.value)
-                      }
-                      className="text-xs h-8"
-                    />
-                  </div>
-                )
-              );
-            })()}
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 text-gray-500">
-            <span className="text-sm">선택 옵션 없음</span>
-          </div>
-        );
-
-      case "image":
-        return cell.imageUrl ? (
-          <ImageCell imageUrl={cell.imageUrl} content={cell.content} />
-        ) : (
-          <div className="flex items-center gap-2 text-gray-500">
-            <Image className="w-4 h-4" />
-            <span className="text-sm">이미지 없음</span>
-          </div>
-        );
-
-      case "video":
-        return cell.videoUrl ? (
-          <div className="flex flex-col items-center gap-2">
-            {cell.videoUrl.includes("youtube.com") || cell.videoUrl.includes("youtu.be") ? (
-              <div className="w-full max-w-xs">
-                <div className="aspect-video">
-                  <iframe
-                    src={getYouTubeEmbedUrl(cell.videoUrl)}
-                    className="w-full h-full rounded"
-                    frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    title="테이블 동영상"
-                  />
-                </div>
-              </div>
-            ) : cell.videoUrl.includes("vimeo.com") ? (
-              <div className="w-full max-w-xs">
-                <div className="aspect-video">
-                  <iframe
-                    src={cell.videoUrl.replace("vimeo.com/", "player.vimeo.com/video/")}
-                    className="w-full h-full rounded"
-                    frameBorder="0"
-                    allow="autoplay; fullscreen; picture-in-picture"
-                    allowFullScreen
-                    title="테이블 동영상"
-                  />
-                </div>
-              </div>
-            ) : cell.videoUrl.match(/\.(mp4|webm|ogg)$/i) ? (
-              <video src={cell.videoUrl} controls className="w-full max-w-xs max-h-32 rounded">
-                동영상을 지원하지 않는 브라우저입니다.
-              </video>
-            ) : (
-              <div className="flex items-center gap-2 text-yellow-600">
-                <Video className="w-4 h-4" />
-                <span className="text-sm">동영상 링크 오류</span>
-              </div>
-            )}
-            {cell.content && (
-              <div className="text-sm text-gray-700 mt-2 text-left">{cell.content}</div>
-            )}
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 text-gray-500">
-            <Video className="w-4 h-4" />
-            <span className="text-sm">동영상 없음</span>
-          </div>
-        );
-
-      case "input":
-        return (
-          <div className="space-y-1.5">
-            <Input
-              type="text"
-              value={(cellResponse as string) || ""}
-              onChange={(e) => handleTextChange(cell.id, e.target.value)}
-              placeholder={cell.placeholder || "답변을 입력하세요..."}
-              maxLength={cell.inputMaxLength}
-              className="w-full text-sm"
-            />
-            {cell.inputMaxLength && (
-              <div className="flex justify-end">
-                <p className="text-xs text-gray-500">
-                  <span
-                    className={
-                      ((cellResponse as string) || "").length >= cell.inputMaxLength
-                        ? "text-red-500 font-medium"
-                        : ""
-                    }
-                  >
-                    {((cellResponse as string) || "").length}
-                  </span>
-                  {" / "}
-                  {cell.inputMaxLength}자
-                </p>
-              </div>
-            )}
-          </div>
-        );
-
-      case "text":
-      default:
-        // text 타입은 단순히 텍스트만 표시
-        return cell.content ? (
-          <div className="whitespace-pre-wrap text-sm text-left leading-relaxed break-words">
-            {cell.content}
-          </div>
-        ) : (
-          <span className="text-gray-400 text-sm"></span>
-        );
-    }
-  };
-
-  // YouTube URL을 임베드 URL로 변환
-  const getYouTubeEmbedUrl = (url: string) => {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    if (match && match[2].length === 11) {
-      return `https://www.youtube.com/embed/${match[2]}`;
-    }
-    return url;
-  };
 
   // 모바일 카드 뷰 렌더링
   const renderMobileCardView = () => {
@@ -662,7 +197,30 @@ export function InteractiveTableResponse({
                           {columnLabel}
                         </div>
                       </div>
-                      <div className="pl-3.5">{renderInteractiveCell(cell)}</div>
+                      <div
+                        className={`pl-3.5 flex ${
+                          cell.horizontalAlign === "left"
+                            ? "justify-start"
+                            : cell.horizontalAlign === "center"
+                            ? "justify-center"
+                            : "justify-end"
+                        } ${
+                          cell.verticalAlign === "top"
+                            ? "items-start"
+                            : cell.verticalAlign === "middle"
+                            ? "items-center"
+                            : "items-end"
+                        }`}
+                      >
+                        <InteractiveTableCell
+                          cell={cell}
+                          questionId={questionId}
+                          isTestMode={isTestMode}
+                          value={value}
+                          onChange={onChange}
+                          onUpdateResponse={updateResponse}
+                        />
+                      </div>
                     </div>
                   );
                 })}
@@ -686,54 +244,62 @@ export function InteractiveTableResponse({
     }
   };
 
-  // 데스크톱 테이블 뷰 렌더링
-  const renderDesktopTableView = () => {
+  // 데스크톱 테이블 뷰 렌더링 (모바일에서도 사용)
+  const renderTableView = () => {
     // 전체 테이블 너비 계산 (각 열의 너비 합계)
     const totalWidth = columns.reduce((acc, col) => acc + (col.width || 150), 0);
 
     return (
       <div className="relative group">
-        {/* 왼쪽 스크롤 버튼 */}
+        {/* 왼쪽 스크롤 버튼 - 모든 화면 크기에서 표시 (터치 불가능한 장치 지원) */}
         {showLeftShadow && (
           <button
             onClick={() => scrollTable("left")}
-            className="absolute top-1/2 left-2 -translate-y-1/2 z-30 bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-full shadow-lg transition-all opacity-0 group-hover:opacity-100"
+            className="absolute top-1/2 left-2 -translate-y-1/2 z-30 bg-white/95 border border-gray-300 text-gray-700 p-2.5 rounded-full shadow-lg transition-all hover:bg-gray-50 active:scale-95 hover:text-blue-600"
             aria-label="왼쪽으로 스크롤"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
         )}
 
-        {/* 오른쪽 스크롤 버튼 */}
+        {/* 오른쪽 스크롤 버튼 - 모든 화면 크기에서 표시 */}
         {showRightShadow && (
           <button
             onClick={() => scrollTable("right")}
-            className="absolute top-1/2 right-2 -translate-y-1/2 z-30 bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-full shadow-lg animate-pulse hover:animate-none transition-all opacity-0 group-hover:opacity-100"
+            className="absolute top-1/2 right-2 -translate-y-1/2 z-30 bg-white/95 border border-gray-300 text-gray-700 p-2.5 rounded-full shadow-lg transition-all hover:bg-gray-50 active:scale-95 hover:text-blue-600 animate-pulse hover:animate-none"
             aria-label="오른쪽으로 스크롤"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
         )}
 
-        {/* 안내 텍스트 */}
-        {!showLeftShadow && showRightShadow && (
-          <div className="mb-2 text-center text-sm text-gray-500 flex items-center justify-center gap-1 md:hidden">
-            <ChevronLeft className="w-3 h-3" />
-            <span>좌우로 스크롤하여 모든 항목을 확인하세요</span>
-            <ChevronRight className="w-3 h-3" />
-          </div>
+        {/* 모바일 스크롤 안내 (그림자 오버레이) */}
+        {showRightShadow && (
+          <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-black/5 to-transparent pointer-events-none z-20 md:hidden" />
         )}
+        {showLeftShadow && (
+          <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-black/5 to-transparent pointer-events-none z-20 md:hidden" />
+        )}
+
+        {/* 안내 텍스트 - 모바일 전용 */}
+        <div className="md:hidden mb-2 text-xs text-gray-500 flex items-center justify-end gap-1 px-1">
+          <span className="animate-pulse">좌우로 스크롤하여 응답해주세요</span>
+          <ChevronRight className="w-3 h-3" />
+        </div>
 
         <div
           ref={tableContainerRef}
-          className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 pb-2"
-          style={{ WebkitOverflowScrolling: "touch" }}
+          className="overflow-x-auto pb-4 -mx-4 px-4 md:mx-0 md:px-0"
+          style={{ 
+            WebkitOverflowScrolling: "touch",
+          }}
         >
           <table
-            className="border-collapse border border-gray-300 text-sm bg-white"
+            className="border-separate border-spacing-0 text-base bg-white mx-auto shadow-sm rounded-lg overflow-hidden border-t border-l border-gray-300"
             style={{
               tableLayout: "fixed",
               minWidth: totalWidth ? `${totalWidth}px` : "100%",
+              width: totalWidth ? `${totalWidth}px` : "100%",
             }}
           >
             {/* 열 너비 정의 */}
@@ -745,13 +311,13 @@ export function InteractiveTableResponse({
 
             {/* 헤더 */}
             <thead>
-              <tr>
+              <tr className="bg-gray-50">
                 {columns.map((column, colIndex) => (
                   <th
                     key={column.id}
-                    className={`border border-gray-300 p-3 bg-gray-50 font-medium text-center align-middle h-full ${
+                    className={`border-b border-r border-gray-300 px-4 py-3 font-semibold text-gray-800 text-center align-middle h-full ${
                       colIndex === 0
-                        ? "sticky left-0 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]"
+                        ? "sticky left-0 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] bg-gray-100"
                         : ""
                     }`}
                     style={{ width: `${column.width || 150}px` }}
@@ -764,13 +330,13 @@ export function InteractiveTableResponse({
 
             {/* 본문 */}
             <tbody>
-              {rows.map((row) => {
+              {rows.map((row, rowIndex) => {
                 const completed = isRowCompleted(row);
                 return (
                   <tr
                     key={row.id}
-                    className={`hover:bg-blue-50 transition-colors ${
-                      completed ? "bg-green-50" : ""
+                    className={`hover:bg-blue-50/30 transition-colors ${
+                      completed ? "bg-green-50/30" : "bg-white"
                     }`}
                   >
                     {/* 셀들 */}
@@ -778,14 +344,25 @@ export function InteractiveTableResponse({
                       // rowspan으로 숨겨진 셀은 렌더링하지 않음
                       if (cell.isHidden) return null;
 
+                      // 정렬 클래스 계산 (세로 정렬만 td에 적용)
+                      const verticalAlignClass =
+                        cell.verticalAlign === "middle"
+                          ? "align-middle"
+                          : cell.verticalAlign === "bottom"
+                          ? "align-bottom"
+                          : "align-top";
+
                       return (
                         <td
                           key={cell.id}
-                          className={`border border-gray-300 p-3 text-left align-top relative bg-white ${
+                          className={`border-b border-r border-gray-300 p-3 ${verticalAlignClass} relative transition-colors duration-200 ${
                             cellIndex === 0
-                              ? "sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]"
+                              ? "sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] bg-white"
                               : ""
-                          } ${completed ? "!bg-green-50" : ""}`}
+                          } ${completed ? "!bg-green-50/40" : ""} ${
+                             // 첫 번째 열(행 헤더)이면서 완료된 경우 배경색 조정
+                             completed && cellIndex === 0 ? "!bg-green-50" : ""
+                          }`}
                           rowSpan={cell.rowspan || 1}
                           colSpan={cell.colspan || 1}
                         >
@@ -794,7 +371,34 @@ export function InteractiveTableResponse({
                               <CheckCircle2 className="w-4 h-4 text-green-500" />
                             </div>
                           )}
-                          {renderInteractiveCell(cell)}
+                          <div
+                            className={`w-full flex flex-col ${
+                              cell.verticalAlign === "top"
+                                ? "justify-start"
+                                : cell.verticalAlign === "middle"
+                                ? "justify-center"
+                                : "justify-end"
+                            }`}
+                          >
+                            <div
+                              className={`w-full ${
+                                cell.horizontalAlign === "left"
+                                  ? "flex justify-start items-start"
+                                  : cell.horizontalAlign === "center"
+                                  ? "flex justify-center items-center"
+                                  : "flex justify-end items-end"
+                              }`}
+                            >
+                              <InteractiveTableCell
+                          cell={cell}
+                          questionId={questionId}
+                          isTestMode={isTestMode}
+                          value={value}
+                          onChange={onChange}
+                          onUpdateResponse={updateResponse}
+                        />
+                            </div>
+                          </div>
                         </td>
                       );
                     })}
@@ -815,13 +419,14 @@ export function InteractiveTableResponse({
           <CardTitle className="text-lg font-medium">{tableTitle}</CardTitle>
         </CardHeader>
       )}
-      <CardContent className="p-4 sm:p-6">
-        {/* CSS 기반 반응형 처리로 변경 (hydration mismatch 방지 및 성능 향상) */}
-        <div className="md:hidden">{renderMobileCardView()}</div>
-        <div className="hidden md:block">{renderDesktopTableView()}</div>
+      <CardContent className="p-0 sm:p-6 overflow-hidden">
+        {/* CSS 기반 반응형 처리 -> 모든 화면에서 테이블 뷰 사용 */}
+        <div className="w-full">
+          {renderTableView()}
+        </div>
 
         {isTestMode && (
-          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+          <div className="mt-4 mx-4 mb-4 sm:mx-0 sm:mb-0 p-3 bg-blue-50 rounded-lg">
             <div className="text-sm text-blue-700">
               <span className="font-medium">테스트 모드:</span> 위 테이블에서 실제로 응답해보세요.
               응답 데이터는 저장되지 않습니다.

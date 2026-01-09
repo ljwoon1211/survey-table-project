@@ -25,26 +25,49 @@ const addBackgroundColorAttribute = () => ({
   },
 });
 
+// colwidth 속성을 style width로 변환하는 설정 추가
+const addColwidthAttribute = () => ({
+  colwidth: {
+    default: null,
+    parseHTML: (element: HTMLElement) => {
+      const colwidth = element.getAttribute("colwidth");
+      return colwidth ? colwidth.split(",").map((item) => parseInt(item, 10)) : null;
+    },
+    renderHTML: (attributes: { colwidth?: number[] | null }) => {
+      if (!attributes.colwidth || !attributes.colwidth.length) {
+        return {};
+      }
+      const width = attributes.colwidth.reduce((a, b) => a + b, 0);
+      return {
+        colwidth: attributes.colwidth.join(","),
+        style: `width: ${width}px`,
+      };
+    },
+  },
+});
+
 // 에디터 확장을 생성하는 함수 (매번 새로운 인스턴스 생성)
 // TipTap 3.x에서 여러 에디터 인스턴스를 사용할 때 플러그인 충돌을 방지하기 위해
 // 각 호출마다 새로운 확장 인스턴스를 생성합니다.
 export function createEditorExtensions() {
-  // 배경색을 지원하는 TableCell 확장 - 매번 새로 생성
+  // 배경색과 너비를 지원하는 TableCell 확장 - 매번 새로 생성
   const TableCellWithBackground = TableCell.extend({
     addAttributes() {
       return {
         ...this.parent?.(),
         ...addBackgroundColorAttribute(),
+        ...addColwidthAttribute(),
       };
     },
   });
 
-  // 배경색을 지원하는 TableHeader 확장 - 매번 새로 생성
+  // 배경색과 너비를 지원하는 TableHeader 확장 - 매번 새로 생성
   const TableHeaderWithBackground = TableHeader.extend({
     addAttributes() {
       return {
         ...this.parent?.(),
         ...addBackgroundColorAttribute(),
+        ...addColwidthAttribute(),
       };
     },
   });

@@ -14,7 +14,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { cn } from "@/lib/utils";
+import { cn, generateId } from "@/lib/utils";
 
 interface BranchRuleEditorProps {
   branchRule?: BranchRule;
@@ -38,12 +38,25 @@ export function BranchRuleEditor({
   const currentIndex = allQuestions.findIndex((q) => q.id === currentQuestionId);
   const availableQuestions = allQuestions.filter((_, index) => index > currentIndex);
 
+  // branchRule prop이 변경될 때 state 동기화
+  useEffect(() => {
+    if (branchRule) {
+      setEnabled(true);
+      setAction(branchRule.action || "goto");
+      setTargetQuestionId(branchRule.targetQuestionId || "");
+    } else {
+      setEnabled(false);
+      setAction("goto");
+      setTargetQuestionId("");
+    }
+  }, [branchRule]);
+
   useEffect(() => {
     if (!enabled) {
       onChange(undefined);
     } else {
       const newBranchRule: BranchRule = {
-        id: branchRule?.id || `branch-${Date.now()}`,
+        id: branchRule?.id || generateId(),
         value: branchRule?.value || "",
         action,
         targetQuestionId: action === "goto" ? targetQuestionId : undefined,
