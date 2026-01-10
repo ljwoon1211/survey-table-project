@@ -379,25 +379,45 @@ export async function deleteQuestionGroup(groupId: string) {
   }
 }
 
-// 그룹 순서 변경 (최상위 그룹만)
+// [최적화] 그룹 순서 변경 (최상위 그룹만)
 export async function reorderGroups(surveyId: string, groupIds: string[]) {
   await requireAuth();
 
-  // UUID 형식인 그룹 ID만 필터링 (임시 ID는 DB에 없으므로 제외)
   const validGroupIds = groupIds.filter(id => isValidUUID(id));
+  if (validGroupIds.length === 0) return;
 
-  // 🚀 병렬 처리 (Promise.all)
-  // 모든 업데이트 요청을 동시에 보냅니다.
-  await Promise.all(
-    validGroupIds.map((id, index) =>
-      db
-        .update(questionGroups)
-        .set({ order: index, updatedAt: new Date() })
-        .where(eq(questionGroups.id, id))
-    )
-  );
+  // 1. 현재 DB에 저장된 순서 조회 (읽기가 쓰기보다 훨씬 저렴합니다)
+  const currentGroups = await db.query.questionGroups.findMany({
+    where: eq(questionGroups.surveyId, surveyId),
+    columns: {
+      id: true,
+      order: true,
+    },
+  });
 
-  revalidatePath(`/admin/surveys/${surveyId}`);
+  // ID별 현재 순서 매핑
+  const currentOrderMap = new Map(currentGroups.map(g => [g.id, g.order]));
+  const updates: Promise<any>[] = [];
+
+  validGroupIds.forEach((id, index) => {
+    const currentOrder = currentOrderMap.get(id);
+    
+    // 2. 실제로 순서가 변경된 그룹만 업데이트 큐에 추가 (Diffing)
+    if (currentOrder !== index) {
+      updates.push(
+        db
+          .update(questionGroups)
+          .set({ order: index, updatedAt: new Date() })
+          .where(eq(questionGroups.id, id))
+      );
+    }
+  });
+
+  // 3. 변경된 것만 병렬 실행
+  if (updates.length > 0) {
+    await Promise.all(updates);
+    revalidatePath(`/admin/surveys/${surveyId}`);
+  }
 }
 
 // ========================
@@ -530,23 +550,45 @@ export async function deleteQuestion(questionId: string) {
   await db.delete(questions).where(eq(questions.id, questionId));
 }
 
-// 질문 순서 변경
+// [최적화] 질문 순서 변경
 export async function reorderQuestions(questionIds: string[]) {
   await requireAuth();
 
-  // UUID 형식인 질문 ID만 필터링 (임시 ID는 DB에 없으므로 제외)
   const validQuestionIds = questionIds.filter(id => isValidUUID(id));
+  if (validQuestionIds.length === 0) return;
 
-  // 🚀 병렬 처리 (Promise.all)
-  // 모든 업데이트 요청을 동시에 보냅니다.
-  await Promise.all(
-    validQuestionIds.map((id, index) =>
-      db
-        .update(questions)
-        .set({ order: index + 1, updatedAt: new Date() })
-        .where(eq(questions.id, id))
-    )
-  );
+  // 1. 현재 DB에 저장된 순서 조회
+  const currentQuestions = await db.query.questions.findMany({
+    where: inArray(questions.id, validQuestionIds),
+    columns: {
+      id: true,
+      order: true,
+    },
+  });
+
+  const currentOrderMap = new Map(currentQuestions.map(q => [q.id, q.order]));
+  const updates: Promise<any>[] = [];
+
+  validQuestionIds.forEach((id, index) => {
+    // 기존 로직과 동일하게 index + 1 사용 (질문 순서는 1부터 시작하는 경우가 많음)
+    const newOrder = index + 1;
+    const currentOrder = currentOrderMap.get(id);
+
+    // 2. 실제로 순서가 변경된 질문만 업데이트 큐에 추가
+    if (currentOrder !== newOrder) {
+      updates.push(
+        db
+          .update(questions)
+          .set({ order: newOrder, updatedAt: new Date() })
+          .where(eq(questions.id, id))
+      );
+    }
+  });
+
+  // 3. 변경된 것만 병렬 실행
+  if (updates.length > 0) {
+    await Promise.all(updates);
+  }
 }
 
 // ========================
@@ -556,15 +598,13 @@ export async function reorderQuestions(questionIds: string[]) {
 export async function saveSurveyWithDetails(surveyData: SurveyType) {
   await requireAuth();
 
-  // 🚀 트랜잭션 시작: 모든 DB 작업을 하나의 단위로 실행
+  // 🚀 트랜잭션 시작
   return await db.transaction(async (tx) => {
-    // 설문이 이미 존재하는지 확인
+    // 1. 설문 기본 정보 저장
     const existingSurvey = await getSurveyById(surveyData.id);
-
-    let surveyId: string;
+    const surveyId = surveyData.id;
 
     if (existingSurvey) {
-      // 기존 설문 업데이트 (트랜잭션 내에서 직접 실행)
       await tx
         .update(surveys)
         .set({
@@ -582,270 +622,190 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
           updatedAt: new Date(),
         })
         .where(eq(surveys.id, surveyData.id));
-      surveyId = surveyData.id;
+    } else {
+      await tx.insert(surveys).values({
+        id: surveyData.id,
+        title: surveyData.title,
+        description: surveyData.description,
+        slug: surveyData.slug,
+        privateToken: surveyData.privateToken,
+        isPublic: surveyData.settings.isPublic,
+        allowMultipleResponses: surveyData.settings.allowMultipleResponses,
+        showProgressBar: surveyData.settings.showProgressBar,
+        shuffleQuestions: surveyData.settings.shuffleQuestions,
+        requireLogin: surveyData.settings.requireLogin,
+        endDate: surveyData.settings.endDate ? new Date(surveyData.settings.endDate) : null,
+        maxResponses: surveyData.settings.maxResponses ?? null,
+        thankYouMessage: surveyData.settings.thankYouMessage,
+      });
+    }
 
-      // 그룹 삭제 전에 DB에서 최신 그룹 정보 가져오기 (displayCondition 포함)
+    // 그룹 displayCondition 보존 로직 (기존 유지)
+    if (existingSurvey && surveyData.groups) {
       const existingGroups = await tx.query.questionGroups.findMany({
         where: eq(questionGroups.surveyId, surveyId),
       });
 
-    // surveyData.groups의 displayCondition을 업데이트
-    // 우선순위: 1) surveyData.groups의 값 (최신 스토어 상태) 2) DB의 값 (fallback)
-    const updatedGroups = (surveyData.groups || []).map((group) => {
-      const existingGroup = existingGroups.find((g) => g.id === group.id);
-
-      // surveyData.groups에 displayCondition이 있으면 그것을 우선 사용 (최신 스토어 상태)
-      if (group.displayCondition) {
+      surveyData.groups = surveyData.groups.map((group) => {
+        if (group.displayCondition) return group;
+        const existingGroup = existingGroups.find((g) => g.id === group.id);
+        if (existingGroup?.displayCondition) {
+          return {
+            ...group,
+            displayCondition: existingGroup.displayCondition as NonNullable<SurveyType['groups']>[0]['displayCondition'],
+          };
+        }
         return group;
-      }
-
-      // surveyData.groups에 displayCondition이 없고, DB에 있으면 DB의 값을 사용
-      if (existingGroup?.displayCondition) {
-        return {
-          ...group,
-          displayCondition: existingGroup.displayCondition as NonNullable<SurveyType['groups']>[0]['displayCondition'],
-        };
-      }
-
-      // 둘 다 없으면 그대로 반환
-      return group;
-    });
-
-    // surveyData를 업데이트된 그룹으로 교체
-    surveyData = {
-      ...surveyData,
-      groups: updatedGroups,
-    };
-
-      if (!Array.isArray(surveyData.questions) || !Array.isArray(surveyData.groups)) {
-        throw new Error('데이터 형식이 올바르지 않습니다.');
-      }
-    } else {
-      // 새 설문 생성 (트랜잭션 내에서 실행)
-      const [newSurvey] = await tx
-        .insert(surveys)
-        .values({
-          id: surveyData.id,
-          title: surveyData.title,
-          description: surveyData.description,
-          slug: surveyData.slug,
-          privateToken: surveyData.privateToken,
-          isPublic: surveyData.settings.isPublic,
-          allowMultipleResponses: surveyData.settings.allowMultipleResponses,
-          showProgressBar: surveyData.settings.showProgressBar,
-          shuffleQuestions: surveyData.settings.shuffleQuestions,
-          requireLogin: surveyData.settings.requireLogin,
-          endDate: surveyData.settings.endDate ? new Date(surveyData.settings.endDate) : null,
-          maxResponses: surveyData.settings.maxResponses ?? null,
-          thankYouMessage: surveyData.settings.thankYouMessage,
-        })
-        .returning();
-      surveyId = newSurvey.id;
+      });
     }
 
-  // 안전장치
-  if (!surveyData.questions) surveyData.questions = [];
-  if (!surveyData.groups) surveyData.groups = [];
+    // 안전장치
+    if (!surveyData.questions) surveyData.questions = [];
+    if (!surveyData.groups) surveyData.groups = [];
 
-  // 1. 그룹 정렬 로직 (기존 로직 유지)
-  const sortedGroups: typeof surveyData.groups = [];
-  if (surveyData.groups && surveyData.groups.length > 0) {
-    const processedGroupIds = new Set<string>();
-    const topLevelGroups = surveyData.groups
-      .filter((g) => !g.parentGroupId)
-      .sort((a, b) => a.order - b.order);
-    sortedGroups.push(...topLevelGroups);
-    topLevelGroups.forEach((g) => processedGroupIds.add(g.id));
-
-    const addSubGroups = (parentId: string) => {
-      const subGroups = (surveyData.groups || [])
-        .filter((g) => g.parentGroupId === parentId && !processedGroupIds.has(g.id))
-        .sort((a, b) => a.order - b.order);
-
-      subGroups.forEach((g) => {
-        sortedGroups.push(g);
-        processedGroupIds.add(g.id);
-        addSubGroups(g.id);
-      });
-    };
-
-    topLevelGroups.forEach((group) => {
-      addSubGroups(group.id);
-    });
-  }
-
-    // [안전성 최적화] 2. 그룹 처리: Diffing + Upsert 방식
-    if (surveyData.groups && sortedGroups.length > 0) {
-      // 기존 그룹 조회 (삭제 대상을 찾기 위해)
-      const existingGroupsForDiff = existingSurvey
+    // ==========================================
+    // ⚡️ 2. 질문 그룹 처리 (Bulk Upsert 적용)
+    // ==========================================
+    if (surveyData.groups.length > 0) {
+      // 2-1. 삭제된 그룹 정리
+      const existingGroups = existingSurvey
         ? await tx.query.questionGroups.findMany({
             where: eq(questionGroups.surveyId, surveyId),
+            columns: { id: true },
           })
         : [];
 
-      const newGroupIds = new Set(sortedGroups.map((g) => g.id));
+      const newGroupIds = new Set(surveyData.groups.map((g) => g.id));
+      const groupIdsToRemove = existingGroups
+        .filter((g) => !newGroupIds.has(g.id))
+        .map((g) => g.id);
 
-      // 삭제된 그룹 식별 (기존에는 있었으나 새 데이터에는 없는 ID)
-      const groupsToRemove = existingGroupsForDiff.filter(
-        (g) => !newGroupIds.has(g.id)
-      );
-
-      // 삭제된 그룹만 DB에서 제거 (트랜잭션 내에서 실행)
-      if (groupsToRemove.length > 0) {
-        const idsToRemove = groupsToRemove.map((g) => g.id);
-        await tx.delete(questionGroups).where(inArray(questionGroups.id, idsToRemove));
+      if (groupIdsToRemove.length > 0) {
+        await tx.delete(questionGroups).where(inArray(questionGroups.id, groupIdsToRemove));
       }
 
-    // 그룹 Upsert (Insert Or Update)
-    const groupValues = sortedGroups.map((group) => ({
-      id: group.id,
-      surveyId,
-      name: group.name,
-      description: group.description,
-      order: group.order,
-      parentGroupId: group.parentGroupId || null,
-      color: group.color,
-      collapsed: group.collapsed,
-      displayCondition: group.displayCondition as NewQuestionGroup['displayCondition'],
-    }));
+      // 2-2. 그룹 일괄 저장 (Upsert)
+      const groupValues = surveyData.groups.map((group) => ({
+        id: group.id,
+        surveyId,
+        name: group.name,
+        description: group.description,
+        order: group.order,
+        parentGroupId: group.parentGroupId || null,
+        color: group.color,
+        collapsed: group.collapsed,
+        displayCondition: group.displayCondition as NewQuestionGroup['displayCondition'],
+        updatedAt: new Date(),
+      }));
 
-      // 기존 그룹 ID 목록을 가져와서 업데이트/삽입 분리
-      const existingGroupIds = new Set(existingGroupsForDiff.map((g) => g.id));
-      const groupsToInsert = groupValues.filter((g) => !existingGroupIds.has(g.id));
-      const groupsToUpdate = groupValues.filter((g) => existingGroupIds.has(g.id));
-
-      // 새로 삽입할 그룹들 (배치 Insert - 트랜잭션 내에서 실행)
-      if (groupsToInsert.length > 0) {
-        await tx.insert(questionGroups).values(groupsToInsert);
-      }
-
-      // 업데이트할 그룹들 (병렬 처리 - 트랜잭션 내에서 실행)
-      if (groupsToUpdate.length > 0) {
-        await Promise.all(
-          groupsToUpdate.map((groupValue) =>
-            tx
-              .update(questionGroups)
-              .set({
-                name: groupValue.name,
-                description: groupValue.description,
-                order: groupValue.order,
-                parentGroupId: groupValue.parentGroupId,
-                color: groupValue.color,
-                collapsed: groupValue.collapsed,
-                displayCondition: groupValue.displayCondition,
-                updatedAt: new Date(),
-              })
-              .where(eq(questionGroups.id, groupValue.id))
-          )
-        );
-      }
+      // PostgreSQL ON CONFLICT 구문
+      await tx
+        .insert(questionGroups)
+        .values(groupValues)
+        .onConflictDoUpdate({
+          target: questionGroups.id, // PK 충돌 시 업데이트
+          set: {
+            name: sql`excluded.name`,
+            description: sql`excluded.description`,
+            order: sql`excluded.order`,
+            parentGroupId: sql`excluded.parent_group_id`,
+            color: sql`excluded.color`,
+            collapsed: sql`excluded.collapsed`,
+            displayCondition: sql`excluded.display_condition`,
+            updatedAt: sql`excluded.updated_at`,
+          },
+        });
     }
 
-    // [안전성 최적화] 3. 질문 처리: Diffing + Upsert 방식
-    // 삭제된 질문의 이미지를 정리하고, 나머지는 Upsert로 처리
+    // ==========================================
+    // ⚡️ 3. 질문 처리 (Bulk Upsert 적용)
+    // ==========================================
     if (surveyData.questions) {
-      // 1. 기존 질문 조회 (삭제 대상을 찾기 위해)
+      // 3-1. 삭제된 질문 정리
       const existingQuestions = existingSurvey
         ? await tx.query.questions.findMany({
             where: eq(questions.surveyId, surveyId),
+            columns: { id: true },
           })
         : [];
 
-    const newQuestionIds = new Set(surveyData.questions.map((q) => q.id));
+      const newQuestionIds = new Set(surveyData.questions.map((q) => q.id));
+      const questionIdsToRemove = existingQuestions
+        .filter((q) => !newQuestionIds.has(q.id))
+        .map((q) => q.id);
 
-    // 2. 삭제된 질문 식별 (기존에는 있었으나 새 데이터에는 없는 ID)
-    const questionsToRemove = existingQuestions.filter(
-      (q) => !newQuestionIds.has(q.id)
-    );
-
-    // 3. 삭제된 질문의 이미지 정리 (R2 서버에서 삭제)
-    if (questionsToRemove.length > 0) {
-      const imagesToDelete = extractImageUrlsFromQuestions(
-        questionsToRemove as Question[]
-      );
-      if (imagesToDelete.length > 0) {
-        try {
-          // 비동기로 처리하되, 실패해도 저장은 진행
-          await deleteImagesFromR2Server(imagesToDelete);
-        } catch (error) {
-          console.error('이미지 삭제 실패:', error);
+      if (questionIdsToRemove.length > 0) {
+        // 이미지 삭제 (비동기 처리로 속도 향상)
+        const questionsToRemove = await tx.query.questions.findMany({
+          where: inArray(questions.id, questionIdsToRemove),
+        });
+        const imagesToDelete = extractImageUrlsFromQuestions(questionsToRemove as Question[]);
+        if (imagesToDelete.length > 0) {
+          deleteImagesFromR2Server(imagesToDelete).catch(console.error);
         }
+
+        await tx.delete(questions).where(inArray(questions.id, questionIdsToRemove));
       }
 
-      // 4. 삭제된 질문만 DB에서 제거 (트랜잭션 내에서 실행)
-      const idsToRemove = questionsToRemove.map((q) => q.id);
-      await tx.delete(questions).where(inArray(questions.id, idsToRemove));
-    }
-
-      // 5. 질문 Upsert (Insert Or Update)
+      // 3-2. 질문 일괄 저장 (Upsert)
       if (surveyData.questions.length > 0) {
-      const questionValues = surveyData.questions.map((question) => ({
-        id: question.id,
-        surveyId,
-        groupId: question.groupId || null,
-        type: question.type,
-        title: question.title,
-        description: question.description,
-        required: question.required,
-        order: question.order,
-        options: question.options as NewQuestion['options'],
-        selectLevels: question.selectLevels as NewQuestion['selectLevels'],
-        tableTitle: question.tableTitle,
-        tableColumns: question.tableColumns as NewQuestion['tableColumns'],
-        tableRowsData: question.tableRowsData as NewQuestion['tableRowsData'],
-        imageUrl: question.imageUrl,
-        videoUrl: question.videoUrl,
-        allowOtherOption: question.allowOtherOption,
-        noticeContent: question.noticeContent,
-        requiresAcknowledgment: question.requiresAcknowledgment,
-        placeholder: question.placeholder,
-        tableValidationRules: question.tableValidationRules as NewQuestion['tableValidationRules'],
-        displayCondition: question.displayCondition as NewQuestion['displayCondition'],
-      }));
+        const questionValues = surveyData.questions.map((question) => ({
+          id: question.id,
+          surveyId,
+          groupId: question.groupId || null,
+          type: question.type,
+          title: question.title,
+          description: question.description,
+          required: question.required,
+          order: question.order,
+          options: question.options as NewQuestion['options'],
+          selectLevels: question.selectLevels as NewQuestion['selectLevels'],
+          tableTitle: question.tableTitle,
+          tableColumns: question.tableColumns as NewQuestion['tableColumns'],
+          tableRowsData: question.tableRowsData as NewQuestion['tableRowsData'],
+          imageUrl: question.imageUrl,
+          videoUrl: question.videoUrl,
+          allowOtherOption: question.allowOtherOption,
+          minSelections: question.minSelections,
+          maxSelections: question.maxSelections,
+          noticeContent: question.noticeContent,
+          requiresAcknowledgment: question.requiresAcknowledgment,
+          placeholder: question.placeholder,
+          tableValidationRules: question.tableValidationRules as NewQuestion['tableValidationRules'],
+          displayCondition: question.displayCondition as NewQuestion['displayCondition'],
+          updatedAt: new Date(),
+        }));
 
-      // PostgreSQL의 ON CONFLICT를 활용한 Upsert
-      // 기존 질문 ID 목록을 가져와서 업데이트/삽입 분리
-      const existingQuestionIds = new Set(existingQuestions.map((q) => q.id));
-      const questionsToInsert = questionValues.filter((q) => !existingQuestionIds.has(q.id));
-      const questionsToUpdate = questionValues.filter((q) => existingQuestionIds.has(q.id));
-
-        // 새로 삽입할 질문들 (배치 Insert - 트랜잭션 내에서 실행)
-        if (questionsToInsert.length > 0) {
-          await tx.insert(questions).values(questionsToInsert);
-        }
-
-        // 업데이트할 질문들 (병렬 처리 - 트랜잭션 내에서 실행)
-        if (questionsToUpdate.length > 0) {
-          await Promise.all(
-            questionsToUpdate.map((questionValue) =>
-              tx
-                .update(questions)
-                .set({
-                  groupId: questionValue.groupId,
-                  type: questionValue.type,
-                  title: questionValue.title,
-                  description: questionValue.description,
-                  required: questionValue.required,
-                  order: questionValue.order,
-                  options: questionValue.options,
-                  selectLevels: questionValue.selectLevels,
-                  tableTitle: questionValue.tableTitle,
-                  tableColumns: questionValue.tableColumns,
-                  tableRowsData: questionValue.tableRowsData,
-                  imageUrl: questionValue.imageUrl,
-                  videoUrl: questionValue.videoUrl,
-                  allowOtherOption: questionValue.allowOtherOption,
-                  noticeContent: questionValue.noticeContent,
-                  requiresAcknowledgment: questionValue.requiresAcknowledgment,
-                  placeholder: questionValue.placeholder,
-                  tableValidationRules: questionValue.tableValidationRules,
-                  displayCondition: questionValue.displayCondition,
-                  updatedAt: new Date(),
-                })
-                .where(eq(questions.id, questionValue.id))
-            )
-          );
-        }
+        await tx
+          .insert(questions)
+          .values(questionValues)
+          .onConflictDoUpdate({
+            target: questions.id, // PK 충돌 시 업데이트
+            set: {
+              groupId: sql`excluded.group_id`,
+              type: sql`excluded.type`,
+              title: sql`excluded.title`,
+              description: sql`excluded.description`,
+              required: sql`excluded.required`,
+              order: sql`excluded.order`,
+              options: sql`excluded.options`,
+              selectLevels: sql`excluded.select_levels`,
+              tableTitle: sql`excluded.table_title`,
+              tableColumns: sql`excluded.table_columns`,
+              tableRowsData: sql`excluded.table_rows_data`,
+              imageUrl: sql`excluded.image_url`,
+              videoUrl: sql`excluded.video_url`,
+              allowOtherOption: sql`excluded.allow_other_option`,
+              minSelections: sql`excluded.min_selections`,
+              maxSelections: sql`excluded.max_selections`,
+              noticeContent: sql`excluded.notice_content`,
+              requiresAcknowledgment: sql`excluded.requires_acknowledgment`,
+              placeholder: sql`excluded.placeholder`,
+              tableValidationRules: sql`excluded.table_validation_rules`,
+              displayCondition: sql`excluded.display_condition`,
+              updatedAt: sql`excluded.updated_at`,
+            },
+          });
       }
     }
 
