@@ -157,96 +157,96 @@ export async function duplicateSurvey(surveyId: string) {
       })
       .returning();
 
-  // 1. 그룹 정렬 (상위 그룹부터 하위 그룹 순으로)
-  const sortedGroups: typeof originalGroups = [];
-  if (originalGroups.length > 0) {
-    const processedGroupIds = new Set<string>();
-    const topLevelGroups = originalGroups
-      .filter((g) => !g.parentGroupId)
-      .sort((a, b) => a.order - b.order);
-    sortedGroups.push(...topLevelGroups);
-    topLevelGroups.forEach((g) => processedGroupIds.add(g.id));
-
-    const addSubGroups = (parentId: string) => {
-      const subGroups = originalGroups
-        .filter((g) => g.parentGroupId === parentId && !processedGroupIds.has(g.id))
+    // 1. 그룹 정렬 (상위 그룹부터 하위 그룹 순으로)
+    const sortedGroups: typeof originalGroups = [];
+    if (originalGroups.length > 0) {
+      const processedGroupIds = new Set<string>();
+      const topLevelGroups = originalGroups
+        .filter((g) => !g.parentGroupId)
         .sort((a, b) => a.order - b.order);
+      sortedGroups.push(...topLevelGroups);
+      topLevelGroups.forEach((g) => processedGroupIds.add(g.id));
 
-      subGroups.forEach((g) => {
-        sortedGroups.push(g);
-        processedGroupIds.add(g.id);
-        addSubGroups(g.id);
+      const addSubGroups = (parentId: string) => {
+        const subGroups = originalGroups
+          .filter((g) => g.parentGroupId === parentId && !processedGroupIds.has(g.id))
+          .sort((a, b) => a.order - b.order);
+
+        subGroups.forEach((g) => {
+          sortedGroups.push(g);
+          processedGroupIds.add(g.id);
+          addSubGroups(g.id);
+        });
+      };
+
+      topLevelGroups.forEach((group) => {
+        addSubGroups(group.id);
       });
-    };
+    }
 
-    topLevelGroups.forEach((group) => {
-      addSubGroups(group.id);
+    // 2. 그룹 ID 매핑 및 데이터 준비 (정렬된 순서대로)
+    const groupIdMap = new Map<string, string>();
+    const newGroupsData = sortedGroups.map((group) => {
+      const newGroupId = generateId();
+      groupIdMap.set(group.id, newGroupId);
+      return {
+        id: newGroupId,
+        surveyId: newSurvey.id,
+        name: group.name,
+        description: group.description,
+        order: group.order,
+        parentGroupId: group.parentGroupId ? groupIdMap.get(group.parentGroupId) : null,
+        color: group.color,
+        collapsed: group.collapsed,
+        displayCondition: group.displayCondition as NewQuestionGroup['displayCondition'],
+      };
     });
-  }
 
-  // 2. 그룹 ID 매핑 및 데이터 준비 (정렬된 순서대로)
-  const groupIdMap = new Map<string, string>();
-  const newGroupsData = sortedGroups.map((group) => {
-    const newGroupId = generateId();
-    groupIdMap.set(group.id, newGroupId);
-    return {
-      id: newGroupId,
-      surveyId: newSurvey.id,
-      name: group.name,
-      description: group.description,
-      order: group.order,
-      parentGroupId: group.parentGroupId ? groupIdMap.get(group.parentGroupId) : null,
-      color: group.color,
-      collapsed: group.collapsed,
-      displayCondition: group.displayCondition as NewQuestionGroup['displayCondition'],
-    };
+    // 🚀 그룹 일괄 저장 (트랜잭션 내에서 실행)
+    if (newGroupsData.length > 0) {
+      await tx.insert(questionGroups).values(newGroupsData);
+    }
+
+    // 2. 질문 데이터 준비
+    const questionIdMap = new Map<string, string>(); // 필요한 경우 유지
+    const newQuestionsData = originalQuestions.map((question) => {
+      const newQuestionId = generateId();
+      questionIdMap.set(question.id, newQuestionId);
+      return {
+        id: newQuestionId,
+        surveyId: newSurvey.id,
+        groupId: question.groupId ? groupIdMap.get(question.groupId) : null,
+        type: question.type,
+        title: question.title,
+        description: question.description,
+        required: question.required,
+        order: question.order,
+        options: question.options as NewQuestion['options'],
+        selectLevels: question.selectLevels as NewQuestion['selectLevels'],
+        tableTitle: question.tableTitle,
+        tableColumns: question.tableColumns as NewQuestion['tableColumns'],
+        tableRowsData: question.tableRowsData as NewQuestion['tableRowsData'],
+        imageUrl: question.imageUrl,
+        videoUrl: question.videoUrl,
+        allowOtherOption: question.allowOtherOption,
+        noticeContent: question.noticeContent,
+        requiresAcknowledgment: question.requiresAcknowledgment,
+        placeholder: question.placeholder,
+        tableValidationRules: question.tableValidationRules as NewQuestion['tableValidationRules'],
+        displayCondition: question.displayCondition as NewQuestion['displayCondition'],
+      };
+    });
+
+    // 🚀 질문 일괄 저장 (트랜잭션 내에서 실행)
+    if (newQuestionsData.length > 0) {
+      await tx.insert(questions).values(newQuestionsData);
+    }
+
+    // 트랜잭션 성공 시에만 revalidatePath 실행
+    revalidatePath('/admin/surveys');
+    return newSurvey;
   });
-
-      // 🚀 그룹 일괄 저장 (트랜잭션 내에서 실행)
-      if (newGroupsData.length > 0) {
-        await tx.insert(questionGroups).values(newGroupsData);
-      }
-
-      // 2. 질문 데이터 준비
-      const questionIdMap = new Map<string, string>(); // 필요한 경우 유지
-      const newQuestionsData = originalQuestions.map((question) => {
-        const newQuestionId = generateId();
-        questionIdMap.set(question.id, newQuestionId);
-        return {
-          id: newQuestionId,
-          surveyId: newSurvey.id,
-          groupId: question.groupId ? groupIdMap.get(question.groupId) : null,
-          type: question.type,
-          title: question.title,
-          description: question.description,
-          required: question.required,
-          order: question.order,
-          options: question.options as NewQuestion['options'],
-          selectLevels: question.selectLevels as NewQuestion['selectLevels'],
-          tableTitle: question.tableTitle,
-          tableColumns: question.tableColumns as NewQuestion['tableColumns'],
-          tableRowsData: question.tableRowsData as NewQuestion['tableRowsData'],
-          imageUrl: question.imageUrl,
-          videoUrl: question.videoUrl,
-          allowOtherOption: question.allowOtherOption,
-          noticeContent: question.noticeContent,
-          requiresAcknowledgment: question.requiresAcknowledgment,
-          placeholder: question.placeholder,
-          tableValidationRules: question.tableValidationRules as NewQuestion['tableValidationRules'],
-          displayCondition: question.displayCondition as NewQuestion['displayCondition'],
-        };
-      });
-
-      // 🚀 질문 일괄 저장 (트랜잭션 내에서 실행)
-      if (newQuestionsData.length > 0) {
-        await tx.insert(questions).values(newQuestionsData);
-      }
-
-      // 트랜잭션 성공 시에만 revalidatePath 실행
-      revalidatePath('/admin/surveys');
-      return newSurvey;
-    });
-  }
+}
 
 // ========================
 // 질문 그룹 변경 액션 (Mutations)
@@ -401,7 +401,7 @@ export async function reorderGroups(surveyId: string, groupIds: string[]) {
 
   validGroupIds.forEach((id, index) => {
     const currentOrder = currentOrderMap.get(id);
-    
+
     // 2. 실제로 순서가 변경된 그룹만 업데이트 큐에 추가 (Diffing)
     if (currentOrder !== index) {
       updates.push(
@@ -601,7 +601,10 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
   // 🚀 트랜잭션 시작
   return await db.transaction(async (tx) => {
     // 1. 설문 기본 정보 저장
-    const existingSurvey = await getSurveyById(surveyData.id);
+    // 트랜잭션 내부에서는 반드시 tx 객체로 쿼리를 날려야 합니다.
+    const existingSurvey = await tx.query.surveys.findFirst({
+      where: eq(surveys.id, surveyData.id),
+    });
     const surveyId = surveyData.id;
 
     if (existingSurvey) {
@@ -670,9 +673,9 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
       // 2-1. 삭제된 그룹 정리
       const existingGroups = existingSurvey
         ? await tx.query.questionGroups.findMany({
-            where: eq(questionGroups.surveyId, surveyId),
-            columns: { id: true },
-          })
+          where: eq(questionGroups.surveyId, surveyId),
+          columns: { id: true },
+        })
         : [];
 
       const newGroupIds = new Set(surveyData.groups.map((g) => g.id));
@@ -724,9 +727,9 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
       // 3-1. 삭제된 질문 정리
       const existingQuestions = existingSurvey
         ? await tx.query.questions.findMany({
-            where: eq(questions.surveyId, surveyId),
-            columns: { id: true },
-          })
+          where: eq(questions.surveyId, surveyId),
+          columns: { id: true },
+        })
         : [];
 
       const newQuestionIds = new Set(surveyData.questions.map((q) => q.id));
