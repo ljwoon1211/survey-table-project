@@ -994,18 +994,32 @@ export function CellContentModal({
                         }}
                         className="rounded"
                       />
-                      <div className="flex-1">
-                        <Input
-                          value={option.label}
-                          onChange={(e) => {
-                            const updated = [...checkboxOptions];
-                            updated[index] = { ...option, label: e.target.value };
-                            setCheckboxOptions(updated);
-                          }}
-                          placeholder="옵션 텍스트"
-                        />
+                      <div className="flex-1 space-y-1">
+                        <div className="flex gap-2">
+                          <Input
+                            value={option.label}
+                            onChange={(e) => {
+                              const updated = [...checkboxOptions];
+                              updated[index] = { ...option, label: e.target.value };
+                              setCheckboxOptions(updated);
+                            }}
+                            placeholder="옵션 텍스트"
+                            className="flex-1"
+                          />
+                          <Input
+                            value={option.optionCode || ""}
+                            onChange={(e) => {
+                              const updated = [...checkboxOptions];
+                              updated[index] = { ...option, optionCode: e.target.value };
+                              setCheckboxOptions(updated);
+                            }}
+                            placeholder="코드"
+                            className="w-20 text-xs"
+                            title="엑셀 내보내기용 코드 (선택)"
+                          />
+                        </div>
                         {option.id === OTHER_OPTION_ID && (
-                          <p className="text-xs text-blue-600 mt-1">🔹 기타 옵션 (수정 가능)</p>
+                          <p className="text-xs text-blue-600">🔹 기타 옵션 (수정 가능)</p>
                         )}
                       </div>
                       <Button
@@ -1248,18 +1262,32 @@ export function CellContentModal({
                           }
                         }}
                       />
-                      <div className="flex-1">
-                        <Input
-                          value={option.label}
-                          onChange={(e) => {
-                            const updated = [...radioOptions];
-                            updated[index] = { ...option, label: e.target.value };
-                            setRadioOptions(updated);
-                          }}
-                          placeholder="옵션 텍스트"
-                        />
+                      <div className="flex-1 space-y-1">
+                        <div className="flex gap-2">
+                          <Input
+                            value={option.label}
+                            onChange={(e) => {
+                              const updated = [...radioOptions];
+                              updated[index] = { ...option, label: e.target.value };
+                              setRadioOptions(updated);
+                            }}
+                            placeholder="옵션 텍스트"
+                            className="flex-1"
+                          />
+                          <Input
+                            value={option.optionCode || ""}
+                            onChange={(e) => {
+                              const updated = [...radioOptions];
+                              updated[index] = { ...option, optionCode: e.target.value };
+                              setRadioOptions(updated);
+                            }}
+                            placeholder="코드"
+                            className="w-20 text-xs"
+                            title="엑셀 내보내기용 코드 (선택)"
+                          />
+                        </div>
                         {option.id === OTHER_OPTION_ID && (
-                          <p className="text-xs text-blue-600 mt-1">🔹 기타 옵션 (수정 가능)</p>
+                          <p className="text-xs text-blue-600">🔹 기타 옵션 (수정 가능)</p>
                         )}
                       </div>
                       <Button
@@ -1392,18 +1420,32 @@ export function CellContentModal({
                     className="border border-gray-200 rounded-lg overflow-hidden"
                   >
                     <div className="flex items-center gap-2 p-3">
-                      <div className="flex-1">
-                        <Input
-                          value={option.label}
-                          onChange={(e) => {
-                            const updated = [...selectOptions];
-                            updated[index] = { ...option, label: e.target.value };
-                            setSelectOptions(updated);
-                          }}
-                          placeholder="옵션 텍스트"
-                        />
+                      <div className="flex-1 space-y-1">
+                        <div className="flex gap-2">
+                          <Input
+                            value={option.label}
+                            onChange={(e) => {
+                              const updated = [...selectOptions];
+                              updated[index] = { ...option, label: e.target.value };
+                              setSelectOptions(updated);
+                            }}
+                            placeholder="옵션 텍스트"
+                            className="flex-1"
+                          />
+                          <Input
+                            value={option.optionCode || ""}
+                            onChange={(e) => {
+                              const updated = [...selectOptions];
+                              updated[index] = { ...option, optionCode: e.target.value };
+                              setSelectOptions(updated);
+                            }}
+                            placeholder="코드"
+                            className="w-20 text-xs"
+                            title="엑셀 내보내기용 코드 (선택)"
+                          />
+                        </div>
                         {option.id === OTHER_OPTION_ID && (
-                          <p className="text-xs text-blue-600 mt-1">🔹 기타 옵션 (수정 가능)</p>
+                          <p className="text-xs text-blue-600">🔹 기타 옵션 (수정 가능)</p>
                         )}
                       </div>
                       <Button
