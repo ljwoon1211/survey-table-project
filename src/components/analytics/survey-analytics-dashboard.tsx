@@ -13,12 +13,14 @@ interface SurveyAnalyticsDashboardProps {
   analytics: SurveyAnalytics;
   onExportJson: () => Promise<string>;
   onExportCsv: () => Promise<string>;
+  onExportFlatExcel?: () => Promise<Blob | null>;
 }
 
 export function SurveyAnalyticsDashboard({
   analytics,
   onExportJson,
   onExportCsv,
+  onExportFlatExcel,
 }: SurveyAnalyticsDashboardProps) {
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -40,6 +42,7 @@ export function SurveyAnalyticsDashboard({
           surveyTitle={analytics.surveyTitle}
           onExportJson={onExportJson}
           onExportCsv={onExportCsv}
+          onExportFlatExcel={onExportFlatExcel}
         />
       </div>
 

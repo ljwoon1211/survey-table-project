@@ -462,6 +462,16 @@ export function DynamicTableEditor({
     notifyChange(currentTitle, currentColumns, updatedRows);
   };
 
+  // 행 코드 업데이트 (엑셀 내보내기용)
+  const updateRowCode = (rowIndex: number, rowCode: string) => {
+    const updatedRows = currentRows.map((row, index) =>
+      index === rowIndex ? { ...row, rowCode } : row,
+    );
+
+    setCurrentRows(updatedRows);
+    notifyChange(currentTitle, currentColumns, updatedRows);
+  };
+
   // 셀 복사
   const copyCell = useCallback(
     (rowIndex: number, cellIndex: number) => {
@@ -1104,7 +1114,7 @@ export function DynamicTableEditor({
               {/* 열 너비 정의 */}
               <colgroup>
                 {/* 행 이름(라벨) 열 너비 */}
-                <col style={{ width: "50px" }} />
+                <col style={{ width: "70px" }} />
                 {currentColumns.map((column, index) => (
                   <col key={`col-${index}`} style={{ width: `${column.width || 150}px` }} />
                 ))}
@@ -1114,8 +1124,8 @@ export function DynamicTableEditor({
               <thead>
                 <tr>
                   {/* 행 이름(라벨) 헤더 */}
-                  <th className="border border-gray-300 p-2 bg-gray-100 w-[50px] min-w-[50px] sticky left-0 z-10">
-                    <div className="text-xs font-semibold text-gray-600 text-center truncate" title="행 이름 (분석용)">
+                  <th className="border border-gray-300 p-2 bg-gray-100 w-[70px] min-w-[70px] sticky left-0 z-10">
+                    <div className="text-xs font-semibold text-gray-600 text-center truncate" title="행 라벨/코드">
                       행
                     </div>
                   </th>
@@ -1236,14 +1246,23 @@ export function DynamicTableEditor({
                     className="group/row"
                   >
                     {/* 행 이름(라벨) 입력칸 */}
-                    <td className="border border-gray-300 p-1 bg-gray-50 sticky left-0 z-10 w-[50px] min-w-[50px]">
-                      <Input
-                        value={row.label}
-                        onChange={(e) => updateRowLabel(rowIndex, e.target.value)}
-                        className="h-8 text-xs bg-white px-1 text-center"
-                        placeholder="#"
-                        title={row.label} // 마우스 호버 시 전체 이름 표시
-                      />
+                    <td className="border border-gray-300 p-1 bg-gray-50 sticky left-0 z-10 w-[70px] min-w-[70px]">
+                      <div className="space-y-1">
+                        <Input
+                          value={row.label}
+                          onChange={(e) => updateRowLabel(rowIndex, e.target.value)}
+                          className="h-6 text-xs bg-white px-1 text-center"
+                          placeholder="라벨"
+                          title={`행 라벨: ${row.label}`}
+                        />
+                        <Input
+                          value={row.rowCode || ""}
+                          onChange={(e) => updateRowCode(rowIndex, e.target.value)}
+                          className="h-5 text-[10px] bg-gray-100 px-1 text-center text-gray-600"
+                          placeholder="코드"
+                          title={`엑셀 코드: ${row.rowCode || "(자동)"}`}
+                        />
+                      </div>
                     </td>
 
                     {/* 셀들 */}

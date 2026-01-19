@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { TabGroup, TabList, Tab, TabPanels, TabPanel, TextInput } from "@tremor/react";
 import { BarChart3, List, TrendingUp, Search, Grid3X3, Filter } from "lucide-react";
-import type { Question } from "@/types/survey";
+import type { Question, Survey } from "@/types/survey";
 import type { SurveyResponse } from "@/db/schema";
 import type { SurveyAnalytics } from "@/lib/analytics/types";
 import { analyzeSurvey } from "@/lib/analytics/analyzer";
 import { applyFilter, createEmptyFilter, type FilterState } from "@/lib/analytics/filter";
+import { generateFlatExcelBlob, type ResponseData } from "@/lib/analytics/flat-excel-export";
 import { SummaryCards } from "./cards/summary-cards";
 import { QuestionAnalytics } from "./question-analytics";
 import { ResponseTimeline } from "./charts/response-timeline";
@@ -45,6 +46,33 @@ export function AnalyticsDashboardClient({
     return analyzeSurvey(survey, filteredResponses);
   }, [survey, filteredResponses]);
 
+  // Flat Excel 내보내기 핸들러
+  const handleExportFlatExcel = useCallback(async (): Promise<Blob | null> => {
+    if (filteredResponses.length === 0) {
+      return null;
+    }
+
+    // SurveyResponse를 ResponseData 형식으로 변환
+    const responseData: ResponseData[] = filteredResponses.map((r) => ({
+      id: r.id,
+      surveyId: r.surveyId,
+      questionResponses: (r.questionResponses as Record<string, unknown>) || {},
+      isCompleted: r.isCompleted ?? true,
+      startedAt: r.createdAt || new Date(),
+      completedAt: r.completedAt || undefined,
+      userAgent: r.userAgent || undefined,
+    }));
+
+    // Survey 타입으로 변환 (flat-excel-export에서 필요한 필드만)
+    const surveyData = {
+      id: survey.id,
+      title: survey.title,
+      questions: survey.questions,
+    } as Survey;
+
+    return generateFlatExcelBlob(surveyData, responseData);
+  }, [survey, filteredResponses]);
+
   // 질문 검색 필터링
   const searchFilteredQuestions = analytics.questions.filter((q) =>
     q.questionTitle.toLowerCase().includes(searchTerm.toLowerCase()),
@@ -72,6 +100,7 @@ export function AnalyticsDashboardClient({
           surveyTitle={analytics.surveyTitle}
           onExportJson={onExportJson}
           onExportCsv={onExportCsv}
+          onExportFlatExcel={handleExportFlatExcel}
         />
       </div>
 

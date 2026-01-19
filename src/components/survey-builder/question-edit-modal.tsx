@@ -1143,6 +1143,109 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                 <div className="space-y-6">
                   <Label className="text-lg font-medium">테이블 설정</Label>
 
+                  {/* 테이블 패턴 설정 (Flat 엑셀 내보내기용) */}
+                  <div className="p-4 border border-gray-200 rounded-lg bg-gray-50 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-base font-medium">테이블 패턴 (엑셀 내보내기용)</Label>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div
+                        onClick={() => setFormData((prev) => ({ ...prev, tableType: "matrix", loopConfig: undefined }))}
+                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                          formData.tableType !== "loop"
+                            ? "border-blue-500 bg-blue-50"
+                            : "border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        <div className="font-medium text-sm mb-1">Matrix (고정 행)</div>
+                        <div className="text-xs text-gray-500">
+                          UHD TV, 디지털 TV 등 고정된 행 목록
+                        </div>
+                        <div className="text-xs text-gray-400 mt-2">
+                          예: A2_UHD_보유, A2_DIGITAL_보유
+                        </div>
+                      </div>
+                      
+                      <div
+                        onClick={() => setFormData((prev) => ({ 
+                          ...prev, 
+                          tableType: "loop",
+                          loopConfig: prev.loopConfig || { prefix: "TV", maxCount: 10 }
+                        }))}
+                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                          formData.tableType === "loop"
+                            ? "border-blue-500 bg-blue-50"
+                            : "border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        <div className="font-medium text-sm mb-1">Loop (반복)</div>
+                        <div className="text-xs text-gray-500">
+                          TV1, TV2, TV3... 동적 반복 행
+                        </div>
+                        <div className="text-xs text-gray-400 mt-2">
+                          예: A8_TV1_종류, A8_TV2_종류
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Loop 설정 (Loop 패턴 선택 시만 표시) */}
+                    {formData.tableType === "loop" && (
+                      <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-200">
+                        <div>
+                          <Label htmlFor="loop-prefix" className="text-sm">반복 접두사</Label>
+                          <Input
+                            id="loop-prefix"
+                            value={formData.loopConfig?.prefix || "TV"}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                loopConfig: {
+                                  ...prev.loopConfig,
+                                  prefix: e.target.value,
+                                  maxCount: prev.loopConfig?.maxCount || 10,
+                                },
+                              }))
+                            }
+                            placeholder="예: TV, 제품"
+                            className="mt-1"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            열 헤더에 사용: TV1, TV2, TV3...
+                          </p>
+                        </div>
+                        <div>
+                          <Label htmlFor="loop-max" className="text-sm">최대 반복 수</Label>
+                          <Input
+                            id="loop-max"
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={formData.loopConfig?.maxCount || 10}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                loopConfig: {
+                                  ...prev.loopConfig,
+                                  prefix: prev.loopConfig?.prefix || "TV",
+                                  maxCount: parseInt(e.target.value) || 10,
+                                },
+                              }))
+                            }
+                            className="mt-1"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            최대 반복 가능 횟수
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                      💡 테이블 패턴은 엑셀 내보내기 시 열 이름 형식에 영향을 줍니다.
+                    </div>
+                  </div>
+
                   <DynamicTableEditor
                     tableTitle={formData.tableTitle}
                     columns={formData.tableColumns}
