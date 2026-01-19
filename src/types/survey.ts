@@ -184,15 +184,6 @@ export interface QuestionGroup {
   displayCondition?: QuestionConditionGroup; // 그룹 표시 조건
 }
 
-// 테이블 타입 구분
-export type TablePatternType = 'loop' | 'matrix';
-
-// Loop 설정 (TV1, TV2, TV3... 형태의 반복)
-export interface LoopConfig {
-  prefix: string;               // 반복 접두사 (예: "TV")
-  maxCount: number;             // 최대 반복 수 (예: 10)
-  dynamicCount?: boolean;       // 동적 개수 여부 (응답에 따라 결정)
-}
 
 export interface Question {
   id: string;
@@ -211,9 +202,6 @@ export interface Question {
   tableTitle?: string;
   tableColumns?: TableColumn[];
   tableRowsData?: TableRow[];
-  // ✨ 테이블 패턴 설정
-  tableType?: TablePatternType; // 테이블 패턴 (loop: 반복, matrix: 고정 행)
-  loopConfig?: LoopConfig;      // Loop 설정 (tableType이 'loop'일 때)
   imageUrl?: string;
   videoUrl?: string;
   order: number;
