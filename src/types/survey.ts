@@ -88,6 +88,7 @@ export interface QuestionOption {
   id: string;
   label: string;
   value: string;
+  optionCode?: string;        // ✨ 엑셀 내보내기용 옵션 코드 (예: "opt1", "삼성UHDTV")
   hasOther?: boolean;
   // 조건부 분기
   branchRule?: BranchRule;
@@ -95,6 +96,8 @@ export interface QuestionOption {
 
 export interface TableCell {
   id: string;
+  cellCode?: string;          // ✨ 엑셀 내보내기용 셀 코드 (예: "c1", "보유여부")
+  exportLabel?: string;       // ✨ 엑셀 열 이름 (예: "TV보유여부")
   content: string;
   imageUrl?: string;
   videoUrl?: string;
@@ -125,6 +128,7 @@ export interface CheckboxOption {
   id: string;
   label: string;
   value: string;
+  optionCode?: string;        // ✨ 엑셀 내보내기용 옵션 코드
   checked?: boolean;
   hasOther?: boolean;
   // 조건부 분기
@@ -135,6 +139,7 @@ export interface RadioOption {
   id: string;
   label: string;
   value: string;
+  optionCode?: string;        // ✨ 엑셀 내보내기용 옵션 코드
   selected?: boolean;
   hasOther?: boolean;
   // 조건부 분기
@@ -143,6 +148,7 @@ export interface RadioOption {
 
 export interface TableRow {
   id: string;
+  rowCode?: string;           // ✨ 엑셀 내보내기용 행 코드 (예: "UHD", "DIGITAL", "r1")
   label: string;
   cells: TableCell[];
   height?: number; // 행 높이 (픽셀 단위)
@@ -151,6 +157,7 @@ export interface TableRow {
 
 export interface TableColumn {
   id: string;
+  columnCode?: string;        // ✨ 엑셀 내보내기용 열 코드
   label: string;
   width?: number; // 열 너비 (픽셀 단위)
   minWidth?: number; // 최소 너비
@@ -177,8 +184,20 @@ export interface QuestionGroup {
   displayCondition?: QuestionConditionGroup; // 그룹 표시 조건
 }
 
+// 테이블 타입 구분
+export type TablePatternType = 'loop' | 'matrix';
+
+// Loop 설정 (TV1, TV2, TV3... 형태의 반복)
+export interface LoopConfig {
+  prefix: string;               // 반복 접두사 (예: "TV")
+  maxCount: number;             // 최대 반복 수 (예: 10)
+  dynamicCount?: boolean;       // 동적 개수 여부 (응답에 따라 결정)
+}
+
 export interface Question {
   id: string;
+  questionCode?: string;        // ✨ 사용자 정의 ID (예: "Q1", "A2", "A8_1")
+  exportLabel?: string;         // ✨ 엑셀 헤더용 라벨 (예: "성별", "TV보유현황")
   type: QuestionType;
   title: string;
   description?: string;
@@ -192,6 +211,9 @@ export interface Question {
   tableTitle?: string;
   tableColumns?: TableColumn[];
   tableRowsData?: TableRow[];
+  // ✨ 테이블 패턴 설정
+  tableType?: TablePatternType; // 테이블 패턴 (loop: 반복, matrix: 고정 행)
+  loopConfig?: LoopConfig;      // Loop 설정 (tableType이 'loop'일 때)
   imageUrl?: string;
   videoUrl?: string;
   order: number;

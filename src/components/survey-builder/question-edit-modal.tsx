@@ -76,6 +76,10 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         description: question.description,
         required: question.required,
         groupId: question.groupId,
+        questionCode: question.questionCode || "",
+        exportLabel: question.exportLabel || "",
+        tableType: question.tableType,
+        loopConfig: question.loopConfig,
         options: optionsWithDeepBranchRule,
         selectLevels: question.selectLevels ? [...question.selectLevels] : [],
         tableTitle: question.tableTitle,
@@ -509,6 +513,40 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                   {validationErrors.title && (
                     <p className="text-red-500 text-sm mt-1">{validationErrors.title}</p>
                   )}
+                </div>
+
+                {/* 질문 코드 및 엑셀 라벨 (Flat 내보내기용) */}
+                <div className="grid grid-cols-2 gap-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                  <div>
+                    <Label htmlFor="questionCode">질문 코드 (선택사항)</Label>
+                    <Input
+                      id="questionCode"
+                      value={formData.questionCode || ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, questionCode: e.target.value }))
+                      }
+                      placeholder="예: Q1, A2, A8_1"
+                      className="mt-2"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      엑셀 내보내기 시 사용할 질문 식별자 (미입력 시 자동 생성)
+                    </p>
+                  </div>
+                  <div>
+                    <Label htmlFor="exportLabel">엑셀 라벨 (선택사항)</Label>
+                    <Input
+                      id="exportLabel"
+                      value={formData.exportLabel || ""}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, exportLabel: e.target.value }))
+                      }
+                      placeholder="예: 성별, TV보유현황"
+                      className="mt-2"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      엑셀 헤더에 표시될 라벨 (미입력 시 질문 제목 사용)
+                    </p>
+                  </div>
                 </div>
 
                 <div>
