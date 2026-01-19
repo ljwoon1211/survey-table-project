@@ -24,6 +24,12 @@ import type {
 /**
  * 값을 문자열로 변환 (객체인 경우 내부 텍스트 추출)
  */
+/**
+ * 값을 문자열로 변환 (객체인 경우 내부 텍스트 추출)
+ */
+// =================================================================
+// [수정 1] Other 포맷팅: 복잡한 기타 응답 객체를 예쁜 문자열로 변환
+// =================================================================
 function formatValue(value: unknown): string {
   if (value === null || value === undefined) return '';
   if (typeof value === 'string') return value;
@@ -35,14 +41,23 @@ function formatValue(value: unknown): string {
 
   if (typeof value === 'object') {
     const v = value as Record<string, unknown>;
-    // '기타' 옵션 입력값 등 구체적인 필드 우선 확인
+
+    // ✨ 핵심: '기타' 응답 객체 감지 및 포맷팅
+    if (v.hasOther === true) {
+      const selected = String(v.selectedValue || '');
+      const input = String(v.otherValue || '').trim();
+      // 입력값이 있으면 "값 (입력내용)", 없으면 그냥 "값" 반환
+      return input ? `${selected} (${input})` : selected;
+    }
+
+    // 기존 로직 유지
     if (v.inputValue && typeof v.inputValue === 'string') return v.inputValue;
     if (v.text && typeof v.text === 'string') return v.text;
     if (v.label && typeof v.label === 'string') return v.label;
     if (v.value && (typeof v.value === 'string' || typeof v.value === 'number'))
       return String(v.value);
 
-    // 마땅한 키가 없으면 첫 번째 값을 사용하거나 JSON 문자열로 변환
+    // 최후의 수단
     const firstVal = Object.values(v)[0];
     if (
       firstVal &&
@@ -327,7 +342,8 @@ function analyzeText(
 /**
  * 테이블 분석 (수정된 버전)
  * - 해결 1: 인덱스 밀림 방지 (filter 제거 및 null 매핑)
- * - 해결 2: 병합된 셀(rowspan)의 통계 데이터를 하위 행으로 상속 (낙수 효과 적용)
+ * - 해결 2: 분자(Interaction) 산출 시 Ghost Data(숨겨진 행의 잔존 데이터) 무시
+ * - 해결 3: 응답자 단위 중복 카운팅 방지 (Cell Loop -> User Loop)
  */
 function analyzeTable(
   question: Question,
@@ -339,7 +355,7 @@ function analyzeTable(
   const columns = question.tableColumns || [];
 
   // =================================================================================
-  // [해결 2]를 위한 준비: 각 열(Column)별로 현재 진행 중인 병합(rowspan) 상태를 추적하는 배열
+  // [준비] 각 열(Column)별로 현재 진행 중인 병합(rowspan) 상태를 추적하는 배열
   // =================================================================================
   // interactionInherited: 현재 병합된 부모 셀이 '상호작용(체크 등)' 상태인지 여부
   // rowsLeft: 앞으로 몇 개의 행이 더 병합되어 있는지
@@ -350,101 +366,110 @@ function analyzeTable(
     details: {} as Record<string, number>,
   }));
 
-  // 1. 행별 요약 (히트맵용) - 상속 로직 적용
+  // =================================================================================
+  // 1. 행별 요약 (히트맵용) - 순수 사용자 응답 여부 집계 (병합/상속 로직 포함)
+  // =================================================================================
   const rowSummary: RowSummary[] = rows.map((row) => {
-    let interactions = 0;
-    const details: Record<string, number> = {};
-
-    // 각 셀(열)을 순회하며 통계 계산
-    row.cells.forEach((cell, colIndex) => {
-      // A. 현재 이 열이 상위 행에서 병합되어 내려오는 중인가?
-      if (columnMergeState[colIndex].rowsLeft > 0) {
-        // [핵심 로직] 병합된 상태라면, 부모의 상호작용 여부를 그대로 물려받음
-        if (columnMergeState[colIndex].interactionInherited) {
-          interactions++; // 나도 체크된 것으로 간주!
-
-          // 상세 정보(옵션값)도 합침
-          const inheritedDetails = columnMergeState[colIndex].details;
-          Object.entries(inheritedDetails).forEach(([key, val]) => {
-            details[key] = (details[key] || 0) + val;
-          });
-        }
-        // 남은 병합 카운트 감소
-        columnMergeState[colIndex].rowsLeft--;
-        return; // 이 셀 처리는 끝 (아래 로직 건너뜀)
-      }
-
-      // B. 일반 셀(병합 시작점 포함) 처리
-      let hasInteraction = false;
-      const currentCellDetails: Record<string, number> = {};
-
-      responses.forEach((r) => {
-        const tableValue = r.value as Record<string, unknown>;
-        const cellValue = tableValue?.[cell.id];
-
-        if (cell.type === 'checkbox') {
-          if (Array.isArray(cellValue) && cellValue.length > 0) {
-            hasInteraction = true;
-          }
-        } else if ((cell.type === 'radio' || cell.type === 'select') && cellValue) {
-          hasInteraction = true;
-          // 옵션 라벨 찾기
-          let optionLabel = String(cellValue);
-          const options = cell.radioOptions || cell.selectOptions;
-          if (options) {
-            const found = options.find(o => o.id === cellValue || o.value === cellValue);
-            if (found) optionLabel = found.label;
-          }
-          currentCellDetails[optionLabel] = (currentCellDetails[optionLabel] || 0) + 1;
-        } else if (cell.type === 'input' && cellValue && String(cellValue).trim().length > 0) {
-          hasInteraction = true;
-        }
-      });
-
-      if (hasInteraction) {
-        interactions++;
-        Object.entries(currentCellDetails).forEach(([key, val]) => {
-          details[key] = (details[key] || 0) + val;
-        });
-      }
-
-      // C. 새로운 병합(rowspan > 1)이 시작되는지 확인하여 상태 저장
-      if ((cell.rowspan || 1) > 1) {
-        columnMergeState[colIndex].rowsLeft = (cell.rowspan || 1) - 1;
-        columnMergeState[colIndex].interactionInherited = hasInteraction;
-        columnMergeState[colIndex].details = currentCellDetails;
-      }
-    });
-
-    // [Impression Logging] 이 행이 노출된 응답 수 계산
-    const rowExposedCount = responses.filter((r) => {
+    // 1-1. 유효 분모 (이 행이 노출된 사람)
+    const validRespondents = responses.filter((r) => {
       const meta = r.metadata as { exposedRowIds?: string[] } | undefined;
-      // 노출 행 ID 목록이 있으면 확인, 없으면(레거시) 전체 노출로 간주
+      // 노출 ID가 있으면 확인, 없으면(구 데이터) 노출된 것으로 간주
       if (meta?.exposedRowIds) {
         return meta.exposedRowIds.includes(row.id);
       }
       return true;
-    }).length;
+    });
+
+    const validDenominator = validRespondents.length;
+    let interactionCount = 0;
+    const details: Record<string, number> = {};
+
+    // 1-2. 분자 (유효 분모 중에서, 실제로 값을 입력한 사람 - ROW 단위 유니크)
+    // [Ghost Data 제거] 전체 responses가 아니라 validRespondents만 사용
+    validRespondents.forEach((r) => {
+      const tableValue = r.value as Record<string, unknown>;
+      if (!tableValue) return;
+
+      // 이 행의 셀 중 하나라도 유효한 값이 있는지 검사
+      let userHasInteraction = false;
+
+      row.cells.forEach((cell) => {
+        const val = tableValue[cell.id];
+        if (!val) return;
+
+        // 값 유효성 정밀 체크
+        if (cell.type === 'checkbox') {
+          if (Array.isArray(val) && val.length > 0) userHasInteraction = true;
+        } else if (cell.type === 'input') {
+          if (String(val).trim().length > 0) userHasInteraction = true;
+        } else {
+          // radio, select 등
+          userHasInteraction = true;
+
+          // 상세 분포 집계 시 포맷팅 적용
+          if (cell.type === 'radio' || cell.type === 'select') {
+            const label = formatValue(val);
+            details[label] = (details[label] || 0) + 1;
+          }
+        }
+      });
+
+      if (userHasInteraction) {
+        interactionCount++;
+      }
+    });
+
+    // 1-3. 병합(Merge) 상속 처리 (낙수 효과)
+    row.cells.forEach((cell, colIndex) => {
+      if (columnMergeState[colIndex].rowsLeft > 0) {
+        if (columnMergeState[colIndex].interactionInherited) {
+          // 상속받은 데이터도 details에 합산
+          const inherited = columnMergeState[colIndex].details;
+          Object.entries(inherited).forEach(([k, v]) => {
+            details[k] = (details[k] || 0) + v;
+          });
+          // 상속받았으면 시각적으로 Interacted 된 것으로 처리될 수 있으나, 
+          // 논리적 비율 100% 초과 방지를 위해 단순 가산은 주의 필요
+        }
+        columnMergeState[colIndex].rowsLeft--;
+      }
+
+      // 다음 행을 위해 상태 갱신
+      if ((cell.rowspan || 1) > 1) {
+        columnMergeState[colIndex].rowsLeft = (cell.rowspan || 1) - 1;
+        columnMergeState[colIndex].details = details; // (약식: 현재 행 전체 details를 상속 - 셀 단위가 더 정확하나 summary용으로 충분)
+        columnMergeState[colIndex].interactionInherited = interactionCount > 0;
+      }
+    });
 
     return {
       rowId: row.id,
       rowLabel: row.label,
-      totalInteractions: interactions,
-      interactionRate:
-        rowExposedCount > 0 ? (interactions / rowExposedCount) * 100 : 0,
+      totalInteractions: interactionCount,
+      // 분모가 0이면 0%, 아니면 100% 넘지 않도록 Cap
+      interactionRate: validDenominator > 0
+        ? Math.min((interactionCount / validDenominator) * 100, 100)
+        : 0,
       details: Object.keys(details).length > 0 ? details : undefined,
     };
   }).sort((a, b) => b.interactionRate - a.interactionRate);
 
 
-  // 2. 셀별 상세 분석 - [해결 1] 인덱스 밀림 방지 + [해결 3] 가로/세로 2D 병합 완벽 지원
-  // [1] 세로 병합 상태 추적 배열 (셀 분석용 별도 상태)
+  // 2. 셀별 상세 분석 - 가로/세로 2D 병합 지원 및 Ghost Data 방지
+  // [1] 세로 병합 상태 추적 배열 (셀 분석용)
   const cellMergeState = new Array(columns.length).fill(null).map(() => ({
     rowsLeft: 0,
     inheritedAnalytics: null as any, // 상속받을 데이터
   }));
 
   const cellAnalytics: CellAnalyticsRow[] = rows.map((row) => {
+    // [Ghost Data 방지] 이 행이 노출된 응답자들만 대상으로 셀 통계를 구해야 함
+    const validRespondents = responses.filter((r) => {
+      const meta = r.metadata as { exposedRowIds?: string[] } | undefined;
+      return meta?.exposedRowIds ? meta.exposedRowIds.includes(row.id) : true;
+    });
+    const rowExposedCount = validRespondents.length;
+
     // [2] 가로 병합 상태 추적 변수 (행마다 초기화)
     let activeHorizontalAnalytics: any = null;
     let activeHorizontalMergesLeft = 0;
@@ -458,42 +483,35 @@ function analyzeTable(
         let isInherited = false;
 
         // ---------------------------------------------------------
-        // CASE A: 가로 병합(Colspan) 중인가? (가장 우선순위 높음)
+        // CASE A: 가로 병합(Colspan) 중인가?
         // ---------------------------------------------------------
         if (activeHorizontalMergesLeft > 0) {
           activeHorizontalMergesLeft--;
-
-          // 왼쪽 부모의 데이터를 그대로 복사
           currentAnalytics = {
             ...activeHorizontalAnalytics,
             cellId: cell.id,
             columnLabel: columns[colIndex]?.label || `열 ${colIndex + 1}`,
-            cellType: 'merged-horizontal', // 가로 병합됨 표시
+            cellType: 'merged-horizontal',
           };
           isInherited = true;
         }
-
         // ---------------------------------------------------------
         // CASE B: 세로 병합(Rowspan) 중인가? 
         // ---------------------------------------------------------
         else if (cellMergeState[colIndex].rowsLeft > 0) {
           cellMergeState[colIndex].rowsLeft--;
-
-          // 위쪽 부모의 데이터를 그대로 복사
           currentAnalytics = {
             ...cellMergeState[colIndex].inheritedAnalytics,
             cellId: cell.id,
             columnLabel: columns[colIndex]?.label || `열 ${colIndex + 1}`,
-            cellType: 'merged-vertical', // 세로 병합됨 표시
+            cellType: 'merged-vertical',
           };
           isInherited = true;
         }
-
         // ---------------------------------------------------------
         // CASE C: 일반 셀 (데이터 원본)
         // ---------------------------------------------------------
         else {
-          // 숨겨진 셀인데 상속받은 것도 없다면 -> 진짜 숨겨진 셀 (혹은 로직 에러 방어)
           if (cell.isHidden) {
             return {
               cellId: cell.id,
@@ -502,7 +520,7 @@ function analyzeTable(
             } as any;
           }
 
-          // --- 데이터 계산 로직 ---
+          // --- 데이터 계산 로직 (validRespondents만 사용) ---
           const analytics: any = {
             cellId: cell.id,
             columnLabel: columns[colIndex]?.label || `열 ${colIndex + 1}`,
@@ -511,37 +529,29 @@ function analyzeTable(
 
           if (cell.type === 'checkbox') {
             let checkedCount = 0;
-            responses.forEach((r) => {
+            validRespondents.forEach((r) => {
               const tableValue = r.value as Record<string, unknown>;
               const cellValue = tableValue?.[cell.id];
               if (Array.isArray(cellValue) && cellValue.length > 0) checkedCount++;
             });
-            // [Impression Logging] 이 행의 노출 기준 적용
-            const rowExposedCount = responses.filter((r) => {
-              const meta = r.metadata as { exposedRowIds?: string[] } | undefined;
-              if (meta?.exposedRowIds) {
-                return meta.exposedRowIds.includes(row.id);
-              }
-              return true;
-            }).length;
 
             analytics.checkedCount = checkedCount;
             analytics.checkedRate =
               rowExposedCount > 0 ? (checkedCount / rowExposedCount) * 100 : 0;
           } else if (cell.type === 'radio' || cell.type === 'select') {
             const counts: Record<string, number> = {};
-            responses.forEach((r) => {
+            validRespondents.forEach((r) => {
               const tableValue = r.value as Record<string, unknown>;
               const cellValue = tableValue?.[cell.id];
               if (cellValue) {
-                const valStr = String(cellValue);
+                const valStr = formatValue(cellValue);
                 counts[valStr] = (counts[valStr] || 0) + 1;
               }
             });
             analytics.valueCounts = counts;
           } else if (cell.type === 'input') {
             const textValues: string[] = [];
-            responses.forEach((r) => {
+            validRespondents.forEach((r) => {
               const tableValue = r.value as Record<string, unknown>;
               const cellValue = tableValue?.[cell.id];
               if (cellValue && String(cellValue).trim()) textValues.push(String(cellValue));
@@ -553,25 +563,13 @@ function analyzeTable(
         }
 
         // ---------------------------------------------------------
-        // [상태 업데이트] 다음 셀/행을 위해 병합 정보 등록
+        // [상태 업데이트] 병합 정보 등록
         // ---------------------------------------------------------
-
-        // 1. 가로 병합 시작 등록 (Colspan > 1)
-        // 주의: 상속받은 데이터(isInherited)도 또다시 가로로 퍼뜨릴 수 있음 (2x2 병합의 경우)
-        // 따라서 currentAnalytics가 존재하면 무조건 체크
         if (currentAnalytics && (cell.colspan || 1) > 1) {
-          // 현재 셀이 가로 병합의 '시작점'이 됨
           activeHorizontalMergesLeft = (cell.colspan || 1) - 1;
-          // 복사할 원본 데이터 저장
           activeHorizontalAnalytics = currentAnalytics;
         }
-
-        // 2. 세로 병합 시작 등록 (Rowspan > 1)
         if (currentAnalytics && (cell.rowspan || 1) > 1) {
-          // 현재 셀이 세로 병합의 '시작점'이 됨
-          // 주의: 가로 병합 중인 셀도 세로 병합을 시작할 수 있음 (Rowspan은 모든 열에 적용됨)
-          // 하지만 여기서는 '현재 열(colIndex)'에 대한 세로 병합만 설정하면 됨.
-          // (가로로 퍼진 셀들은 각자의 colIndex 루프에서 이 블록을 만나 설정됨)
           cellMergeState[colIndex].rowsLeft = (cell.rowspan || 1) - 1;
           cellMergeState[colIndex].inheritedAnalytics = currentAnalytics;
         }
