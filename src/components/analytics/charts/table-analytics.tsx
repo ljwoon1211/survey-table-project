@@ -72,6 +72,25 @@ export function TableAnalyticsChart({ data }: TableAnalyticsChartProps) {
     return item;
   });
 
+  // 5. 텍스트 응답 수집
+  const textResponseData: Array<{
+    rowLabel: string;
+    colLabel: string;
+    responses: string[];
+  }> = [];
+
+  data.cellAnalytics?.forEach((row) => {
+    row.cells.forEach((cell: any) => {
+      if (cell.textResponses && cell.textResponses.length > 0) {
+        textResponseData.push({
+          rowLabel: row.rowLabel,
+          colLabel: cell.columnLabel,
+          responses: cell.textResponses,
+        });
+      }
+    });
+  });
+
   return (
     <Card className="p-6">
       <div className="flex items-start justify-between mb-4">
@@ -80,6 +99,10 @@ export function TableAnalyticsChart({ data }: TableAnalyticsChartProps) {
           <p className="text-sm text-gray-500 mt-1">
             {data.totalResponses}명 응답 · 응답률 {formatPercentage(data.responseRate)}
           </p>
+          {/* [해결 1] 조건부 로직 무시 경고 문구 추가 */}
+          <div className="mt-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded inline-block">
+            ℹ️ 응답률은 해당 문항이 노출된 참여자 기준입니다. (조건부 노출 반영됨)
+          </div>
         </div>
         <Badge color="amber" icon={Table}>
           테이블 ({data.rowSummary.length}개 항목)
@@ -88,8 +111,15 @@ export function TableAnalyticsChart({ data }: TableAnalyticsChartProps) {
 
       <TabGroup>
         <TabList variant="solid" className="w-fit">
-          <Tab icon={BarChart3}>항목별 분포</Tab>
-          <Tab icon={Grid3X3}>상세 보기 (히트맵)</Tab>
+          {[
+            <Tab key="dist" icon={BarChart3}>항목별 분포</Tab>,
+            <Tab key="heat" icon={Grid3X3}>상세 보기 (히트맵)</Tab>,
+            ...(textResponseData.length > 0 ? [
+              <Tab key="text" icon={Table}>
+                주관식 답변 ({textResponseData.reduce((acc, curr) => acc + curr.responses.length, 0)})
+              </Tab>
+            ] : [])
+          ]}
         </TabList>
         <TabPanels>
           {/* 스택 막대 차트 */}
@@ -199,6 +229,30 @@ export function TableAnalyticsChart({ data }: TableAnalyticsChartProps) {
               * 배경색이 진할수록 선택률이 높은 항목입니다.
             </div>
           </TabPanel>
+
+          {/* 3. 주관식 답변 리스트 뷰 */}
+          {...(textResponseData.length > 0 ? [
+            <TabPanel key="text-panel">
+              <div className="mt-6 space-y-6">
+                {textResponseData.map((item, idx) => (
+                  <div key={idx} className="border rounded-lg p-4 bg-gray-50">
+                    <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                      <Badge size="xs" color="gray">{item.rowLabel}</Badge>
+                      <span className="text-gray-400">/</span>
+                      <span className="text-gray-700">{item.colLabel}</span>
+                    </h4>
+                    <ul className="space-y-2 max-h-60 overflow-y-auto bg-white p-3 rounded border border-gray-200">
+                      {item.responses.map((res, rIdx) => (
+                        <li key={rIdx} className="text-sm text-gray-700 border-b last:border-0 pb-2 last:pb-0 pt-2 first:pt-0">
+                          {res}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </TabPanel>
+          ] : [])}
         </TabPanels>
       </TabGroup>
     </Card>

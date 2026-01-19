@@ -112,6 +112,11 @@ export const surveyResponses = pgTable('survey_responses', {
   userAgent: text('user_agent'),
   ipAddress: text('ip_address'),
   sessionId: text('session_id'),
+  metadata: jsonb('metadata').$type<{
+    exposedQuestionIds?: string[];
+    exposedRowIds?: string[]; // 테이블 질문의 노출된 행 ID들
+    [key: string]: unknown;
+  }>(),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });

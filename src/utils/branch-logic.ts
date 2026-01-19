@@ -5,7 +5,8 @@ import {
   QuestionCondition,
   QuestionConditionGroup,
   QuestionGroup,
-  SurveyResponse
+  SurveyResponse,
+  TableRow
 } from "@/types/survey";
 
 /**
@@ -756,6 +757,40 @@ export function shouldDisplayGroup(
   }
 
   const { conditions, logicType } = group.displayCondition;
+
+  // 조건들을 평가 (enabled가 false인 조건은 제외)
+  const results = conditions
+    .filter(condition => condition.enabled !== false)
+    .map(condition =>
+      evaluateQuestionCondition(condition, allResponses, allQuestions)
+    );
+
+  // 논리 타입에 따라 결과 결합
+  switch (logicType) {
+    case 'AND':
+      return results.every(result => result);
+    case 'OR':
+      return results.some(result => result);
+    case 'NOT':
+      return !results.some(result => result);
+    default:
+      return true;
+  }
+}
+
+/**
+ * 테이블 행 표시 조건 확인
+ */
+export function shouldDisplayRow(
+  row: TableRow,
+  allResponses: Record<string, unknown>,
+  allQuestions: Question[]
+): boolean {
+  if (!row.displayCondition) {
+    return true; // 조건이 없으면 표시
+  }
+
+  const { conditions, logicType } = row.displayCondition;
 
   // 조건들을 평가 (enabled가 false인 조건은 제외)
   const results = conditions

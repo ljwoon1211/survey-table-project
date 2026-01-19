@@ -41,7 +41,7 @@ export async function updateQuestionResponse(
     .set({
       questionResponses: sql`jsonb_set(
         COALESCE(${surveyResponses.questionResponses}, '{}'::jsonb),
-        ${sql.array([questionId], 'text')},
+        ARRAY[${questionId}],
         ${JSON.stringify(value)}::jsonb,
         true
       )`,
@@ -57,12 +57,16 @@ export async function updateQuestionResponse(
 }
 
 // 응답 완료
-export async function completeResponse(responseId: string) {
+export async function completeResponse(
+  responseId: string,
+  metadata?: { exposedQuestionIds?: string[]; exposedRowIds?: string[] }
+) {
   const [updated] = await db
     .update(surveyResponses)
     .set({
       isCompleted: true,
       completedAt: new Date(),
+      ...(metadata ? { metadata } : {}),
     })
     .where(eq(surveyResponses.id, responseId))
     .returning();

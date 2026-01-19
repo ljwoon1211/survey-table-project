@@ -11,7 +11,11 @@ import { InteractiveTableResponse } from "@/components/survey-builder/interactiv
 import { UserDefinedMultiLevelSelect } from "@/components/survey-builder/user-defined-multi-level-select";
 import { NoticeRenderer } from "@/components/survey-builder/notice-renderer";
 import { CheckCircle, AlertCircle, ArrowLeft, ArrowRight, Loader2, Lock } from "lucide-react";
-import { getNextQuestionIndex, shouldDisplayQuestion } from "@/utils/branch-logic";
+import {
+  getNextQuestionIndex,
+  shouldDisplayQuestion,
+  shouldDisplayRow,
+} from "@/utils/branch-logic";
 import { parsesurveyIdentifier } from "@/lib/survey-url";
 import { Question, QuestionOption, Survey } from "@/types/survey";
 import { generateId } from "@/lib/utils";
@@ -20,6 +24,7 @@ import {
   getSurveyBySlug,
   getSurveyByPrivateToken,
 } from "@/actions/query-actions";
+import { completeResponse } from "@/actions/response-actions";
 import { useLineCountDetection } from "@/hooks/use-line-count-detection";
 
 type ResponsesMap = Record<string, unknown>;
@@ -50,7 +55,7 @@ export default function SurveyResponsePage() {
   const identifier = decodeURIComponent(params.id as string);
 
   // 응답 스토어
-  const { setCurrentResponseId, setPendingResponse, resetResponseState } = useSurveyResponseStore();
+  const { currentResponseId, setCurrentResponseId, setPendingResponse, resetResponseState } = useSurveyResponseStore();
 
   // 설문 로딩 상태
   const [isLoading, setIsLoading] = useState(true);
@@ -341,7 +346,29 @@ export default function SurveyResponsePage() {
         return;
       }
 
-      // TODO: 서버에 응답 저장 로직 추가 필요
+      // 서버에 응답 및 노출 데이터 저장
+      if (currentResponseId) {
+        // 1. 노출된 질문 ID 수집
+        const exposedQuestionIds = visibleQuestions.map((q) => q.id);
+
+        // 2. 노출된 테이블 행 ID 수집
+        // [수정] 행 단위 노출 조건(displayCondition)을 체크하여 실제 노출된 행만 수집
+        const exposedRowIds = visibleQuestions
+          .filter((q) => q.type === "table" && q.tableRowsData)
+          .flatMap((q) =>
+            q.tableRowsData!
+              .filter((row) => shouldDisplayRow(row, responses as Record<string, unknown>, questions))
+              .map((row) => row.id)
+          );
+
+        console.log("Impression Logging:", { exposedQuestionIds, exposedRowIds });
+
+        await completeResponse(currentResponseId, {
+          exposedQuestionIds,
+          exposedRowIds,
+        });
+      }
+
       // 현재는 클라이언트에서만 완료 처리
       resetResponseState();
       setIsCompleted(true);

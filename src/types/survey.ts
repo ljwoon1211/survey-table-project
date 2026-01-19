@@ -153,6 +153,7 @@ export interface TableRow {
   cells: TableCell[];
   height?: number; // 행 높이 (픽셀 단위)
   minHeight?: number; // 최소 높이
+  displayCondition?: QuestionConditionGroup; // 행 표시 조건
 }
 
 export interface TableColumn {
