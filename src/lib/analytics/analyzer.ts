@@ -1,20 +1,21 @@
 // src/lib/analytics/analyzer.ts
-import type { Question, QuestionType } from '@/types/survey';
 import type { SurveyResponse } from '@/db/schema';
+import type { Question, QuestionType } from '@/types/survey';
+
 import type {
   AnalyticsResult,
-  SingleChoiceAnalytics,
-  MultipleChoiceAnalytics,
-  TextAnalytics,
-  TableAnalytics,
+  CellAnalyticsRow,
   MultiSelectAnalytics,
+  MultipleChoiceAnalytics,
   NoticeAnalytics,
+  OptionDistribution,
+  RowSummary,
+  SingleChoiceAnalytics,
   SurveyAnalytics,
   SurveySummary,
+  TableAnalytics,
+  TextAnalytics,
   TimelineData,
-  OptionDistribution,
-  CellAnalyticsRow,
-  RowSummary,
 } from './types';
 
 // ========================
@@ -59,10 +60,7 @@ function formatValue(value: unknown): string {
 
     // 최후의 수단
     const firstVal = Object.values(v)[0];
-    if (
-      firstVal &&
-      (typeof firstVal === 'string' || typeof firstVal === 'number')
-    )
+    if (firstVal && (typeof firstVal === 'string' || typeof firstVal === 'number'))
       return String(firstVal);
 
     return JSON.stringify(value);
@@ -78,10 +76,7 @@ function formatValue(value: unknown): string {
 /**
  * 질문 타입에 따라 적절한 분석 수행
  */
-export function analyzeQuestion(
-  question: Question,
-  responses: SurveyResponse[]
-): AnalyticsResult {
+export function analyzeQuestion(question: Question, responses: SurveyResponse[]): AnalyticsResult {
   // 1. 노출된 응답만 필터링 (Impression Logging)
   const exposedResponses = responses.filter((r) => {
     const metadata = r.metadata as { exposedQuestionIds?: string[] } | undefined;
@@ -105,12 +100,11 @@ export function analyzeQuestion(
 
   // 실제 응답 수 (값이 있는 경우)
   const answeredCount = questionResponses.filter(
-    (r) => r.value !== undefined && r.value !== null && r.value !== ''
+    (r) => r.value !== undefined && r.value !== null && r.value !== '',
   ).length;
 
   // 응답률 = 응답 수 / 노출 수
-  const responseRate =
-    totalExposed > 0 ? (answeredCount / totalExposed) * 100 : 0;
+  const responseRate = totalExposed > 0 ? (answeredCount / totalExposed) * 100 : 0;
 
   // 각 분석 함수에 totalExposed를 전달하여 정확한 퍼센트 계산
   const totalResponses = totalExposed;
@@ -118,61 +112,26 @@ export function analyzeQuestion(
   switch (question.type) {
     case 'radio':
     case 'select':
-      return analyzeSingleChoice(
-        question,
-        questionResponses,
-        totalResponses,
-        responseRate
-      );
+      return analyzeSingleChoice(question, questionResponses, totalResponses, responseRate);
 
     case 'checkbox':
-      return analyzeMultipleChoice(
-        question,
-        questionResponses,
-        totalResponses,
-        responseRate
-      );
+      return analyzeMultipleChoice(question, questionResponses, totalResponses, responseRate);
 
     case 'text':
     case 'textarea':
-      return analyzeText(
-        question,
-        questionResponses,
-        totalResponses,
-        responseRate
-      );
+      return analyzeText(question, questionResponses, totalResponses, responseRate);
 
     case 'table':
-      return analyzeTable(
-        question,
-        questionResponses,
-        totalResponses,
-        responseRate
-      );
+      return analyzeTable(question, questionResponses, totalResponses, responseRate);
 
     case 'multiselect':
-      return analyzeMultiSelect(
-        question,
-        questionResponses,
-        totalResponses,
-        responseRate
-      );
+      return analyzeMultiSelect(question, questionResponses, totalResponses, responseRate);
 
     case 'notice':
-      return analyzeNotice(
-        question,
-        questionResponses,
-        totalResponses,
-        responseRate
-      );
+      return analyzeNotice(question, questionResponses, totalResponses, responseRate);
 
     default:
-      return analyzeText(
-        question,
-        questionResponses,
-        totalResponses,
-        responseRate
-      );
+      return analyzeText(question, questionResponses, totalResponses, responseRate);
   }
 }
 
@@ -183,7 +142,7 @@ function analyzeSingleChoice(
   question: Question,
   responses: { value: unknown }[],
   totalResponses: number,
-  responseRate: number
+  responseRate: number,
 ): SingleChoiceAnalytics {
   const counts: Record<string, number> = {};
 
@@ -192,17 +151,12 @@ function analyzeSingleChoice(
     counts[value] = (counts[value] || 0) + 1;
   });
 
-  const distribution: OptionDistribution[] = (question.options || []).map(
-    (opt) => ({
-      label: opt.label,
-      value: opt.value,
-      count: counts[opt.value] || 0,
-      percentage:
-        totalResponses > 0
-          ? ((counts[opt.value] || 0) / totalResponses) * 100
-          : 0,
-    })
-  );
+  const distribution: OptionDistribution[] = (question.options || []).map((opt) => ({
+    label: opt.label,
+    value: opt.value,
+    count: counts[opt.value] || 0,
+    percentage: totalResponses > 0 ? ((counts[opt.value] || 0) / totalResponses) * 100 : 0,
+  }));
 
   // 옵션에 없는 값 (기타 등) 추가
   Object.keys(counts).forEach((value) => {
@@ -234,7 +188,7 @@ function analyzeMultipleChoice(
   question: Question,
   responses: { value: unknown }[],
   totalResponses: number,
-  responseRate: number
+  responseRate: number,
 ): MultipleChoiceAnalytics {
   const counts: Record<string, number> = {};
   let totalSelections = 0;
@@ -250,17 +204,12 @@ function analyzeMultipleChoice(
     });
   });
 
-  const distribution: OptionDistribution[] = (question.options || []).map(
-    (opt) => ({
-      label: opt.label,
-      value: opt.value,
-      count: counts[opt.value] || 0,
-      percentage:
-        totalResponses > 0
-          ? ((counts[opt.value] || 0) / totalResponses) * 100
-          : 0,
-    })
-  );
+  const distribution: OptionDistribution[] = (question.options || []).map((opt) => ({
+    label: opt.label,
+    value: opt.value,
+    count: counts[opt.value] || 0,
+    percentage: totalResponses > 0 ? ((counts[opt.value] || 0) / totalResponses) * 100 : 0,
+  }));
 
   // 옵션에 없는 값 추가
   Object.keys(counts).forEach((value) => {
@@ -281,8 +230,7 @@ function analyzeMultipleChoice(
     questionType: question.type,
     totalResponses,
     responseRate,
-    avgSelectionsPerResponse:
-      totalResponses > 0 ? totalSelections / totalResponses : 0,
+    avgSelectionsPerResponse: totalResponses > 0 ? totalSelections / totalResponses : 0,
     distribution: distribution.sort((a, b) => b.count - a.count),
   };
 }
@@ -294,7 +242,7 @@ function analyzeText(
   question: Question,
   responses: { responseId: string; value: unknown; submittedAt?: Date | null }[],
   totalResponses: number,
-  responseRate: number
+  responseRate: number,
 ): TextAnalytics {
   const textResponses = responses.map((r) => ({
     id: r.responseId,
@@ -349,7 +297,7 @@ function analyzeTable(
   question: Question,
   responses: { responseId: string; value: unknown; metadata?: unknown }[],
   totalResponses: number,
-  responseRate: number
+  responseRate: number,
 ): TableAnalytics {
   const rows = question.tableRowsData || [];
   const columns = question.tableColumns || [];
@@ -369,91 +317,91 @@ function analyzeTable(
   // =================================================================================
   // 1. 행별 요약 (히트맵용) - 순수 사용자 응답 여부 집계 (병합/상속 로직 포함)
   // =================================================================================
-  const rowSummary: RowSummary[] = rows.map((row) => {
-    // 1-1. 유효 분모 (이 행이 노출된 사람)
-    const validRespondents = responses.filter((r) => {
-      const meta = r.metadata as { exposedRowIds?: string[] } | undefined;
-      // 노출 ID가 있으면 확인, 없으면(구 데이터) 노출된 것으로 간주
-      if (meta?.exposedRowIds) {
-        return meta.exposedRowIds.includes(row.id);
-      }
-      return true;
-    });
+  const rowSummary: RowSummary[] = rows
+    .map((row) => {
+      // 1-1. 유효 분모 (이 행이 노출된 사람)
+      const validRespondents = responses.filter((r) => {
+        const meta = r.metadata as { exposedRowIds?: string[] } | undefined;
+        // 노출 ID가 있으면 확인, 없으면(구 데이터) 노출된 것으로 간주
+        if (meta?.exposedRowIds) {
+          return meta.exposedRowIds.includes(row.id);
+        }
+        return true;
+      });
 
-    const validDenominator = validRespondents.length;
-    let interactionCount = 0;
-    const details: Record<string, number> = {};
+      const validDenominator = validRespondents.length;
+      let interactionCount = 0;
+      const details: Record<string, number> = {};
 
-    // 1-2. 분자 (유효 분모 중에서, 실제로 값을 입력한 사람 - ROW 단위 유니크)
-    // [Ghost Data 제거] 전체 responses가 아니라 validRespondents만 사용
-    validRespondents.forEach((r) => {
-      const tableValue = r.value as Record<string, unknown>;
-      if (!tableValue) return;
+      // 1-2. 분자 (유효 분모 중에서, 실제로 값을 입력한 사람 - ROW 단위 유니크)
+      // [Ghost Data 제거] 전체 responses가 아니라 validRespondents만 사용
+      validRespondents.forEach((r) => {
+        const tableValue = r.value as Record<string, unknown>;
+        if (!tableValue) return;
 
-      // 이 행의 셀 중 하나라도 유효한 값이 있는지 검사
-      let userHasInteraction = false;
+        // 이 행의 셀 중 하나라도 유효한 값이 있는지 검사
+        let userHasInteraction = false;
 
-      row.cells.forEach((cell) => {
-        const val = tableValue[cell.id];
-        if (!val) return;
+        row.cells.forEach((cell) => {
+          const val = tableValue[cell.id];
+          if (!val) return;
 
-        // 값 유효성 정밀 체크
-        if (cell.type === 'checkbox') {
-          if (Array.isArray(val) && val.length > 0) userHasInteraction = true;
-        } else if (cell.type === 'input') {
-          if (String(val).trim().length > 0) userHasInteraction = true;
-        } else {
-          // radio, select 등
-          userHasInteraction = true;
+          // 값 유효성 정밀 체크
+          if (cell.type === 'checkbox') {
+            if (Array.isArray(val) && val.length > 0) userHasInteraction = true;
+          } else if (cell.type === 'input') {
+            if (String(val).trim().length > 0) userHasInteraction = true;
+          } else {
+            // radio, select 등
+            userHasInteraction = true;
 
-          // 상세 분포 집계 시 포맷팅 적용
-          if (cell.type === 'radio' || cell.type === 'select') {
-            const label = formatValue(val);
-            details[label] = (details[label] || 0) + 1;
+            // 상세 분포 집계 시 포맷팅 적용
+            if (cell.type === 'radio' || cell.type === 'select') {
+              const label = formatValue(val);
+              details[label] = (details[label] || 0) + 1;
+            }
           }
+        });
+
+        if (userHasInteraction) {
+          interactionCount++;
         }
       });
 
-      if (userHasInteraction) {
-        interactionCount++;
-      }
-    });
-
-    // 1-3. 병합(Merge) 상속 처리 (낙수 효과)
-    row.cells.forEach((cell, colIndex) => {
-      if (columnMergeState[colIndex].rowsLeft > 0) {
-        if (columnMergeState[colIndex].interactionInherited) {
-          // 상속받은 데이터도 details에 합산
-          const inherited = columnMergeState[colIndex].details;
-          Object.entries(inherited).forEach(([k, v]) => {
-            details[k] = (details[k] || 0) + v;
-          });
-          // 상속받았으면 시각적으로 Interacted 된 것으로 처리될 수 있으나, 
-          // 논리적 비율 100% 초과 방지를 위해 단순 가산은 주의 필요
+      // 1-3. 병합(Merge) 상속 처리 (낙수 효과)
+      row.cells.forEach((cell, colIndex) => {
+        if (columnMergeState[colIndex].rowsLeft > 0) {
+          if (columnMergeState[colIndex].interactionInherited) {
+            // 상속받은 데이터도 details에 합산
+            const inherited = columnMergeState[colIndex].details;
+            Object.entries(inherited).forEach(([k, v]) => {
+              details[k] = (details[k] || 0) + v;
+            });
+            // 상속받았으면 시각적으로 Interacted 된 것으로 처리될 수 있으나,
+            // 논리적 비율 100% 초과 방지를 위해 단순 가산은 주의 필요
+          }
+          columnMergeState[colIndex].rowsLeft--;
         }
-        columnMergeState[colIndex].rowsLeft--;
-      }
 
-      // 다음 행을 위해 상태 갱신
-      if ((cell.rowspan || 1) > 1) {
-        columnMergeState[colIndex].rowsLeft = (cell.rowspan || 1) - 1;
-        columnMergeState[colIndex].details = details; // (약식: 현재 행 전체 details를 상속 - 셀 단위가 더 정확하나 summary용으로 충분)
-        columnMergeState[colIndex].interactionInherited = interactionCount > 0;
-      }
-    });
+        // 다음 행을 위해 상태 갱신
+        if ((cell.rowspan || 1) > 1) {
+          columnMergeState[colIndex].rowsLeft = (cell.rowspan || 1) - 1;
+          columnMergeState[colIndex].details = details; // (약식: 현재 행 전체 details를 상속 - 셀 단위가 더 정확하나 summary용으로 충분)
+          columnMergeState[colIndex].interactionInherited = interactionCount > 0;
+        }
+      });
 
-    return {
-      rowId: row.id,
-      rowLabel: row.label,
-      totalInteractions: interactionCount,
-      // 분모가 0이면 0%, 아니면 100% 넘지 않도록 Cap
-      interactionRate: validDenominator > 0
-        ? Math.min((interactionCount / validDenominator) * 100, 100)
-        : 0,
-      details: Object.keys(details).length > 0 ? details : undefined,
-    };
-  }).sort((a, b) => b.interactionRate - a.interactionRate);
-
+      return {
+        rowId: row.id,
+        rowLabel: row.label,
+        totalInteractions: interactionCount,
+        // 분모가 0이면 0%, 아니면 100% 넘지 않도록 Cap
+        interactionRate:
+          validDenominator > 0 ? Math.min((interactionCount / validDenominator) * 100, 100) : 0,
+        details: Object.keys(details).length > 0 ? details : undefined,
+      };
+    })
+    .sort((a, b) => b.interactionRate - a.interactionRate);
 
   // 2. 셀별 상세 분석 - 가로/세로 2D 병합 지원 및 Ghost Data 방지
   // [1] 세로 병합 상태 추적 배열 (셀 분석용)
@@ -496,7 +444,7 @@ function analyzeTable(
           isInherited = true;
         }
         // ---------------------------------------------------------
-        // CASE B: 세로 병합(Rowspan) 중인가? 
+        // CASE B: 세로 병합(Rowspan) 중인가?
         // ---------------------------------------------------------
         else if (cellMergeState[colIndex].rowsLeft > 0) {
           cellMergeState[colIndex].rowsLeft--;
@@ -598,7 +546,7 @@ function analyzeMultiSelect(
   question: Question,
   responses: { value: unknown }[],
   totalResponses: number,
-  responseRate: number
+  responseRate: number,
 ): MultiSelectAnalytics {
   const levels = question.selectLevels || [];
 
@@ -617,10 +565,7 @@ function analyzeMultiSelect(
       label: opt.label,
       value: opt.value,
       count: counts[opt.value] || 0,
-      percentage:
-        totalResponses > 0
-          ? ((counts[opt.value] || 0) / totalResponses) * 100
-          : 0,
+      percentage: totalResponses > 0 ? ((counts[opt.value] || 0) / totalResponses) * 100 : 0,
     }));
 
     return {
@@ -648,10 +593,10 @@ function analyzeNotice(
   question: Question,
   responses: { value: unknown }[],
   totalResponses: number,
-  responseRate: number
+  responseRate: number,
 ): NoticeAnalytics {
   const acknowledgedCount = responses.filter(
-    (r) => r.value === true || r.value === 'true' || r.value === 1
+    (r) => r.value === true || r.value === 'true' || r.value === 1,
   ).length;
 
   return {
@@ -662,8 +607,7 @@ function analyzeNotice(
     totalResponses,
     responseRate,
     acknowledgedCount,
-    acknowledgeRate:
-      totalResponses > 0 ? (acknowledgedCount / totalResponses) * 100 : 0,
+    acknowledgeRate: totalResponses > 0 ? (acknowledgedCount / totalResponses) * 100 : 0,
   };
 }
 
@@ -676,13 +620,12 @@ function analyzeNotice(
  */
 export function analyzeSurvey(
   survey: { id: string; title: string; questions: Question[] },
-  responses: SurveyResponse[]
+  responses: SurveyResponse[],
 ): SurveyAnalytics {
   const completedResponses = responses.filter((r) => r.isCompleted);
 
   // 타임라인 계산
-  const timelineMap: Record<string, { responses: number; completed: number }> =
-    {};
+  const timelineMap: Record<string, { responses: number; completed: number }> = {};
 
   responses.forEach((r) => {
     const date = new Date(r.startedAt).toISOString().split('T')[0];
@@ -724,21 +667,18 @@ export function analyzeSurvey(
   weekStart.setDate(weekStart.getDate() - 7);
 
   const todayResponses = completedResponses.filter(
-    (r) => r.completedAt && new Date(r.completedAt) >= todayStart
+    (r) => r.completedAt && new Date(r.completedAt) >= todayStart,
   ).length;
 
   const weekResponses = completedResponses.filter(
-    (r) => r.completedAt && new Date(r.completedAt) >= weekStart
+    (r) => r.completedAt && new Date(r.completedAt) >= weekStart,
   ).length;
 
   // 요약
   const summary: SurveySummary = {
     totalResponses: responses.length,
     completedResponses: completedResponses.length,
-    completionRate:
-      responses.length > 0
-        ? (completedResponses.length / responses.length) * 100
-        : 0,
+    completionRate: responses.length > 0 ? (completedResponses.length / responses.length) * 100 : 0,
     avgCompletionTime,
     lastResponseAt: completedResponses[0]?.completedAt || undefined,
     todayResponses,

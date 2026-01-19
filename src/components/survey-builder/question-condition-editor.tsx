@@ -1,22 +1,25 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect, useImperativeHandle, forwardRef, useCallback } from "react";
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
+
+import { AlertCircle, ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { generateId } from '@/lib/utils';
 import {
-  QuestionConditionGroup,
-  QuestionCondition,
   ConditionLogicType,
   Question,
-} from "@/types/survey";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Plus, Trash2, AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
-import { getMergedRowIds, getRowMergeInfo } from "@/utils/table-merge-helpers";
-import { TableOptionSelector } from "./table-option-selector";
-import { generateId } from "@/lib/utils";
+  QuestionCondition,
+  QuestionConditionGroup,
+} from '@/types/survey';
+import { getMergedRowIds, getRowMergeInfo } from '@/utils/table-merge-helpers';
+
+import { TableOptionSelector } from './table-option-selector';
 
 interface QuestionConditionEditorProps {
   question: Question;
@@ -36,7 +39,7 @@ export const QuestionConditionEditor = forwardRef<
   const [conditionGroup, setConditionGroup] = useState<QuestionConditionGroup | undefined>(
     question.displayCondition || {
       conditions: [],
-      logicType: "AND",
+      logicType: 'AND',
     },
   );
   const [expandedConditions, setExpandedConditions] = useState<Set<string>>(new Set());
@@ -47,7 +50,7 @@ export const QuestionConditionEditor = forwardRef<
   useEffect(() => {
     const newConditionGroup = question.displayCondition || {
       conditions: [],
-      logicType: "AND",
+      logicType: 'AND',
     };
     setConditionGroup(newConditionGroup);
 
@@ -68,9 +71,9 @@ export const QuestionConditionEditor = forwardRef<
     const newCondition: QuestionCondition = {
       id: generateId(),
       name: `조건 ${conditionCount + 1}`,
-      sourceQuestionId: "",
-      conditionType: "table-cell-check",
-      logicType: "AND",
+      sourceQuestionId: '',
+      conditionType: 'table-cell-check',
+      logicType: 'AND',
       enabled: true,
     };
 
@@ -80,7 +83,7 @@ export const QuestionConditionEditor = forwardRef<
     const updatedGroup: QuestionConditionGroup = {
       ...conditionGroup,
       conditions: [...(conditionGroup?.conditions || []), newCondition],
-      logicType: conditionGroup?.logicType || "AND",
+      logicType: conditionGroup?.logicType || 'AND',
     };
 
     setConditionGroup(updatedGroup);
@@ -194,7 +197,7 @@ export const QuestionConditionEditor = forwardRef<
     updateCondition(conditionId, {
       tableConditions: {
         rowIds: updatedRowIds,
-        checkType: condition.tableConditions?.checkType || "any",
+        checkType: condition.tableConditions?.checkType || 'any',
         cellColumnIndex: condition.tableConditions?.cellColumnIndex,
         expectedValues: condition.tableConditions?.expectedValues,
       },
@@ -224,7 +227,7 @@ export const QuestionConditionEditor = forwardRef<
         {/* 조건 추가 버튼 */}
         <div className="flex justify-end">
           <Button onClick={addCondition} size="sm">
-            <Plus className="w-4 h-4 mr-2" />
+            <Plus className="mr-2 h-4 w-4" />
             조건 추가
           </Button>
         </div>
@@ -232,7 +235,7 @@ export const QuestionConditionEditor = forwardRef<
         {conditionGroup && conditionGroup.conditions.length === 0 && (
           <Card>
             <CardContent className="p-6 text-center text-gray-500">
-              <AlertCircle className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+              <AlertCircle className="mx-auto mb-2 h-8 w-8 text-gray-400" />
               <p>조건이 없습니다. 조건을 추가해보세요.</p>
             </CardContent>
           </Card>
@@ -246,13 +249,13 @@ export const QuestionConditionEditor = forwardRef<
           const conditionName =
             conditionNames[condition.id] !== undefined
               ? conditionNames[condition.id]
-              : condition.name ?? "";
+              : (condition.name ?? '');
 
           return (
             <Card key={condition.id} className="border-l-4 border-l-green-500">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 flex-1">
+                  <div className="flex flex-1 items-center gap-2">
                     <Switch
                       checked={condition.enabled !== false}
                       onCheckedChange={(checked) => {
@@ -284,7 +287,7 @@ export const QuestionConditionEditor = forwardRef<
                           return next;
                         });
                       }}
-                      className="text-base font-semibold border-0 shadow-none focus-visible:ring-0 p-0 h-auto flex-1 max-w-xs"
+                      className="h-auto max-w-xs flex-1 border-0 p-0 text-base font-semibold shadow-none focus-visible:ring-0"
                       placeholder={`조건 ${index + 1}`}
                     />
                     {condition.enabled === false && (
@@ -297,9 +300,9 @@ export const QuestionConditionEditor = forwardRef<
                     onClick={() => {
                       removeCondition(condition.id);
                     }}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    className="text-red-600 hover:bg-red-50 hover:text-red-700"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </CardHeader>
@@ -319,14 +322,14 @@ export const QuestionConditionEditor = forwardRef<
                   }}
                 >
                   <CollapsibleTrigger asChild>
-                    <div className="px-6 pb-2 cursor-pointer hover:bg-gray-50 transition-colors">
+                    <div className="cursor-pointer px-6 pb-2 transition-colors hover:bg-gray-50">
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         {isExpanded ? (
-                          <ChevronDown className="w-4 h-4" />
+                          <ChevronDown className="h-4 w-4" />
                         ) : (
-                          <ChevronRight className="w-4 h-4" />
+                          <ChevronRight className="h-4 w-4" />
                         )}
-                        <span>상세 설정 {isExpanded ? "접기" : "펼치기"}</span>
+                        <span>상세 설정 {isExpanded ? '접기' : '펼치기'}</span>
                       </div>
                     </div>
                   </CollapsibleTrigger>
@@ -344,13 +347,13 @@ export const QuestionConditionEditor = forwardRef<
                             );
                             // 질문 타입에 따라 conditionType 자동 설정
                             const autoConditionType =
-                              selectedQ?.type === "table" ? "table-cell-check" : "value-match";
+                              selectedQ?.type === 'table' ? 'table-cell-check' : 'value-match';
                             updateCondition(condition.id, {
                               sourceQuestionId: e.target.value,
                               conditionType: autoConditionType,
                             });
                           }}
-                          className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                         >
                           <option value="">질문 선택...</option>
                           {previousQuestions.map((q, idx) => (
@@ -374,12 +377,12 @@ export const QuestionConditionEditor = forwardRef<
                             onChange={(e) =>
                               updateCondition(condition.id, {
                                 conditionType: e.target.value as
-                                  | "value-match"
-                                  | "table-cell-check"
-                                  | "custom",
+                                  | 'value-match'
+                                  | 'table-cell-check'
+                                  | 'custom',
                               })
                             }
-                            className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                           >
                             <option value="value-match">값 일치 (radio, select, checkbox)</option>
                             <option value="table-cell-check">테이블 셀 체크 확인</option>
@@ -388,12 +391,12 @@ export const QuestionConditionEditor = forwardRef<
                       )}
 
                       {/* 테이블 셀 체크 조건 */}
-                      {condition.conditionType === "table-cell-check" &&
-                        sourceQuestion?.type === "table" && (
+                      {condition.conditionType === 'table-cell-check' &&
+                        sourceQuestion?.type === 'table' && (
                           <>
                             <div className="space-y-2">
                               <Label>체크 확인할 행 선택</Label>
-                              <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md p-3">
+                              <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-gray-200 p-3">
                                 {sourceQuestion.tableRowsData?.map((row, rowIndex) => {
                                   const colIndex = condition.tableConditions?.cellColumnIndex;
                                   const mergeInfo = getRowMergeInfo(
@@ -409,7 +412,7 @@ export const QuestionConditionEditor = forwardRef<
                                     <div
                                       key={row.id}
                                       className={`flex items-center gap-2 ${
-                                        mergeInfo.isMerged && !isMergeStart ? "opacity-60" : ""
+                                        mergeInfo.isMerged && !isMergeStart ? 'opacity-60' : ''
                                       }`}
                                     >
                                       <input
@@ -422,10 +425,10 @@ export const QuestionConditionEditor = forwardRef<
                                       />
                                       <label
                                         htmlFor={`cond-row-${condition.id}-${row.id}`}
-                                        className={`text-sm cursor-pointer flex-1 ${
+                                        className={`flex-1 cursor-pointer text-sm ${
                                           mergeInfo.isMerged && !isMergeStart
-                                            ? "cursor-not-allowed"
-                                            : ""
+                                            ? 'cursor-not-allowed'
+                                            : ''
                                         }`}
                                       >
                                         {row.label}
@@ -459,18 +462,18 @@ export const QuestionConditionEditor = forwardRef<
                               <Label htmlFor={`check-type-${condition.id}`}>체크 조건</Label>
                               <select
                                 id={`check-type-${condition.id}`}
-                                value={condition.tableConditions?.checkType || "any"}
+                                value={condition.tableConditions?.checkType || 'any'}
                                 onChange={(e) =>
                                   updateCondition(condition.id, {
                                     tableConditions: {
                                       rowIds: condition.tableConditions?.rowIds || [],
-                                      checkType: e.target.value as "any" | "all" | "none",
+                                      checkType: e.target.value as 'any' | 'all' | 'none',
                                       cellColumnIndex: condition.tableConditions?.cellColumnIndex,
                                       expectedValues: condition.tableConditions?.expectedValues,
                                     },
                                   })
                                 }
-                                className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                               >
                                 <option value="any">하나라도 체크됨</option>
                                 <option value="all">모두 체크됨</option>
@@ -486,16 +489,16 @@ export const QuestionConditionEditor = forwardRef<
                                 id={`col-index-${condition.id}`}
                                 type="number"
                                 min="0"
-                                value={condition.tableConditions?.cellColumnIndex ?? ""}
+                                value={condition.tableConditions?.cellColumnIndex ?? ''}
                                 onChange={(e) => {
                                   const value =
-                                    e.target.value === ""
+                                    e.target.value === ''
                                       ? undefined
                                       : parseInt(e.target.value, 10);
                                   updateCondition(condition.id, {
                                     tableConditions: {
                                       rowIds: condition.tableConditions?.rowIds || [],
-                                      checkType: condition.tableConditions?.checkType || "any",
+                                      checkType: condition.tableConditions?.checkType || 'any',
                                       cellColumnIndex: value,
                                       expectedValues: condition.tableConditions?.expectedValues,
                                     },
@@ -521,7 +524,7 @@ export const QuestionConditionEditor = forwardRef<
                                       tableConditions: {
                                         ...condition.tableConditions,
                                         rowIds: condition.tableConditions?.rowIds || [],
-                                        checkType: condition.tableConditions?.checkType || "any",
+                                        checkType: condition.tableConditions?.checkType || 'any',
                                         cellColumnIndex: condition.tableConditions?.cellColumnIndex,
                                         expectedValues: values,
                                       },
@@ -534,9 +537,9 @@ export const QuestionConditionEditor = forwardRef<
                         )}
 
                       {/* 추가 조건 설정 (테이블 셀 체크 조건일 때만) */}
-                      {condition.conditionType === "table-cell-check" &&
-                        sourceQuestion?.type === "table" && (
-                          <div className="space-y-3 pt-3 border-t border-gray-200">
+                      {condition.conditionType === 'table-cell-check' &&
+                        sourceQuestion?.type === 'table' && (
+                          <div className="space-y-3 border-t border-gray-200 pt-3">
                             <div className="flex items-center justify-between">
                               <Label className="text-sm font-medium">추가 조건 (선택)</Label>
                               <Switch
@@ -546,7 +549,7 @@ export const QuestionConditionEditor = forwardRef<
                                     updateCondition(condition.id, {
                                       additionalConditions: {
                                         cellColumnIndex: 0,
-                                        checkType: "radio",
+                                        checkType: 'radio',
                                       },
                                     });
                                   } else {
@@ -559,7 +562,7 @@ export const QuestionConditionEditor = forwardRef<
                             </div>
 
                             {condition.additionalConditions && (
-                              <div className="space-y-3 pl-4 border-l-2 border-blue-200">
+                              <div className="space-y-3 border-l-2 border-blue-200 pl-4">
                                 {/* 추가 조건 열 인덱스 */}
                                 <div className="space-y-2">
                                   <Label htmlFor={`additional-col-${condition.id}`}>
@@ -570,10 +573,10 @@ export const QuestionConditionEditor = forwardRef<
                                     type="number"
                                     min="0"
                                     max={(sourceQuestion.tableColumns?.length || 1) - 1}
-                                    value={condition.additionalConditions.cellColumnIndex ?? ""}
+                                    value={condition.additionalConditions.cellColumnIndex ?? ''}
                                     onChange={(e) => {
                                       const value =
-                                        e.target.value === ""
+                                        e.target.value === ''
                                           ? undefined
                                           : parseInt(e.target.value, 10);
                                       updateCondition(condition.id, {
@@ -603,14 +606,14 @@ export const QuestionConditionEditor = forwardRef<
                                         additionalConditions: {
                                           ...condition.additionalConditions!,
                                           checkType: e.target.value as
-                                            | "checkbox"
-                                            | "radio"
-                                            | "select"
-                                            | "input",
+                                            | 'checkbox'
+                                            | 'radio'
+                                            | 'select'
+                                            | 'input',
                                         },
                                       })
                                     }
-                                    className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                                   >
                                     <option value="checkbox">체크박스</option>
                                     <option value="radio">라디오 버튼</option>
@@ -620,14 +623,14 @@ export const QuestionConditionEditor = forwardRef<
                                 </div>
 
                                 {/* 추가 조건 확인할 옵션 선택 */}
-                                {condition.additionalConditions.checkType !== "input" &&
+                                {condition.additionalConditions.checkType !== 'input' &&
                                   condition.additionalConditions.cellColumnIndex !== undefined &&
                                   sourceQuestion && (
                                     <TableOptionSelector
                                       question={sourceQuestion}
                                       rowIds={
                                         (condition.tableConditions?.rowIds?.length ?? 0) > 0
-                                          ? condition.tableConditions?.rowIds ?? []
+                                          ? (condition.tableConditions?.rowIds ?? [])
                                           : sourceQuestion.tableRowsData?.map((r) => r.id) || []
                                       }
                                       colIndex={condition.additionalConditions.cellColumnIndex}
@@ -653,19 +656,19 @@ export const QuestionConditionEditor = forwardRef<
                         )}
 
                       {/* 값 일치 조건 */}
-                      {condition.conditionType === "value-match" && (
+                      {condition.conditionType === 'value-match' && (
                         <div className="space-y-2">
                           <Label htmlFor={`values-${condition.id}`}>필요한 값들</Label>
 
                           {/* 참조 질문의 옵션이 있으면 체크박스로 표시 */}
                           {sourceQuestion &&
-                          (sourceQuestion.type === "radio" ||
-                            sourceQuestion.type === "checkbox" ||
-                            sourceQuestion.type === "select") &&
+                          (sourceQuestion.type === 'radio' ||
+                            sourceQuestion.type === 'checkbox' ||
+                            sourceQuestion.type === 'select') &&
                           sourceQuestion.options &&
                           sourceQuestion.options.length > 0 ? (
                             <div className="space-y-2">
-                              <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-md p-3 space-y-2">
+                              <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border border-gray-200 p-3">
                                 {sourceQuestion.options.map((option) => {
                                   const isSelected = (condition.requiredValues || []).includes(
                                     option.value,
@@ -689,7 +692,7 @@ export const QuestionConditionEditor = forwardRef<
                                       />
                                       <label
                                         htmlFor={`cond-opt-${condition.id}-${option.id}`}
-                                        className="text-sm cursor-pointer flex-1"
+                                        className="flex-1 cursor-pointer text-sm"
                                       >
                                         {option.label}
                                         <span className="ml-2 text-xs text-gray-400">
@@ -711,10 +714,10 @@ export const QuestionConditionEditor = forwardRef<
                             <>
                               <Input
                                 id={`values-${condition.id}`}
-                                value={(condition.requiredValues || []).join(", ")}
+                                value={(condition.requiredValues || []).join(', ')}
                                 onChange={(e) => {
                                   const values = e.target.value
-                                    .split(",")
+                                    .split(',')
                                     .map((v) => v.trim())
                                     .filter((v) => v);
                                   updateCondition(condition.id, { requiredValues: values });
@@ -742,14 +745,14 @@ export const QuestionConditionEditor = forwardRef<
 
         {/* 조건 결합 방식 */}
         {conditionGroup && conditionGroup.conditions.length > 1 && (
-          <Card className="bg-blue-50 border-blue-200">
+          <Card className="border-blue-200 bg-blue-50">
             <CardContent className="p-4">
               <div className="space-y-2">
                 <Label>여러 조건 결합 방식</Label>
                 <select
                   value={conditionGroup.logicType}
                   onChange={(e) => updateGroupLogic(e.target.value as ConditionLogicType)}
-                  className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 >
                   <option value="AND">AND - 모든 조건을 만족해야 함</option>
                   <option value="OR">OR - 하나라도 만족하면 됨</option>
@@ -764,4 +767,4 @@ export const QuestionConditionEditor = forwardRef<
   );
 });
 
-QuestionConditionEditor.displayName = "QuestionConditionEditor";
+QuestionConditionEditor.displayName = 'QuestionConditionEditor';

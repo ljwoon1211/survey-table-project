@@ -42,12 +42,7 @@ export {
 } from './library-actions';
 
 // Auth Actions
-export {
-  login,
-  logout,
-  updatePassword,
-  getUser,
-} from './auth-actions';
+export { login, logout, updatePassword, getUser } from './auth-actions';
 
 // Query Actions (for client-side TanStack Query)
 export {

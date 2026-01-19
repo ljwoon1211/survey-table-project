@@ -1,6 +1,8 @@
+import { desc, eq, ilike, or } from 'drizzle-orm';
+
 import { db } from '@/db';
-import { savedQuestions, questionCategories } from '@/db/schema';
-import { eq, desc, ilike, or } from 'drizzle-orm';
+import { questionCategories, savedQuestions } from '@/db/schema';
+import { SavedQuestion } from '@/types/survey';
 
 // ========================
 // 질문 보관함 조회 함수
@@ -11,7 +13,7 @@ export async function getAllSavedQuestions() {
   const questions = await db.query.savedQuestions.findMany({
     orderBy: [desc(savedQuestions.updatedAt)],
   });
-  return questions;
+  return questions as unknown as SavedQuestion[];
 }
 
 // 카테고리별 질문 조회
@@ -20,7 +22,7 @@ export async function getQuestionsByCategory(category: string) {
     where: eq(savedQuestions.category, category),
     orderBy: [desc(savedQuestions.updatedAt)],
   });
-  return questions;
+  return questions as unknown as SavedQuestion[];
 }
 
 // 질문 검색
@@ -28,11 +30,11 @@ export async function searchSavedQuestions(query: string) {
   const questions = await db.query.savedQuestions.findMany({
     where: or(
       ilike(savedQuestions.name, `%${query}%`),
-      ilike(savedQuestions.description, `%${query}%`)
+      ilike(savedQuestions.description, `%${query}%`),
     ),
     orderBy: [desc(savedQuestions.updatedAt)],
   });
-  return questions;
+  return questions as unknown as SavedQuestion[];
 }
 
 // 최근 사용 질문 조회
@@ -41,7 +43,8 @@ export async function getRecentlyUsedQuestions(limit: number = 5) {
     orderBy: [desc(savedQuestions.updatedAt)],
     limit,
   });
-  return questions.filter(q => q.usageCount > 0);
+  // usageCount check implies filtering
+  return questions.filter((q) => q.usageCount > 0) as unknown as SavedQuestion[];
 }
 
 // 가장 많이 사용된 질문 조회
@@ -50,7 +53,7 @@ export async function getMostUsedQuestions(limit: number = 5) {
     orderBy: [desc(savedQuestions.usageCount)],
     limit,
   });
-  return questions;
+  return questions as unknown as SavedQuestion[];
 }
 
 // 모든 태그 조회
@@ -58,10 +61,10 @@ export async function getAllTags() {
   const questions = await db.query.savedQuestions.findMany();
   const tagSet = new Set<string>();
 
-  questions.forEach(q => {
+  questions.forEach((q) => {
     const tags = q.tags as string[] | null;
     if (tags) {
-      tags.forEach(tag => tagSet.add(tag));
+      tags.forEach((tag) => tagSet.add(tag));
     }
   });
 
@@ -71,7 +74,7 @@ export async function getAllTags() {
 // 태그로 질문 조회
 export async function getQuestionsByTag(tag: string) {
   const questions = await db.query.savedQuestions.findMany();
-  return questions.filter(q => {
+  return questions.filter((q) => {
     const tags = q.tags as string[] | null;
     return tags?.includes(tag);
   });

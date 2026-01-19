@@ -1,6 +1,7 @@
+import { and, count, desc, eq } from 'drizzle-orm';
+
 import { db } from '@/db';
 import { surveyResponses } from '@/db/schema';
-import { eq, desc, and, count } from 'drizzle-orm';
 
 // ========================
 // 응답 조회 함수
@@ -18,10 +19,7 @@ export async function getResponsesBySurvey(surveyId: string) {
 // 완료된 응답만 조회
 export async function getCompletedResponses(surveyId: string) {
   const responses = await db.query.surveyResponses.findMany({
-    where: and(
-      eq(surveyResponses.surveyId, surveyId),
-      eq(surveyResponses.isCompleted, true)
-    ),
+    where: and(eq(surveyResponses.surveyId, surveyId), eq(surveyResponses.isCompleted, true)),
     orderBy: [desc(surveyResponses.completedAt)],
   });
   return responses;
@@ -50,12 +48,7 @@ export async function getCompletedResponseCountBySurvey(surveyId: string) {
   const result = await db
     .select({ count: count() })
     .from(surveyResponses)
-    .where(
-      and(
-        eq(surveyResponses.surveyId, surveyId),
-        eq(surveyResponses.isCompleted, true)
-      )
-    );
+    .where(and(eq(surveyResponses.surveyId, surveyId), eq(surveyResponses.isCompleted, true)));
 
   return result[0]?.count || 0;
 }
@@ -67,23 +60,24 @@ export async function getCompletedResponseCountBySurvey(surveyId: string) {
 // 응답 통계 계산
 export async function calculateResponseSummary(surveyId: string) {
   const allResponses = await getResponsesBySurvey(surveyId);
-  const completedResponses = allResponses.filter(r => r.isCompleted);
+  const completedResponses = allResponses.filter((r) => r.isCompleted);
 
   const totalResponses = allResponses.length;
   const completedCount = completedResponses.length;
 
   // 평균 완료 시간 계산 (분 단위)
   const completionTimes = completedResponses
-    .filter(r => r.completedAt)
-    .map(r => {
+    .filter((r) => r.completedAt)
+    .map((r) => {
       const startTime = new Date(r.startedAt).getTime();
       const completedTime = new Date(r.completedAt!).getTime();
       return (completedTime - startTime) / (1000 * 60);
     });
 
-  const averageCompletionTime = completionTimes.length > 0
-    ? completionTimes.reduce((sum, time) => sum + time, 0) / completionTimes.length
-    : 0;
+  const averageCompletionTime =
+    completionTimes.length > 0
+      ? completionTimes.reduce((sum, time) => sum + time, 0) / completionTimes.length
+      : 0;
 
   const lastResponse = allResponses[0];
 
@@ -102,8 +96,8 @@ export async function getQuestionStatistics(surveyId: string, questionId: string
   const completedResponses = await getCompletedResponses(surveyId);
 
   const questionResponses = completedResponses
-    .map(r => (r.questionResponses as Record<string, unknown>)[questionId])
-    .filter(r => r !== undefined && r !== null && r !== '');
+    .map((r) => (r.questionResponses as Record<string, unknown>)[questionId])
+    .filter((r) => r !== undefined && r !== null && r !== '');
 
   if (questionResponses.length === 0) {
     return {
@@ -120,7 +114,7 @@ export async function getQuestionStatistics(surveyId: string, questionId: string
     const allOptions = questionResponses.flat() as string[];
     const optionCounts: Record<string, number> = {};
 
-    allOptions.forEach(option => {
+    allOptions.forEach((option) => {
       if (typeof option === 'string') {
         optionCounts[option] = (optionCounts[option] || 0) + 1;
       }
@@ -145,7 +139,7 @@ export async function getQuestionStatistics(surveyId: string, questionId: string
     // 단일 응답 (텍스트, 라디오)
     const responseCounts: Record<string, number> = {};
 
-    questionResponses.forEach(response => {
+    questionResponses.forEach((response) => {
       const key = String(response);
       responseCounts[key] = (responseCounts[key] || 0) + 1;
     });
@@ -179,17 +173,18 @@ export async function exportResponsesAsCsv(surveyId: string) {
   const headers = ['응답 ID', '시작 시간', '완료 시간', '완료 시간(분)'];
   const questionIds = new Set<string>();
 
-  responses.forEach(response => {
-    Object.keys(response.questionResponses as Record<string, unknown>).forEach(questionId => {
+  responses.forEach((response) => {
+    Object.keys(response.questionResponses as Record<string, unknown>).forEach((questionId) => {
       questionIds.add(questionId);
     });
   });
 
   headers.push(...Array.from(questionIds));
 
-  const csvData = responses.map(response => {
+  const csvData = responses.map((response) => {
     const completionTime = response.completedAt
-      ? (new Date(response.completedAt).getTime() - new Date(response.startedAt).getTime()) / (1000 * 60)
+      ? (new Date(response.completedAt).getTime() - new Date(response.startedAt).getTime()) /
+        (1000 * 60)
       : 0;
 
     const row = [
@@ -200,7 +195,7 @@ export async function exportResponsesAsCsv(surveyId: string) {
     ];
 
     const responseData = response.questionResponses as Record<string, unknown>;
-    Array.from(questionIds).forEach(questionId => {
+    Array.from(questionIds).forEach((questionId) => {
       const value = responseData[questionId];
       if (Array.isArray(value)) {
         row.push(value.join('; '));
@@ -215,6 +210,6 @@ export async function exportResponsesAsCsv(surveyId: string) {
   });
 
   return [headers, ...csvData]
-    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
     .join('\n');
 }

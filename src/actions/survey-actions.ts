@@ -1,26 +1,28 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
+
+import { eq, inArray, sql } from 'drizzle-orm';
+
+import { getQuestionGroupsBySurvey, getQuestionsBySurvey, getSurveyById } from '@/data/surveys';
 import { db } from '@/db';
 import {
-  surveys,
-  questions,
-  questionGroups,
-  NewSurvey,
   NewQuestion,
   NewQuestionGroup,
+  NewSurvey,
+  questionGroups,
+  questions,
+  surveys,
 } from '@/db/schema';
-import { eq, inArray, sql } from 'drizzle-orm';
-import { revalidatePath } from 'next/cache';
-import type { Survey as SurveyType, Question as QuestionType, QuestionConditionGroup } from '@/types/survey';
-import {
-  getSurveyById,
-  getQuestionGroupsBySurvey,
-  getQuestionsBySurvey,
-} from '@/data/surveys';
 import { requireAuth } from '@/lib/auth';
-import { isValidUUID, generateId } from '@/lib/utils';
 import { extractImageUrlsFromQuestion, extractImageUrlsFromQuestions } from '@/lib/image-extractor';
 import { deleteImagesFromR2Server } from '@/lib/image-utils-server';
+import { generateId, isValidUUID } from '@/lib/utils';
+import type {
+  QuestionConditionGroup,
+  Question as QuestionType,
+  Survey as SurveyType,
+} from '@/types/survey';
 import type { Question } from '@/types/survey';
 
 // ========================
@@ -72,7 +74,7 @@ export async function updateSurvey(
     endDate: Date | null;
     maxResponses: number | null;
     thankYouMessage: string;
-  }>
+  }>,
 ) {
   await requireAuth();
 
@@ -101,14 +103,12 @@ export async function deleteSurvey(surveyId: string) {
 
   // 모든 질문에서 이미지 추출 및 삭제
   if (surveyQuestions.length > 0) {
-    const allImages = extractImageUrlsFromQuestions(
-      surveyQuestions as Question[]
-    );
+    const allImages = extractImageUrlsFromQuestions(surveyQuestions as Question[]);
     if (allImages.length > 0) {
       try {
         await deleteImagesFromR2Server(allImages);
       } catch (error) {
-        console.error("설문 삭제 시 이미지 삭제 실패:", error);
+        console.error('설문 삭제 시 이미지 삭제 실패:', error);
         // 이미지 삭제 실패해도 설문 삭제는 진행
       }
     }
@@ -266,13 +266,11 @@ export async function createQuestionGroup(data: {
 
   // 같은 레벨의 그룹 중 가장 큰 order 찾기
   const siblingGroups = await getQuestionGroupsBySurvey(data.surveyId);
-  const filteredGroups = siblingGroups.filter(g =>
-    data.parentGroupId ? g.parentGroupId === data.parentGroupId : !g.parentGroupId
+  const filteredGroups = siblingGroups.filter((g) =>
+    data.parentGroupId ? g.parentGroupId === data.parentGroupId : !g.parentGroupId,
   );
 
-  const maxOrder = filteredGroups.length > 0
-    ? Math.max(...filteredGroups.map(g => g.order))
-    : -1;
+  const maxOrder = filteredGroups.length > 0 ? Math.max(...filteredGroups.map((g) => g.order)) : -1;
 
   const newGroup: NewQuestionGroup = {
     id: data.id || generateId(), // 클라이언트에서 제공한 ID 또는 새로 생성
@@ -301,7 +299,7 @@ export async function updateQuestionGroup(
     color: string;
     collapsed: boolean;
     displayCondition: QuestionConditionGroup | undefined;
-  }>
+  }>,
 ) {
   await requireAuth();
 
@@ -352,14 +350,12 @@ export async function deleteQuestionGroup(groupId: string) {
 
   // 5. 질문들에서 이미지 추출 및 삭제
   if (questionsInGroups.length > 0) {
-    const allImages = extractImageUrlsFromQuestions(
-      questionsInGroups as Question[]
-    );
+    const allImages = extractImageUrlsFromQuestions(questionsInGroups as Question[]);
     if (allImages.length > 0) {
       try {
         await deleteImagesFromR2Server(allImages);
       } catch (error) {
-        console.error("그룹 삭제 시 이미지 삭제 실패:", error);
+        console.error('그룹 삭제 시 이미지 삭제 실패:', error);
         // 이미지 삭제 실패해도 그룹 삭제는 진행
       }
     }
@@ -383,7 +379,7 @@ export async function deleteQuestionGroup(groupId: string) {
 export async function reorderGroups(surveyId: string, groupIds: string[]) {
   await requireAuth();
 
-  const validGroupIds = groupIds.filter(id => isValidUUID(id));
+  const validGroupIds = groupIds.filter((id) => isValidUUID(id));
   if (validGroupIds.length === 0) return;
 
   // 1. 현재 DB에 저장된 순서 조회 (읽기가 쓰기보다 훨씬 저렴합니다)
@@ -396,7 +392,7 @@ export async function reorderGroups(surveyId: string, groupIds: string[]) {
   });
 
   // ID별 현재 순서 매핑
-  const currentOrderMap = new Map(currentGroups.map(g => [g.id, g.order]));
+  const currentOrderMap = new Map(currentGroups.map((g) => [g.id, g.order]));
   const updates: Promise<any>[] = [];
 
   validGroupIds.forEach((id, index) => {
@@ -408,7 +404,7 @@ export async function reorderGroups(surveyId: string, groupIds: string[]) {
         db
           .update(questionGroups)
           .set({ order: index, updatedAt: new Date() })
-          .where(eq(questionGroups.id, id))
+          .where(eq(questionGroups.id, id)),
       );
     }
   });
@@ -453,9 +449,8 @@ export async function createQuestion(data: {
   // 같은 설문의 질문 중 가장 큰 order 찾기
   const existingQuestions = await getQuestionsBySurvey(data.surveyId);
 
-  const maxOrder = existingQuestions.length > 0
-    ? Math.max(...existingQuestions.map(q => q.order))
-    : -1;
+  const maxOrder =
+    existingQuestions.length > 0 ? Math.max(...existingQuestions.map((q) => q.order)) : -1;
 
   const newQuestion: NewQuestion = {
     id: data.id || generateId(), // 클라이언트에서 제공한 ID 또는 새로 생성
@@ -510,7 +505,7 @@ export async function updateQuestion(
     placeholder: string;
     tableValidationRules: QuestionType['tableValidationRules'];
     displayCondition: QuestionType['displayCondition'];
-  }>
+  }>,
 ) {
   await requireAuth();
 
@@ -541,7 +536,7 @@ export async function deleteQuestion(questionId: string) {
       try {
         await deleteImagesFromR2Server(images);
       } catch (error) {
-        console.error("질문 삭제 시 이미지 삭제 실패:", error);
+        console.error('질문 삭제 시 이미지 삭제 실패:', error);
         // 이미지 삭제 실패해도 질문 삭제는 진행
       }
     }
@@ -554,7 +549,7 @@ export async function deleteQuestion(questionId: string) {
 export async function reorderQuestions(questionIds: string[]) {
   await requireAuth();
 
-  const validQuestionIds = questionIds.filter(id => isValidUUID(id));
+  const validQuestionIds = questionIds.filter((id) => isValidUUID(id));
   if (validQuestionIds.length === 0) return;
 
   // 1. 현재 DB에 저장된 순서 조회
@@ -566,7 +561,7 @@ export async function reorderQuestions(questionIds: string[]) {
     },
   });
 
-  const currentOrderMap = new Map(currentQuestions.map(q => [q.id, q.order]));
+  const currentOrderMap = new Map(currentQuestions.map((q) => [q.id, q.order]));
   const updates: Promise<any>[] = [];
 
   validQuestionIds.forEach((id, index) => {
@@ -580,7 +575,7 @@ export async function reorderQuestions(questionIds: string[]) {
         db
           .update(questions)
           .set({ order: newOrder, updatedAt: new Date() })
-          .where(eq(questions.id, id))
+          .where(eq(questions.id, id)),
       );
     }
   });
@@ -655,7 +650,9 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
         if (existingGroup?.displayCondition) {
           return {
             ...group,
-            displayCondition: existingGroup.displayCondition as NonNullable<SurveyType['groups']>[0]['displayCondition'],
+            displayCondition: existingGroup.displayCondition as NonNullable<
+              SurveyType['groups']
+            >[0]['displayCondition'],
           };
         }
         return group;
@@ -673,9 +670,9 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
       // 2-1. 삭제된 그룹 정리
       const existingGroups = existingSurvey
         ? await tx.query.questionGroups.findMany({
-          where: eq(questionGroups.surveyId, surveyId),
-          columns: { id: true },
-        })
+            where: eq(questionGroups.surveyId, surveyId),
+            columns: { id: true },
+          })
         : [];
 
       const newGroupIds = new Set(surveyData.groups.map((g) => g.id));
@@ -727,9 +724,9 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
       // 3-1. 삭제된 질문 정리
       const existingQuestions = existingSurvey
         ? await tx.query.questions.findMany({
-          where: eq(questions.surveyId, surveyId),
-          columns: { id: true },
-        })
+            where: eq(questions.surveyId, surveyId),
+            columns: { id: true },
+          })
         : [];
 
       const newQuestionIds = new Set(surveyData.questions.map((q) => q.id));
@@ -774,7 +771,8 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
           noticeContent: question.noticeContent,
           requiresAcknowledgment: question.requiresAcknowledgment,
           placeholder: question.placeholder,
-          tableValidationRules: question.tableValidationRules as NewQuestion['tableValidationRules'],
+          tableValidationRules:
+            question.tableValidationRules as NewQuestion['tableValidationRules'],
           displayCondition: question.displayCondition as NewQuestion['displayCondition'],
           updatedAt: new Date(),
         }));

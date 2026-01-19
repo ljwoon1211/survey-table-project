@@ -1,42 +1,45 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { useSurveys, useDeleteSurvey } from "@/hooks/queries";
+import { useState } from 'react';
+
+import Link from 'next/link';
+
 import {
-  FileText,
-  Plus,
-  Search,
-  MoreVertical,
-  Edit,
-  Trash2,
+  ArrowLeft,
   BarChart3,
   Copy,
+  Edit,
   ExternalLink,
-  ArrowLeft,
+  FileText,
   Globe,
-  Lock,
   Loader2,
+  Lock,
   LogOut,
+  MoreVertical,
+  Plus,
+  Search,
+  Trash2,
   User,
-} from "lucide-react";
-import { logout } from "@/actions/auth-actions";
-import Link from "next/link";
+} from 'lucide-react';
+
+import { logout } from '@/actions/auth-actions';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { useDeleteSurvey, useSurveys } from '@/hooks/queries';
 
 export default function SurveyListPage() {
   const { data: surveys, isLoading, error } = useSurveys();
   const { mutate: deleteSurvey } = useDeleteSurvey();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // 로딩 중
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
+          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-blue-500" />
           <p className="text-gray-500">설문 목록을 불러오는 중...</p>
         </div>
       </div>
@@ -46,13 +49,13 @@ export default function SurveyListPage() {
   // 에러 발생
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FileText className="w-8 h-8 text-red-400" />
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+            <FileText className="h-8 w-8 text-red-400" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">오류가 발생했습니다</h3>
-          <p className="text-gray-500 mb-6">설문 목록을 불러올 수 없습니다.</p>
+          <h3 className="mb-2 text-lg font-medium text-gray-900">오류가 발생했습니다</h3>
+          <p className="mb-6 text-gray-500">설문 목록을 불러올 수 없습니다.</p>
           <Button onClick={() => window.location.reload()}>다시 시도</Button>
         </div>
       </div>
@@ -66,7 +69,7 @@ export default function SurveyListPage() {
   );
 
   const handleDeleteSurvey = (surveyId: string) => {
-    if (confirm("이 설문을 삭제하시겠습니까?")) {
+    if (confirm('이 설문을 삭제하시겠습니까?')) {
       deleteSurvey(surveyId);
       setOpenMenuId(null);
     }
@@ -76,7 +79,7 @@ export default function SurveyListPage() {
     const link = getSurveyUrl(survey);
     const fullLink = `${window.location.origin}${link}`;
     navigator.clipboard.writeText(fullLink);
-    alert("링크가 복사되었습니다!");
+    alert('링크가 복사되었습니다!');
     setOpenMenuId(null);
   };
 
@@ -94,19 +97,19 @@ export default function SurveyListPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation */}
-      <nav className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <nav className="border-b border-gray-200 bg-white px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div className="flex items-center space-x-4">
             <Link href="/">
               <Button variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
+                <ArrowLeft className="mr-2 h-4 w-4" />
                 홈으로
               </Button>
             </Link>
             <div className="h-6 w-px bg-gray-300" />
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                <FileText className="w-5 h-5 text-white" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600">
+                <FileText className="h-5 w-5 text-white" />
               </div>
               <span className="text-xl font-semibold text-gray-900">설문 관리</span>
             </div>
@@ -115,12 +118,12 @@ export default function SurveyListPage() {
           <div className="flex items-center space-x-2">
             <Button asChild>
               <Link href="/admin/surveys/create">
-                <Plus className="w-4 h-4 mr-2" />새 설문 만들기
+                <Plus className="mr-2 h-4 w-4" />새 설문 만들기
               </Link>
             </Button>
             <Link href="/admin/profile">
               <Button variant="ghost" size="icon" title="프로필">
-                <User className="w-5 h-5" />
+                <User className="h-5 w-5" />
               </Button>
             </Link>
             <form action={logout}>
@@ -128,9 +131,9 @@ export default function SurveyListPage() {
                 variant="ghost"
                 size="icon"
                 title="로그아웃"
-                className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                className="text-red-500 hover:bg-red-50 hover:text-red-600"
               >
-                <LogOut className="w-5 h-5" />
+                <LogOut className="h-5 w-5" />
               </Button>
             </form>
           </div>
@@ -138,11 +141,11 @@ export default function SurveyListPage() {
       </nav>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="mx-auto max-w-7xl p-6">
         {/* Search Bar */}
         <div className="mb-6">
           <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform text-gray-400" />
             <Input
               type="text"
               placeholder="설문 검색..."
@@ -155,54 +158,54 @@ export default function SurveyListPage() {
 
         {/* Survey List */}
         {filteredSurveys.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FileText className="w-8 h-8 text-gray-400" />
+          <div className="py-16 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+              <FileText className="h-8 w-8 text-gray-400" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {searchQuery ? "검색 결과가 없습니다" : "아직 설문이 없습니다"}
+            <h3 className="mb-2 text-lg font-medium text-gray-900">
+              {searchQuery ? '검색 결과가 없습니다' : '아직 설문이 없습니다'}
             </h3>
-            <p className="text-gray-500 mb-6">
-              {searchQuery ? "다른 검색어로 시도해보세요" : "첫 번째 설문을 만들어보세요!"}
+            <p className="mb-6 text-gray-500">
+              {searchQuery ? '다른 검색어로 시도해보세요' : '첫 번째 설문을 만들어보세요!'}
             </p>
             {!searchQuery && (
               <Button asChild>
                 <Link href="/admin/surveys/create">
-                  <Plus className="w-4 h-4 mr-2" />새 설문 만들기
+                  <Plus className="mr-2 h-4 w-4" />새 설문 만들기
                 </Link>
               </Button>
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredSurveys.map((survey) => (
               <Card
                 key={survey.id}
-                className="p-6 hover:shadow-lg transition-shadow duration-200 relative group"
+                className="group relative p-6 transition-shadow duration-200 hover:shadow-lg"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-blue-600" />
+                <div className="mb-4 flex items-start justify-between">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
+                    <FileText className="h-5 w-5 text-blue-600" />
                   </div>
                   <div className="relative">
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="opacity-0 transition-opacity group-hover:opacity-100"
                       onClick={() => setOpenMenuId(openMenuId === survey.id ? null : survey.id)}
                     >
-                      <MoreVertical className="w-4 h-4" />
+                      <MoreVertical className="h-4 w-4" />
                     </Button>
 
                     {openMenuId === survey.id && (
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                      <div className="absolute right-0 z-50 mt-2 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
                         <div className="py-1">
                           <Link
                             href={`/admin/surveys/${survey.id}/edit`}
                             className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                             onClick={() => setOpenMenuId(null)}
                           >
-                            <Edit className="w-4 h-4 mr-2" />
+                            <Edit className="mr-2 h-4 w-4" />
                             수정
                           </Link>
                           <Link
@@ -210,14 +213,14 @@ export default function SurveyListPage() {
                             className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                             onClick={() => setOpenMenuId(null)}
                           >
-                            <BarChart3 className="w-4 h-4 mr-2" />
+                            <BarChart3 className="mr-2 h-4 w-4" />
                             분석
                           </Link>
                           <button
                             onClick={() => handleCopyLink(survey)}
-                            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                           >
-                            <Copy className="w-4 h-4 mr-2" />
+                            <Copy className="mr-2 h-4 w-4" />
                             링크 복사
                           </button>
                           <Link
@@ -226,15 +229,15 @@ export default function SurveyListPage() {
                             className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                             onClick={() => setOpenMenuId(null)}
                           >
-                            <ExternalLink className="w-4 h-4 mr-2" />
+                            <ExternalLink className="mr-2 h-4 w-4" />
                             설문 열기
                           </Link>
                           <hr className="my-1" />
                           <button
                             onClick={() => handleDeleteSurvey(survey.id)}
-                            className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                            className="flex w-full items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50"
                           >
-                            <Trash2 className="w-4 h-4 mr-2" />
+                            <Trash2 className="mr-2 h-4 w-4" />
                             삭제
                           </button>
                         </div>
@@ -243,44 +246,44 @@ export default function SurveyListPage() {
                   </div>
                 </div>
 
-                <h3 className="text-lg font-semibold text-gray-900 mb-2 truncate">
+                <h3 className="mb-2 truncate text-lg font-semibold text-gray-900">
                   {survey.title}
                 </h3>
-                <p className="text-sm text-gray-500 mb-4">{survey.questionCount}개 질문</p>
+                <p className="mb-4 text-sm text-gray-500">{survey.questionCount}개 질문</p>
 
                 <div className="flex items-center justify-between text-xs text-gray-400">
                   <span>수정일: {new Date(survey.updatedAt).toLocaleDateString()}</span>
                   <span
-                    className={`px-2 py-1 rounded-full flex items-center gap-1 ${
+                    className={`flex items-center gap-1 rounded-full px-2 py-1 ${
                       survey.isPublic
-                        ? "bg-green-100 text-green-600"
-                        : "bg-amber-100 text-amber-600"
+                        ? 'bg-green-100 text-green-600'
+                        : 'bg-amber-100 text-amber-600'
                     }`}
                   >
                     {survey.isPublic ? (
                       <>
-                        <Globe className="w-3 h-3" />
+                        <Globe className="h-3 w-3" />
                         공개
                       </>
                     ) : (
                       <>
-                        <Lock className="w-3 h-3" />
+                        <Lock className="h-3 w-3" />
                         비공개
                       </>
                     )}
                   </span>
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-gray-100 flex space-x-2">
+                <div className="mt-4 flex space-x-2 border-t border-gray-100 pt-4">
                   <Button variant="outline" size="sm" className="flex-1" asChild>
                     <Link href={`/admin/surveys/${survey.id}/edit`}>
-                      <Edit className="w-3 h-3 mr-1" />
+                      <Edit className="mr-1 h-3 w-3" />
                       수정
                     </Link>
                   </Button>
                   <Button variant="outline" size="sm" className="flex-1" asChild>
                     <Link href={`/admin/surveys/${survey.id}/analytics`}>
-                      <BarChart3 className="w-3 h-3 mr-1" />
+                      <BarChart3 className="mr-1 h-3 w-3" />
                       분석
                     </Link>
                   </Button>

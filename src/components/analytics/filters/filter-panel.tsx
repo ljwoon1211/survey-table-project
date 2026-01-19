@@ -1,32 +1,35 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Filter, Plus, RotateCcw, Save, Users, ChevronDown, ChevronUp } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useState } from 'react';
+
+import { ChevronDown, ChevronUp, Filter, Plus, RotateCcw, Save, Users } from 'lucide-react';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import type { Question } from "@/types/survey";
-import type { SurveyResponse } from "@/db/schema";
-import type { FilterState, FilterLogic, FilterCondition } from "@/lib/analytics/filter";
+} from '@/components/ui/select';
+import type { SurveyResponse } from '@/db/schema';
+import type { FilterCondition, FilterLogic, FilterState } from '@/lib/analytics/filter';
 import {
+  addConditionToFilter,
   createEmptyFilter,
   createFilterCondition,
-  addConditionToFilter,
-  removeConditionFromFilter,
-  updateConditionInFilter,
   getActiveFilterCount,
   getFilterSummary,
   isFilterableQuestion,
-} from "@/lib/analytics/filter";
-import { FilterConditionRow } from "./filter-condition";
+  removeConditionFromFilter,
+  updateConditionInFilter,
+} from '@/lib/analytics/filter';
+import type { Question } from '@/types/survey';
+
+import { FilterConditionRow } from './filter-condition';
 
 interface FilterPanelProps {
   questions: Question[];
@@ -89,11 +92,11 @@ export function FilterPanel({ questions, responses, filter, onFilterChange }: Fi
   return (
     <Card className="mb-6">
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <div className="p-4 border-b border-gray-100">
+        <div className="border-b border-gray-100 p-4">
           <div className="flex items-center justify-between">
             <CollapsibleTrigger asChild>
               <button className="flex items-center gap-2 hover:opacity-80">
-                <Filter className="w-5 h-5 text-blue-500" />
+                <Filter className="h-5 w-5 text-blue-500" />
                 <h3 className="font-semibold text-gray-900">필터</h3>
                 {activeCount > 0 && (
                   <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
@@ -101,9 +104,9 @@ export function FilterPanel({ questions, responses, filter, onFilterChange }: Fi
                   </Badge>
                 )}
                 {isOpen ? (
-                  <ChevronUp className="w-4 h-4 text-gray-400 ml-1" />
+                  <ChevronUp className="ml-1 h-4 w-4 text-gray-400" />
                 ) : (
-                  <ChevronDown className="w-4 h-4 text-gray-400 ml-1" />
+                  <ChevronDown className="ml-1 h-4 w-4 text-gray-400" />
                 )}
               </button>
             </CollapsibleTrigger>
@@ -112,14 +115,14 @@ export function FilterPanel({ questions, responses, filter, onFilterChange }: Fi
             {activeCount > 0 && (
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 text-sm">
-                  <Users className="w-4 h-4 text-gray-400" />
+                  <Users className="h-4 w-4 text-gray-400" />
                   <span className="text-gray-600">
                     <span className="font-semibold text-blue-600">
                       {summary.filteredResponses}명
                     </span>
-                    <span className="text-gray-400 mx-1">/</span>
+                    <span className="mx-1 text-gray-400">/</span>
                     <span>{summary.totalResponses}명</span>
-                    <span className="text-gray-400 ml-1">({summary.filterRate.toFixed(1)}%)</span>
+                    <span className="ml-1 text-gray-400">({summary.filterRate.toFixed(1)}%)</span>
                   </span>
                 </div>
 
@@ -129,7 +132,7 @@ export function FilterPanel({ questions, responses, filter, onFilterChange }: Fi
                   onClick={handleReset}
                   className="text-gray-500 hover:text-red-500"
                 >
-                  <RotateCcw className="w-4 h-4 mr-1" />
+                  <RotateCcw className="mr-1 h-4 w-4" />
                   초기화
                 </Button>
               </div>
@@ -138,13 +141,13 @@ export function FilterPanel({ questions, responses, filter, onFilterChange }: Fi
         </div>
 
         <CollapsibleContent>
-          <div className="p-4 space-y-3">
+          <div className="space-y-3 p-4">
             {/* 조건 목록 */}
             {allConditions.length > 0 ? (
               <>
                 {/* 로직 선택 (조건이 2개 이상일 때) */}
                 {allConditions.length > 1 && (
-                  <div className="flex items-center gap-2 mb-4">
+                  <div className="mb-4 flex items-center gap-2">
                     <span className="text-sm text-gray-500">조건 결합:</span>
                     <Select
                       value={filter.groupLogic}
@@ -178,10 +181,10 @@ export function FilterPanel({ questions, responses, filter, onFilterChange }: Fi
                 </div>
               </>
             ) : (
-              <div className="text-center py-6 text-gray-500">
-                <Filter className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <div className="py-6 text-center text-gray-500">
+                <Filter className="mx-auto mb-2 h-8 w-8 opacity-30" />
                 <p className="text-sm">필터 조건이 없습니다</p>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="mt-1 text-xs text-gray-400">
                   조건을 추가하여 특정 응답자만 분석하세요
                 </p>
               </div>
@@ -195,12 +198,12 @@ export function FilterPanel({ questions, responses, filter, onFilterChange }: Fi
               disabled={filterableQuestions.length === 0}
               className="mt-3"
             >
-              <Plus className="w-4 h-4 mr-1" />
+              <Plus className="mr-1 h-4 w-4" />
               조건 추가
             </Button>
 
             {filterableQuestions.length === 0 && (
-              <p className="text-xs text-amber-600 mt-2">
+              <p className="mt-2 text-xs text-amber-600">
                 필터링 가능한 질문(선택형, 텍스트)이 없습니다
               </p>
             )}

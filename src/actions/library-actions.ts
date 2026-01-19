@@ -1,20 +1,22 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
+
+import { eq, inArray, sql } from 'drizzle-orm';
+
+import { getAllCategories, getAllSavedQuestions } from '@/data/library';
 import { db } from '@/db';
 import {
-  savedQuestions,
-  questionCategories,
-  NewSavedQuestion,
   NewQuestionCategory,
+  NewSavedQuestion,
+  questionCategories,
+  savedQuestions,
 } from '@/db/schema';
-import { eq, inArray, sql } from 'drizzle-orm';
-import { revalidatePath } from 'next/cache';
-import type { Question } from '@/types/survey';
-import { getAllSavedQuestions, getAllCategories } from '@/data/library';
 import { requireAuth } from '@/lib/auth';
-import { generateId } from '@/lib/utils';
 import { extractImageUrlsFromQuestion } from '@/lib/image-extractor';
 import { deleteImagesFromR2Server } from '@/lib/image-utils-server';
+import { generateId } from '@/lib/utils';
+import type { Question } from '@/types/survey';
 
 // ========================
 // 질문 보관함 변경 액션 (Mutations)
@@ -28,7 +30,7 @@ export async function saveQuestion(
     description?: string;
     category: string;
     tags?: string[];
-  }
+  },
 ) {
   await requireAuth();
 
@@ -56,7 +58,7 @@ export async function updateSavedQuestion(
     category: string;
     tags: string[];
     question: Question;
-  }>
+  }>,
 ) {
   await requireAuth();
 
@@ -92,7 +94,7 @@ export async function deleteSavedQuestion(id: string) {
       try {
         await deleteImagesFromR2Server(images);
       } catch (error) {
-        console.error("라이브러리 질문 삭제 시 이미지 삭제 실패:", error);
+        console.error('라이브러리 질문 삭제 시 이미지 삭제 실패:', error);
         // 이미지 삭제 실패해도 질문 삭제는 진행
       }
     }
@@ -185,7 +187,7 @@ export async function importLibrary(json: string) {
         (sq: NewSavedQuestion) => ({
           ...sq,
           isPreset: false,
-        })
+        }),
       );
 
       await db.insert(savedQuestions).values(importedQuestions);
@@ -193,10 +195,10 @@ export async function importLibrary(json: string) {
 
     if (data.categories) {
       const existingCategories = await getAllCategories();
-      const existingIds = new Set(existingCategories.map(c => c.id));
+      const existingIds = new Set(existingCategories.map((c) => c.id));
 
       const newCategories = data.categories.filter(
-        (c: NewQuestionCategory) => !existingIds.has(c.id!)
+        (c: NewQuestionCategory) => !existingIds.has(c.id!),
       );
 
       if (newCategories.length > 0) {
@@ -220,9 +222,7 @@ export async function createCategory(name: string, color: string = 'bg-gray-100 
   await requireAuth();
 
   const categories = await getAllCategories();
-  const maxOrder = categories.length > 0
-    ? Math.max(...categories.map(c => c.order))
-    : -1;
+  const maxOrder = categories.length > 0 ? Math.max(...categories.map((c) => c.order)) : -1;
 
   const newCategory: NewQuestionCategory = {
     name,
@@ -243,7 +243,7 @@ export async function updateCategory(
     color: string;
     icon: string;
     order: number;
-  }>
+  }>,
 ) {
   await requireAuth();
 

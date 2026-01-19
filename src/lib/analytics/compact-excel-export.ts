@@ -1,18 +1,15 @@
 /**
  * Compact Excel Export Utilities
- * 
+ *
  * 간결 스타일의 데이터 내보내기 기능
  * - 각 질문/셀당 하나의 열
  * - 다중 선택(Checkbox)은 선택된 값들을 콤마로 합침
  * - 열 개수 최소화 (데이터 확인용)
  */
-
 import * as XLSX from 'xlsx';
-import {
-  Survey,
-  Question,
-  TableCell,
-} from '@/types/survey';
+
+import { Question, Survey, TableCell } from '@/types/survey';
+
 import type { ResponseData } from './flat-excel-export';
 
 /** 간결 열 정의 */
@@ -53,7 +50,7 @@ function flattenQuestionsToCompactColumns(survey: Survey): CompactColumn[] {
   // 질문별 열 생성
   const sortedQuestions = [...survey.questions].sort((a, b) => a.order - b.order);
 
-  sortedQuestions.forEach(question => {
+  sortedQuestions.forEach((question) => {
     if (question.type === 'table') {
       columns.push(...expandTableToCompactColumns(question));
     } else if (question.type === 'notice') {
@@ -84,7 +81,7 @@ function expandTableToCompactColumns(question: Question): CompactColumn[] {
 
   if (!question.tableRowsData) return columns;
 
-  question.tableRowsData.forEach(row => {
+  question.tableRowsData.forEach((row) => {
     const rowCode = row.rowCode || row.id.slice(0, 4);
     const rowLabel = row.label;
 
@@ -130,12 +127,12 @@ function expandTableToCompactColumns(question: Question): CompactColumn[] {
 function flattenResponsesToCompactRows(
   responses: ResponseData[],
   columns: CompactColumn[],
-  survey: Survey
+  survey: Survey,
 ): CompactRow[] {
-  return responses.map(response => {
+  return responses.map((response) => {
     const row: CompactRow = {};
 
-    columns.forEach(col => {
+    columns.forEach((col) => {
       row[col.header] = getCompactValueForColumn(col, response, survey);
     });
 
@@ -149,7 +146,7 @@ function flattenResponsesToCompactRows(
 function getCompactValueForColumn(
   column: CompactColumn,
   response: ResponseData,
-  survey: Survey
+  survey: Survey,
 ): string | number {
   const { questionResponses } = response;
 
@@ -204,10 +201,7 @@ function getMetaValue(code: string, response: ResponseData): string | number {
 /**
  * 테이블 셀 값 추출
  */
-function getTableCellValue(
-  answer: unknown,
-  tableInfo: { rowId: string; cellId: string }
-): unknown {
+function getTableCellValue(answer: unknown, tableInfo: { rowId: string; cellId: string }): unknown {
   if (!answer || typeof answer !== 'object') return undefined;
 
   const answerObj = answer as Record<string, unknown>;
@@ -230,14 +224,14 @@ function getTableCellValue(
  * 간결 값 포맷팅 (다중 선택은 콤마로 합침)
  */
 function formatCompactValue(value: unknown, questionId: string, survey: Survey): string {
-  const question = survey.questions.find(q => q.id === questionId);
+  const question = survey.questions.find((q) => q.id === questionId);
   if (!question) return String(value ?? '');
 
   // 배열 (체크박스 다중 선택)
   if (Array.isArray(value)) {
-    const labels = value.map(v => {
+    const labels = value.map((v) => {
       if (question.options) {
-        const option = question.options.find(o => o.value === v);
+        const option = question.options.find((o) => o.value === v);
         if (option) return option.label;
       }
       return String(v);
@@ -247,7 +241,7 @@ function formatCompactValue(value: unknown, questionId: string, survey: Survey):
 
   // 단일 값 (Radio/Select)
   if (question.options && typeof value === 'string') {
-    const option = question.options.find(o => o.value === value);
+    const option = question.options.find((o) => o.value === value);
     if (option) return option.label;
   }
 
@@ -261,23 +255,23 @@ function formatCompactCellValue(
   value: unknown,
   tableInfo: { rowId: string; cellId: string; cellType: string },
   questionId: string,
-  survey: Survey
+  survey: Survey,
 ): string {
   if (value === undefined || value === null) return '';
 
-  const question = survey.questions.find(q => q.id === questionId);
+  const question = survey.questions.find((q) => q.id === questionId);
   if (!question) return String(value);
 
   // 셀 찾기
-  const row = question.tableRowsData?.find(r => r.id === tableInfo.rowId);
-  const cell = row?.cells.find(c => c.id === tableInfo.cellId);
+  const row = question.tableRowsData?.find((r) => r.id === tableInfo.rowId);
+  const cell = row?.cells.find((c) => c.id === tableInfo.cellId);
   if (!cell) return String(value);
 
   // 배열 (체크박스 다중 선택) → 콤마로 합침
   if (Array.isArray(value)) {
-    const labels = value.map(v => {
+    const labels = value.map((v) => {
       if (cell.checkboxOptions) {
-        const option = cell.checkboxOptions.find(o => o.value === v);
+        const option = cell.checkboxOptions.find((o) => o.value === v);
         if (option) return option.label;
       }
       return String(v);
@@ -287,13 +281,13 @@ function formatCompactCellValue(
 
   // Radio 옵션 라벨 변환
   if (cell.type === 'radio' && cell.radioOptions && typeof value === 'string') {
-    const option = cell.radioOptions.find(o => o.value === value);
+    const option = cell.radioOptions.find((o) => o.value === value);
     if (option) return option.label;
   }
 
   // Select 옵션 라벨 변환
   if (cell.type === 'select' && cell.selectOptions && typeof value === 'string') {
-    const option = cell.selectOptions.find(o => o.value === value);
+    const option = cell.selectOptions.find((o) => o.value === value);
     if (option) return option.label;
   }
 
@@ -307,10 +301,7 @@ function formatCompactCellValue(
 /**
  * Compact 엑셀 워크북 생성
  */
-function generateCompactExcelWorkbook(
-  survey: Survey,
-  responses: ResponseData[]
-): XLSX.WorkBook {
+function generateCompactExcelWorkbook(survey: Survey, responses: ResponseData[]): XLSX.WorkBook {
   const workbook = XLSX.utils.book_new();
 
   // 열 정의 생성
@@ -323,8 +314,8 @@ function generateCompactExcelWorkbook(
   const ws = XLSX.utils.json_to_sheet(rows);
 
   // 열 너비 자동 조정
-  const colWidths = columns.map(col => ({
-    wch: Math.min(Math.max(col.header.length * 1.5, 10), 50)
+  const colWidths = columns.map((col) => ({
+    wch: Math.min(Math.max(col.header.length * 1.5, 10), 50),
   }));
   ws['!cols'] = colWidths;
 
@@ -336,14 +327,11 @@ function generateCompactExcelWorkbook(
 /**
  * Compact 엑셀 파일 다운로드용 Blob 생성
  */
-export function generateCompactExcelBlob(
-  survey: Survey,
-  responses: ResponseData[]
-): Blob {
+export function generateCompactExcelBlob(survey: Survey, responses: ResponseData[]): Blob {
   const workbook = generateCompactExcelWorkbook(survey, responses);
   const buffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
   return new Blob([buffer], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
 }
 

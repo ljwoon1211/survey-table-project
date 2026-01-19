@@ -1,5 +1,5 @@
-import type { Question } from '@/types/survey';
 import type { SurveyResponse } from '@/db/schema';
+import type { Question } from '@/types/survey';
 
 // ========================
 // 교차분석 타입
@@ -7,9 +7,9 @@ import type { SurveyResponse } from '@/db/schema';
 
 export interface CrossTabCell {
   count: number;
-  rowPercent: number;    // 행 기준 비율
-  colPercent: number;    // 열 기준 비율
-  totalPercent: number;  // 전체 기준 비율
+  rowPercent: number; // 행 기준 비율
+  colPercent: number; // 열 기준 비율
+  totalPercent: number; // 전체 기준 비율
 }
 
 export interface CrossTabRow {
@@ -83,10 +83,7 @@ function getQuestionOptions(question: Question): { label: string; value: string 
 /**
  * 응답에서 해당 질문의 값 추출
  */
-function getResponseValue(
-  response: SurveyResponse,
-  questionId: string
-): string | string[] | null {
+function getResponseValue(response: SurveyResponse, questionId: string): string | string[] | null {
   const questionResponses = response.questionResponses as Record<string, unknown>;
   const value = questionResponses[questionId];
 
@@ -114,7 +111,7 @@ function getResponseValue(
 export function calculateCrossTab(
   rowQuestion: Question,
   colQuestion: Question,
-  responses: SurveyResponse[]
+  responses: SurveyResponse[],
 ): CrossTabResult {
   const rowOptions = getQuestionOptions(rowQuestion);
   const colOptions = getQuestionOptions(colQuestion);
@@ -234,7 +231,7 @@ export interface CrossTabChartData {
 
 export function toCrossTabChartData(
   result: CrossTabResult,
-  percentageBase: PercentageBase = 'row'
+  percentageBase: PercentageBase = 'row',
 ): CrossTabChartData[] {
   return result.rows.map((row) => {
     const dataItem: CrossTabChartData = { name: row.label };
@@ -270,7 +267,7 @@ export interface HeatmapCell {
 
 export function toHeatmapData(
   result: CrossTabResult,
-  percentageBase: PercentageBase = 'row'
+  percentageBase: PercentageBase = 'row',
 ): HeatmapCell[] {
   const cells: HeatmapCell[] = [];
 

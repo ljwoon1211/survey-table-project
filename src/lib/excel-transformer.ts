@@ -1,11 +1,6 @@
 import * as XLSX from 'xlsx';
-import {
-  Survey,
-  Question,
-  SurveyResponse,
-  TableColumn,
-  TableRow
-} from '@/types/survey';
+
+import { Question, Survey, SurveySubmission, TableColumn, TableRow } from '@/types/survey';
 
 interface ExportOptions {
   includeRawData: boolean;
@@ -19,8 +14,8 @@ interface ExportOptions {
  */
 export function generateExcelWorkbook(
   survey: Survey,
-  responses: SurveyResponse[],
-  options: ExportOptions
+  responses: SurveySubmission[],
+  options: ExportOptions,
 ): XLSX.WorkBook {
   const workbook = XLSX.utils.book_new();
 
@@ -58,7 +53,10 @@ export function generateExcelWorkbook(
 /**
  * 1. Raw Data (통합) 워크북 생성
  */
-export function generateRawDataCombinedWorkbook(survey: Survey, responses: SurveyResponse[]): XLSX.WorkBook {
+export function generateRawDataCombinedWorkbook(
+  survey: Survey,
+  responses: SurveySubmission[],
+): XLSX.WorkBook {
   const workbook = XLSX.utils.book_new();
   const rawData = generateRawDataCombinedData(survey, responses);
   const ws = XLSX.utils.json_to_sheet(rawData);
@@ -69,16 +67,19 @@ export function generateRawDataCombinedWorkbook(survey: Survey, responses: Surve
 /**
  * 2. Raw Data (개별 시트) 워크북 생성
  */
-export function generateRawDataIndividualWorkbook(survey: Survey, responses: SurveyResponse[]): XLSX.WorkBook {
+export function generateRawDataIndividualWorkbook(
+  survey: Survey,
+  responses: SurveySubmission[],
+): XLSX.WorkBook {
   const workbook = XLSX.utils.book_new();
   const sortedQuestions = survey.questions.sort((a, b) => a.order - b.order);
 
   responses.forEach((res, index) => {
     // 시트 이름 생성 (최대 31자 제한, 특수문자 제거)
     const sheetName = `Response_${index + 1}`.substring(0, 31);
-    
+
     const rows: any[][] = [];
-    
+
     // 2-1. 메타데이터
     const startedAt = new Date(res.startedAt);
     const completedAt = res.completedAt ? new Date(res.completedAt) : new Date();
@@ -88,7 +89,10 @@ export function generateRawDataIndividualWorkbook(survey: Survey, responses: Sur
     rows.push(['Response ID', res.id]);
     rows.push(['Status', res.isCompleted ? 'Completed' : 'Partial']);
     rows.push(['Started At', startedAt.toLocaleString()]);
-    rows.push(['Completed At', res.completedAt ? new Date(res.completedAt).toLocaleString() : '미완료']);
+    rows.push([
+      'Completed At',
+      res.completedAt ? new Date(res.completedAt).toLocaleString() : '미완료',
+    ]);
     rows.push(['Duration', `${durationSeconds}초`]);
     rows.push(['Device', res.userAgent ? parseUserAgent(res.userAgent) : 'Unknown']);
     rows.push([]); // Spacer
@@ -102,56 +106,61 @@ export function generateRawDataIndividualWorkbook(survey: Survey, responses: Sur
       if (q.type === 'table' && q.tableRowsData && q.tableColumns) {
         // 테이블 질문: 2D 매트릭스 렌더링
         rows.push([`Q. ${q.title}`]);
-        
+
         // 열 헤더 (빈칸 + 열 라벨들)
-        const headerRow = [''].concat(q.tableColumns.map(c => c.label));
+        const headerRow = [''].concat(q.tableColumns.map((c) => c.label));
         rows.push(headerRow);
 
         // 행 데이터
-        q.tableRowsData.forEach(row => {
+        q.tableRowsData.forEach((row) => {
           const cells = [row.label];
           q.tableColumns!.forEach((col, colIndex) => {
             let val = '';
             const cell = row.cells[colIndex];
-            
+
             if (cell && answer) {
               // 1. cell.id로 조회
               let rawVal = answer[cell.id];
-              
+
               // 2. Fallback
               if (!rawVal && answer[row.id] && answer[row.id][col.id]) {
                 rawVal = answer[row.id][col.id];
               }
 
               if (rawVal) {
-                 // 값 변환 로직
-                 if (cell.type === 'radio' && cell.radioOptions) {
-                    const opt = cell.radioOptions.find(o => o.value === rawVal);
-                    val = opt ? opt.label : rawVal;
-                  } else if (cell.type === 'checkbox' && cell.checkboxOptions && Array.isArray(rawVal)) {
-                     val = rawVal.map((v: string) => {
-                       const opt = cell.checkboxOptions?.find(o => o.value === v);
-                       return opt ? opt.label : v;
-                     }).join(', ');
-                  } else if (cell.type === 'select' && cell.selectOptions) {
-                    const opt = cell.selectOptions.find(o => o.value === rawVal);
-                    val = opt ? opt.label : rawVal;
-                  } else {
-                    val = String(rawVal);
-                  }
+                // 값 변환 로직
+                if (cell.type === 'radio' && cell.radioOptions) {
+                  const opt = cell.radioOptions.find((o) => o.value === rawVal);
+                  val = opt ? opt.label : rawVal;
+                } else if (
+                  cell.type === 'checkbox' &&
+                  cell.checkboxOptions &&
+                  Array.isArray(rawVal)
+                ) {
+                  val = rawVal
+                    .map((v: string) => {
+                      const opt = cell.checkboxOptions?.find((o) => o.value === v);
+                      return opt ? opt.label : v;
+                    })
+                    .join(', ');
+                } else if (cell.type === 'select' && cell.selectOptions) {
+                  const opt = cell.selectOptions.find((o) => o.value === rawVal);
+                  val = opt ? opt.label : rawVal;
+                } else {
+                  val = String(rawVal);
+                }
               }
             }
             cells.push(val);
           });
           rows.push(cells);
         });
-        
-        rows.push([]); // Spacer
 
+        rows.push([]); // Spacer
       } else {
         // 일반 질문
         let displayValue = '';
-        
+
         if (Array.isArray(answer)) {
           displayValue = answer.join(', ');
         } else if (typeof answer === 'object' && answer !== null) {
@@ -165,7 +174,7 @@ export function generateRawDataIndividualWorkbook(survey: Survey, responses: Sur
     });
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    
+
     // 컬럼 너비 설정 (대략적으로)
     const wscols = [
       { wch: 30 }, // A열 (질문/행라벨)
@@ -184,7 +193,10 @@ export function generateRawDataIndividualWorkbook(survey: Survey, responses: Sur
 /**
  * 3. Summary 워크북 생성
  */
-export function generateSummaryWorkbook(survey: Survey, responses: SurveyResponse[]): XLSX.WorkBook {
+export function generateSummaryWorkbook(
+  survey: Survey,
+  responses: SurveySubmission[],
+): XLSX.WorkBook {
   const workbook = XLSX.utils.book_new();
   const summaryData = generateSummaryData(survey, responses);
   const ws = XLSX.utils.json_to_sheet(summaryData);
@@ -206,7 +218,7 @@ export function generateVariableMapWorkbook(survey: Survey): XLSX.WorkBook {
 /**
  * Raw Data 생성 로직 (Internal)
  */
-function generateRawDataCombinedData(survey: Survey, responses: SurveyResponse[]) {
+function generateRawDataCombinedData(survey: Survey, responses: SurveySubmission[]) {
   // 질문 목록 (순서대로)
   const sortedQuestions = survey.questions.sort((a, b) => a.order - b.order);
 
@@ -221,8 +233,8 @@ function generateRawDataCombinedData(survey: Survey, responses: SurveyResponse[]
       'Started At': startedAt.toLocaleString(),
       'Completed At': res.completedAt ? new Date(res.completedAt).toLocaleString() : '미완료',
       'Duration (sec)': durationSeconds,
-      'Status': res.isCompleted ? 'Completed' : 'Partial',
-      'Device': res.userAgent ? parseUserAgent(res.userAgent) : 'Unknown',
+      Status: res.isCompleted ? 'Completed' : 'Partial',
+      Device: res.userAgent ? parseUserAgent(res.userAgent) : 'Unknown',
     };
 
     // 1-2. 질문 데이터 매핑
@@ -249,7 +261,7 @@ function generateRawDataCombinedData(survey: Survey, responses: SurveyResponse[]
               if (cell && answer) {
                 // 1. cell.id로 직접 조회 (가장 정확)
                 let rawVal = answer[cell.id];
-                
+
                 // 2. Fallback: 혹시 rowId > colId 구조로 저장된 경우 (구버전 데이터 등)
                 if (!rawVal && answer[tRow.id] && answer[tRow.id][tCol.id]) {
                   rawVal = answer[tRow.id][tCol.id];
@@ -258,22 +270,28 @@ function generateRawDataCombinedData(survey: Survey, responses: SurveyResponse[]
                 if (rawVal) {
                   // 값 변환 로직 (옵션 ID -> 라벨)
                   if (cell.type === 'radio' && cell.radioOptions) {
-                    const opt = cell.radioOptions.find(o => o.value === rawVal);
+                    const opt = cell.radioOptions.find((o) => o.value === rawVal);
                     value = opt ? opt.label : rawVal;
-                  } else if (cell.type === 'checkbox' && cell.checkboxOptions && Array.isArray(rawVal)) {
-                     value = rawVal.map((v: string) => {
-                       const opt = cell.checkboxOptions?.find(o => o.value === v);
-                       return opt ? opt.label : v;
-                     }).join(', ');
+                  } else if (
+                    cell.type === 'checkbox' &&
+                    cell.checkboxOptions &&
+                    Array.isArray(rawVal)
+                  ) {
+                    value = rawVal
+                      .map((v: string) => {
+                        const opt = cell.checkboxOptions?.find((o) => o.value === v);
+                        return opt ? opt.label : v;
+                      })
+                      .join(', ');
                   } else if (cell.type === 'select' && cell.selectOptions) {
-                    const opt = cell.selectOptions.find(o => o.value === rawVal);
+                    const opt = cell.selectOptions.find((o) => o.value === rawVal);
                     value = opt ? opt.label : rawVal;
                   } else {
                     value = String(rawVal);
                   }
                 }
               }
-              
+
               row[header] = value;
             });
           });
@@ -302,61 +320,62 @@ function generateRawDataCombinedData(survey: Survey, responses: SurveyResponse[]
 /**
  * 2. Summary 데이터 생성
  */
-function generateSummaryData(survey: Survey, responses: SurveyResponse[]) {
+function generateSummaryData(survey: Survey, responses: SurveySubmission[]) {
   const summary: any[] = [];
   const totalResponses = responses.length;
 
-  survey.questions.sort((a, b) => a.order - b.order).forEach((q) => {
-    // 질문 헤더
-    summary.push({
-      '구분': `[${q.type}] ${q.title}`,
-      '응답 수': '',
-      '비율(%)': ''
-    });
+  survey.questions
+    .sort((a, b) => a.order - b.order)
+    .forEach((q) => {
+      // 질문 헤더
+      summary.push({
+        구분: `[${q.type}] ${q.title}`,
+        '응답 수': '',
+        '비율(%)': '',
+      });
 
-    if (q.type === 'table' && q.tableRowsData && q.tableColumns) {
-      // 테이블형 통계
-      q.tableRowsData.forEach((row) => {
-        q.tableColumns!.forEach((col, colIndex) => {
-          const cell = row.cells[colIndex];
-          
-          if (!cell) return;
+      if (q.type === 'table' && q.tableRowsData && q.tableColumns) {
+        // 테이블형 통계
+        q.tableRowsData.forEach((row) => {
+          q.tableColumns!.forEach((col, colIndex) => {
+            const cell = row.cells[colIndex];
 
-          // 해당 셀에 데이터가 있는 응답 수 계산
-          const count = responses.filter(r => {
+            if (!cell) return;
+
+            // 해당 셀에 데이터가 있는 응답 수 계산
+            const count = responses.filter((r) => {
+              const ans = (r.questionResponses as any)?.[q.id];
+              // cell.id로 조회하거나, fallback 구조로 조회
+              return ans && (ans[cell.id] || (ans[row.id] && ans[row.id][col.id]));
+            }).length;
+
+            summary.push({
+              구분: `  - ${row.label} > ${col.label}`,
+              '응답 수': count,
+              '비율(%)': ((count / totalResponses) * 100).toFixed(1) + '%',
+            });
+          });
+        });
+      } else if (q.options) {
+        // 객관식 통계
+        q.options.forEach((opt) => {
+          const count = responses.filter((r) => {
             const ans = (r.questionResponses as any)?.[q.id];
-            // cell.id로 조회하거나, fallback 구조로 조회
-            return ans && (ans[cell.id] || (ans[row.id] && ans[row.id][col.id]));
+            if (Array.isArray(ans)) return ans.includes(opt.value); // Checkbox
+            return ans === opt.value; // Radio/Select
           }).length;
 
           summary.push({
-            '구분': `  - ${row.label} > ${col.label}`,
+            구분: `  - ${opt.label}`,
             '응답 수': count,
-            '비율(%)': ((count / totalResponses) * 100).toFixed(1) + '%'
+            '비율(%)': ((count / totalResponses) * 100).toFixed(1) + '%',
           });
         });
-      });
+      }
 
-    } else if (q.options) {
-      // 객관식 통계
-      q.options.forEach((opt) => {
-        const count = responses.filter(r => {
-          const ans = (r.questionResponses as any)?.[q.id];
-          if (Array.isArray(ans)) return ans.includes(opt.value); // Checkbox
-          return ans === opt.value; // Radio/Select
-        }).length;
-
-        summary.push({
-          '구분': `  - ${opt.label}`,
-          '응답 수': count,
-          '비율(%)': ((count / totalResponses) * 100).toFixed(1) + '%'
-        });
-      });
-    }
-
-    // 빈 줄 추가
-    summary.push({});
-  });
+      // 빈 줄 추가
+      summary.push({});
+    });
 
   return summary;
 }
@@ -367,36 +386,38 @@ function generateSummaryData(survey: Survey, responses: SurveyResponse[]) {
 function generateVariableMap(survey: Survey) {
   const mapData: any[] = [];
 
-  survey.questions.sort((a, b) => a.order - b.order).forEach((q) => {
-    mapData.push({
-      'Question ID': q.id,
-      'Type': q.type,
-      'Title': q.title,
-      'Description': q.description || ''
-    });
+  survey.questions
+    .sort((a, b) => a.order - b.order)
+    .forEach((q) => {
+      mapData.push({
+        'Question ID': q.id,
+        Type: q.type,
+        Title: q.title,
+        Description: q.description || '',
+      });
 
-    if (q.type === 'table') {
-      q.tableRowsData?.forEach(row => {
-        q.tableColumns?.forEach(col => {
-          mapData.push({
-            'Question ID': '',
-            'Type': 'Table Cell',
-            'Title': `  Row: ${row.label} / Col: ${col.label}`,
-            'Description': `RowID: ${row.id}, ColID: ${col.id}`
+      if (q.type === 'table') {
+        q.tableRowsData?.forEach((row) => {
+          q.tableColumns?.forEach((col) => {
+            mapData.push({
+              'Question ID': '',
+              Type: 'Table Cell',
+              Title: `  Row: ${row.label} / Col: ${col.label}`,
+              Description: `RowID: ${row.id}, ColID: ${col.id}`,
+            });
           });
         });
-      });
-    } else if (q.options) {
-      q.options.forEach(opt => {
-        mapData.push({
-          'Question ID': '',
-          'Type': 'Option',
-          'Title': `  ${opt.label}`,
-          'Description': `Value: ${opt.value}`
+      } else if (q.options) {
+        q.options.forEach((opt) => {
+          mapData.push({
+            'Question ID': '',
+            Type: 'Option',
+            Title: `  ${opt.label}`,
+            Description: `Value: ${opt.value}`,
+          });
         });
-      });
-    }
-  });
+      }
+    });
 
   return mapData;
 }
@@ -404,26 +425,26 @@ function generateVariableMap(survey: Survey) {
 /**
  * 4. Verbatim (주관식) 생성
  */
-function generateVerbatimData(survey: Survey, responses: SurveyResponse[]) {
+function generateVerbatimData(survey: Survey, responses: SurveySubmission[]) {
   const verbatim: any[] = [];
 
   // 주관식 질문만 필터링 (text, textarea)
-  const textQuestions = survey.questions.filter(q =>
-    q.type === 'text' || q.type === 'textarea' || (q.type === 'table') // 테이블 내 input도 포함 가능
+  const textQuestions = survey.questions.filter(
+    (q) => q.type === 'text' || q.type === 'textarea' || q.type === 'table', // 테이블 내 input도 포함 가능
   );
 
-  responses.forEach(res => {
-    textQuestions.forEach(q => {
+  responses.forEach((res) => {
+    textQuestions.forEach((q) => {
       if (q.type === 'table') {
         // 테이블 내 텍스트/입력 셀 찾기
-        q.tableRowsData?.forEach(row => {
+        q.tableRowsData?.forEach((row) => {
           q.tableColumns?.forEach((col, colIndex) => {
             const cell = row.cells[colIndex];
             if (!cell) return;
 
             const ans = (res.questionResponses as any)?.[q.id];
             let val = ans?.[cell.id];
-            
+
             // Fallback
             if (!val && ans?.[row.id]?.[col.id]) {
               val = ans[row.id][col.id];
@@ -432,8 +453,8 @@ function generateVerbatimData(survey: Survey, responses: SurveyResponse[]) {
             if (val) {
               verbatim.push({
                 'Response ID': res.id,
-                'Question': `${q.title} [${row.label}-${col.label}]`,
-                'Answer': val
+                Question: `${q.title} [${row.label}-${col.label}]`,
+                Answer: val,
               });
             }
           });
@@ -443,8 +464,8 @@ function generateVerbatimData(survey: Survey, responses: SurveyResponse[]) {
         if (val) {
           verbatim.push({
             'Response ID': res.id,
-            'Question': q.title,
-            'Answer': val
+            Question: q.title,
+            Answer: val,
           });
         }
       }
@@ -458,7 +479,10 @@ function generateVerbatimData(survey: Survey, responses: SurveyResponse[]) {
 
 function sanitize(str: string) {
   // 엑셀 헤더로 쓸 수 없는 문자나 너무 긴 공백 제거
-  return str.replace(/[\r\n]+/g, ' ').trim().substring(0, 100);
+  return str
+    .replace(/[\r\n]+/g, ' ')
+    .trim()
+    .substring(0, 100);
 }
 
 function parseUserAgent(ua: string) {

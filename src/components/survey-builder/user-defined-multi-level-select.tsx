@@ -1,8 +1,10 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { ChevronDown } from "lucide-react";
-import { SelectLevel, QuestionOption } from "@/types/survey";
+import { useEffect, useState } from 'react';
+
+import { ChevronDown } from 'lucide-react';
+
+import { QuestionOption, SelectLevel } from '@/types/survey';
 
 interface UserDefinedMultiLevelSelectProps {
   levels: SelectLevel[];
@@ -17,7 +19,7 @@ export function UserDefinedMultiLevelSelect({
   values,
   onChange,
   disabled = false,
-  className = "",
+  className = '',
 }: UserDefinedMultiLevelSelectProps) {
   const [currentValues, setCurrentValues] = useState<string[]>(values);
 
@@ -33,7 +35,7 @@ export function UserDefinedMultiLevelSelect({
 
     // 하위 레벨들을 초기화 (cascade effect)
     for (let i = levelIndex + 1; i < levels.length; i++) {
-      newValues[i] = "";
+      newValues[i] = '';
     }
 
     setCurrentValues(newValues);
@@ -55,12 +57,12 @@ export function UserDefinedMultiLevelSelect({
     if (!parentValue) return [];
 
     // 상위 레벨들의 값을 모두 결합하여 현재까지의 경로를 만듦
-    const currentPath = currentValues.slice(0, levelIndex).join("-");
+    const currentPath = currentValues.slice(0, levelIndex).join('-');
 
     // 현재 경로와 정확히 일치하는 prefix를 가진 옵션들만 필터링
     return level.options.filter((option) => {
       // option의 value가 currentPath로 시작하는지 확인
-      return option.value.startsWith(currentPath + "-") || option.value === currentPath;
+      return option.value.startsWith(currentPath + '-') || option.value === currentPath;
     });
   };
 
@@ -75,13 +77,13 @@ export function UserDefinedMultiLevelSelect({
             <label className="block text-sm font-medium text-gray-700">{level.label}</label>
             <div className="relative">
               <select
-                value={currentValues[index] || ""}
+                value={currentValues[index] || ''}
                 onChange={(e) => handleLevelChange(index, e.target.value)}
                 disabled={isDisabled}
-                className={`w-full p-3 border border-gray-200 rounded-lg bg-white appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
+                className={`w-full appearance-none rounded-lg border border-gray-200 bg-white p-3 transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none ${
                   isDisabled
-                    ? "bg-gray-50 text-gray-400 cursor-not-allowed"
-                    : "hover:border-gray-300"
+                    ? 'cursor-not-allowed bg-gray-50 text-gray-400'
+                    : 'hover:border-gray-300'
                 }`}
               >
                 <option value="">{level.placeholder || `${level.label} 선택`}</option>
@@ -92,8 +94,8 @@ export function UserDefinedMultiLevelSelect({
                 ))}
               </select>
               <ChevronDown
-                className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 pointer-events-none transition-colors ${
-                  isDisabled ? "text-gray-300" : "text-gray-400"
+                className={`pointer-events-none absolute top-1/2 right-3 h-5 w-5 -translate-y-1/2 transform transition-colors ${
+                  isDisabled ? 'text-gray-300' : 'text-gray-400'
                 }`}
               />
             </div>
@@ -112,7 +114,7 @@ interface UserDefinedMultiLevelSelectPreviewProps {
 
 export function UserDefinedMultiLevelSelectPreview({
   levels,
-  className = "",
+  className = '',
 }: UserDefinedMultiLevelSelectPreviewProps) {
   return (
     <div className={`space-y-3 ${className}`}>
@@ -122,11 +124,11 @@ export function UserDefinedMultiLevelSelectPreview({
           <div className="relative">
             <select
               disabled
-              className="w-full p-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-400 cursor-not-allowed appearance-none"
+              className="w-full cursor-not-allowed appearance-none rounded-lg border border-gray-200 bg-gray-50 p-3 text-gray-400"
             >
               <option>{level.placeholder || `${level.label} 선택`}</option>
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-300 pointer-events-none" />
+            <ChevronDown className="pointer-events-none absolute top-1/2 right-3 h-5 w-5 -translate-y-1/2 transform text-gray-300" />
           </div>
         </div>
       ))}

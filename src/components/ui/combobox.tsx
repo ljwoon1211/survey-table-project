@@ -1,9 +1,10 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import { Check, ChevronsUpDown } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import * as React from 'react';
+
+import { Check, ChevronsUpDown } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
 import {
   Command,
   CommandEmpty,
@@ -11,8 +12,9 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+} from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 
 export interface ComboboxOption {
   value: string;
@@ -36,9 +38,9 @@ export function Combobox({
   options,
   value,
   onValueChange,
-  placeholder = "선택...",
-  searchPlaceholder = "검색...",
-  emptyText = "결과가 없습니다",
+  placeholder = '선택...',
+  searchPlaceholder = '검색...',
+  emptyText = '결과가 없습니다',
   className,
   triggerClassName,
   disabled = false,
@@ -56,8 +58,8 @@ export function Combobox({
           aria-expanded={open}
           disabled={disabled}
           className={cn(
-            "w-full justify-between font-normal",
-            !value && "text-muted-foreground",
+            'w-full justify-between font-normal',
+            !value && 'text-muted-foreground',
             triggerClassName,
           )}
         >
@@ -65,7 +67,7 @@ export function Combobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className={cn("p-0", className)} align="start">
+      <PopoverContent className={cn('p-0', className)} align="start">
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
@@ -83,8 +85,8 @@ export function Combobox({
                 >
                   <Check
                     className={cn(
-                      "mr-2 h-4 w-4",
-                      value === option.value ? "opacity-100" : "opacity-0",
+                      'mr-2 h-4 w-4',
+                      value === option.value ? 'opacity-100' : 'opacity-0',
                     )}
                   />
                   <span className="truncate">{option.label}</span>

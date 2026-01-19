@@ -1,23 +1,30 @@
 'use client';
 
-import { useCallback, useTransition, useState } from 'react';
-import { useSurveyBuilderStore, useSurveyListStore, useSurveyResponseStore } from '@/stores';
+import { useCallback, useState, useTransition } from 'react';
+
 import {
-  getSurveyWithDetails,
-  getSurveyListWithCounts,
-  getResponsesBySurvey,
   calculateResponseSummary,
+  getResponsesBySurvey,
+  getSurveyListWithCounts,
+  getSurveyWithDetails,
 } from '@/actions/query-actions';
 import {
-  saveSurveyWithDetails,
-  deleteSurvey as deleteSurveyAction,
-  duplicateSurvey as duplicateSurveyAction,
-} from '@/actions/survey-actions';
-import {
+  completeResponse as completeResponseAction,
   startResponse as startResponseAction,
   updateQuestionResponse as updateQuestionResponseAction,
-  completeResponse as completeResponseAction,
 } from '@/actions/response-actions';
+import {
+  deleteSurvey as deleteSurveyAction,
+  duplicateSurvey as duplicateSurveyAction,
+  saveSurveyWithDetails,
+} from '@/actions/survey-actions';
+import {
+  useSurveyBuilderStore,
+  useSurveyListStore,
+  useSurveyResponseStore,
+  useSurveyUIStore,
+  useTestResponseStore,
+} from '@/stores';
 import type { Survey } from '@/types/survey';
 
 /**
@@ -30,42 +37,45 @@ export function useSurveySync() {
   const [saveError, setSaveError] = useState<Error | null>(null);
 
   // 현재 설문을 DB에 저장 (중복 저장 방지 포함)
-  const saveSurvey = useCallback(async (surveyData?: Survey) => {
-    // surveyData가 제공되면 그것을 사용, 아니면 currentSurvey 사용
-    const surveyToSave = surveyData || currentSurvey;
+  const saveSurvey = useCallback(
+    async (surveyData?: Survey) => {
+      // surveyData가 제공되면 그것을 사용, 아니면 currentSurvey 사용
+      const surveyToSave = surveyData || currentSurvey;
 
-    if (!surveyToSave.id) {
-      console.error('설문 ID가 없습니다.');
-      return null;
-    }
+      if (!surveyToSave.id) {
+        console.error('설문 ID가 없습니다.');
+        return null;
+      }
 
-    // 이미 저장 중이면 중복 저장 방지
-    if (isSaving) {
-      console.log('이미 저장 중입니다. 중복 저장을 방지합니다.');
-      return null;
-    }
+      // 이미 저장 중이면 중복 저장 방지
+      if (isSaving) {
+        console.log('이미 저장 중입니다. 중복 저장을 방지합니다.');
+        return null;
+      }
 
-    setIsSaving(true);
-    setSaveError(null);
+      setIsSaving(true);
+      setSaveError(null);
 
-    try {
-      // 저장 전에 최신 currentSurvey 상태 가져오기 (그룹의 displayCondition 포함)
-      const latestSurvey = useSurveyBuilderStore.getState().currentSurvey;
-      const finalSurvey = surveyData || latestSurvey;
+      try {
+        // 저장 전에 최신 currentSurvey 상태 가져오기 (그룹의 displayCondition 포함)
+        const latestSurvey = useSurveyBuilderStore.getState().currentSurvey;
+        const finalSurvey = surveyData || latestSurvey;
 
-      const result = await saveSurveyWithDetails(finalSurvey);
-      // 저장 성공 시 dirty 플래그 초기화
-      markClean();
-      return result;
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error('설문 저장 실패');
-      console.error('설문 저장 실패:', err);
-      setSaveError(err);
-      throw err;
-    } finally {
-      setIsSaving(false);
-    }
-  }, [currentSurvey, isSaving, markClean]);
+        const result = await saveSurveyWithDetails(finalSurvey);
+        // 저장 성공 시 dirty 플래그 초기화
+        markClean();
+        return result;
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error('설문 저장 실패');
+        console.error('설문 저장 실패:', err);
+        setSaveError(err);
+        throw err;
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [currentSurvey, isSaving, markClean],
+  );
 
   // DB에서 설문 불러오기
   const loadSurvey = useCallback(async (surveyId: string) => {
@@ -75,10 +85,15 @@ export function useSurveySync() {
         // Zustand store 업데이트
         useSurveyBuilderStore.setState({
           currentSurvey: survey,
-          selectedQuestionId: null,
-          isTestMode: false,
-          testResponses: {},
         });
+
+        // UI 상태 초기화
+        const { selectQuestion, setTestMode } = useSurveyUIStore.getState();
+        selectQuestion(null);
+        setTestMode(false);
+
+        // 테스트 응답 초기화
+        useTestResponseStore.getState().clearTestResponses();
       }
       return survey;
     } catch (error) {
@@ -90,6 +105,13 @@ export function useSurveySync() {
   // 새 설문 생성 (DB + Store)
   const createNewSurvey = useCallback(async () => {
     resetSurvey();
+
+    // UI 및 테스트 응답 초기화
+    const { selectQuestion, setTestMode } = useSurveyUIStore.getState();
+    selectQuestion(null);
+    setTestMode(false);
+    useTestResponseStore.getState().clearTestResponses();
+
     const newSurvey = useSurveyBuilderStore.getState().currentSurvey;
 
     try {
@@ -144,8 +166,8 @@ export function useSurveyListSync() {
   const deleteSurvey = useCallback(async (surveyId: string) => {
     try {
       await deleteSurveyAction(surveyId);
-      // 로컬 store에서도 삭제
-      useSurveyListStore.getState().deleteSurvey(surveyId);
+      // 로컬 store에서 선택 해제 (목록에서 삭제는 쿼리 무효화로 처리됨)
+      useSurveyListStore.getState().deselectSurvey(surveyId);
     } catch (error) {
       console.error('설문 삭제 실패:', error);
       throw error;
@@ -200,7 +222,7 @@ export function useResponseSync() {
         throw error;
       }
     },
-    []
+    [],
   );
 
   // 응답 완료

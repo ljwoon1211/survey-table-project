@@ -1,4 +1,4 @@
-import type { Question } from "@/types/survey";
+import type { Question } from '@/types/survey';
 
 /**
  * 질문에서 사용된 모든 이미지 URL을 추출합니다.
@@ -42,15 +42,15 @@ export function extractImageUrlsFromQuestion(question: Question): string[] {
  */
 export function extractImageUrlsFromHtml(html: string): string[] {
   const imageUrls: string[] = [];
-  
+
   // img 태그에서 src 속성 추출
   const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
   let match;
-  
+
   while ((match = imgRegex.exec(html)) !== null) {
     const url = match[1];
     // data URL은 제외 (base64 등)
-    if (url && !url.startsWith("data:")) {
+    if (url && !url.startsWith('data:')) {
       // 프록시 URL인 경우 원본 URL로 변환
       const originalUrl = extractOriginalUrlFromProxy(url);
       if (originalUrl) {
@@ -89,19 +89,19 @@ export function extractImageUrlsFromQuestions(questions: Question[]): string[] {
 export function extractOriginalUrlFromProxy(proxyUrl: string): string | null {
   try {
     // 프록시 URL인지 확인
-    if (!proxyUrl.includes("/api/image/proxy")) {
+    if (!proxyUrl.includes('/api/image/proxy')) {
       return null;
     }
 
     // URL 파라미터에서 원본 URL 추출
-    const urlParts = proxyUrl.split("?");
+    const urlParts = proxyUrl.split('?');
     if (urlParts.length < 2) {
       return null;
     }
 
     const params = new URLSearchParams(urlParts[1]);
-    const originalUrl = params.get("url");
-    
+    const originalUrl = params.get('url');
+
     if (originalUrl) {
       return decodeURIComponent(originalUrl);
     }
@@ -123,9 +123,9 @@ export function extractFilePathFromR2Url(url: string): string | null {
     // 예: https://pub-xxx.r2.dev/images/1234567890-abc123.jpg
     const urlObj = new URL(url);
     const pathname = urlObj.pathname;
-    
+
     // 맨 앞의 "/" 제거
-    return pathname.startsWith("/") ? pathname.substring(1) : pathname;
+    return pathname.startsWith('/') ? pathname.substring(1) : pathname;
   } catch {
     return null;
   }

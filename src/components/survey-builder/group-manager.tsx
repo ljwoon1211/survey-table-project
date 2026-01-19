@@ -1,32 +1,35 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { Button } from "@/components/ui/button";
-import { useSurveyBuilderStore } from "@/stores/survey-store";
-import { QuestionGroup, QuestionConditionGroup } from "@/types/survey";
-import { isUUID } from "@/lib/survey-url";
-import { FolderPlus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
 import {
   DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
   DragEndEvent,
   DragOverEvent,
   DragStartEvent,
-} from "@dnd-kit/core";
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
 import {
-  arrayMove,
   SortableContext,
+  arrayMove,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { SortableGroupItem } from "./group-manager/group-item";
-import { GroupCreateModal } from "./group-manager/group-create-modal";
-import { GroupEditModal } from "./group-manager/group-edit-modal";
-import { canBeParentOf } from "./group-manager/group-helpers";
+} from '@dnd-kit/sortable';
+import { FolderPlus } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { isUUID } from '@/lib/survey-url';
+import { useSurveyBuilderStore } from '@/stores/survey-store';
+import { QuestionConditionGroup, QuestionGroup } from '@/types/survey';
+
+import { GroupCreateModal } from './group-manager/group-create-modal';
+import { GroupEditModal } from './group-manager/group-edit-modal';
+import { canBeParentOf } from './group-manager/group-helpers';
+import { SortableGroupItem } from './group-manager/group-item';
 
 interface GroupManagerProps {
   className?: string;
@@ -38,8 +41,8 @@ export function GroupManager({ className }: GroupManagerProps) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<QuestionGroup | null>(null);
-  const [groupName, setGroupName] = useState("");
-  const [groupDescription, setGroupDescription] = useState("");
+  const [groupName, setGroupName] = useState('');
+  const [groupDescription, setGroupDescription] = useState('');
   const [parentGroupIdForNew, setParentGroupIdForNew] = useState<string | undefined>(undefined);
   const [parentGroupIdForEdit, setParentGroupIdForEdit] = useState<string | undefined>(undefined);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -154,7 +157,7 @@ export function GroupManager({ className }: GroupManagerProps) {
       // DB에 그룹 저장
       if (currentSurvey.id && isUUID(currentSurvey.id)) {
         try {
-          const { createQuestionGroup } = await import("@/actions/survey-actions");
+          const { createQuestionGroup } = await import('@/actions/survey-actions');
           const createdGroup = await createQuestionGroup({
             surveyId: currentSurvey.id,
             name: groupName.trim(),
@@ -163,8 +166,8 @@ export function GroupManager({ className }: GroupManagerProps) {
           });
           createdGroupId = createdGroup.id;
         } catch (error) {
-          console.error("그룹 생성 실패:", error);
-          alert("그룹 생성에 실패했습니다. 다시 시도해주세요.");
+          console.error('그룹 생성 실패:', error);
+          alert('그룹 생성에 실패했습니다. 다시 시도해주세요.');
           return;
         }
       }
@@ -204,8 +207,8 @@ export function GroupManager({ className }: GroupManagerProps) {
         addGroup(groupName.trim(), groupDescription.trim() || undefined, parentGroupIdForNew);
       }
 
-      setGroupName("");
-      setGroupDescription("");
+      setGroupName('');
+      setGroupDescription('');
       setParentGroupIdForNew(undefined);
       setIsCreateModalOpen(false);
       // 그룹 생성은 이미 createQuestionGroup API로 저장됨
@@ -234,7 +237,7 @@ export function GroupManager({ className }: GroupManagerProps) {
     const latestGroup = groups.find((g) => g.id === group.id) || group;
     setEditingGroup(latestGroup);
     setGroupName(latestGroup.name);
-    setGroupDescription(latestGroup.description || "");
+    setGroupDescription(latestGroup.description || '');
     setParentGroupIdForEdit(latestGroup.parentGroupId);
     setIsEditModalOpen(true);
   };
@@ -245,11 +248,11 @@ export function GroupManager({ className }: GroupManagerProps) {
 
       // DB에 저장 (그룹 ID가 UUID인 경우에만)
       if (currentSurvey.id && isUUID(currentSurvey.id) && isUUID(editingGroup.id)) {
-        import("@/actions/survey-actions").then(({ updateQuestionGroup }) => {
+        import('@/actions/survey-actions').then(({ updateQuestionGroup }) => {
           updateQuestionGroup(editingGroup.id, {
             displayCondition: conditionGroup,
           }).catch((error) => {
-            console.error("그룹 표시 조건 저장 실패:", error);
+            console.error('그룹 표시 조건 저장 실패:', error);
           });
         });
       }
@@ -269,7 +272,7 @@ export function GroupManager({ className }: GroupManagerProps) {
       if (oldParentGroupId !== newParentGroupId) {
         // 순환 참조 체크: newParentGroupId가 editingGroup의 하위 그룹이 될 수 있는지 확인
         if (newParentGroupId && !canBeParentOf(newParentGroupId, editingGroup.id, groups)) {
-          alert("순환 참조 방지: 선택한 그룹을 상위 그룹으로 설정할 수 없습니다.");
+          alert('순환 참조 방지: 선택한 그룹을 상위 그룹으로 설정할 수 없습니다.');
           return;
         }
 
@@ -304,7 +307,7 @@ export function GroupManager({ className }: GroupManagerProps) {
           (!newParentGroupId || isUUID(newParentGroupId))
         ) {
           try {
-            const { updateQuestionGroup } = await import("@/actions/survey-actions");
+            const { updateQuestionGroup } = await import('@/actions/survey-actions');
             await updateQuestionGroup(editingGroup.id, {
               name: groupName.trim(),
               description: groupDescription.trim() || undefined,
@@ -313,7 +316,7 @@ export function GroupManager({ className }: GroupManagerProps) {
               displayCondition: finalDisplayCondition,
             });
           } catch (error) {
-            console.error("그룹 업데이트 저장 실패:", error);
+            console.error('그룹 업데이트 저장 실패:', error);
           }
         }
 
@@ -331,21 +334,21 @@ export function GroupManager({ className }: GroupManagerProps) {
         // DB에 저장 (그룹 ID가 UUID인 경우에만)
         if (currentSurvey.id && isUUID(currentSurvey.id) && isUUID(editingGroup.id)) {
           try {
-            const { updateQuestionGroup } = await import("@/actions/survey-actions");
+            const { updateQuestionGroup } = await import('@/actions/survey-actions');
             await updateQuestionGroup(editingGroup.id, {
               name: groupName.trim(),
               description: groupDescription.trim() || undefined,
               displayCondition: finalDisplayCondition,
             });
           } catch (error) {
-            console.error("그룹 업데이트 저장 실패:", error);
+            console.error('그룹 업데이트 저장 실패:', error);
           }
         }
       }
 
       setEditingGroup(null);
-      setGroupName("");
-      setGroupDescription("");
+      setGroupName('');
+      setGroupDescription('');
       setParentGroupIdForEdit(undefined);
       setIsEditModalOpen(false);
       // 그룹 수정은 이미 updateQuestionGroup API로 저장됨
@@ -357,18 +360,18 @@ export function GroupManager({ className }: GroupManagerProps) {
     const message =
       subGroups.length > 0
         ? `이 그룹과 ${subGroups.length}개의 하위 그룹을 삭제하시겠습니까? (그룹에 속한 질문들은 그룹 없음 상태가 됩니다)`
-        : "이 그룹을 삭제하시겠습니까? (그룹에 속한 질문들은 그룹 없음 상태가 됩니다)";
+        : '이 그룹을 삭제하시겠습니까? (그룹에 속한 질문들은 그룹 없음 상태가 됩니다)';
 
     if (confirm(message)) {
       // DB에서 그룹 삭제 (deleteQuestionGroup이 재귀적으로 하위 그룹도 함께 처리)
       if (currentSurvey.id && isUUID(currentSurvey.id)) {
         try {
-          const { deleteQuestionGroup } = await import("@/actions/survey-actions");
+          const { deleteQuestionGroup } = await import('@/actions/survey-actions');
           // 최상위 그룹만 삭제하면, 서버 액션에서 하위 그룹도 함께 처리됨
           await deleteQuestionGroup(groupId);
         } catch (error) {
-          console.error("그룹 삭제 실패:", error);
-          alert("그룹 삭제에 실패했습니다. 다시 시도해주세요.");
+          console.error('그룹 삭제 실패:', error);
+          alert('그룹 삭제에 실패했습니다. 다시 시도해주세요.');
           return;
         }
       }
@@ -421,13 +424,13 @@ export function GroupManager({ className }: GroupManagerProps) {
         // DB에 저장 (UUID인 그룹 ID만 필터링)
         if (currentSurvey.id && isUUID(currentSurvey.id)) {
           try {
-            const { reorderGroups: reorderGroupsAction } = await import("@/actions/survey-actions");
+            const { reorderGroups: reorderGroupsAction } = await import('@/actions/survey-actions');
             const uuidGroupIds = newGroupIds.filter((id) => isUUID(id));
             if (uuidGroupIds.length > 0) {
               await reorderGroupsAction(currentSurvey.id, uuidGroupIds);
             }
           } catch (error) {
-            console.error("그룹 순서 저장 실패:", error);
+            console.error('그룹 순서 저장 실패:', error);
           }
         }
         // 그룹 순서 변경은 이미 reorderGroups API로 저장됨
@@ -460,7 +463,7 @@ export function GroupManager({ className }: GroupManagerProps) {
           // DB에 저장 (그룹 ID가 UUID인 경우에만)
           if (currentSurvey.id && isUUID(currentSurvey.id)) {
             try {
-              const { updateQuestionGroup } = await import("@/actions/survey-actions");
+              const { updateQuestionGroup } = await import('@/actions/survey-actions');
               await Promise.all(
                 newOrder
                   .filter((group) => isUUID(group.id))
@@ -471,7 +474,7 @@ export function GroupManager({ className }: GroupManagerProps) {
                   ),
               );
             } catch (error) {
-              console.error("하위 그룹 순서 저장 실패:", error);
+              console.error('하위 그룹 순서 저장 실패:', error);
             }
           }
           // 하위 그룹 순서 변경은 이미 updateQuestionGroup API로 저장됨
@@ -487,7 +490,7 @@ export function GroupManager({ className }: GroupManagerProps) {
   return (
     <div>
       {/* 고정 헤더 */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="mb-3 flex items-center justify-between">
         <h4 className="text-sm font-medium text-gray-700">📁 그룹 관리</h4>
         <Button
           variant="ghost"
@@ -495,14 +498,14 @@ export function GroupManager({ className }: GroupManagerProps) {
           className="h-7 px-2 text-xs"
           onClick={() => handleOpenCreateModal()}
         >
-          <FolderPlus className="w-3 h-3 mr-1" />새 그룹
+          <FolderPlus className="mr-1 h-3 w-3" />새 그룹
         </Button>
       </div>
 
       {/* 스크롤 가능한 그룹 리스트 */}
-      <div className={`overflow-y-auto ${className || ""}`}>
+      <div className={`overflow-y-auto ${className || ''}`}>
         {topLevelGroups.length === 0 ? (
-          <div className="text-center py-6 text-gray-400 text-xs">
+          <div className="py-6 text-center text-xs text-gray-400">
             <p>생성된 그룹이 없습니다</p>
             <p className="mt-1">그룹을 만들어 질문을 정리하세요</p>
           </div>
@@ -543,7 +546,7 @@ export function GroupManager({ className }: GroupManagerProps) {
                           items={subGroups.map((g) => g.id)}
                           strategy={verticalListSortingStrategy}
                         >
-                          <div className="ml-6 mt-2 space-y-2 border-l-2 border-gray-200 pl-3">
+                          <div className="mt-2 ml-6 space-y-2 border-l-2 border-gray-200 pl-3">
                             {subGroups.map((subGroup) => {
                               return (
                                 <div key={subGroup.id}>
@@ -578,8 +581,8 @@ export function GroupManager({ className }: GroupManagerProps) {
         isOpen={isCreateModalOpen}
         onClose={() => {
           setIsCreateModalOpen(false);
-          setGroupName("");
-          setGroupDescription("");
+          setGroupName('');
+          setGroupDescription('');
           setParentGroupIdForNew(undefined);
         }}
         onSubmit={handleCreateGroup}
@@ -597,8 +600,8 @@ export function GroupManager({ className }: GroupManagerProps) {
         onClose={() => {
           setIsEditModalOpen(false);
           setEditingGroup(null);
-          setGroupName("");
-          setGroupDescription("");
+          setGroupName('');
+          setGroupDescription('');
           setParentGroupIdForEdit(undefined);
         }}
         onSubmit={handleUpdateGroup}

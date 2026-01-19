@@ -48,19 +48,21 @@ export function generateSlugFromTitle(title: string): string {
     return '';
   }
 
-  return title
-    .toLowerCase()
-    .trim()
-    // 공백을 하이픈으로 변환
-    .replace(/\s+/g, '-')
-    // 한글, 영문, 숫자, 하이픈만 유지 (특수문자 제거)
-    .replace(/[^\w\u3131-\u3163\uac00-\ud7a3-]/g, '')
-    // 연속 하이픈을 단일 하이픈으로
-    .replace(/-+/g, '-')
-    // 앞뒤 하이픈 제거
-    .replace(/^-|-$/g, '')
-    // 최대 50자로 제한
-    .slice(0, 50);
+  return (
+    title
+      .toLowerCase()
+      .trim()
+      // 공백을 하이픈으로 변환
+      .replace(/\s+/g, '-')
+      // 한글, 영문, 숫자, 하이픈만 유지 (특수문자 제거)
+      .replace(/[^\w\u3131-\u3163\uac00-\ud7a3-]/g, '')
+      // 연속 하이픈을 단일 하이픈으로
+      .replace(/-+/g, '-')
+      // 앞뒤 하이픈 제거
+      .replace(/^-|-$/g, '')
+      // 최대 50자로 제한
+      .slice(0, 50)
+  );
 }
 
 /**
@@ -164,7 +166,7 @@ export function getSurveyAccessUrl(
     privateToken?: string;
     settings: { isPublic: boolean };
   },
-  baseUrl: string = typeof window !== 'undefined' ? window.location.origin : ''
+  baseUrl: string = typeof window !== 'undefined' ? window.location.origin : '',
 ): string {
   if (survey.settings.isPublic) {
     // 공개 설문: slug 사용, 없으면 id 사용
@@ -211,4 +213,3 @@ export function appendUniqueSlugSuffix(baseSlug: string): string {
   const truncatedBase = baseSlug.slice(0, maxBaseLength);
   return `${truncatedBase}-${suffix}`;
 }
-

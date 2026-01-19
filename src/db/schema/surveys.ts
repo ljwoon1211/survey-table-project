@@ -1,13 +1,5 @@
-import {
-  pgTable,
-  text,
-  timestamp,
-  boolean,
-  integer,
-  jsonb,
-  uuid,
-} from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
+import { boolean, integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 // 설문 테이블
 export const surveys = pgTable('surveys', {
@@ -34,7 +26,9 @@ export const surveys = pgTable('surveys', {
 // 질문 그룹 테이블
 export const questionGroups = pgTable('question_groups', {
   id: uuid('id').primaryKey().defaultRandom(),
-  surveyId: uuid('survey_id').notNull().references(() => surveys.id, { onDelete: 'cascade' }),
+  surveyId: uuid('survey_id')
+    .notNull()
+    .references(() => surveys.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   description: text('description'),
   order: integer('order').notNull().default(0),
@@ -50,7 +44,9 @@ export const questionGroups = pgTable('question_groups', {
 // 질문 테이블
 export const questions = pgTable('questions', {
   id: uuid('id').primaryKey().defaultRandom(),
-  surveyId: uuid('survey_id').notNull().references(() => surveys.id, { onDelete: 'cascade' }),
+  surveyId: uuid('survey_id')
+    .notNull()
+    .references(() => surveys.id, { onDelete: 'cascade' }),
   groupId: uuid('group_id').references(() => questionGroups.id, { onDelete: 'set null' }),
 
   type: text('type').notNull(), // 'text' | 'textarea' | 'radio' | 'checkbox' | 'select' | 'multiselect' | 'table' | 'notice'
@@ -99,7 +95,9 @@ export const questions = pgTable('questions', {
 // 설문 응답 테이블
 export const surveyResponses = pgTable('survey_responses', {
   id: uuid('id').primaryKey().defaultRandom(),
-  surveyId: uuid('survey_id').notNull().references(() => surveys.id, { onDelete: 'cascade' }),
+  surveyId: uuid('survey_id')
+    .notNull()
+    .references(() => surveys.id, { onDelete: 'cascade' }),
 
   // 응답 데이터 (질문ID -> 응답값 매핑)
   questionResponses: jsonb('question_responses').notNull().$type<Record<string, unknown>>(),

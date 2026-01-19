@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { QuestionGroup } from "@/types/survey";
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { QuestionGroup } from '@/types/survey';
 
 interface GroupCreateModalProps {
   isOpen: boolean;
@@ -43,12 +43,12 @@ export function GroupCreateModal({
           <DialogTitle>
             {parentGroupId
               ? `하위 그룹 만들기 (${groups.find((g) => g.id === parentGroupId)?.name})`
-              : "새 그룹 만들기"}
+              : '새 그룹 만들기'}
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 mt-4">
+        <div className="mt-4 space-y-4">
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
               그룹 이름 <span className="text-red-500">*</span>
             </label>
             <Input
@@ -56,16 +56,14 @@ export function GroupCreateModal({
               onChange={(e) => setGroupName(e.target.value)}
               placeholder="예: 응답자 정보, 1. TV보유 현황"
               onKeyPress={(e) => {
-                if (e.key === "Enter") {
+                if (e.key === 'Enter') {
                   onSubmit();
                 }
               }}
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">
-              그룹 설명 (선택)
-            </label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">그룹 설명 (선택)</label>
             <Textarea
               value={groupDescription}
               onChange={(e) => setGroupDescription(e.target.value)}
@@ -86,4 +84,3 @@ export function GroupCreateModal({
     </Dialog>
   );
 }
-

@@ -1,8 +1,9 @@
-"use client";
+'use client';
 
-import { AlertTriangle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import type { CrossTabResult, PercentageBase } from "@/lib/analytics/cross-tab";
+import { AlertTriangle } from 'lucide-react';
+
+import { Badge } from '@/components/ui/badge';
+import type { CrossTabResult, PercentageBase } from '@/lib/analytics/cross-tab';
 
 interface PivotTableProps {
   result: CrossTabResult;
@@ -16,32 +17,32 @@ export function PivotTable({ result, percentageBase, showCounts }: PivotTablePro
     base: PercentageBase,
   ): number => {
     switch (base) {
-      case "row":
+      case 'row':
         return cell.rowPercent;
-      case "column":
+      case 'column':
         return cell.colPercent;
-      case "total":
+      case 'total':
         return cell.totalPercent;
     }
   };
 
   // 셀 배경색 계산 (히트맵 효과)
   const getCellColor = (percentage: number): string => {
-    if (percentage === 0) return "bg-gray-50";
-    if (percentage < 10) return "bg-blue-50";
-    if (percentage < 25) return "bg-blue-100";
-    if (percentage < 40) return "bg-blue-200";
-    if (percentage < 55) return "bg-blue-300";
-    if (percentage < 70) return "bg-blue-400 text-white";
-    return "bg-blue-500 text-white";
+    if (percentage === 0) return 'bg-gray-50';
+    if (percentage < 10) return 'bg-blue-50';
+    if (percentage < 25) return 'bg-blue-100';
+    if (percentage < 40) return 'bg-blue-200';
+    if (percentage < 55) return 'bg-blue-300';
+    if (percentage < 70) return 'bg-blue-400 text-white';
+    return 'bg-blue-500 text-white';
   };
 
   return (
     <div className="overflow-x-auto">
       {/* 표본 수 경고 */}
       {result.hasLowSampleWarning && (
-        <div className="flex items-center gap-2 p-3 mb-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
-          <AlertTriangle className="w-4 h-4" />
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+          <AlertTriangle className="h-4 w-4" />
           <span>일부 셀의 표본 수가 30 미만입니다. 통계적 해석에 주의가 필요합니다.</span>
         </div>
       )}
@@ -50,7 +51,7 @@ export function PivotTable({ result, percentageBase, showCounts }: PivotTablePro
         <thead>
           <tr>
             {/* 빈 셀 (좌상단) */}
-            <th className="border border-gray-200 bg-gray-100 p-3 text-left font-semibold text-gray-700 min-w-[150px]">
+            <th className="min-w-[150px] border border-gray-200 bg-gray-100 p-3 text-left font-semibold text-gray-700">
               {result.rowQuestion.title}
             </th>
 
@@ -58,15 +59,15 @@ export function PivotTable({ result, percentageBase, showCounts }: PivotTablePro
             {result.columns.map((col) => (
               <th
                 key={col.value}
-                className="border border-gray-200 bg-gray-100 p-3 text-center font-medium text-gray-700 min-w-[100px]"
+                className="min-w-[100px] border border-gray-200 bg-gray-100 p-3 text-center font-medium text-gray-700"
               >
                 <div>{col.label}</div>
-                <div className="text-xs text-gray-500 font-normal mt-1">n={col.total}</div>
+                <div className="mt-1 text-xs font-normal text-gray-500">n={col.total}</div>
               </th>
             ))}
 
             {/* 합계 열 */}
-            <th className="border border-gray-200 bg-gray-200 p-3 text-center font-semibold text-gray-800 min-w-[80px]">
+            <th className="min-w-[80px] border border-gray-200 bg-gray-200 p-3 text-center font-semibold text-gray-800">
               합계
             </th>
           </tr>
@@ -78,7 +79,7 @@ export function PivotTable({ result, percentageBase, showCounts }: PivotTablePro
               {/* 행 헤더 */}
               <td className="border border-gray-200 bg-gray-50 p-3 font-medium text-gray-700">
                 <div>{row.label}</div>
-                <div className="text-xs text-gray-500 font-normal">n={row.total}</div>
+                <div className="text-xs font-normal text-gray-500">n={row.total}</div>
               </td>
 
               {/* 데이터 셀 */}
@@ -90,7 +91,7 @@ export function PivotTable({ result, percentageBase, showCounts }: PivotTablePro
                     className={`border border-gray-200 p-3 text-center ${getCellColor(percentage)}`}
                   >
                     <div className="font-semibold">{percentage.toFixed(1)}%</div>
-                    {showCounts && <div className="text-xs opacity-75 mt-1">({cell.count})</div>}
+                    {showCounts && <div className="mt-1 text-xs opacity-75">({cell.count})</div>}
                   </td>
                 );
               })}
@@ -98,7 +99,7 @@ export function PivotTable({ result, percentageBase, showCounts }: PivotTablePro
               {/* 행 합계 */}
               <td className="border border-gray-200 bg-gray-100 p-3 text-center font-semibold">
                 <div>{row.total}</div>
-                <div className="text-xs text-gray-500 font-normal">
+                <div className="text-xs font-normal text-gray-500">
                   {row.rowPercent.toFixed(1)}%
                 </div>
               </td>
@@ -111,7 +112,7 @@ export function PivotTable({ result, percentageBase, showCounts }: PivotTablePro
             {result.columns.map((col) => (
               <td key={col.value} className="border border-gray-200 p-3 text-center font-semibold">
                 <div>{col.total}</div>
-                <div className="text-xs text-gray-600 font-normal">
+                <div className="text-xs font-normal text-gray-600">
                   {col.colPercent.toFixed(1)}%
                 </div>
               </td>
@@ -127,12 +128,12 @@ export function PivotTable({ result, percentageBase, showCounts }: PivotTablePro
       <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
         <span>색상 강도:</span>
         <div className="flex gap-1">
-          <div className="w-6 h-4 bg-gray-50 border rounded" title="0%" />
-          <div className="w-6 h-4 bg-blue-100 border rounded" title="10-25%" />
-          <div className="w-6 h-4 bg-blue-200 border rounded" title="25-40%" />
-          <div className="w-6 h-4 bg-blue-300 border rounded" title="40-55%" />
-          <div className="w-6 h-4 bg-blue-400 border rounded" title="55-70%" />
-          <div className="w-6 h-4 bg-blue-500 border rounded" title="70%+" />
+          <div className="h-4 w-6 rounded border bg-gray-50" title="0%" />
+          <div className="h-4 w-6 rounded border bg-blue-100" title="10-25%" />
+          <div className="h-4 w-6 rounded border bg-blue-200" title="25-40%" />
+          <div className="h-4 w-6 rounded border bg-blue-300" title="40-55%" />
+          <div className="h-4 w-6 rounded border bg-blue-400" title="55-70%" />
+          <div className="h-4 w-6 rounded border bg-blue-500" title="70%+" />
         </div>
         <span className="ml-2">낮음 → 높음</span>
       </div>

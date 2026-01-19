@@ -1,19 +1,20 @@
-"use client";
+'use client';
 
 import {
+  BarChart,
   Card,
   DonutChart,
-  BarChart,
+  Legend,
+  Tab,
   TabGroup,
   TabList,
-  Tab,
-  TabPanels,
   TabPanel,
-  Legend,
-} from "@tremor/react";
-import { PieChart, BarChart3 } from "lucide-react";
-import type { SingleChoiceAnalytics } from "@/lib/analytics/types";
-import { CHART_COLORS, formatPercentage } from "@/lib/analytics/analyzer";
+  TabPanels,
+} from '@tremor/react';
+import { BarChart3, PieChart } from 'lucide-react';
+
+import { CHART_COLORS, formatPercentage } from '@/lib/analytics/analyzer';
+import type { SingleChoiceAnalytics } from '@/lib/analytics/types';
 
 interface SingleChoiceChartProps {
   data: SingleChoiceAnalytics;
@@ -31,15 +32,15 @@ export function SingleChoiceChart({ data }: SingleChoiceChartProps) {
 
   return (
     <Card className="p-6">
-      <div className="flex items-start justify-between mb-4">
+      <div className="mb-4 flex items-start justify-between">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">{data.questionTitle}</h3>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="mt-1 text-sm text-gray-500">
             {data.totalResponses}명 응답 · 응답률 {formatPercentage(data.responseRate)}
           </p>
         </div>
-        <span className="px-2 py-1 text-xs font-medium bg-blue-50 text-blue-600 rounded-full">
-          {data.questionType === "radio" ? "단일 선택" : "드롭다운"}
+        <span className="rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-600">
+          {data.questionType === 'radio' ? '단일 선택' : '드롭다운'}
         </span>
       </div>
 
@@ -51,7 +52,7 @@ export function SingleChoiceChart({ data }: SingleChoiceChartProps) {
         <TabPanels>
           {/* 도넛 차트 */}
           <TabPanel>
-            <div className="flex flex-col lg:flex-row items-center gap-6 mt-6">
+            <div className="mt-6 flex flex-col items-center gap-6 lg:flex-row">
               <DonutChart
                 className="h-52 w-52"
                 data={chartData}
@@ -61,18 +62,18 @@ export function SingleChoiceChart({ data }: SingleChoiceChartProps) {
                 colors={colors}
                 showAnimation
               />
-              <div className="flex-1 w-full">
+              <div className="w-full flex-1">
                 <Legend
                   categories={chartData.map((d) => d.name)}
                   colors={colors}
                   className="flex-wrap justify-center lg:justify-start"
                 />
                 {/* 상세 목록 */}
-                <div className="mt-4 space-y-2 max-h-48 overflow-y-auto">
+                <div className="mt-4 max-h-48 space-y-2 overflow-y-auto">
                   {data.distribution.map((item, idx) => (
                     <div key={item.value} className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600 truncate flex-1">{item.label}</span>
-                      <span className="text-gray-900 font-medium ml-4">
+                      <span className="flex-1 truncate text-gray-600">{item.label}</span>
+                      <span className="ml-4 font-medium text-gray-900">
                         {item.count}명 ({formatPercentage(item.percentage)})
                       </span>
                     </div>
@@ -88,8 +89,8 @@ export function SingleChoiceChart({ data }: SingleChoiceChartProps) {
               className="mt-6 h-72"
               data={chartData}
               index="name"
-              categories={["value"]}
-              colors={["blue"]}
+              categories={['value']}
+              colors={['blue']}
               valueFormatter={(value) => `${value}명`}
               layout="vertical"
               showAnimation

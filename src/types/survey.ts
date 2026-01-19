@@ -21,11 +21,11 @@ export interface BranchRule {
 
 // 테이블 검증 규칙 타입
 export type TableValidationType =
-  | 'exclusive-check'      // 특정 행만 체크된 경우 (예: "~만 있는 경우")
+  | 'exclusive-check' // 특정 행만 체크된 경우 (예: "~만 있는 경우")
   | 'required-combination' // 특정 조합이 체크된 경우
-  | 'any-of'              // 여러 행 중 하나라도 체크된 경우
-  | 'all-of'              // 특정 행들이 모두 체크된 경우
-  | 'none-of';            // 특정 행들이 모두 체크 안된 경우
+  | 'any-of' // 여러 행 중 하나라도 체크된 경우
+  | 'all-of' // 특정 행들이 모두 체크된 경우
+  | 'none-of'; // 특정 행들이 모두 체크 안된 경우
 
 // 테이블 검증 규칙
 export interface TableValidationRule {
@@ -88,7 +88,7 @@ export interface QuestionOption {
   id: string;
   label: string;
   value: string;
-  optionCode?: string;        // ✨ 엑셀 내보내기용 옵션 코드 (예: "opt1", "삼성UHDTV")
+  optionCode?: string; // ✨ 엑셀 내보내기용 옵션 코드 (예: "opt1", "삼성UHDTV")
   hasOther?: boolean;
   // 조건부 분기
   branchRule?: BranchRule;
@@ -96,8 +96,8 @@ export interface QuestionOption {
 
 export interface TableCell {
   id: string;
-  cellCode?: string;          // ✨ 엑셀 내보내기용 셀 코드 (예: "c1", "보유여부")
-  exportLabel?: string;       // ✨ 엑셀 열 이름 (예: "TV보유여부")
+  cellCode?: string; // ✨ 엑셀 내보내기용 셀 코드 (예: "c1", "보유여부")
+  exportLabel?: string; // ✨ 엑셀 열 이름 (예: "TV보유여부")
   content: string;
   imageUrl?: string;
   videoUrl?: string;
@@ -128,7 +128,7 @@ export interface CheckboxOption {
   id: string;
   label: string;
   value: string;
-  optionCode?: string;        // ✨ 엑셀 내보내기용 옵션 코드
+  optionCode?: string; // ✨ 엑셀 내보내기용 옵션 코드
   checked?: boolean;
   hasOther?: boolean;
   // 조건부 분기
@@ -139,7 +139,7 @@ export interface RadioOption {
   id: string;
   label: string;
   value: string;
-  optionCode?: string;        // ✨ 엑셀 내보내기용 옵션 코드
+  optionCode?: string; // ✨ 엑셀 내보내기용 옵션 코드
   selected?: boolean;
   hasOther?: boolean;
   // 조건부 분기
@@ -148,7 +148,7 @@ export interface RadioOption {
 
 export interface TableRow {
   id: string;
-  rowCode?: string;           // ✨ 엑셀 내보내기용 행 코드 (예: "UHD", "DIGITAL", "r1")
+  rowCode?: string; // ✨ 엑셀 내보내기용 행 코드 (예: "UHD", "DIGITAL", "r1")
   label: string;
   cells: TableCell[];
   height?: number; // 행 높이 (픽셀 단위)
@@ -158,7 +158,7 @@ export interface TableRow {
 
 export interface TableColumn {
   id: string;
-  columnCode?: string;        // ✨ 엑셀 내보내기용 열 코드
+  columnCode?: string; // ✨ 엑셀 내보내기용 열 코드
   label: string;
   width?: number; // 열 너비 (픽셀 단위)
   minWidth?: number; // 최소 너비
@@ -185,11 +185,10 @@ export interface QuestionGroup {
   displayCondition?: QuestionConditionGroup; // 그룹 표시 조건
 }
 
-
 export interface Question {
   id: string;
-  questionCode?: string;        // ✨ 사용자 정의 ID (예: "Q1", "A2", "A8_1")
-  exportLabel?: string;         // ✨ 엑셀 헤더용 라벨 (예: "성별", "TV보유현황")
+  questionCode?: string; // ✨ 사용자 정의 ID (예: "Q1", "A2", "A8_1")
+  exportLabel?: string; // ✨ 엑셀 헤더용 라벨 (예: "성별", "TV보유현황")
   type: QuestionType;
   title: string;
   description?: string;
@@ -199,6 +198,9 @@ export interface Question {
   selectLevels?: SelectLevel[]; // 다단계 select용
   tableRows?: string[];
   tableCols?: string[];
+  tableType?: string; // ✨ 테이블 타입 (매트릭스 등) - "matrix", "loop" 등
+  loopConfig?: any; // ✨ 반복 질문 설정
+
   // 새로운 테이블 구조
   tableTitle?: string;
   tableColumns?: TableColumn[];
@@ -225,8 +227,8 @@ export interface Survey {
   id: string;
   title: string;
   description?: string;
-  slug?: string;           // 공개 설문용 커스텀 URL 슬러그
-  privateToken?: string;   // 비공개 설문용 보안 토큰 (UUID)
+  slug?: string; // 공개 설문용 커스텀 URL 슬러그
+  privateToken?: string; // 비공개 설문용 보안 토큰 (UUID)
   groups?: QuestionGroup[]; // 질문 그룹 목록
   questions: Question[];
   settings: SurveySettings;
@@ -251,11 +253,26 @@ export interface OtherInputValue {
   inputValue: string;
 }
 
-// 설문 응답데이터 타입
+// 설문 응답데이터 타입 (단일 질문 응답)
 export interface SurveyResponse {
   questionId: string;
   value: string | string[] | { [key: string]: string | string[] | object };
   otherInputs?: OtherInputValue[]; // 기타 옵션 입력값들
+}
+
+// 설문 제출 데이터 타입 (DB 레코드)
+export interface SurveySubmission {
+  id: string;
+  surveyId: string;
+  sessionId?: string | null;
+  startedAt: Date;
+  completedAt?: Date | null;
+  isCompleted: boolean;
+  currentGroupOrder: number;
+  questionResponses: Record<string, any>; // JSON 저장된 응답들 (questionId -> value)
+  userAgent?: string | null;
+  ipAddress?: string | null;
+  updatedAt: Date;
 }
 
 export interface QuestionTypeInfo {
@@ -270,12 +287,12 @@ export interface QuestionTypeInfo {
 export interface SavedQuestion {
   id: string;
   question: Question;
-  name: string;           // 사용자가 지정한 이름 (예: "성별 질문", "연령대 선택")
-  description?: string;   // 설명
-  tags: string[];         // 태그 (예: ["인구통계", "기본정보"])
-  category: string;       // 카테고리 (예: "인구통계", "만족도", "NPS")
-  usageCount: number;     // 사용 횟수
-  isPreset: boolean;      // 프리셋 질문 여부
+  name: string; // 사용자가 지정한 이름 (예: "성별 질문", "연령대 선택")
+  description?: string; // 설명
+  tags: string[]; // 태그 (예: ["인구통계", "기본정보"])
+  category: string; // 카테고리 (예: "인구통계", "만족도", "NPS")
+  usageCount: number; // 사용 횟수
+  isPreset: boolean; // 프리셋 질문 여부
   createdAt: Date;
   updatedAt: Date;
 }
@@ -291,10 +308,34 @@ export interface QuestionCategory {
 
 // 기본 카테고리 목록
 export const DEFAULT_CATEGORIES: QuestionCategory[] = [
-  { id: 'demographics', name: '인구통계', color: 'bg-blue-100 text-blue-600', icon: 'Users', order: 0 },
-  { id: 'satisfaction', name: '만족도', color: 'bg-green-100 text-green-600', icon: 'ThumbsUp', order: 1 },
+  {
+    id: 'demographics',
+    name: '인구통계',
+    color: 'bg-blue-100 text-blue-600',
+    icon: 'Users',
+    order: 0,
+  },
+  {
+    id: 'satisfaction',
+    name: '만족도',
+    color: 'bg-green-100 text-green-600',
+    icon: 'ThumbsUp',
+    order: 1,
+  },
   { id: 'nps', name: 'NPS', color: 'bg-purple-100 text-purple-600', icon: 'TrendingUp', order: 2 },
-  { id: 'feedback', name: '피드백', color: 'bg-orange-100 text-orange-600', icon: 'MessageSquare', order: 3 },
+  {
+    id: 'feedback',
+    name: '피드백',
+    color: 'bg-orange-100 text-orange-600',
+    icon: 'MessageSquare',
+    order: 3,
+  },
   { id: 'preference', name: '선호도', color: 'bg-pink-100 text-pink-600', icon: 'Heart', order: 4 },
-  { id: 'custom', name: '사용자 정의', color: 'bg-gray-100 text-gray-600', icon: 'Folder', order: 5 },
+  {
+    id: 'custom',
+    name: '사용자 정의',
+    color: 'bg-gray-100 text-gray-600',
+    icon: 'Folder',
+    order: 5,
+  },
 ];

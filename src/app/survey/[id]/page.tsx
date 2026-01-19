@@ -1,31 +1,34 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
-import { useSurveyResponseStore } from "@/stores/survey-response-store";
-import { InteractiveTableResponse } from "@/components/survey-builder/interactive-table-response";
-import { UserDefinedMultiLevelSelect } from "@/components/survey-builder/user-defined-multi-level-select";
-import { NoticeRenderer } from "@/components/survey-builder/notice-renderer";
-import { CheckCircle, AlertCircle, ArrowLeft, ArrowRight, Loader2, Lock } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+import { useParams, useRouter } from 'next/navigation';
+
+import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle, Loader2, Lock } from 'lucide-react';
+
+import {
+  getSurveyByPrivateToken,
+  getSurveyBySlug,
+  getSurveyWithDetails,
+} from '@/actions/query-actions';
+import { completeResponse } from '@/actions/response-actions';
+import { InteractiveTableResponse } from '@/components/survey-builder/interactive-table-response';
+import { NoticeRenderer } from '@/components/survey-builder/notice-renderer';
+import { UserDefinedMultiLevelSelect } from '@/components/survey-builder/user-defined-multi-level-select';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
+import { useLineCountDetection } from '@/hooks/use-line-count-detection';
+import { parsesurveyIdentifier } from '@/lib/survey-url';
+import { generateId } from '@/lib/utils';
+import { useSurveyResponseStore } from '@/stores/survey-response-store';
+import { Question, QuestionOption, Survey } from '@/types/survey';
 import {
   getNextQuestionIndex,
   shouldDisplayQuestion,
   shouldDisplayRow,
-} from "@/utils/branch-logic";
-import { parsesurveyIdentifier } from "@/lib/survey-url";
-import { Question, QuestionOption, Survey } from "@/types/survey";
-import { generateId } from "@/lib/utils";
-import {
-  getSurveyWithDetails,
-  getSurveyBySlug,
-  getSurveyByPrivateToken,
-} from "@/actions/query-actions";
-import { completeResponse } from "@/actions/response-actions";
-import { useLineCountDetection } from "@/hooks/use-line-count-detection";
+} from '@/utils/branch-logic';
 
 type ResponsesMap = Record<string, unknown>;
 
@@ -36,11 +39,11 @@ type OtherChoiceValue = {
 };
 
 function isOtherChoiceValue(value: unknown): value is OtherChoiceValue {
-  if (!value || typeof value !== "object") return false;
+  if (!value || typeof value !== 'object') return false;
   return (
-    "selectedValue" in value &&
-    typeof (value as { selectedValue: unknown }).selectedValue === "string" &&
-    "hasOther" in value &&
+    'selectedValue' in value &&
+    typeof (value as { selectedValue: unknown }).selectedValue === 'string' &&
+    'hasOther' in value &&
     (value as { hasOther: unknown }).hasOther === true
   );
 }
@@ -55,7 +58,8 @@ export default function SurveyResponsePage() {
   const identifier = decodeURIComponent(params.id as string);
 
   // 응답 스토어
-  const { currentResponseId, setCurrentResponseId, setPendingResponse, resetResponseState } = useSurveyResponseStore();
+  const { currentResponseId, setCurrentResponseId, setPendingResponse, resetResponseState } =
+    useSurveyResponseStore();
 
   // 설문 로딩 상태
   const [isLoading, setIsLoading] = useState(true);
@@ -82,38 +86,38 @@ export default function SurveyResponsePage() {
         let survey: Survey | null = null;
 
         switch (type) {
-          case "slug": {
+          case 'slug': {
             const dbSurvey = await getSurveyBySlug(value);
             if (dbSurvey) {
               survey = await getSurveyWithDetails(dbSurvey.id);
             }
             break;
           }
-          case "privateToken": {
+          case 'privateToken': {
             const dbSurvey = await getSurveyByPrivateToken(value);
             if (dbSurvey) {
               survey = await getSurveyWithDetails(dbSurvey.id);
             }
             break;
           }
-          case "id":
+          case 'id':
             survey = await getSurveyWithDetails(value);
             break;
         }
 
         if (!survey) {
-          setLoadError("요청하신 설문을 찾을 수 없습니다.");
+          setLoadError('요청하신 설문을 찾을 수 없습니다.');
           setLoadedSurvey(null);
-        } else if (!survey.settings.isPublic && type === "slug") {
+        } else if (!survey.settings.isPublic && type === 'slug') {
           // 비공개 설문인데 slug로 접근한 경우
-          setLoadError("이 설문은 비공개 설문입니다. 올바른 링크로 접근해주세요.");
+          setLoadError('이 설문은 비공개 설문입니다. 올바른 링크로 접근해주세요.');
           setLoadedSurvey(null);
         } else {
           setLoadedSurvey(survey);
         }
       } catch (error) {
-        console.error("설문 로딩 오류:", error);
-        setLoadError("설문을 불러오는 중 오류가 발생했습니다.");
+        console.error('설문 로딩 오류:', error);
+        setLoadError('설문을 불러오는 중 오류가 발생했습니다.');
         setLoadedSurvey(null);
       } finally {
         setIsLoading(false);
@@ -153,10 +157,10 @@ export default function SurveyResponsePage() {
     checkMobile();
 
     // 리사이즈 이벤트 리스너
-    window.addEventListener("resize", checkMobile);
+    window.addEventListener('resize', checkMobile);
 
     return () => {
-      window.removeEventListener("resize", checkMobile);
+      window.removeEventListener('resize', checkMobile);
     };
   }, []);
 
@@ -248,26 +252,26 @@ export default function SurveyResponsePage() {
     if (!response) return false;
 
     switch (question.type) {
-      case "notice":
+      case 'notice':
         return question.requiresAcknowledgment ? response === true : true;
-      case "text":
-      case "textarea":
-        return typeof response === "string" && response.trim().length > 0;
-      case "radio":
-      case "select":
-        return response !== null && response !== undefined && response !== "";
-      case "checkbox":
+      case 'text':
+      case 'textarea':
+        return typeof response === 'string' && response.trim().length > 0;
+      case 'radio':
+      case 'select':
+        return response !== null && response !== undefined && response !== '';
+      case 'checkbox':
         if (!Array.isArray(response) || response.length === 0) return false;
         // 최소 선택 개수 검증
         if (question.minSelections !== undefined && question.minSelections > 0) {
           return response.length >= question.minSelections;
         }
         return true;
-      case "multiselect":
+      case 'multiselect':
         return Array.isArray(response) && response.length > 0;
-      case "table":
+      case 'table':
         return (
-          typeof response === "object" &&
+          typeof response === 'object' &&
           response !== null &&
           Object.keys(response as Record<string, unknown>).length > 0
         );
@@ -334,14 +338,14 @@ export default function SurveyResponsePage() {
 
       if (unansweredRequired.length > 0) {
         const errorMessages = unansweredRequired.map((q) => {
-          if (q.type === "checkbox" && q.minSelections !== undefined && q.minSelections > 0) {
+          if (q.type === 'checkbox' && q.minSelections !== undefined && q.minSelections > 0) {
             const response = responses[q.id];
             const count = Array.isArray(response) ? response.length : 0;
             return `${q.title} (최소 ${q.minSelections}개 선택 필요, 현재 ${count}개 선택됨)`;
           }
           return q.title;
         });
-        alert(`다음 필수 질문에 답해주세요:\n${errorMessages.join("\n")}`);
+        alert(`다음 필수 질문에 답해주세요:\n${errorMessages.join('\n')}`);
         setIsSubmitting(false);
         return;
       }
@@ -354,14 +358,16 @@ export default function SurveyResponsePage() {
         // 2. 노출된 테이블 행 ID 수집
         // [수정] 행 단위 노출 조건(displayCondition)을 체크하여 실제 노출된 행만 수집
         const exposedRowIds = visibleQuestions
-          .filter((q) => q.type === "table" && q.tableRowsData)
+          .filter((q) => q.type === 'table' && q.tableRowsData)
           .flatMap((q) =>
-            q.tableRowsData!
-              .filter((row) => shouldDisplayRow(row, responses as Record<string, unknown>, questions))
-              .map((row) => row.id)
+            q
+              .tableRowsData!.filter((row) =>
+                shouldDisplayRow(row, responses as Record<string, unknown>, questions),
+              )
+              .map((row) => row.id),
           );
 
-        console.log("Impression Logging:", { exposedQuestionIds, exposedRowIds });
+        console.log('Impression Logging:', { exposedQuestionIds, exposedRowIds });
 
         await completeResponse(currentResponseId, {
           exposedQuestionIds,
@@ -373,8 +379,8 @@ export default function SurveyResponsePage() {
       resetResponseState();
       setIsCompleted(true);
     } catch (error) {
-      console.error("응답 제출 오류:", error);
-      alert("응답 제출 중 오류가 발생했습니다. 다시 시도해주세요.");
+      console.error('응답 제출 오류:', error);
+      alert('응답 제출 중 오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
       setIsSubmitting(false);
     }
@@ -383,11 +389,11 @@ export default function SurveyResponsePage() {
   // 로딩 중
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="max-w-md mx-auto">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <Card className="mx-auto max-w-md">
           <CardContent className="p-8 text-center">
-            <Loader2 className="w-12 h-12 mx-auto mb-4 text-blue-500 animate-spin" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">설문을 불러오는 중...</h2>
+            <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin text-blue-500" />
+            <h2 className="mb-2 text-xl font-semibold text-gray-900">설문을 불러오는 중...</h2>
             <p className="text-gray-600">잠시만 기다려주세요.</p>
           </CardContent>
         </Card>
@@ -397,25 +403,25 @@ export default function SurveyResponsePage() {
 
   // 에러 발생
   if (loadError || !loadedSurvey) {
-    const isPrivateError = loadError?.includes("비공개");
+    const isPrivateError = loadError?.includes('비공개');
 
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="max-w-md mx-auto">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <Card className="mx-auto max-w-md">
           <CardContent className="p-8 text-center">
             {isPrivateError ? (
-              <Lock className="w-12 h-12 mx-auto mb-4 text-yellow-500" />
+              <Lock className="mx-auto mb-4 h-12 w-12 text-yellow-500" />
             ) : (
-              <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-500" />
+              <AlertCircle className="mx-auto mb-4 h-12 w-12 text-red-500" />
             )}
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              {isPrivateError ? "접근이 제한된 설문입니다" : "설문을 찾을 수 없습니다"}
+            <h2 className="mb-2 text-xl font-semibold text-gray-900">
+              {isPrivateError ? '접근이 제한된 설문입니다' : '설문을 찾을 수 없습니다'}
             </h2>
-            <p className="text-gray-600 mb-4">
-              {loadError || "요청하신 설문이 존재하지 않거나 삭제되었습니다."}
+            <p className="mb-4 text-gray-600">
+              {loadError || '요청하신 설문이 존재하지 않거나 삭제되었습니다.'}
             </p>
-            <Button onClick={() => router.push("/")}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
+            <Button onClick={() => router.push('/')}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
               홈으로 돌아가기
             </Button>
           </CardContent>
@@ -427,14 +433,14 @@ export default function SurveyResponsePage() {
   // 질문이 없는 경우
   if (questions.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="max-w-md mx-auto">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <Card className="mx-auto max-w-md">
           <CardContent className="p-8 text-center">
-            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-yellow-500" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">아직 질문이 없습니다</h2>
-            <p className="text-gray-600 mb-4">이 설문에는 아직 질문이 등록되지 않았습니다.</p>
-            <Button onClick={() => router.push("/")}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
+            <AlertCircle className="mx-auto mb-4 h-12 w-12 text-yellow-500" />
+            <h2 className="mb-2 text-xl font-semibold text-gray-900">아직 질문이 없습니다</h2>
+            <p className="mb-4 text-gray-600">이 설문에는 아직 질문이 등록되지 않았습니다.</p>
+            <Button onClick={() => router.push('/')}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
               홈으로 돌아가기
             </Button>
           </CardContent>
@@ -446,19 +452,19 @@ export default function SurveyResponsePage() {
   // 완료 화면
   if (isCompleted) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="max-w-md mx-auto">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <Card className="mx-auto max-w-md">
           <CardContent className="p-8 text-center">
-            <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-500" />
-            <h2 className="text-2xl font-semibold text-gray-900 mb-2">응답 완료!</h2>
-            <p className="text-gray-600 mb-6">
-              {loadedSurvey.settings.thankYouMessage || "설문에 참여해주셔서 감사합니다!"}
+            <CheckCircle className="mx-auto mb-4 h-16 w-16 text-green-500" />
+            <h2 className="mb-2 text-2xl font-semibold text-gray-900">응답 완료!</h2>
+            <p className="mb-6 text-gray-600">
+              {loadedSurvey.settings.thankYouMessage || '설문에 참여해주셔서 감사합니다!'}
             </p>
             <div className="space-y-2 text-sm text-gray-500">
               <p>총 {questions.length}개 질문</p>
               <p>응답 완료 시간: {new Date().toLocaleString()}</p>
             </div>
-            <Button onClick={() => router.push("/")} className="mt-6">
+            <Button onClick={() => router.push('/')} className="mt-6">
               홈으로 돌아가기
             </Button>
           </CardContent>
@@ -468,22 +474,22 @@ export default function SurveyResponsePage() {
   }
 
   // 현재 질문이 테이블 타입인지 확인
-  const isTableQuestion = currentQuestion?.type === "table";
-  const containerMaxWidth = "max-w-4xl";
+  const isTableQuestion = currentQuestion?.type === 'table';
+  const containerMaxWidth = 'max-w-4xl';
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="border-b border-gray-200 bg-white">
         <div className={`${containerMaxWidth} mx-auto px-6 py-4 transition-all duration-300`}>
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <h1 className="text-xl font-semibold text-gray-900">{loadedSurvey.title}</h1>
               {loadedSurvey.description && (
-                <p className="text-sm text-gray-600 mt-1">{loadedSurvey.description}</p>
+                <p className="mt-1 text-sm text-gray-600">{loadedSurvey.description}</p>
               )}
             </div>
-            <div className="text-sm text-gray-500 self-start md:self-auto">
+            <div className="self-start text-sm text-gray-500 md:self-auto">
               {currentVisibleNumber || 1} / {Math.max(totalVisibleCount, 1)}
               <span className="ml-2 text-xs text-gray-400">(전체 {questions.length}개)</span>
             </div>
@@ -502,21 +508,21 @@ export default function SurveyResponsePage() {
         <Card>
           <CardHeader className="pb-4">
             <div className="flex items-start gap-4">
-              <span className="hidden md:flex flex-shrink-0 items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-600 text-sm font-semibold mt-0.5 shadow-sm">
+              <span className="mt-0.5 hidden h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-600 shadow-sm md:flex">
                 {currentVisibleNumber || 1}
               </span>
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 <CardTitle
                   ref={titleRef}
                   className={`${
                     titleHasMultipleLines && isMobile
-                      ? "text-base md:text-2xl"
-                      : "text-xl md:text-2xl"
-                  } font-semibold text-gray-900 leading-relaxed break-keep`}
+                      ? 'text-base md:text-2xl'
+                      : 'text-xl md:text-2xl'
+                  } leading-relaxed font-semibold break-keep text-gray-900`}
                 >
                   {currentQuestion.title}
                   {isQuestionRequired(currentQuestion) && (
-                    <span className="text-red-500 text-sm ml-1.5 align-top" aria-label="필수 질문">
+                    <span className="ml-1.5 align-top text-sm text-red-500" aria-label="필수 질문">
                       *
                     </span>
                   )}
@@ -525,15 +531,10 @@ export default function SurveyResponsePage() {
                   <div
                     ref={descriptionRef}
                     className={`${
-                      descriptionHasMultipleLines && isMobile ? "text-base" : "text-base"
-                    } text-gray-600 mt-3 prose prose-base max-w-none overflow-auto max-h-[60vh]
-                      [&_table]:border-collapse [&_table]:table-auto [&_table]:min-w-full [&_table]:my-2 [&_table]:border [&_table]:border-gray-200
-                      [&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:px-4 [&_table_td]:py-2
-                      [&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:px-4 [&_table_th]:py-2 [&_table_th]:bg-gray-50 [&_table_th]:font-semibold
-                      [&_table_p]:m-0
-                      [&_p]:min-h-[1.6em]`}
+                      descriptionHasMultipleLines && isMobile ? 'text-base' : 'text-base'
+                    } prose prose-base mt-3 max-h-[60vh] max-w-none overflow-auto text-gray-600 [&_p]:min-h-[1.6em] [&_table]:my-2 [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-200 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:px-4 [&_table_td]:py-2 [&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:bg-gray-50 [&_table_th]:px-4 [&_table_th]:py-2 [&_table_th]:font-semibold`}
                     style={{
-                      WebkitOverflowScrolling: "touch",
+                      WebkitOverflowScrolling: 'touch',
                     }}
                     dangerouslySetInnerHTML={{ __html: currentQuestion.description }}
                   />
@@ -542,7 +543,7 @@ export default function SurveyResponsePage() {
             </div>
           </CardHeader>
 
-          <CardContent className={isTableQuestion ? "" : "md:px-16"}>
+          <CardContent className={isTableQuestion ? '' : 'md:px-16'}>
             <div className="space-y-4">
               <QuestionInput
                 question={currentQuestion}
@@ -554,9 +555,9 @@ export default function SurveyResponsePage() {
         </Card>
 
         {/* 네비게이션 */}
-        <div className="flex justify-between items-center mt-8">
+        <div className="mt-8 flex items-center justify-between">
           <Button variant="outline" onClick={handlePrevious} disabled={!hasPreviousDisplayable}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
+            <ArrowLeft className="mr-2 h-4 w-4" />
             이전
           </Button>
 
@@ -568,12 +569,12 @@ export default function SurveyResponsePage() {
 
           {isLastVisibleStep ? (
             <Button onClick={handleNext} disabled={!canProceed() || isSubmitting}>
-              {isSubmitting ? "제출 중..." : "제출"}
+              {isSubmitting ? '제출 중...' : '제출'}
             </Button>
           ) : (
             <Button onClick={handleNext} disabled={!canProceed()}>
               다음
-              <ArrowRight className="w-4 h-4 ml-2" />
+              <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           )}
         </div>
@@ -592,39 +593,39 @@ function QuestionInput({
   onChange: (value: unknown) => void;
 }) {
   switch (question.type) {
-    case "notice":
+    case 'notice':
       return (
         <NoticeRenderer
-          content={question.noticeContent || ""}
+          content={question.noticeContent || ''}
           requiresAcknowledgment={question.requiresAcknowledgment}
-          value={typeof value === "boolean" ? value : false}
+          value={typeof value === 'boolean' ? value : false}
           onChange={(v) => onChange(v)}
           isTestMode={false}
         />
       );
 
-    case "text":
+    case 'text':
       return (
         <Input
-          placeholder={question.placeholder || "답변을 입력하세요..."}
-          value={typeof value === "string" ? value : ""}
+          placeholder={question.placeholder || '답변을 입력하세요...'}
+          value={typeof value === 'string' ? value : ''}
           onChange={(e) => onChange(e.target.value)}
           className="w-full text-base"
         />
       );
 
-    case "textarea":
+    case 'textarea':
       return (
         <textarea
-          className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+          className="w-full resize-none rounded-lg border border-gray-300 p-3 text-base focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
           rows={4}
           placeholder="답변을 입력하세요..."
-          value={typeof value === "string" ? value : ""}
+          value={typeof value === 'string' ? value : ''}
           onChange={(e) => onChange(e.target.value)}
         />
       );
 
-    case "radio":
+    case 'radio':
       return (
         <RadioQuestion
           question={question}
@@ -633,7 +634,7 @@ function QuestionInput({
         />
       );
 
-    case "checkbox":
+    case 'checkbox':
       return (
         <CheckboxQuestion
           question={question}
@@ -642,16 +643,16 @@ function QuestionInput({
         />
       );
 
-    case "select":
+    case 'select':
       return (
         <SelectQuestion
           question={question}
-          value={(value ?? "") as SingleChoiceResponse}
+          value={(value ?? '') as SingleChoiceResponse}
           onChange={onChange}
         />
       );
 
-    case "multiselect":
+    case 'multiselect':
       return question.selectLevels ? (
         <UserDefinedMultiLevelSelect
           levels={question.selectLevels}
@@ -660,10 +661,10 @@ function QuestionInput({
           className="w-full"
         />
       ) : (
-        <div className="text-gray-500 text-center py-4">다단계 선택이 구성되지 않았습니다.</div>
+        <div className="py-4 text-center text-gray-500">다단계 선택이 구성되지 않았습니다.</div>
       );
 
-    case "table":
+    case 'table':
       return question.tableColumns && question.tableRowsData ? (
         <InteractiveTableResponse
           questionId={question.id}
@@ -671,7 +672,7 @@ function QuestionInput({
           columns={question.tableColumns}
           rows={question.tableRowsData}
           value={
-            typeof value === "object" && value !== null
+            typeof value === 'object' && value !== null
               ? (value as Record<string, unknown>)
               : undefined
           }
@@ -680,11 +681,11 @@ function QuestionInput({
           className="border-0 shadow-none"
         />
       ) : (
-        <div className="text-gray-500 text-center py-4">테이블이 구성되지 않았습니다.</div>
+        <div className="py-4 text-center text-gray-500">테이블이 구성되지 않았습니다.</div>
       );
 
     default:
-      return <div className="text-gray-500 text-center py-4">지원하지 않는 질문 유형입니다.</div>;
+      return <div className="py-4 text-center text-gray-500">지원하지 않는 질문 유형입니다.</div>;
   }
 }
 
@@ -698,7 +699,7 @@ function RadioQuestion({
   value: SingleChoiceResponse;
   onChange: (value: SingleChoiceResponse) => void;
 }) {
-  const [otherInput, setOtherInput] = useState("");
+  const [otherInput, setOtherInput] = useState('');
 
   useEffect(() => {
     if (isOtherChoiceValue(value) && value.otherValue) {
@@ -707,7 +708,7 @@ function RadioQuestion({
   }, [value]);
 
   const handleOptionChange = (optionValue: string, optionId: string) => {
-    const isOtherOption = optionId === "other-option";
+    const isOtherOption = optionId === 'other-option';
 
     if (isSelected(optionValue)) {
       onChange(null);
@@ -755,7 +756,7 @@ function RadioQuestion({
               checked={isSelected(option.value)}
               onChange={() => handleOptionChange(option.value, option.id)}
               onClick={() => handleOptionChange(option.value, option.id)}
-              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
+              className="h-4 w-4 cursor-pointer border-gray-300 text-blue-600 focus:ring-blue-500"
             />
             <label
               htmlFor={`${question.id}-${option.id}`}
@@ -763,12 +764,12 @@ function RadioQuestion({
                 e.preventDefault();
                 handleOptionChange(option.value, option.id);
               }}
-              className="text-base text-gray-700 cursor-pointer flex-1"
+              className="flex-1 cursor-pointer text-base text-gray-700"
             >
               {option.label}
             </label>
           </div>
-          {option.id === "other-option" && isSelected(option.value) && (
+          {option.id === 'other-option' && isSelected(option.value) && (
             <div className="ml-7">
               <Input
                 placeholder="기타 내용을 입력하세요..."
@@ -805,7 +806,7 @@ function CheckboxQuestion({
     const newOtherInputs: Record<string, string> = {};
     currentValues.forEach((val) => {
       if (isOtherChoiceValue(val)) {
-        newOtherInputs[val.selectedValue] = val.otherValue || "";
+        newOtherInputs[val.selectedValue] = val.otherValue || '';
       }
     });
     setOtherInputs(newOtherInputs);
@@ -813,7 +814,7 @@ function CheckboxQuestion({
 
   const handleOptionChange = (optionValue: string, optionId: string, isChecked: boolean) => {
     let newValues = [...currentValues];
-    const isOtherOption = optionId === "other-option";
+    const isOtherOption = optionId === 'other-option';
 
     if (isChecked) {
       // 최대 선택 개수 체크
@@ -829,7 +830,7 @@ function CheckboxQuestion({
       if (isOtherOption) {
         newValues.push({
           selectedValue: optionValue,
-          otherValue: otherInputs[optionValue] || "",
+          otherValue: otherInputs[optionValue] || '',
           hasOther: true,
         });
       } else {
@@ -899,24 +900,24 @@ function CheckboxQuestion({
                 checked={checked}
                 disabled={disabled}
                 onChange={(e) => handleOptionChange(option.value, option.id, e.target.checked)}
-                className={`w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 ${
-                  disabled ? "opacity-50 cursor-not-allowed" : ""
+                className={`h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 ${
+                  disabled ? 'cursor-not-allowed opacity-50' : ''
                 }`}
               />
               <label
                 htmlFor={`${question.id}-${option.id}`}
-                className={`text-base text-gray-700 flex-1 ${
-                  disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                className={`flex-1 text-base text-gray-700 ${
+                  disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
                 }`}
               >
                 {option.label}
               </label>
             </div>
-            {option.id === "other-option" && checked && (
+            {option.id === 'other-option' && checked && (
               <div className="ml-7">
                 <Input
                   placeholder="기타 내용을 입력하세요..."
-                  value={otherInputs[option.value] || ""}
+                  value={otherInputs[option.value] || ''}
                   onChange={(e) => handleOtherInputChange(option.value, e.target.value)}
                   className="w-full"
                 />
@@ -928,7 +929,7 @@ function CheckboxQuestion({
 
       {/* 선택 개수 표시 */}
       {(maxSelections !== undefined || minSelections !== undefined) && (
-        <div className="pt-2 border-t border-gray-200">
+        <div className="border-t border-gray-200 pt-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-600">
               {maxSelections !== undefined && maxSelections > 0
@@ -956,17 +957,17 @@ function SelectQuestion({
   value: SingleChoiceResponse;
   onChange: (value: SingleChoiceResponse) => void;
 }) {
-  const [otherInput, setOtherInput] = useState("");
-  const [selectedValue, setSelectedValue] = useState<string>("");
+  const [otherInput, setOtherInput] = useState('');
+  const [selectedValue, setSelectedValue] = useState<string>('');
 
   // value가 변경될 때 selectedValue와 otherInput 동기화
   useEffect(() => {
     if (isOtherChoiceValue(value)) {
       setSelectedValue(value.selectedValue);
-      setOtherInput(value.otherValue || "");
+      setOtherInput(value.otherValue || '');
     } else {
-      setSelectedValue(value || "");
-      setOtherInput("");
+      setSelectedValue(value || '');
+      setOtherInput('');
     }
   }, [value]);
 
@@ -974,7 +975,7 @@ function SelectQuestion({
     setSelectedValue(newValue);
     const selectedOption = question.options?.find((opt) => opt.value === newValue);
 
-    if (selectedOption?.id === "other-option") {
+    if (selectedOption?.id === 'other-option') {
       onChange({
         selectedValue: newValue,
         otherValue: otherInput,
@@ -989,7 +990,7 @@ function SelectQuestion({
     setOtherInput(inputValue);
     if (selectedValue) {
       const selectedOption = question.options?.find((opt) => opt.value === selectedValue);
-      if (selectedOption?.id === "other-option") {
+      if (selectedOption?.id === 'other-option') {
         onChange({
           selectedValue,
           otherValue: inputValue,
@@ -1002,7 +1003,7 @@ function SelectQuestion({
   const showOtherInput = () => {
     if (!selectedValue) return false;
     const selectedOption = question.options?.find((opt) => opt.value === selectedValue);
-    return selectedOption?.id === "other-option";
+    return selectedOption?.id === 'other-option';
   };
 
   return (
@@ -1010,7 +1011,7 @@ function SelectQuestion({
       <select
         value={selectedValue}
         onChange={(e) => handleSelectChange(e.target.value)}
-        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+        className="w-full rounded-lg border border-gray-300 p-3 text-base focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
       >
         <option value="">선택하세요...</option>
         {question.options?.map((option: QuestionOption) => (

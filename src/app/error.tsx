@@ -1,10 +1,19 @@
-"use client";
+'use client';
 
-import * as Sentry from "@sentry/nextjs";
-import { useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle } from "lucide-react";
+import { useEffect } from 'react';
+
+import * as Sentry from '@sentry/nextjs';
+import { AlertCircle } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 
 export default function Error({
   error,
@@ -19,11 +28,11 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Card className="max-w-md w-full">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+      <Card className="w-full max-w-md">
         <CardHeader>
-          <div className="flex items-center gap-2 mb-2">
-            <AlertCircle className="w-6 h-6 text-red-500" />
+          <div className="mb-2 flex items-center gap-2">
+            <AlertCircle className="h-6 w-6 text-red-500" />
             <CardTitle>오류가 발생했습니다</CardTitle>
           </div>
           <CardDescription>
@@ -31,14 +40,10 @@ export default function Error({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {process.env.NODE_ENV === "development" && (
-            <div className="mt-4 p-4 bg-red-50 rounded-md border border-red-200">
-              <p className="text-sm font-mono text-red-800 break-all">
-                {error.message}
-              </p>
-              {error.digest && (
-                <p className="text-xs text-red-600 mt-2">오류 ID: {error.digest}</p>
-              )}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-4">
+              <p className="font-mono text-sm break-all text-red-800">{error.message}</p>
+              {error.digest && <p className="mt-2 text-xs text-red-600">오류 ID: {error.digest}</p>}
             </div>
           )}
         </CardContent>
@@ -46,11 +51,7 @@ export default function Error({
           <Button onClick={reset} variant="default" className="flex-1">
             다시 시도
           </Button>
-          <Button
-            onClick={() => (window.location.href = "/")}
-            variant="outline"
-            className="flex-1"
-          >
+          <Button onClick={() => (window.location.href = '/')} variant="outline" className="flex-1">
             홈으로 이동
           </Button>
         </CardFooter>

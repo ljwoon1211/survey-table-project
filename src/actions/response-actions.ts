@@ -1,9 +1,11 @@
 'use server';
 
-import { db } from '@/db';
-import { surveyResponses, NewSurveyResponse } from '@/db/schema';
-import { eq, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
+
+import { eq, sql } from 'drizzle-orm';
+
+import { db } from '@/db';
+import { NewSurveyResponse, surveyResponses } from '@/db/schema';
 import { requireAuth } from '@/lib/auth';
 
 // ========================
@@ -32,7 +34,7 @@ export async function startResponse(surveyId: string, sessionId?: string) {
 export async function updateQuestionResponse(
   responseId: string,
   questionId: string,
-  value: unknown
+  value: unknown,
 ) {
   // 🚀 SQL 레벨에서 JSON의 특정 경로만 원자적으로 업데이트
   // PostgreSQL의 jsonb_set 함수 사용 (읽기-수정-쓰기 과정 없음)
@@ -59,7 +61,7 @@ export async function updateQuestionResponse(
 // 응답 완료
 export async function completeResponse(
   responseId: string,
-  metadata?: { exposedQuestionIds?: string[]; exposedRowIds?: string[] }
+  metadata?: { exposedQuestionIds?: string[]; exposedRowIds?: string[] },
 ) {
   const [updated] = await db
     .update(surveyResponses)

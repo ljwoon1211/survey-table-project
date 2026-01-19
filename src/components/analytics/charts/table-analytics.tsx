@@ -1,9 +1,10 @@
-"use client";
+'use client';
 
-import { Card, BarChart, Badge, TabGroup, TabList, Tab, TabPanels, TabPanel } from "@tremor/react";
-import { Table, BarChart3, Grid3X3 } from "lucide-react";
-import type { TableAnalytics } from "@/lib/analytics/types";
-import { formatPercentage } from "@/lib/analytics/analyzer";
+import { Badge, BarChart, Card, Tab, TabGroup, TabList, TabPanel, TabPanels } from '@tremor/react';
+import { BarChart3, Grid3X3, Table } from 'lucide-react';
+
+import { formatPercentage } from '@/lib/analytics/analyzer';
+import type { TableAnalytics } from '@/lib/analytics/types';
 
 interface TableAnalyticsChartProps {
   data: TableAnalytics;
@@ -11,26 +12,26 @@ interface TableAnalyticsChartProps {
 
 // 20가지 색상 팔레트 (Tremor 색상 + 커스텀)
 const PALETTE = [
-  "blue",
-  "cyan",
-  "indigo",
-  "violet",
-  "fuchsia",
-  "rose",
-  "red",
-  "orange",
-  "amber",
-  "yellow",
-  "lime",
-  "green",
-  "emerald",
-  "teal",
-  "sky",
-  "slate",
-  "zinc",
-  "neutral",
-  "stone",
-  "gray",
+  'blue',
+  'cyan',
+  'indigo',
+  'violet',
+  'fuchsia',
+  'rose',
+  'red',
+  'orange',
+  'amber',
+  'yellow',
+  'lime',
+  'green',
+  'emerald',
+  'teal',
+  'sky',
+  'slate',
+  'zinc',
+  'neutral',
+  'stone',
+  'gray',
 ];
 
 export function TableAnalyticsChart({ data }: TableAnalyticsChartProps) {
@@ -45,7 +46,7 @@ export function TableAnalyticsChart({ data }: TableAnalyticsChartProps) {
     if (row.details) {
       Object.keys(row.details).forEach((key) => allCategories.add(key));
     } else {
-      allCategories.add("응답함");
+      allCategories.add('응답함');
     }
   });
   const categoriesList = Array.from(allCategories);
@@ -53,7 +54,7 @@ export function TableAnalyticsChart({ data }: TableAnalyticsChartProps) {
   // 차트 데이터 생성
   const stackChartData = data.rowSummary.map((row) => {
     const item: Record<string, any> = {
-      name: row.rowLabel.length > 20 ? row.rowLabel.slice(0, 20) + "..." : row.rowLabel,
+      name: row.rowLabel.length > 20 ? row.rowLabel.slice(0, 20) + '...' : row.rowLabel,
       fullName: row.rowLabel,
     };
 
@@ -63,7 +64,7 @@ export function TableAnalyticsChart({ data }: TableAnalyticsChartProps) {
         item[cat] = row.details?.[cat] || 0;
       });
     } else {
-      item["응답함"] = row.totalInteractions;
+      item['응답함'] = row.totalInteractions;
     }
 
     // 응답하지 않음(회색 처리용) 계산 (필요시)
@@ -93,14 +94,14 @@ export function TableAnalyticsChart({ data }: TableAnalyticsChartProps) {
 
   return (
     <Card className="p-6">
-      <div className="flex items-start justify-between mb-4">
+      <div className="mb-4 flex items-start justify-between">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">{data.questionTitle}</h3>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="mt-1 text-sm text-gray-500">
             {data.totalResponses}명 응답 · 응답률 {formatPercentage(data.responseRate)}
           </p>
           {/* [해결 1] 조건부 로직 무시 경고 문구 추가 */}
-          <div className="mt-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded inline-block">
+          <div className="mt-2 inline-block rounded bg-blue-50 px-2 py-1 text-xs text-blue-600">
             ℹ️ 응답률은 해당 문항이 노출된 참여자 기준입니다. (조건부 노출 반영됨)
           </div>
         </div>
@@ -112,13 +113,20 @@ export function TableAnalyticsChart({ data }: TableAnalyticsChartProps) {
       <TabGroup>
         <TabList variant="solid" className="w-fit">
           {[
-            <Tab key="dist" icon={BarChart3}>항목별 분포</Tab>,
-            <Tab key="heat" icon={Grid3X3}>상세 보기 (히트맵)</Tab>,
-            ...(textResponseData.length > 0 ? [
-              <Tab key="text" icon={Table}>
-                주관식 답변 ({textResponseData.reduce((acc, curr) => acc + curr.responses.length, 0)})
-              </Tab>
-            ] : [])
+            <Tab key="dist" icon={BarChart3}>
+              항목별 분포
+            </Tab>,
+            <Tab key="heat" icon={Grid3X3}>
+              상세 보기 (히트맵)
+            </Tab>,
+            ...(textResponseData.length > 0
+              ? [
+                  <Tab key="text" icon={Table}>
+                    주관식 답변 (
+                    {textResponseData.reduce((acc, curr) => acc + curr.responses.length, 0)})
+                  </Tab>,
+                ]
+              : []),
           ]}
         </TabList>
         <TabPanels>
@@ -139,7 +147,7 @@ export function TableAnalyticsChart({ data }: TableAnalyticsChartProps) {
             />
 
             {data.rowSummary.length > 15 && (
-              <p className="text-xs text-gray-500 mt-2 text-center">
+              <p className="mt-2 text-center text-xs text-gray-500">
                 전체 {data.rowSummary.length}개 항목 중 일부만 표시될 수 있습니다.
               </p>
             )}
@@ -148,15 +156,15 @@ export function TableAnalyticsChart({ data }: TableAnalyticsChartProps) {
           {/* 상세 테이블 (히트맵 스타일) */}
           <TabPanel>
             <div className="mt-6 overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
+              <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50">
-                    <th className="text-left py-3 px-4 font-medium text-gray-700 w-1/4">
+                    <th className="w-1/4 px-4 py-3 text-left font-medium text-gray-700">
                       항목 (행)
                     </th>
-                    <th className="text-right py-3 px-4 font-medium text-gray-700 w-24">응답 수</th>
-                    <th className="text-right py-3 px-4 font-medium text-gray-700 w-24">선택률</th>
-                    <th className="py-3 px-4 font-medium text-gray-700">상세 분포</th>
+                    <th className="w-24 px-4 py-3 text-right font-medium text-gray-700">응답 수</th>
+                    <th className="w-24 px-4 py-3 text-right font-medium text-gray-700">선택률</th>
+                    <th className="px-4 py-3 font-medium text-gray-700">상세 분포</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -173,16 +181,16 @@ export function TableAnalyticsChart({ data }: TableAnalyticsChartProps) {
                         className="border-b border-gray-100 transition-colors hover:bg-gray-50"
                         style={{ backgroundColor: bgColor }}
                       >
-                        <td className="py-3 px-4 text-gray-900 font-medium">{row.rowLabel}</td>
-                        <td className="py-3 px-4 text-right text-gray-600">
+                        <td className="px-4 py-3 font-medium text-gray-900">{row.rowLabel}</td>
+                        <td className="px-4 py-3 text-right text-gray-600">
                           {row.totalInteractions}명
                         </td>
-                        <td className="py-3 px-4 text-right font-bold text-gray-900">
+                        <td className="px-4 py-3 text-right font-bold text-gray-900">
                           {formatPercentage(row.interactionRate)}
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="px-4 py-3">
                           {/* 미니 바 차트 */}
-                          <div className="flex items-center gap-2 h-4 w-full bg-white/50 rounded-full overflow-hidden border border-black/5">
+                          <div className="flex h-4 w-full items-center gap-2 overflow-hidden rounded-full border border-black/5 bg-white/50">
                             {row.details ? (
                               Object.entries(row.details).map(([key, value], i) => {
                                 const width = (value / data.totalResponses) * 100;
@@ -201,7 +209,7 @@ export function TableAnalyticsChart({ data }: TableAnalyticsChartProps) {
                               })
                             ) : (
                               <div
-                                className="h-full bg-amber-500 rounded-full"
+                                className="h-full rounded-full bg-amber-500"
                                 style={{ width: `${Math.min(row.interactionRate, 100)}%` }}
                               />
                             )}
@@ -225,34 +233,41 @@ export function TableAnalyticsChart({ data }: TableAnalyticsChartProps) {
             </div>
 
             {/* 범례 및 추가 정보 */}
-            <div className="mt-4 text-xs text-gray-400 text-right">
+            <div className="mt-4 text-right text-xs text-gray-400">
               * 배경색이 진할수록 선택률이 높은 항목입니다.
             </div>
           </TabPanel>
 
           {/* 3. 주관식 답변 리스트 뷰 */}
-          {...(textResponseData.length > 0 ? [
-            <TabPanel key="text-panel">
-              <div className="mt-6 space-y-6">
-                {textResponseData.map((item, idx) => (
-                  <div key={idx} className="border rounded-lg p-4 bg-gray-50">
-                    <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                      <Badge size="xs" color="gray">{item.rowLabel}</Badge>
-                      <span className="text-gray-400">/</span>
-                      <span className="text-gray-700">{item.colLabel}</span>
-                    </h4>
-                    <ul className="space-y-2 max-h-60 overflow-y-auto bg-white p-3 rounded border border-gray-200">
-                      {item.responses.map((res, rIdx) => (
-                        <li key={rIdx} className="text-sm text-gray-700 border-b last:border-0 pb-2 last:pb-0 pt-2 first:pt-0">
-                          {res}
-                        </li>
-                      ))}
-                    </ul>
+          {...textResponseData.length > 0
+            ? [
+                <TabPanel key="text-panel">
+                  <div className="mt-6 space-y-6">
+                    {textResponseData.map((item, idx) => (
+                      <div key={idx} className="rounded-lg border bg-gray-50 p-4">
+                        <h4 className="mb-2 flex items-center gap-2 font-semibold text-gray-900">
+                          <Badge size="xs" color="gray">
+                            {item.rowLabel}
+                          </Badge>
+                          <span className="text-gray-400">/</span>
+                          <span className="text-gray-700">{item.colLabel}</span>
+                        </h4>
+                        <ul className="max-h-60 space-y-2 overflow-y-auto rounded border border-gray-200 bg-white p-3">
+                          {item.responses.map((res, rIdx) => (
+                            <li
+                              key={rIdx}
+                              className="border-b pt-2 pb-2 text-sm text-gray-700 first:pt-0 last:border-0 last:pb-0"
+                            >
+                              {res}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </TabPanel>
-          ] : [])}
+                </TabPanel>,
+              ]
+            : []}
         </TabPanels>
       </TabGroup>
     </Card>

@@ -1,6 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+
+import { BarChart3, FileSpreadsheet, FileText, Loader2, Table } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -11,7 +14,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Loader2, FileSpreadsheet, FileText, Table, BarChart3 } from 'lucide-react';
 
 interface Props {
   surveyId: string;
@@ -25,10 +27,10 @@ export function ExportDataModal({ surveyId, surveyTitle }: Props) {
   const handleExport = async (type: string) => {
     try {
       setExportingType(type);
-      
+
       // API 호출 (파일 다운로드 트리거)
       const response = await fetch(`/api/surveys/${surveyId}/export?type=${type}`);
-      
+
       if (!response.ok) throw new Error('Export failed');
 
       // Blob 변환 및 다운로드 링크 생성
@@ -36,7 +38,7 @@ export function ExportDataModal({ surveyId, surveyTitle }: Props) {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      
+
       // 파일명 설정 (헤더에서 가져오거나 기본값 사용)
       const contentDisposition = response.headers.get('Content-Disposition');
       let filename = `${surveyTitle}_Export.xlsx`;
@@ -46,7 +48,7 @@ export function ExportDataModal({ surveyId, surveyTitle }: Props) {
           filename = decodeURIComponent(filenameMatch[1]);
         }
       }
-      
+
       a.download = filename;
       document.body.appendChild(a);
       a.click();
@@ -73,13 +75,10 @@ export function ExportDataModal({ surveyId, surveyTitle }: Props) {
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>데이터 내보내기</DialogTitle>
-          <DialogDescription>
-            원하는 데이터 형식을 선택하여 다운로드하세요.
-          </DialogDescription>
+          <DialogDescription>원하는 데이터 형식을 선택하여 다운로드하세요.</DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-1 gap-4 py-4">
-          
           {/* 1. Raw Data (통합) */}
           <ExportCard
             title="Raw Data (통합)"
@@ -115,11 +114,12 @@ export function ExportDataModal({ surveyId, surveyTitle }: Props) {
             isLoading={exportingType === 'map'}
             onClick={() => handleExport('map')}
           />
-
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => setIsOpen(false)}>닫기</Button>
+          <Button variant="outline" onClick={() => setIsOpen(false)}>
+            닫기
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -136,24 +136,16 @@ interface ExportCardProps {
 
 function ExportCard({ title, description, icon, isLoading, onClick }: ExportCardProps) {
   return (
-    <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-slate-50 transition-colors">
+    <div className="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-slate-50">
       <div className="flex items-start gap-4">
-        <div className="mt-1 p-2 bg-white border rounded-md shadow-sm">
-          {icon}
-        </div>
+        <div className="mt-1 rounded-md border bg-white p-2 shadow-sm">{icon}</div>
         <div className="space-y-1">
-          <h4 className="text-sm font-semibold leading-none">{title}</h4>
-          <p className="text-sm text-muted-foreground pr-4">
-            {description}
-          </p>
+          <h4 className="text-sm leading-none font-semibold">{title}</h4>
+          <p className="text-muted-foreground pr-4 text-sm">{description}</p>
         </div>
       </div>
       <Button variant="secondary" size="sm" onClick={onClick} disabled={isLoading}>
-        {isLoading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          '다운로드'
-        )}
+        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : '다운로드'}
       </Button>
     </div>
   );

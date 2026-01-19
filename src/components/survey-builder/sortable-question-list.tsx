@@ -1,58 +1,63 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from 'react';
+
 import {
   DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
   DragEndEvent,
-  DragStartEvent,
   DragOverEvent,
   DragOverlay,
-} from "@dnd-kit/core";
+  DragStartEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
 import {
-  arrayMove,
   SortableContext,
+  arrayMove,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Question } from "@/types/survey";
-import { useSurveyBuilderStore } from "@/stores/survey-store";
-import { QuestionEditModal } from "./question-edit-modal";
-import { generateId } from "@/lib/utils";
+} from '@dnd-kit/sortable';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
-  deleteQuestion as deleteQuestionAction,
-  reorderQuestions as reorderQuestionsAction,
-  createQuestion as createQuestionAction,
-} from "@/actions/survey-actions";
-import { UserDefinedMultiLevelSelectPreview } from "./user-defined-multi-level-select";
-import { MultiLevelSelect } from "./multi-level-select";
-import { UserDefinedMultiLevelSelect } from "./user-defined-multi-level-select";
-import { InteractiveTableResponse } from "./interactive-table-response";
-import { TablePreview } from "./table-preview";
-import { NoticeRenderer } from "./notice-renderer";
-import { GroupHeader } from "./group-header";
-import { convertHtmlImageUrlsToProxy, deleteImagesFromR2 } from "@/lib/image-utils";
-import { extractImageUrlsFromQuestion } from "@/lib/image-extractor";
-import { isValidUUID } from "@/lib/utils";
-import {
-  GripVertical,
-  Settings,
-  Trash2,
+  BookmarkPlus,
   Copy,
   Edit3,
   Eye,
   EyeOff,
-  BookmarkPlus,
-} from "lucide-react";
+  GripVertical,
+  Settings,
+  Trash2,
+} from 'lucide-react';
+
+import {
+  createQuestion as createQuestionAction,
+  deleteQuestion as deleteQuestionAction,
+  reorderQuestions as reorderQuestionsAction,
+} from '@/actions/survey-actions';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { extractImageUrlsFromQuestion } from '@/lib/image-extractor';
+import { convertHtmlImageUrlsToProxy, deleteImagesFromR2 } from '@/lib/image-utils';
+import { generateId } from '@/lib/utils';
+import { isValidUUID } from '@/lib/utils';
+import { useSurveyBuilderStore } from '@/stores/survey-store';
+import { useTestResponseStore } from '@/stores/test-response-store';
+import { useSurveyUIStore } from '@/stores/ui-store';
+import { Question } from '@/types/survey';
+
+import { GroupHeader } from './group-header';
+import { InteractiveTableResponse } from './interactive-table-response';
+import { MultiLevelSelect } from './multi-level-select';
+import { NoticeRenderer } from './notice-renderer';
+import { QuestionEditModal } from './question-edit-modal';
+import { TablePreview } from './table-preview';
+import { UserDefinedMultiLevelSelectPreview } from './user-defined-multi-level-select';
+import { UserDefinedMultiLevelSelect } from './user-defined-multi-level-select';
 
 interface SortableQuestionProps {
   question: Question;
@@ -81,7 +86,7 @@ function SortableQuestion({
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition: isDragging ? "none" : transition,
+    transition: isDragging ? 'none' : transition,
     opacity: isDragging ? 0.8 : 1,
   };
 
@@ -90,34 +95,34 @@ function SortableQuestion({
       ref={setNodeRef}
       style={style}
       data-question-index={index}
-      className={`relative group transition-all duration-200 ${
+      className={`group relative transition-all duration-200 ${
         isSelected
-          ? "ring-2 ring-blue-500 border-blue-200 shadow-lg"
-          : "border-gray-200 hover:border-gray-300 hover:shadow-md"
+          ? 'border-blue-200 ring-2 shadow-lg ring-blue-500'
+          : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
       } ${
         isDragging
-          ? "z-50 rotate-2 scale-105 shadow-2xl ring-4 ring-blue-300 ring-opacity-50 bg-blue-50 border-blue-300"
-          : ""
+          ? 'ring-opacity-50 z-50 scale-105 rotate-2 border-blue-300 bg-blue-50 ring-4 shadow-2xl ring-blue-300'
+          : ''
       }`}
       onClick={() => onSelect(question.id)}
     >
       <div className="p-6">
         {/* Header with drag handle */}
-        <div className="flex items-start justify-between mb-3">
+        <div className="mb-3 flex items-start justify-between">
           <div className="flex items-center space-x-3">
             <div
-              className={`p-2 rounded-md transition-all duration-200 ${
+              className={`rounded-md p-2 transition-all duration-200 ${
                 isDragging
-                  ? "bg-blue-200 text-blue-700 cursor-grabbing"
-                  : "cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                  ? 'cursor-grabbing bg-blue-200 text-blue-700'
+                  : 'cursor-grab text-gray-400 hover:bg-gray-100 hover:text-gray-600 active:cursor-grabbing'
               }`}
               {...attributes}
               {...listeners}
               title="드래그하여 순서 변경"
             >
-              <GripVertical className={`w-4 h-4 ${isDragging ? "animate-pulse" : ""}`} />
+              <GripVertical className={`h-4 w-4 ${isDragging ? 'animate-pulse' : ''}`} />
             </div>
-            <span className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-medium">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-xs font-medium text-blue-600">
               {index + 1}
             </span>
             <span className="text-sm font-medium text-gray-600 capitalize">
@@ -127,11 +132,11 @@ function SortableQuestion({
 
           <div className="flex items-center space-x-1">
             {question.required && (
-              <span className="text-xs text-red-500 bg-red-50 px-2 py-1 rounded">필수</span>
+              <span className="rounded bg-red-50 px-2 py-1 text-xs text-red-500">필수</span>
             )}
 
             {/* Action buttons - show on hover */}
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center space-x-1">
+            <div className="flex items-center space-x-1 opacity-0 transition-opacity group-hover:opacity-100">
               <Button
                 variant="ghost"
                 size="sm"
@@ -142,7 +147,7 @@ function SortableQuestion({
                 }}
                 title="편집"
               >
-                <Edit3 className="w-4 h-4" />
+                <Edit3 className="h-4 w-4" />
               </Button>
               <Button
                 variant="ghost"
@@ -154,33 +159,33 @@ function SortableQuestion({
                 }}
                 title="복제"
               >
-                <Copy className="w-4 h-4" />
+                <Copy className="h-4 w-4" />
               </Button>
               {onSaveToLibrary && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 w-8 p-0 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                  className="h-8 w-8 p-0 text-blue-500 hover:bg-blue-50 hover:text-blue-600"
                   onClick={(e) => {
                     e.stopPropagation();
                     onSaveToLibrary(question);
                   }}
                   title="질문 저장"
                 >
-                  <BookmarkPlus className="w-4 h-4" />
+                  <BookmarkPlus className="h-4 w-4" />
                 </Button>
               )}
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                className="h-8 w-8 p-0 text-red-500 hover:bg-red-50 hover:text-red-600"
                 onClick={(e) => {
                   e.stopPropagation();
                   onDelete(question.id);
                 }}
                 title="삭제"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -188,18 +193,12 @@ function SortableQuestion({
 
         {/* Question content */}
         <div className="mb-4">
-          <h4 className="text-base font-medium text-gray-900 mb-2">{question.title}</h4>
+          <h4 className="mb-2 text-base font-medium text-gray-900">{question.title}</h4>
           {question.description && (
             <div
-              className="text-sm text-gray-600 mb-3 prose prose-sm max-w-none overflow-x-auto
-                [&_table]:border-collapse [&_table]:table-fixed [&_table]:w-full [&_table]:my-2 [&_table]:border-2 [&_table]:border-gray-300
-                [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2
-                [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-3 [&_table_th]:py-2
-                [&_table_th]:font-normal [&_table_th]:bg-transparent
-                [&_table_p]:m-0
-                [&_p]:min-h-[1.6em]"
+              className="prose prose-sm mb-3 max-w-none overflow-x-auto text-sm text-gray-600 [&_p]:min-h-[1.6em] [&_table]:my-2 [&_table]:w-full [&_table]:table-fixed [&_table]:border-collapse [&_table]:border-2 [&_table]:border-gray-300 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2 [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:bg-transparent [&_table_th]:px-3 [&_table_th]:py-2 [&_table_th]:font-normal"
               style={{
-                WebkitOverflowScrolling: "touch",
+                WebkitOverflowScrolling: 'touch',
               }}
               dangerouslySetInnerHTML={{
                 __html: convertHtmlImageUrlsToProxy(question.description),
@@ -209,7 +208,7 @@ function SortableQuestion({
         </div>
 
         {/* Question preview */}
-        <div className="p-3 bg-gray-50 rounded-lg">
+        <div className="rounded-lg bg-gray-50 p-3">
           <QuestionPreview question={question} />
         </div>
       </div>
@@ -219,27 +218,27 @@ function SortableQuestion({
 
 function QuestionPreview({ question }: { question: Question }) {
   switch (question.type) {
-    case "text":
+    case 'text':
       return (
         <Input
-          placeholder={question.placeholder || "답변을 입력하세요..."}
+          placeholder={question.placeholder || '답변을 입력하세요...'}
           disabled
           className="bg-white"
         />
       );
 
-    case "textarea":
+    case 'textarea':
       return (
         <textarea
-          className="w-full p-3 border border-gray-200 rounded-md resize-none bg-white"
+          className="w-full resize-none rounded-md border border-gray-200 bg-white p-3"
           rows={3}
           placeholder="답변을 입력하세요..."
           disabled
         />
       );
 
-    case "radio":
-    case "checkbox":
+    case 'radio':
+    case 'checkbox':
       return (
         <div className="space-y-2">
           {question.options?.map((option) => (
@@ -251,9 +250,9 @@ function QuestionPreview({ question }: { question: Question }) {
         </div>
       );
 
-    case "select":
+    case 'select':
       return (
-        <select disabled className="w-full p-3 border border-gray-200 rounded-md bg-white">
+        <select disabled className="w-full rounded-md border border-gray-200 bg-white p-3">
           <option>선택하세요...</option>
           {question.options?.map((option) => (
             <option key={option.id}>{option.label}</option>
@@ -262,14 +261,14 @@ function QuestionPreview({ question }: { question: Question }) {
         </select>
       );
 
-    case "multiselect":
+    case 'multiselect':
       return question.selectLevels ? (
         <UserDefinedMultiLevelSelectPreview levels={question.selectLevels} />
       ) : (
-        <div className="text-gray-400 text-sm">다단계 Select가 설정되지 않았습니다.</div>
+        <div className="text-sm text-gray-400">다단계 Select가 설정되지 않았습니다.</div>
       );
 
-    case "table":
+    case 'table':
       return question.tableColumns && question.tableRowsData ? (
         <TablePreview
           tableTitle={question.tableTitle}
@@ -278,10 +277,10 @@ function QuestionPreview({ question }: { question: Question }) {
           className="border-0 shadow-none"
         />
       ) : (
-        <div className="text-gray-400 text-sm text-center py-4">테이블이 구성되지 않았습니다.</div>
+        <div className="py-4 text-center text-sm text-gray-400">테이블이 구성되지 않았습니다.</div>
       );
 
-    case "notice":
+    case 'notice':
       return question.noticeContent ? (
         <NoticeRenderer
           content={question.noticeContent}
@@ -290,17 +289,17 @@ function QuestionPreview({ question }: { question: Question }) {
           isTestMode={false}
         />
       ) : (
-        <div className="text-gray-400 text-sm text-center py-4">공지사항 내용이 없습니다.</div>
+        <div className="py-4 text-center text-sm text-gray-400">공지사항 내용이 없습니다.</div>
       );
 
     default:
-      return <div className="text-gray-400 text-sm">미리보기 준비 중...</div>;
+      return <div className="text-sm text-gray-400">미리보기 준비 중...</div>;
   }
 }
 
 // 테스트 모드용 인터랙티브 질문 카드 컴포넌트
 function QuestionTestCard({ question, index }: { question: Question; index: number }) {
-  const { testResponses, updateTestResponse } = useSurveyBuilderStore();
+  const { testResponses, updateTestResponse } = useTestResponseStore();
 
   const handleResponse = (value: unknown) => {
     updateTestResponse(
@@ -310,26 +309,20 @@ function QuestionTestCard({ question, index }: { question: Question; index: numb
   };
 
   return (
-    <Card className="p-6 border-l-4 border-l-blue-500" data-question-index={index}>
+    <Card className="border-l-4 border-l-blue-500 p-6" data-question-index={index}>
       <div className="mb-4">
-        <div className="flex items-center space-x-2 mb-2">
-          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-sm font-medium">
+        <div className="mb-2 flex items-center space-x-2">
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-sm font-medium text-blue-600">
             {index + 1}
           </span>
-          {question.required && <span className="text-red-500 text-sm">*</span>}
+          {question.required && <span className="text-sm text-red-500">*</span>}
         </div>
-        <h3 className="text-lg font-medium text-gray-900 mb-1">{question.title}</h3>
+        <h3 className="mb-1 text-lg font-medium text-gray-900">{question.title}</h3>
         {question.description && (
           <div
-            className="text-sm text-gray-600 mb-4 prose prose-sm max-w-none overflow-x-auto
-              [&_table]:border-collapse [&_table]:table-fixed [&_table]:w-full [&_table]:my-2 [&_table]:border-2 [&_table]:border-gray-300
-              [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2
-              [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-3 [&_table_th]:py-2
-              [&_table_th]:font-normal [&_table_th]:bg-transparent
-              [&_table_p]:m-0
-              [&_p]:min-h-[1.6em]"
+            className="prose prose-sm mb-4 max-w-none overflow-x-auto text-sm text-gray-600 [&_p]:min-h-[1.6em] [&_table]:my-2 [&_table]:w-full [&_table]:table-fixed [&_table]:border-collapse [&_table]:border-2 [&_table]:border-gray-300 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2 [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:bg-transparent [&_table_th]:px-3 [&_table_th]:py-2 [&_table_th]:font-normal"
             style={{
-              WebkitOverflowScrolling: "touch",
+              WebkitOverflowScrolling: 'touch',
             }}
             dangerouslySetInnerHTML={{ __html: convertHtmlImageUrlsToProxy(question.description) }}
           />
@@ -355,11 +348,11 @@ type OtherChoiceValue = {
 };
 
 function isOtherChoiceValue(value: unknown): value is OtherChoiceValue {
-  if (!value || typeof value !== "object") return false;
+  if (!value || typeof value !== 'object') return false;
   return (
-    "selectedValue" in value &&
-    typeof (value as { selectedValue: unknown }).selectedValue === "string" &&
-    "hasOther" in value &&
+    'selectedValue' in value &&
+    typeof (value as { selectedValue: unknown }).selectedValue === 'string' &&
+    'hasOther' in value &&
     (value as { hasOther: unknown }).hasOther === true
   );
 }
@@ -377,18 +370,18 @@ function RadioTestInput({
   value: SingleChoiceResponse;
   onChange: (value: SingleChoiceResponse) => void;
 }) {
-  const [otherInput, setOtherInput] = useState("");
+  const [otherInput, setOtherInput] = useState('');
 
   useEffect(() => {
     if (isOtherChoiceValue(value) && value.otherValue) {
       setOtherInput(value.otherValue);
     } else {
-      setOtherInput("");
+      setOtherInput('');
     }
   }, [value]);
 
   const handleOptionChange = (optionValue: string, optionId: string) => {
-    const isOtherOption = optionId === "other-option";
+    const isOtherOption = optionId === 'other-option';
     const isSelected = isOtherChoiceValue(value)
       ? value.selectedValue === optionValue
       : value === optionValue;
@@ -439,7 +432,7 @@ function RadioTestInput({
               checked={isSelected(option.value)}
               onChange={() => handleOptionChange(option.value, option.id)}
               onClick={() => handleOptionChange(option.value, option.id)}
-              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer"
+              className="h-4 w-4 cursor-pointer border-gray-300 text-blue-600 focus:ring-blue-500"
             />
             <label
               htmlFor={`${question.id}-${option.id}`}
@@ -447,12 +440,12 @@ function RadioTestInput({
                 e.preventDefault();
                 handleOptionChange(option.value, option.id);
               }}
-              className="text-sm text-gray-700 cursor-pointer flex-1"
+              className="flex-1 cursor-pointer text-sm text-gray-700"
             >
               {option.label}
             </label>
           </div>
-          {option.id === "other-option" && isSelected(option.value) && (
+          {option.id === 'other-option' && isSelected(option.value) && (
             <div className="ml-7">
               <Input
                 placeholder="기타 내용을 입력하세요..."
@@ -489,7 +482,7 @@ function CheckboxTestInput({
     const newOtherInputs: Record<string, string> = {};
     currentValues.forEach((val) => {
       if (isOtherChoiceValue(val)) {
-        newOtherInputs[val.selectedValue] = val.otherValue || "";
+        newOtherInputs[val.selectedValue] = val.otherValue || '';
       }
     });
     setOtherInputs(newOtherInputs);
@@ -497,7 +490,7 @@ function CheckboxTestInput({
 
   const handleOptionChange = (optionValue: string, optionId: string, isChecked: boolean) => {
     let newValues = [...currentValues];
-    const isOtherOption = optionId === "other-option";
+    const isOtherOption = optionId === 'other-option';
 
     if (isChecked) {
       // 최대 선택 개수 체크
@@ -513,7 +506,7 @@ function CheckboxTestInput({
       if (isOtherOption) {
         newValues.push({
           selectedValue: optionValue,
-          otherValue: otherInputs[optionValue] || "",
+          otherValue: otherInputs[optionValue] || '',
           hasOther: true,
         });
       } else {
@@ -583,24 +576,24 @@ function CheckboxTestInput({
                 checked={checked}
                 disabled={disabled}
                 onChange={(e) => handleOptionChange(option.value, option.id, e.target.checked)}
-                className={`w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 ${
-                  disabled ? "opacity-50 cursor-not-allowed" : ""
+                className={`h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 ${
+                  disabled ? 'cursor-not-allowed opacity-50' : ''
                 }`}
               />
               <label
                 htmlFor={`${question.id}-${option.id}`}
-                className={`text-sm text-gray-700 flex-1 ${
-                  disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                className={`flex-1 text-sm text-gray-700 ${
+                  disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
                 }`}
               >
                 {option.label}
               </label>
             </div>
-            {option.id === "other-option" && checked && (
+            {option.id === 'other-option' && checked && (
               <div className="ml-7">
                 <Input
                   placeholder="기타 내용을 입력하세요..."
-                  value={otherInputs[option.value] || ""}
+                  value={otherInputs[option.value] || ''}
                   onChange={(e) => handleOtherInputChange(option.value, e.target.value)}
                   className="w-full"
                 />
@@ -612,7 +605,7 @@ function CheckboxTestInput({
 
       {/* 선택 개수 표시 */}
       {(maxSelections !== undefined || minSelections !== undefined) && (
-        <div className="pt-2 border-t border-gray-200">
+        <div className="border-t border-gray-200 pt-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-600">
               {maxSelections !== undefined && maxSelections > 0
@@ -640,17 +633,17 @@ function SelectTestInput({
   value: SingleChoiceResponse;
   onChange: (value: SingleChoiceResponse) => void;
 }) {
-  const [otherInput, setOtherInput] = useState("");
-  const [selectedValue, setSelectedValue] = useState<string>("");
+  const [otherInput, setOtherInput] = useState('');
+  const [selectedValue, setSelectedValue] = useState<string>('');
 
   // value가 변경될 때 selectedValue와 otherInput 동기화
   useEffect(() => {
     if (isOtherChoiceValue(value)) {
       setSelectedValue(value.selectedValue);
-      setOtherInput(value.otherValue || "");
+      setOtherInput(value.otherValue || '');
     } else {
-      setSelectedValue(value || "");
-      setOtherInput("");
+      setSelectedValue(value || '');
+      setOtherInput('');
     }
   }, [value]);
 
@@ -658,7 +651,7 @@ function SelectTestInput({
     setSelectedValue(newValue);
     const selectedOption = question.options?.find((opt) => opt.value === newValue);
 
-    if (selectedOption?.id === "other-option") {
+    if (selectedOption?.id === 'other-option') {
       onChange({
         selectedValue: newValue,
         otherValue: otherInput,
@@ -673,7 +666,7 @@ function SelectTestInput({
     setOtherInput(inputValue);
     if (selectedValue) {
       const selectedOption = question.options?.find((opt) => opt.value === selectedValue);
-      if (selectedOption?.id === "other-option") {
+      if (selectedOption?.id === 'other-option') {
         onChange({
           selectedValue,
           otherValue: inputValue,
@@ -686,7 +679,7 @@ function SelectTestInput({
   const showOtherInput = () => {
     if (!selectedValue) return false;
     const selectedOption = question.options?.find((opt) => opt.value === selectedValue);
-    return selectedOption?.id === "other-option";
+    return selectedOption?.id === 'other-option';
   };
 
   return (
@@ -694,7 +687,7 @@ function SelectTestInput({
       <select
         value={selectedValue}
         onChange={(e) => handleSelectChange(e.target.value)}
-        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        className="w-full rounded-lg border border-gray-300 p-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
       >
         <option value="">선택하세요...</option>
         {question.options?.map((option) => (
@@ -729,28 +722,28 @@ function QuestionTestInput({
   onChange: (value: unknown) => void;
 }) {
   switch (question.type) {
-    case "text":
+    case 'text':
       return (
         <Input
-          placeholder={question.placeholder || "답변을 입력하세요..."}
-          value={(value as string) || ""}
+          placeholder={question.placeholder || '답변을 입력하세요...'}
+          value={(value as string) || ''}
           onChange={(e) => onChange(e.target.value)}
           className="w-full"
         />
       );
 
-    case "textarea":
+    case 'textarea':
       return (
         <textarea
-          className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full resize-none rounded-lg border border-gray-300 p-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
           rows={3}
           placeholder="답변을 입력하세요..."
-          value={(value as string) || ""}
+          value={(value as string) || ''}
           onChange={(e) => onChange(e.target.value)}
         />
       );
 
-    case "radio":
+    case 'radio':
       return (
         <RadioTestInput
           question={question}
@@ -759,7 +752,7 @@ function QuestionTestInput({
         />
       );
 
-    case "checkbox":
+    case 'checkbox':
       return (
         <CheckboxTestInput
           question={question}
@@ -768,7 +761,7 @@ function QuestionTestInput({
         />
       );
 
-    case "select":
+    case 'select':
       return (
         <SelectTestInput
           question={question}
@@ -777,7 +770,7 @@ function QuestionTestInput({
         />
       );
 
-    case "multiselect":
+    case 'multiselect':
       return question.selectLevels ? (
         <UserDefinedMultiLevelSelect
           levels={question.selectLevels}
@@ -787,28 +780,28 @@ function QuestionTestInput({
         />
       ) : null;
 
-    case "table":
+    case 'table':
       return question.tableColumns && question.tableRowsData ? (
         <InteractiveTableResponse
           questionId={question.id}
           tableTitle={question.tableTitle}
           columns={question.tableColumns}
           rows={question.tableRowsData}
-          value={typeof value === "object" && value !== null ? value : undefined}
+          value={typeof value === 'object' && value !== null ? value : undefined}
           onChange={onChange}
           isTestMode={true}
           className="border-0 shadow-none"
         />
       ) : (
-        <div className="text-center py-4 text-gray-500">테이블이 구성되지 않았습니다.</div>
+        <div className="py-4 text-center text-gray-500">테이블이 구성되지 않았습니다.</div>
       );
 
-    case "notice":
+    case 'notice':
       return (
         <NoticeRenderer
-          content={question.noticeContent || ""}
+          content={question.noticeContent || ''}
           requiresAcknowledgment={question.requiresAcknowledgment}
-          value={typeof value === "boolean" ? value : false}
+          value={typeof value === 'boolean' ? value : false}
           onChange={onChange}
           isTestMode={true}
         />
@@ -816,21 +809,21 @@ function QuestionTestInput({
 
     default:
       return (
-        <div className="text-center py-4 text-gray-500">이 질문 유형은 테스트할 수 없습니다.</div>
+        <div className="py-4 text-center text-gray-500">이 질문 유형은 테스트할 수 없습니다.</div>
       );
   }
 }
 
 function getQuestionTypeLabel(type: string): string {
   const labels = {
-    notice: "공지사항",
-    text: "단답형",
-    textarea: "장문형",
-    radio: "단일선택",
-    checkbox: "다중선택",
-    select: "드롭다운",
-    multiselect: "다단계선택",
-    table: "테이블",
+    notice: '공지사항',
+    text: '단답형',
+    textarea: '장문형',
+    radio: '단일선택',
+    checkbox: '다중선택',
+    select: '드롭다운',
+    multiselect: '다단계선택',
+    table: '테이블',
   };
   return labels[type as keyof typeof labels] || type;
 }
@@ -848,14 +841,9 @@ export function SortableQuestionList({
   isTestMode = false,
   onSaveToLibrary,
 }: SortableQuestionListProps) {
-  const {
-    currentSurvey,
-    reorderQuestions,
-    selectQuestion,
-    deleteQuestion,
-    updateQuestion,
-    addQuestion,
-  } = useSurveyBuilderStore();
+  const { currentSurvey, reorderQuestions, deleteQuestion, updateQuestion, addQuestion } =
+    useSurveyBuilderStore();
+  const { selectQuestion } = useSurveyUIStore();
 
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -879,14 +867,17 @@ export function SortableQuestionList({
   };
 
   // 그룹별로 질문 분류
-  const questionsByGroup = questions.reduce((acc, question) => {
-    const groupId = question.groupId || "ungrouped";
-    if (!acc[groupId]) {
-      acc[groupId] = [];
-    }
-    acc[groupId].push(question);
-    return acc;
-  }, {} as Record<string, Question[]>);
+  const questionsByGroup = questions.reduce(
+    (acc, question) => {
+      const groupId = question.groupId || 'ungrouped';
+      if (!acc[groupId]) {
+        acc[groupId] = [];
+      }
+      acc[groupId].push(question);
+      return acc;
+    },
+    {} as Record<string, Question[]>,
+  );
 
   // 재귀적으로 그룹과 모든 하위 그룹의 질문 개수 합계 계산
   const getTotalQuestionCount = (groupId: string): number => {
@@ -909,7 +900,7 @@ export function SortableQuestionList({
   };
 
   // 그룹 없는 질문들
-  const ungroupedQuestions = questionsByGroup["ungrouped"] || [];
+  const ungroupedQuestions = questionsByGroup['ungrouped'] || [];
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -953,7 +944,7 @@ export function SortableQuestionList({
       });
 
       // 그룹 없는 질문들
-      const ungrouped = (questionsByGroup["ungrouped"] || []).sort((a, b) => a.order - b.order);
+      const ungrouped = (questionsByGroup['ungrouped'] || []).sort((a, b) => a.order - b.order);
       orderedQuestions.push(...ungrouped);
 
       const oldIndex = orderedQuestions.findIndex((q) => q.id === active.id);
@@ -969,7 +960,7 @@ export function SortableQuestionList({
         // 서버에 질문 순서 변경 API 호출
         if (currentSurvey.id) {
           reorderQuestionsAction(questionIds).catch((error) => {
-            console.error("질문 순서 변경 실패:", error);
+            console.error('질문 순서 변경 실패:', error);
           });
         }
       }
@@ -984,7 +975,7 @@ export function SortableQuestionList({
   };
 
   const handleDelete = async (questionId: string) => {
-    if (confirm("이 질문을 삭제하시겠습니까?")) {
+    if (confirm('이 질문을 삭제하시겠습니까?')) {
       // 삭제 전 질문에서 이미지 추출 및 삭제
       const questionToDelete = questions.find((q) => q.id === questionId);
       if (questionToDelete) {
@@ -993,7 +984,7 @@ export function SortableQuestionList({
           try {
             await deleteImagesFromR2(images);
           } catch (error) {
-            console.error("질문 삭제 시 이미지 삭제 실패:", error);
+            console.error('질문 삭제 시 이미지 삭제 실패:', error);
             // 이미지 삭제 실패해도 질문 삭제는 진행
           }
         }
@@ -1007,7 +998,7 @@ export function SortableQuestionList({
         try {
           await deleteQuestionAction(questionId);
         } catch (error) {
-          console.error("질문 삭제 실패:", error);
+          console.error('질문 삭제 실패:', error);
         }
       }
     }
@@ -1025,10 +1016,8 @@ export function SortableQuestionList({
         : undefined;
 
       // 기존 질문들의 최대 order를 찾아서 +1 (없으면 1부터 시작)
-      const maxOrder = questions.length > 0 
-        ? Math.max(...questions.map(q => q.order), 0)
-        : 0;
-      
+      const maxOrder = questions.length > 0 ? Math.max(...questions.map((q) => q.order), 0) : 0;
+
       // 새로운 ID를 가진 완전한 복사본 생성
       const newQuestion: Question = {
         ...questionToDuplicate,
@@ -1124,7 +1113,7 @@ export function SortableQuestionList({
             displayCondition: newQuestion.displayCondition,
           });
         } catch (error) {
-          console.error("질문 복제 실패:", error);
+          console.error('질문 복제 실패:', error);
         }
       }
     }
@@ -1201,9 +1190,9 @@ export function SortableQuestionList({
           <div className="space-y-4">
             {topLevelGroups.length > 0 && (
               <div className="flex items-center space-x-2 py-2">
-                <div className="flex-1 h-px bg-gray-200" />
+                <div className="h-px flex-1 bg-gray-200" />
                 <span className="text-xs text-gray-400">그룹 없음</span>
-                <div className="flex-1 h-px bg-gray-200" />
+                <div className="h-px flex-1 bg-gray-200" />
               </div>
             )}
             {ungroupedQuestions.map((question, index) => (
@@ -1251,7 +1240,7 @@ export function SortableQuestionList({
                             <div key={question.id} className="relative">
                               {/* 드롭 영역 표시 */}
                               {overId === question.id && activeId !== question.id && (
-                                <div className="absolute -top-2 left-0 right-0 h-1 bg-blue-500 rounded-full animate-pulse z-10" />
+                                <div className="absolute -top-2 right-0 left-0 z-10 h-1 animate-pulse rounded-full bg-blue-500" />
                               )}
                               <SortableQuestion
                                 question={question}
@@ -1285,7 +1274,7 @@ export function SortableQuestionList({
                                   <div key={question.id} className="relative">
                                     {/* 드롭 영역 표시 */}
                                     {overId === question.id && activeId !== question.id && (
-                                      <div className="absolute -top-2 left-0 right-0 h-1 bg-blue-500 rounded-full animate-pulse z-10" />
+                                      <div className="absolute -top-2 right-0 left-0 z-10 h-1 animate-pulse rounded-full bg-blue-500" />
                                     )}
                                     <SortableQuestion
                                       question={question}
@@ -1315,16 +1304,16 @@ export function SortableQuestionList({
               <div className="space-y-4">
                 {topLevelGroups.length > 0 && (
                   <div className="flex items-center space-x-2 py-2">
-                    <div className="flex-1 h-px bg-gray-200" />
+                    <div className="h-px flex-1 bg-gray-200" />
                     <span className="text-xs text-gray-400">그룹 없음</span>
-                    <div className="flex-1 h-px bg-gray-200" />
+                    <div className="h-px flex-1 bg-gray-200" />
                   </div>
                 )}
                 {ungroupedQuestions.map((question, index) => (
                   <div key={question.id} className="relative">
                     {/* 드롭 영역 표시 */}
                     {overId === question.id && activeId !== question.id && (
-                      <div className="absolute -top-2 left-0 right-0 h-1 bg-blue-500 rounded-full animate-pulse z-10" />
+                      <div className="absolute -top-2 right-0 left-0 z-10 h-1 animate-pulse rounded-full bg-blue-500" />
                     )}
                     <SortableQuestion
                       question={question}

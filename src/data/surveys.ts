@@ -1,7 +1,8 @@
+import { and, desc, eq, gte, ilike, lte } from 'drizzle-orm';
+
 import { db } from '@/db';
-import { surveys, questions, questionGroups } from '@/db/schema';
-import { eq, desc, ilike, and, gte, lte } from 'drizzle-orm';
-import type { Survey as SurveyType, Question as QuestionType } from '@/types/survey';
+import { questionGroups, questions, surveys } from '@/db/schema';
+import type { QuestionGroup, Question as QuestionType, Survey as SurveyType } from '@/types/survey';
 
 // ========================
 // 설문 조회 함수
@@ -61,10 +62,7 @@ export async function searchSurveys(query: string) {
 // 날짜 범위로 설문 조회
 export async function getSurveysByDateRange(startDate: Date, endDate: Date) {
   const result = await db.query.surveys.findMany({
-    where: and(
-      gte(surveys.createdAt, startDate),
-      lte(surveys.createdAt, endDate)
-    ),
+    where: and(gte(surveys.createdAt, startDate), lte(surveys.createdAt, endDate)),
     orderBy: [desc(surveys.createdAt)],
   });
   return result;
@@ -115,17 +113,18 @@ export async function getSurveyWithDetails(surveyId: string): Promise<SurveyType
     description: survey.description ?? undefined,
     slug: survey.slug ?? undefined,
     privateToken: survey.privateToken ?? undefined,
-    groups: groups.map(g => ({
+    groups: groups.map((g) => ({
       id: g.id,
+      surveyId: g.surveyId,
       name: g.name,
       description: g.description ?? undefined,
       order: g.order,
       parentGroupId: g.parentGroupId ?? undefined,
       color: g.color ?? undefined,
       collapsed: g.collapsed ?? undefined,
-      displayCondition: g.displayCondition as SurveyType['groups'][0]['displayCondition'],
+      displayCondition: g.displayCondition as QuestionGroup['displayCondition'],
     })),
-    questions: questionList.map(q => ({
+    questions: questionList.map((q) => ({
       id: q.id,
       type: q.type as QuestionType['type'],
       title: q.title,
@@ -189,7 +188,7 @@ export async function getSurveyListWithCounts() {
         updatedAt: survey.updatedAt,
         isPublic: survey.isPublic,
       };
-    })
+    }),
   );
 
   return surveysWithCounts;

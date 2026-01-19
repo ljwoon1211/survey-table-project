@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useEffect, useRef, useState, RefObject } from "react";
+import { RefObject, useEffect, useRef, useState } from 'react';
 
 /**
  * 텍스트 요소의 줄 수를 감지하여 2줄 이상인지 확인하는 커스텀 훅
@@ -11,7 +11,7 @@ import { useEffect, useRef, useState, RefObject } from "react";
 export function useLineCountDetection<T extends HTMLElement>(
   isMobile: boolean,
   content?: string,
-): [RefObject<T>, boolean] {
+): [RefObject<T | null>, boolean] {
   const ref = useRef<T>(null);
   const [hasMultipleLines, setHasMultipleLines] = useState(false);
 
@@ -58,11 +58,11 @@ export function useLineCountDetection<T extends HTMLElement>(
       setTimeout(checkLineCount, 100);
     };
 
-    window.addEventListener("resize", handleResize);
+    window.addEventListener('resize', handleResize);
 
     return () => {
       resizeObserver.disconnect();
-      window.removeEventListener("resize", handleResize);
+      window.removeEventListener('resize', handleResize);
     };
   }, [isMobile, content]);
 

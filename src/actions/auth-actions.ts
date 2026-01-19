@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+
 import { createClient } from '@/lib/supabase/server';
 
 export async function login(formData: FormData) {
@@ -47,7 +48,9 @@ export async function updatePassword(formData: FormData) {
   }
 
   // 현재 비밀번호 확인을 위해 재로그인 시도
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user?.email) {
     return { error: '로그인이 필요합니다.' };
@@ -77,8 +80,8 @@ export async function updatePassword(formData: FormData) {
 
 export async function getUser() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   return user;
 }
-
-

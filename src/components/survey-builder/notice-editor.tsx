@@ -1,43 +1,46 @@
-"use client";
+'use client';
 
-import { useEditor, EditorContent } from "@tiptap/react";
-import { Button } from "@/components/ui/button";
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import { EditorContent, useEditor } from '@tiptap/react';
 import {
+  AlertCircle,
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
   Bold,
-  Italic,
-  List,
-  ListOrdered,
+  Columns,
+  Equal,
   Heading1,
   Heading2,
   Image as ImageIcon,
+  Italic,
   Link as LinkIcon,
-  Table as TableIcon,
-  Undo,
-  Redo,
-  Columns,
-  Rows,
-  Trash2,
-  Merge,
-  Split,
-  Paintbrush,
-  X,
-  Upload,
+  List,
+  ListOrdered,
   Loader2,
-  AlertCircle,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-  Equal,
-} from "lucide-react";
-import { useState, useMemo, useRef, useCallback, useEffect } from "react";
-import { createEditorExtensions } from "./editor-extensions";
+  Merge,
+  Paintbrush,
+  Redo,
+  Rows,
+  Split,
+  Table as TableIcon,
+  Trash2,
+  Undo,
+  Upload,
+  X,
+} from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { extractImageUrlsFromHtml } from '@/lib/image-extractor';
 import {
+  deleteImagesFromR2,
+  getProxiedImageUrl,
   optimizeImage,
   validateImageFile,
-  getProxiedImageUrl,
-  deleteImagesFromR2,
-} from "@/lib/image-utils";
-import { extractImageUrlsFromHtml } from "@/lib/image-extractor";
+} from '@/lib/image-utils';
+
+import { createEditorExtensions } from './editor-extensions';
 
 interface NoticeEditorProps {
   content: string;
@@ -50,9 +53,9 @@ export function NoticeEditor({
   content,
   onChange,
   compact = false,
-  placeholder = "",
+  placeholder = '',
 }: NoticeEditorProps) {
-  const [linkUrl, setLinkUrl] = useState("");
+  const [linkUrl, setLinkUrl] = useState('');
   const [showImageUpload, setShowImageUpload] = useState(false);
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -66,7 +69,7 @@ export function NoticeEditor({
 
   // 업로드된 이미지 URL 추적 (원본 URL로 저장)
   const uploadedImageUrlsRef = useRef<Set<string>>(new Set());
-  const previousContentRef = useRef<string>(content || "");
+  const previousContentRef = useRef<string>(content || '');
 
   // 각 에디터 인스턴스마다 고유한 확장 배열 생성
   const extensions = useMemo(() => createEditorExtensions(), []);
@@ -76,7 +79,7 @@ export function NoticeEditor({
     // 파일 유효성 검사
     const validation = validateImageFile(file);
     if (!validation.valid) {
-      setUploadError(validation.error || "파일 검증에 실패했습니다.");
+      setUploadError(validation.error || '파일 검증에 실패했습니다.');
       return;
     }
 
@@ -112,7 +115,7 @@ export function NoticeEditor({
 
   const editor = useEditor({
     extensions,
-    content: content || "",
+    content: content || '',
     immediatelyRender: false,
     onUpdate: ({ editor }) => {
       const currentHtml = editor.getHTML();
@@ -129,7 +132,7 @@ export function NoticeEditor({
       // 삭제된 이미지가 있으면 R2에서 삭제
       if (deletedImages.length > 0) {
         deleteImagesFromR2(deletedImages).catch((error) => {
-          console.error("이미지 삭제 실패:", error);
+          console.error('이미지 삭제 실패:', error);
         });
 
         // 추적 목록에서 제거
@@ -148,33 +151,33 @@ export function NoticeEditor({
     editorProps: {
       attributes: {
         class: compact
-          ? "prose prose-sm max-w-none focus:outline-none min-h-[80px] p-3 border border-gray-200 rounded-lg overflow-x-auto " +
-            "[&_table]:border-collapse [&_table]:table-auto [&_table]:w-full [&_table]:my-2 [&_table]:border-2 [&_table]:border-gray-300 " +
-            "[&_table_td]:min-w-[1em] [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-2 [&_table_td]:py-1 [&_table_td]:align-top [&_table_td]:box-border [&_table_td]:relative [&_table_td]:cursor-pointer [&_table_td]:overflow-hidden " +
-            "[&_table_th]:min-w-[1em] [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-2 [&_table_th]:py-1 [&_table_th]:align-top [&_table_th]:box-border [&_table_th]:relative [&_table_th]:cursor-pointer [&_table_th]:overflow-hidden " +
-            "[&_table_th]:font-normal [&_table_th]:text-left [&_table_th]:bg-transparent " +
-            "[&_table_.selectedCell]:bg-blue-100 [&_table_.selectedCell]:border-2 [&_table_.selectedCell]:border-blue-500 " +
-            "[&_table_.selected]:bg-blue-50 " +
-            "[&_table:hover]:border-blue-500 " +
-            "[&_table_p]:m-0 " +
-            "[&_img]:inline-block [&_img]:!m-0 [&_img]:align-top"
-          : "prose prose-sm max-w-none focus:outline-none min-h-[300px] p-6 bg-blue-50 border-2 border-blue-200 rounded-lg overflow-x-auto text-[14px] leading-[1.6] " +
-            "[&_table]:border-collapse [&_table]:table-auto [&_table]:w-full [&_table]:min-w-full [&_table]:my-4 [&_table]:border-2 [&_table]:border-gray-300 " +
-            "[&_table_td]:min-w-[1em] [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2 [&_table_td]:align-top [&_table_td]:box-border [&_table_td]:relative [&_table_td]:cursor-pointer [&_table_td]:overflow-hidden " +
-            "[&_table_th]:min-w-[1em] [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-3 [&_table_th]:py-2 [&_table_th]:align-top [&_table_th]:box-border [&_table_th]:relative [&_table_th]:cursor-pointer [&_table_th]:overflow-hidden " +
-            "[&_table_th]:font-normal [&_table_th]:text-left [&_table_th]:bg-transparent " +
-            "[&_table_.selectedCell]:bg-blue-100 [&_table_.selectedCell]:border-2 [&_table_.selectedCell]:border-blue-500 " +
-            "[&_table_.selected]:bg-blue-50 " +
-            "[&_table:hover]:border-blue-500 " +
-            "[&_table_p]:m-0 " +
-            "[&_p]:min-h-[1.6em] " +
-            "[&_img]:inline-block [&_img]:!m-0 [&_img]:align-top",
+          ? 'prose prose-sm max-w-none focus:outline-none min-h-[80px] p-3 border border-gray-200 rounded-lg overflow-x-auto ' +
+            '[&_table]:border-collapse [&_table]:table-auto [&_table]:w-full [&_table]:my-2 [&_table]:border-2 [&_table]:border-gray-300 ' +
+            '[&_table_td]:min-w-[1em] [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-2 [&_table_td]:py-1 [&_table_td]:align-top [&_table_td]:box-border [&_table_td]:relative [&_table_td]:cursor-pointer [&_table_td]:overflow-hidden ' +
+            '[&_table_th]:min-w-[1em] [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-2 [&_table_th]:py-1 [&_table_th]:align-top [&_table_th]:box-border [&_table_th]:relative [&_table_th]:cursor-pointer [&_table_th]:overflow-hidden ' +
+            '[&_table_th]:font-normal [&_table_th]:text-left [&_table_th]:bg-transparent ' +
+            '[&_table_.selectedCell]:bg-blue-100 [&_table_.selectedCell]:border-2 [&_table_.selectedCell]:border-blue-500 ' +
+            '[&_table_.selected]:bg-blue-50 ' +
+            '[&_table:hover]:border-blue-500 ' +
+            '[&_table_p]:m-0 ' +
+            '[&_img]:inline-block [&_img]:!m-0 [&_img]:align-top'
+          : 'prose prose-sm max-w-none focus:outline-none min-h-[300px] p-6 bg-blue-50 border-2 border-blue-200 rounded-lg overflow-x-auto text-[14px] leading-[1.6] ' +
+            '[&_table]:border-collapse [&_table]:table-auto [&_table]:w-full [&_table]:min-w-full [&_table]:my-4 [&_table]:border-2 [&_table]:border-gray-300 ' +
+            '[&_table_td]:min-w-[1em] [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2 [&_table_td]:align-top [&_table_td]:box-border [&_table_td]:relative [&_table_td]:cursor-pointer [&_table_td]:overflow-hidden ' +
+            '[&_table_th]:min-w-[1em] [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-3 [&_table_th]:py-2 [&_table_th]:align-top [&_table_th]:box-border [&_table_th]:relative [&_table_th]:cursor-pointer [&_table_th]:overflow-hidden ' +
+            '[&_table_th]:font-normal [&_table_th]:text-left [&_table_th]:bg-transparent ' +
+            '[&_table_.selectedCell]:bg-blue-100 [&_table_.selectedCell]:border-2 [&_table_.selectedCell]:border-blue-500 ' +
+            '[&_table_.selected]:bg-blue-50 ' +
+            '[&_table:hover]:border-blue-500 ' +
+            '[&_table_p]:m-0 ' +
+            '[&_p]:min-h-[1.6em] ' +
+            '[&_img]:inline-block [&_img]:!m-0 [&_img]:align-top',
       },
       handleDOMEvents: {
         mousedown: (view, event) => {
           const target = event.target as HTMLElement;
           // 테이블 셀을 클릭했을 때 셀 선택 모드 활성화
-          if (target.tagName === "TD" || target.tagName === "TH") {
+          if (target.tagName === 'TD' || target.tagName === 'TH') {
             return false; // 기본 동작 허용
           }
           return false;
@@ -202,13 +205,13 @@ export function NoticeEditor({
 
       // FormData 생성
       const formData = new FormData();
-      formData.append("file", optimizedFile);
+      formData.append('file', optimizedFile);
 
       // 업로드 (진행률 추적)
       const xhr = new XMLHttpRequest();
 
       // 진행률 업데이트
-      xhr.upload.addEventListener("progress", (e) => {
+      xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) {
           const percentComplete = (e.loaded / e.total) * 100;
           setUploadProgress(percentComplete);
@@ -217,25 +220,25 @@ export function NoticeEditor({
 
       // Promise로 래핑
       const uploadPromise = new Promise<string>((resolve, reject) => {
-        xhr.addEventListener("load", () => {
+        xhr.addEventListener('load', () => {
           if (xhr.status === 200) {
             const response = JSON.parse(xhr.responseText);
             resolve(response.url);
           } else {
             const errorResponse = JSON.parse(xhr.responseText);
-            reject(new Error(errorResponse.error || "업로드에 실패했습니다."));
+            reject(new Error(errorResponse.error || '업로드에 실패했습니다.'));
           }
         });
 
-        xhr.addEventListener("error", () => {
-          reject(new Error("네트워크 오류가 발생했습니다."));
+        xhr.addEventListener('error', () => {
+          reject(new Error('네트워크 오류가 발생했습니다.'));
         });
 
-        xhr.addEventListener("abort", () => {
-          reject(new Error("업로드가 취소되었습니다."));
+        xhr.addEventListener('abort', () => {
+          reject(new Error('업로드가 취소되었습니다.'));
         });
 
-        xhr.open("POST", "/api/upload/image");
+        xhr.open('POST', '/api/upload/image');
         xhr.send(formData);
       });
 
@@ -272,7 +275,7 @@ export function NoticeEditor({
       setUploadProgress(0);
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : "업로드 중 오류가 발생했습니다.";
+        error instanceof Error ? error.message : '업로드 중 오류가 발생했습니다.';
       setUploadError(errorMessage);
       setUploadProgress(0);
     } finally {
@@ -292,7 +295,7 @@ export function NoticeEditor({
     setUploadProgress(0);
     setIsUploading(false);
     if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+      fileInputRef.current.value = '';
     }
   }, []);
 
@@ -329,7 +332,7 @@ export function NoticeEditor({
 
         if (unusedImages.length > 0) {
           deleteImagesFromR2(unusedImages).catch((error) => {
-            console.error("언마운트 시 이미지 삭제 실패:", error);
+            console.error('언마운트 시 이미지 삭제 실패:', error);
           });
         }
       }
@@ -347,7 +350,7 @@ export function NoticeEditor({
   const addLink = () => {
     if (linkUrl) {
       ed.chain().focus().setLink({ href: linkUrl }).run();
-      setLinkUrl("");
+      setLinkUrl('');
       setShowLinkInput(false);
     }
   };
@@ -362,15 +365,15 @@ export function NoticeEditor({
 
     ed.chain()
       .focus()
-      .updateAttributes("tableCell", {
-        backgroundColor: "#e5e7eb", // gray-200
+      .updateAttributes('tableCell', {
+        backgroundColor: '#e5e7eb', // gray-200
       })
       .run();
 
     ed.chain()
       .focus()
-      .updateAttributes("tableHeader", {
-        backgroundColor: "#e5e7eb", // gray-200
+      .updateAttributes('tableHeader', {
+        backgroundColor: '#e5e7eb', // gray-200
       })
       .run();
   };
@@ -381,14 +384,14 @@ export function NoticeEditor({
 
     ed.chain()
       .focus()
-      .updateAttributes("tableCell", {
+      .updateAttributes('tableCell', {
         backgroundColor: null,
       })
       .run();
 
     ed.chain()
       .focus()
-      .updateAttributes("tableHeader", {
+      .updateAttributes('tableHeader', {
         backgroundColor: null,
       })
       .run();
@@ -408,7 +411,7 @@ export function NoticeEditor({
 
     for (let depth = $from.depth; depth >= 0; depth--) {
       const node = $from.node(depth);
-      if (node.type.name === "table") {
+      if (node.type.name === 'table') {
         tableNode = node;
         tablePos = $from.before(depth);
         break;
@@ -437,19 +440,24 @@ export function NoticeEditor({
     const { tr } = state;
     let modified = false;
 
-    tableNode.descendants((node: { type: { name: string }; attrs: { colspan?: number; colwidth?: number[] } }, pos: number) => {
-      if (node.type.name === "tableCell" || node.type.name === "tableHeader") {
-        const colspan = node.attrs.colspan || 1;
-        const newColwidth = Array(colspan).fill(equalWidth);
-        const absolutePos = tablePos + 1 + pos;
+    tableNode.descendants(
+      (
+        node: { type: { name: string }; attrs: { colspan?: number; colwidth?: number[] } },
+        pos: number,
+      ) => {
+        if (node.type.name === 'tableCell' || node.type.name === 'tableHeader') {
+          const colspan = node.attrs.colspan || 1;
+          const newColwidth = Array(colspan).fill(equalWidth);
+          const absolutePos = tablePos + 1 + pos;
 
-        tr.setNodeMarkup(absolutePos, undefined, {
-          ...node.attrs,
-          colwidth: newColwidth,
-        });
-        modified = true;
-      }
-    });
+          tr.setNodeMarkup(absolutePos, undefined, {
+            ...node.attrs,
+            colwidth: newColwidth,
+          });
+          modified = true;
+        }
+      },
+    );
 
     if (modified) {
       ed.view.dispatch(tr);
@@ -460,8 +468,8 @@ export function NoticeEditor({
     <div className="space-y-2">
       {/* Toolbar */}
       <div
-        className={`flex flex-wrap gap-2 p-2 bg-gray-50 border border-gray-200 rounded-lg ${
-          compact ? "gap-1" : ""
+        className={`flex flex-wrap gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 ${
+          compact ? 'gap-1' : ''
         }`}
       >
         <div className="flex gap-1">
@@ -470,22 +478,22 @@ export function NoticeEditor({
             variant="ghost"
             size="sm"
             onClick={() => ed.chain().focus().toggleBold().run()}
-            className={ed.isActive("bold") ? "bg-gray-200" : ""}
+            className={ed.isActive('bold') ? 'bg-gray-200' : ''}
           >
-            <Bold className="w-4 h-4" />
+            <Bold className="h-4 w-4" />
           </Button>
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={() => ed.chain().focus().toggleItalic().run()}
-            className={ed.isActive("italic") ? "bg-gray-200" : ""}
+            className={ed.isActive('italic') ? 'bg-gray-200' : ''}
           >
-            <Italic className="w-4 h-4" />
+            <Italic className="h-4 w-4" />
           </Button>
         </div>
 
-        <div className="w-px h-6 bg-gray-300" />
+        <div className="h-6 w-px bg-gray-300" />
 
         <div className="flex gap-1">
           <Button
@@ -493,22 +501,22 @@ export function NoticeEditor({
             variant="ghost"
             size="sm"
             onClick={() => ed.chain().focus().toggleHeading({ level: 1 }).run()}
-            className={ed.isActive("heading", { level: 1 }) ? "bg-gray-200" : ""}
+            className={ed.isActive('heading', { level: 1 }) ? 'bg-gray-200' : ''}
           >
-            <Heading1 className="w-4 h-4" />
+            <Heading1 className="h-4 w-4" />
           </Button>
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={() => ed.chain().focus().toggleHeading({ level: 2 }).run()}
-            className={ed.isActive("heading", { level: 2 }) ? "bg-gray-200" : ""}
+            className={ed.isActive('heading', { level: 2 }) ? 'bg-gray-200' : ''}
           >
-            <Heading2 className="w-4 h-4" />
+            <Heading2 className="h-4 w-4" />
           </Button>
         </div>
 
-        <div className="w-px h-6 bg-gray-300" />
+        <div className="h-6 w-px bg-gray-300" />
 
         <div className="flex gap-1">
           <Button
@@ -516,22 +524,22 @@ export function NoticeEditor({
             variant="ghost"
             size="sm"
             onClick={() => ed.chain().focus().toggleBulletList().run()}
-            className={ed.isActive("bulletList") ? "bg-gray-200" : ""}
+            className={ed.isActive('bulletList') ? 'bg-gray-200' : ''}
           >
-            <List className="w-4 h-4" />
+            <List className="h-4 w-4" />
           </Button>
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={() => ed.chain().focus().toggleOrderedList().run()}
-            className={ed.isActive("orderedList") ? "bg-gray-200" : ""}
+            className={ed.isActive('orderedList') ? 'bg-gray-200' : ''}
           >
-            <ListOrdered className="w-4 h-4" />
+            <ListOrdered className="h-4 w-4" />
           </Button>
         </div>
 
-        <div className="w-px h-6 bg-gray-300" />
+        <div className="h-6 w-px bg-gray-300" />
 
         <div className="flex gap-1">
           <Button
@@ -541,7 +549,7 @@ export function NoticeEditor({
             onClick={() => setShowImageUpload(!showImageUpload)}
             disabled={isUploading}
           >
-            <ImageIcon className="w-4 h-4" />
+            <ImageIcon className="h-4 w-4" />
           </Button>
           <Button
             type="button"
@@ -549,14 +557,14 @@ export function NoticeEditor({
             size="sm"
             onClick={() => setShowLinkInput(!showLinkInput)}
           >
-            <LinkIcon className="w-4 h-4" />
+            <LinkIcon className="h-4 w-4" />
           </Button>
           <Button type="button" variant="ghost" size="sm" onClick={addTable}>
-            <TableIcon className="w-4 h-4" />
+            <TableIcon className="h-4 w-4" />
           </Button>
         </div>
 
-        <div className="w-px h-6 bg-gray-300" />
+        <div className="h-6 w-px bg-gray-300" />
 
         <div className="flex gap-1">
           <Button
@@ -566,7 +574,7 @@ export function NoticeEditor({
             onClick={() => ed.chain().focus().undo().run()}
             disabled={!ed.can().undo()}
           >
-            <Undo className="w-4 h-4" />
+            <Undo className="h-4 w-4" />
           </Button>
           <Button
             type="button"
@@ -575,14 +583,14 @@ export function NoticeEditor({
             onClick={() => ed.chain().focus().redo().run()}
             disabled={!ed.can().redo()}
           >
-            <Redo className="w-4 h-4" />
+            <Redo className="h-4 w-4" />
           </Button>
         </div>
 
         {/* 이미지 편집 버튼 - 이미지가 선택되었을 때만 표시 */}
-        {ed.isActive("image") && (
+        {ed.isActive('image') && (
           <>
-            <div className="w-px h-6 bg-gray-300" />
+            <div className="h-6 w-px bg-gray-300" />
 
             {/* 이미지 정렬 버튼 */}
             <div className="flex gap-1">
@@ -591,61 +599,61 @@ export function NoticeEditor({
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  const container = document.querySelector(".ProseMirror img[src]")?.parentElement;
+                  const container = document.querySelector('.ProseMirror img[src]')?.parentElement;
                   if (container) {
                     container.setAttribute(
-                      "style",
+                      'style',
                       `${container.style.cssText.replace(
                         /margin:[^;]+;?/g,
-                        "",
+                        '',
                       )} margin: 0 auto 0 0;`,
                     );
                   }
                 }}
                 title="왼쪽 정렬"
               >
-                <AlignLeft className="w-4 h-4" />
+                <AlignLeft className="h-4 w-4" />
               </Button>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  const container = document.querySelector(".ProseMirror img[src]")?.parentElement;
+                  const container = document.querySelector('.ProseMirror img[src]')?.parentElement;
                   if (container) {
                     container.setAttribute(
-                      "style",
-                      `${container.style.cssText.replace(/margin:[^;]+;?/g, "")} margin: 0 auto;`,
+                      'style',
+                      `${container.style.cssText.replace(/margin:[^;]+;?/g, '')} margin: 0 auto;`,
                     );
                   }
                 }}
                 title="가운데 정렬"
               >
-                <AlignCenter className="w-4 h-4" />
+                <AlignCenter className="h-4 w-4" />
               </Button>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  const container = document.querySelector(".ProseMirror img[src]")?.parentElement;
+                  const container = document.querySelector('.ProseMirror img[src]')?.parentElement;
                   if (container) {
                     container.setAttribute(
-                      "style",
+                      'style',
                       `${container.style.cssText.replace(
                         /margin:[^;]+;?/g,
-                        "",
+                        '',
                       )} margin: 0 0 0 auto;`,
                     );
                   }
                 }}
                 title="오른쪽 정렬"
               >
-                <AlignRight className="w-4 h-4" />
+                <AlignRight className="h-4 w-4" />
               </Button>
             </div>
 
-            <div className="w-px h-6 bg-gray-300" />
+            <div className="h-6 w-px bg-gray-300" />
 
             {/* 이미지 크기 버튼 */}
             <div className="flex gap-1">
@@ -654,16 +662,16 @@ export function NoticeEditor({
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  const container = document.querySelector(".ProseMirror img[src]")?.parentElement;
+                  const container = document.querySelector('.ProseMirror img[src]')?.parentElement;
                   if (container) {
                     container.setAttribute(
-                      "style",
-                      container.style.cssText.replace(/width:\s*[^;]+;?/g, "") + " width: 25%;",
+                      'style',
+                      container.style.cssText.replace(/width:\s*[^;]+;?/g, '') + ' width: 25%;',
                     );
                   }
                 }}
                 title="25% 크기"
-                className="text-xs px-2"
+                className="px-2 text-xs"
               >
                 25%
               </Button>
@@ -672,16 +680,16 @@ export function NoticeEditor({
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  const container = document.querySelector(".ProseMirror img[src]")?.parentElement;
+                  const container = document.querySelector('.ProseMirror img[src]')?.parentElement;
                   if (container) {
                     container.setAttribute(
-                      "style",
-                      container.style.cssText.replace(/width:\s*[^;]+;?/g, "") + " width: 50%;",
+                      'style',
+                      container.style.cssText.replace(/width:\s*[^;]+;?/g, '') + ' width: 50%;',
                     );
                   }
                 }}
                 title="50% 크기"
-                className="text-xs px-2"
+                className="px-2 text-xs"
               >
                 50%
               </Button>
@@ -690,16 +698,16 @@ export function NoticeEditor({
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  const container = document.querySelector(".ProseMirror img[src]")?.parentElement;
+                  const container = document.querySelector('.ProseMirror img[src]')?.parentElement;
                   if (container) {
                     container.setAttribute(
-                      "style",
-                      container.style.cssText.replace(/width:\s*[^;]+;?/g, "") + " width: 75%;",
+                      'style',
+                      container.style.cssText.replace(/width:\s*[^;]+;?/g, '') + ' width: 75%;',
                     );
                   }
                 }}
                 title="75% 크기"
-                className="text-xs px-2"
+                className="px-2 text-xs"
               >
                 75%
               </Button>
@@ -708,16 +716,16 @@ export function NoticeEditor({
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  const container = document.querySelector(".ProseMirror img[src]")?.parentElement;
+                  const container = document.querySelector('.ProseMirror img[src]')?.parentElement;
                   if (container) {
                     container.setAttribute(
-                      "style",
-                      container.style.cssText.replace(/width:\s*[^;]+;?/g, "") + " width: 100%;",
+                      'style',
+                      container.style.cssText.replace(/width:\s*[^;]+;?/g, '') + ' width: 100%;',
                     );
                   }
                 }}
                 title="100% 크기"
-                className="text-xs px-2"
+                className="px-2 text-xs"
               >
                 100%
               </Button>
@@ -728,7 +736,7 @@ export function NoticeEditor({
         {/* 표 편집 버튼 - 표가 선택되었을 때만 표시 */}
         {ed.can().deleteTable() && (
           <>
-            <div className="w-px h-6 bg-gray-300" />
+            <div className="h-6 w-px bg-gray-300" />
 
             <div className="flex gap-1">
               <Button
@@ -738,7 +746,7 @@ export function NoticeEditor({
                 onClick={() => ed.chain().focus().addColumnAfter().run()}
                 title="열 추가 (뒤)"
               >
-                <Columns className="w-4 h-4" />
+                <Columns className="h-4 w-4" />
               </Button>
               <Button
                 type="button"
@@ -747,11 +755,11 @@ export function NoticeEditor({
                 onClick={() => ed.chain().focus().addRowAfter().run()}
                 title="행 추가 (아래)"
               >
-                <Rows className="w-4 h-4" />
+                <Rows className="h-4 w-4" />
               </Button>
             </div>
 
-            <div className="w-px h-6 bg-gray-300" />
+            <div className="h-6 w-px bg-gray-300" />
 
             <div className="flex gap-1">
               <Button
@@ -763,7 +771,7 @@ export function NoticeEditor({
                 title="열 삭제"
                 className="text-red-600 hover:text-red-700"
               >
-                <Columns className="w-4 h-4" />
+                <Columns className="h-4 w-4" />
                 <span className="text-xs">-</span>
               </Button>
               <Button
@@ -775,7 +783,7 @@ export function NoticeEditor({
                 title="행 삭제"
                 className="text-red-600 hover:text-red-700"
               >
-                <Rows className="w-4 h-4" />
+                <Rows className="h-4 w-4" />
                 <span className="text-xs">-</span>
               </Button>
               <Button
@@ -786,7 +794,7 @@ export function NoticeEditor({
                 title="표 삭제"
                 className="text-red-600 hover:text-red-700"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           </>
@@ -795,7 +803,7 @@ export function NoticeEditor({
         {/* 셀 병합/분리 버튼 - 항상 표시, 조건에 따라 활성화 */}
         {ed.can().deleteTable() && (
           <>
-            <div className="w-px h-6 bg-gray-300" />
+            <div className="h-6 w-px bg-gray-300" />
 
             <div className="flex gap-1">
               <Button
@@ -806,7 +814,7 @@ export function NoticeEditor({
                 disabled={!ed.can().mergeCells()}
                 title="셀 병합"
               >
-                <Merge className="w-4 h-4" />
+                <Merge className="h-4 w-4" />
               </Button>
               <Button
                 type="button"
@@ -816,11 +824,11 @@ export function NoticeEditor({
                 disabled={!ed.can().splitCell()}
                 title="셀 분할"
               >
-                <Split className="w-4 h-4" />
+                <Split className="h-4 w-4" />
               </Button>
             </div>
 
-            <div className="w-px h-6 bg-gray-300" />
+            <div className="h-6 w-px bg-gray-300" />
 
             <div className="flex gap-1">
               <Button
@@ -830,7 +838,7 @@ export function NoticeEditor({
                 onClick={applyCellBackground}
                 title="셀 배경색 적용 (회색)"
               >
-                <Paintbrush className="w-4 h-4" />
+                <Paintbrush className="h-4 w-4" />
               </Button>
               <Button
                 type="button"
@@ -841,13 +849,13 @@ export function NoticeEditor({
                 className="text-red-600 hover:text-red-700"
               >
                 <div className="relative">
-                  <Paintbrush className="w-4 h-4" />
-                  <X className="w-2.5 h-2.5 absolute -top-0.5 -right-0.5" />
+                  <Paintbrush className="h-4 w-4" />
+                  <X className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5" />
                 </div>
               </Button>
             </div>
 
-            <div className="w-px h-6 bg-gray-300" />
+            <div className="h-6 w-px bg-gray-300" />
 
             <div className="flex gap-1">
               <Button
@@ -857,7 +865,7 @@ export function NoticeEditor({
                 onClick={equalizeColumnWidths}
                 title="열 너비 균등 분배"
               >
-                <Equal className="w-4 h-4" />
+                <Equal className="h-4 w-4" />
               </Button>
             </div>
           </>
@@ -866,11 +874,11 @@ export function NoticeEditor({
 
       {/* Image Upload Panel */}
       {showImageUpload && (
-        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-4">
+        <div className="space-y-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
           {/* 드래그 앤 드롭 영역 */}
           {!selectedFile && !isUploading && (
             <div
-              className="border-2 border-dashed border-blue-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors cursor-pointer"
+              className="cursor-pointer rounded-lg border-2 border-dashed border-blue-300 p-6 text-center transition-colors hover:border-blue-400"
               onDrop={handleDrop}
               onDragOver={handleDragOver}
               onClick={() => fileInputRef.current?.click()}
@@ -887,11 +895,11 @@ export function NoticeEditor({
                 }}
                 className="hidden"
               />
-              <Upload className="w-8 h-8 mx-auto mb-2 text-blue-500" />
-              <p className="text-sm text-gray-600 mb-2">
+              <Upload className="mx-auto mb-2 h-8 w-8 text-blue-500" />
+              <p className="mb-2 text-sm text-gray-600">
                 이미지를 드래그 앤 드롭하거나 클릭하여 선택하세요
               </p>
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="mt-2 text-xs text-gray-500">
                 지원 형식: JPG, PNG, GIF, WebP, SVG (최대 10MB)
               </p>
             </div>
@@ -901,8 +909,8 @@ export function NoticeEditor({
           {selectedFile && previewUrl && !isUploading && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-700 truncate">{selectedFile.name}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-gray-700">{selectedFile.name}</p>
                   <p className="text-xs text-gray-500">
                     {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                   </p>
@@ -914,15 +922,15 @@ export function NoticeEditor({
                   onClick={handleCancelUpload}
                   className="text-red-600 hover:text-red-700"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="border rounded-lg overflow-hidden bg-white">
+              <div className="overflow-hidden rounded-lg border bg-white">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={getProxiedImageUrl(previewUrl || "")}
+                  src={getProxiedImageUrl(previewUrl || '')}
                   alt="미리보기"
-                  className="w-full max-h-48 object-contain"
+                  className="max-h-48 w-full object-contain"
                 />
               </div>
               <div className="flex gap-2">
@@ -943,19 +951,19 @@ export function NoticeEditor({
                 <span className="text-sm font-medium text-gray-700">업로드 중...</span>
                 <span className="text-sm text-gray-500">{Math.round(uploadProgress)}%</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="h-2 w-full rounded-full bg-gray-200">
                 <div
-                  className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                  className="h-2 rounded-full bg-blue-500 transition-all duration-300"
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>
               {previewUrl && (
-                <div className="border rounded-lg overflow-hidden bg-white">
+                <div className="overflow-hidden rounded-lg border bg-white">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={getProxiedImageUrl(previewUrl)}
                     alt="업로드 중"
-                    className="w-full max-h-32 object-contain opacity-50"
+                    className="max-h-32 w-full object-contain opacity-50"
                   />
                 </div>
               )}
@@ -967,7 +975,7 @@ export function NoticeEditor({
                 className="w-full"
                 disabled={uploadProgress >= 100}
               >
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 업로드 취소
               </Button>
             </div>
@@ -975,11 +983,11 @@ export function NoticeEditor({
 
           {/* 에러 메시지 */}
           {uploadError && (
-            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
+              <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-red-900">업로드 실패</p>
-                <p className="text-sm text-red-700 mt-1">{uploadError}</p>
+                <p className="mt-1 text-sm text-red-700">{uploadError}</p>
                 <Button
                   type="button"
                   variant="outline"
@@ -1002,7 +1010,7 @@ export function NoticeEditor({
                 onClick={() => setUploadError(null)}
                 className="text-red-600 hover:text-red-700"
               >
-                <X className="w-4 h-4" />
+                <X className="h-4 w-4" />
               </Button>
             </div>
           )}
@@ -1011,13 +1019,13 @@ export function NoticeEditor({
 
       {/* Link URL Input */}
       {showLinkInput && (
-        <div className="flex gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="flex gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
           <input
             type="text"
             value={linkUrl}
             onChange={(e) => setLinkUrl(e.target.value)}
             placeholder="링크 URL을 입력하세요 (텍스트를 먼저 선택하세요)"
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
           />
           <Button type="button" size="sm" onClick={addLink}>
             추가
@@ -1032,7 +1040,7 @@ export function NoticeEditor({
       <div className="relative">
         <EditorContent editor={editor} />
         {compact && !content && placeholder && (
-          <div className="absolute top-3 left-3 text-gray-400 text-sm pointer-events-none">
+          <div className="pointer-events-none absolute top-3 left-3 text-sm text-gray-400">
             {placeholder}
           </div>
         )}
@@ -1040,7 +1048,7 @@ export function NoticeEditor({
 
       {/* Help Text - 일반 모드에서만 표시 */}
       {!compact && (
-        <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded-lg">
+        <div className="rounded-lg bg-gray-50 p-2 text-xs text-gray-500">
           <p>
             💡 <strong>사용 팁:</strong> 텍스트, 이미지, 동영상 URL, 표를 자유롭게 추가할 수
             있습니다.

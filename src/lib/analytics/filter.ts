@@ -1,19 +1,19 @@
-import type { Question, QuestionType } from '@/types/survey';
 import type { SurveyResponse } from '@/db/schema';
+import type { Question, QuestionType } from '@/types/survey';
 
 // ========================
 // 필터 조건 타입
 // ========================
 
 export type FilterOperator =
-  | 'equals'        // 값이 정확히 일치
-  | 'not_equals'    // 값이 일치하지 않음
-  | 'contains'      // 값을 포함 (다중선택, 텍스트)
-  | 'not_contains'  // 값을 포함하지 않음
-  | 'is_empty'      // 빈 값
-  | 'is_not_empty'  // 비어있지 않음
-  | 'greater_than'  // 숫자 비교
-  | 'less_than';    // 숫자 비교
+  | 'equals' // 값이 정확히 일치
+  | 'not_equals' // 값이 일치하지 않음
+  | 'contains' // 값을 포함 (다중선택, 텍스트)
+  | 'not_contains' // 값을 포함하지 않음
+  | 'is_empty' // 빈 값
+  | 'is_not_empty' // 비어있지 않음
+  | 'greater_than' // 숫자 비교
+  | 'less_than'; // 숫자 비교
 
 export type FilterLogic = 'AND' | 'OR';
 
@@ -54,7 +54,7 @@ export interface SavedSegment {
 function evaluateCondition(
   condition: FilterCondition,
   response: SurveyResponse,
-  questions: Question[]
+  questions: Question[],
 ): boolean {
   const question = questions.find((q) => q.id === condition.questionId);
   if (!question) return true; // 질문을 찾지 못하면 통과
@@ -113,9 +113,7 @@ function evaluateCondition(
         return conditionValues.some((v) => answerValue.includes(v));
       }
       // 텍스트에서 포함 여부
-      return String(answerValue)
-        .toLowerCase()
-        .includes(String(condition.value).toLowerCase());
+      return String(answerValue).toLowerCase().includes(String(condition.value).toLowerCase());
 
     case 'not_contains':
       if (Array.isArray(answerValue)) {
@@ -124,9 +122,7 @@ function evaluateCondition(
           : [condition.value];
         return !conditionValues.some((v) => answerValue.includes(v));
       }
-      return !String(answerValue)
-        .toLowerCase()
-        .includes(String(condition.value).toLowerCase());
+      return !String(answerValue).toLowerCase().includes(String(condition.value).toLowerCase());
 
     case 'greater_than':
       return Number(answerValue) > Number(condition.value);
@@ -145,12 +141,12 @@ function evaluateCondition(
 function evaluateFilterGroup(
   group: FilterGroup,
   response: SurveyResponse,
-  questions: Question[]
+  questions: Question[],
 ): boolean {
   if (group.conditions.length === 0) return true;
 
   const results = group.conditions.map((condition) =>
-    evaluateCondition(condition, response, questions)
+    evaluateCondition(condition, response, questions),
   );
 
   if (group.logic === 'AND') {
@@ -166,13 +162,13 @@ function evaluateFilterGroup(
 export function applyFilter(
   filter: FilterState,
   responses: SurveyResponse[],
-  questions: Question[]
+  questions: Question[],
 ): SurveyResponse[] {
   if (filter.groups.length === 0) return responses;
 
   return responses.filter((response) => {
     const groupResults = filter.groups.map((group) =>
-      evaluateFilterGroup(group, response, questions)
+      evaluateFilterGroup(group, response, questions),
     );
 
     if (filter.groupLogic === 'AND') {
@@ -277,10 +273,7 @@ export function createFilterCondition(questionId: string): FilterCondition {
 /**
  * 필터 상태에 조건 추가
  */
-export function addConditionToFilter(
-  filter: FilterState,
-  condition: FilterCondition
-): FilterState {
+export function addConditionToFilter(filter: FilterState, condition: FilterCondition): FilterState {
   // 그룹이 없으면 새 그룹 생성
   if (filter.groups.length === 0) {
     const newGroup = createFilterGroup();
@@ -306,10 +299,7 @@ export function addConditionToFilter(
 /**
  * 필터 상태에서 조건 제거
  */
-export function removeConditionFromFilter(
-  filter: FilterState,
-  conditionId: string
-): FilterState {
+export function removeConditionFromFilter(filter: FilterState, conditionId: string): FilterState {
   const updatedGroups = filter.groups
     .map((group) => ({
       ...group,
@@ -329,13 +319,11 @@ export function removeConditionFromFilter(
 export function updateConditionInFilter(
   filter: FilterState,
   conditionId: string,
-  updates: Partial<FilterCondition>
+  updates: Partial<FilterCondition>,
 ): FilterState {
   const updatedGroups = filter.groups.map((group) => ({
     ...group,
-    conditions: group.conditions.map((c) =>
-      c.id === conditionId ? { ...c, ...updates } : c
-    ),
+    conditions: group.conditions.map((c) => (c.id === conditionId ? { ...c, ...updates } : c)),
   }));
 
   return {
@@ -363,15 +351,12 @@ export interface FilterSummary {
 export function getFilterSummary(
   filter: FilterState,
   responses: SurveyResponse[],
-  questions: Question[]
+  questions: Question[],
 ): FilterSummary {
   const filteredResponses = applyFilter(filter, responses, questions);
   return {
     totalResponses: responses.length,
     filteredResponses: filteredResponses.length,
-    filterRate:
-      responses.length > 0
-        ? (filteredResponses.length / responses.length) * 100
-        : 0,
+    filterRate: responses.length > 0 ? (filteredResponses.length / responses.length) * 100 : 0,
   };
 }

@@ -1,13 +1,16 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { updatePassword, logout } from "@/actions/auth-actions";
-import { ArrowLeft, Lock, CheckCircle, AlertCircle, LogOut, User } from "lucide-react";
+import { useState } from 'react';
+
+import Link from 'next/link';
+
+import { AlertCircle, ArrowLeft, CheckCircle, Lock, LogOut, User } from 'lucide-react';
+
+import { logout, updatePassword } from '@/actions/auth-actions';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function AdminProfilePage() {
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +29,7 @@ export default function AdminProfilePage() {
     } else if (result?.success) {
       setSuccess(true);
       // 폼 초기화
-      const form = document.getElementById("password-form") as HTMLFormElement;
+      const form = document.getElementById('password-form') as HTMLFormElement;
       form?.reset();
     }
 
@@ -34,15 +37,15 @@ export default function AdminProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-2xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gray-50 px-4 py-8">
+      <div className="mx-auto max-w-2xl space-y-6">
         {/* 헤더 */}
         <div className="flex items-center justify-between">
           <Link
             href="/admin/surveys"
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
+            className="flex items-center gap-2 text-gray-600 transition-colors hover:text-gray-900"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="h-5 w-5" />
             <span>설문 관리로 돌아가기</span>
           </Link>
           <form action={logout}>
@@ -50,9 +53,9 @@ export default function AdminProfilePage() {
               type="submit"
               variant="ghost"
               size="sm"
-              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="text-red-600 hover:bg-red-50 hover:text-red-700"
             >
-              <LogOut className="w-4 h-4 mr-2" />
+              <LogOut className="mr-2 h-4 w-4" />
               로그아웃
             </Button>
           </form>
@@ -62,8 +65,8 @@ export default function AdminProfilePage() {
         <Card>
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                <User className="w-6 h-6 text-blue-600" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
+                <User className="h-6 w-6 text-blue-600" />
               </div>
               <div>
                 <CardTitle>관리자 프로필</CardTitle>
@@ -77,8 +80,8 @@ export default function AdminProfilePage() {
         <Card>
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                <Lock className="w-5 h-5 text-gray-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100">
+                <Lock className="h-5 w-5 text-gray-600" />
               </div>
               <div>
                 <CardTitle className="text-lg">비밀번호 변경</CardTitle>
@@ -89,15 +92,15 @@ export default function AdminProfilePage() {
           <CardContent>
             <form id="password-form" action={handleSubmit} className="space-y-5">
               {error && (
-                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
                   <span>{error}</span>
                 </div>
               )}
 
               {success && (
-                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-                  <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+                  <CheckCircle className="h-4 w-4 flex-shrink-0" />
                   <span>비밀번호가 성공적으로 변경되었습니다.</span>
                 </div>
               )}
@@ -149,11 +152,11 @@ export default function AdminProfilePage() {
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? (
                   <span className="flex items-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                     변경 중...
                   </span>
                 ) : (
-                  "비밀번호 변경"
+                  '비밀번호 변경'
                 )}
               </Button>
             </form>
@@ -163,11 +166,3 @@ export default function AdminProfilePage() {
     </div>
   );
 }
-
-
-
-
-
-
-
-

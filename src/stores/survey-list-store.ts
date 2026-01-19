@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
+import { immer } from 'zustand/middleware/immer';
 
 /**
  * 설문 목록 UI 상태 관리
@@ -29,7 +30,7 @@ interface SurveyListUIState {
 
 export const useSurveyListStore = create<SurveyListUIState>()(
   devtools(
-    (set) => ({
+    immer<SurveyListUIState>((set) => ({
       searchQuery: '',
       selectedSurveyIds: [],
       sortBy: 'updatedAt',
@@ -37,57 +38,73 @@ export const useSurveyListStore = create<SurveyListUIState>()(
       filterByPublic: null,
 
       setSearchQuery: (query: string) =>
-        set(() => ({ searchQuery: query })),
+        set((state) => {
+          state.searchQuery = query;
+        }),
 
       selectSurvey: (surveyId: string) =>
-        set((state) => ({
-          selectedSurveyIds: state.selectedSurveyIds.includes(surveyId)
-            ? state.selectedSurveyIds
-            : [...state.selectedSurveyIds, surveyId]
-        })),
+        set((state) => {
+          if (!state.selectedSurveyIds.includes(surveyId)) {
+            state.selectedSurveyIds.push(surveyId);
+          }
+        }),
 
       deselectSurvey: (surveyId: string) =>
-        set((state) => ({
-          selectedSurveyIds: state.selectedSurveyIds.filter(id => id !== surveyId)
-        })),
+        set((state) => {
+          state.selectedSurveyIds = state.selectedSurveyIds.filter((id) => id !== surveyId);
+        }),
 
       toggleSurveySelection: (surveyId: string) =>
-        set((state) => ({
-          selectedSurveyIds: state.selectedSurveyIds.includes(surveyId)
-            ? state.selectedSurveyIds.filter(id => id !== surveyId)
-            : [...state.selectedSurveyIds, surveyId]
-        })),
+        set((state) => {
+          if (state.selectedSurveyIds.includes(surveyId)) {
+            state.selectedSurveyIds = state.selectedSurveyIds.filter((id) => id !== surveyId);
+          } else {
+            state.selectedSurveyIds.push(surveyId);
+          }
+        }),
 
       selectAllSurveys: (surveyIds: string[]) =>
-        set(() => ({ selectedSurveyIds: surveyIds })),
+        set((state) => {
+          state.selectedSurveyIds = surveyIds;
+        }),
 
       clearSelection: () =>
-        set(() => ({ selectedSurveyIds: [] })),
+        set((state) => {
+          state.selectedSurveyIds = [];
+        }),
 
       setSortBy: (sortBy) =>
-        set(() => ({ sortBy })),
+        set((state) => {
+          state.sortBy = sortBy;
+        }),
 
       setSortOrder: (order) =>
-        set(() => ({ sortOrder: order })),
+        set((state) => {
+          state.sortOrder = order;
+        }),
 
       toggleSortOrder: () =>
-        set((state) => ({ sortOrder: state.sortOrder === 'asc' ? 'desc' : 'asc' })),
+        set((state) => {
+          state.sortOrder = state.sortOrder === 'asc' ? 'desc' : 'asc';
+        }),
 
       setFilterByPublic: (filter) =>
-        set(() => ({ filterByPublic: filter })),
+        set((state) => {
+          state.filterByPublic = filter;
+        }),
 
       resetFilters: () =>
-        set(() => ({
-          searchQuery: '',
-          sortBy: 'updatedAt',
-          sortOrder: 'desc',
-          filterByPublic: null,
-        })),
-    }),
+        set((state) => {
+          state.searchQuery = '';
+          state.sortBy = 'updatedAt';
+          state.sortOrder = 'desc';
+          state.filterByPublic = null;
+        }),
+    })) as any,
     {
-      name: 'survey-list-ui-store'
-    }
-  )
+      name: 'survey-list-ui-store',
+    },
+  ),
 );
 
 // 타입 export (하위 호환성)

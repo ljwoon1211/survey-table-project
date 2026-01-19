@@ -1,21 +1,21 @@
 /**
  * Flat Excel Export Utilities
- * 
+ *
  * 퀄트릭스 스타일의 Flat/Linear 데이터 내보내기 기능
  * - 각 질문/셀/옵션을 개별 열로 확장
  * - 다중 선택(Checkbox)은 각 옵션별 별도 열 (Y/N)
  * - Loop/Matrix 테이블 패턴 지원
  */
-
 import * as XLSX from 'xlsx';
+
 import {
-  Survey,
-  Question,
-  TableRow,
-  TableCell,
   CheckboxOption,
-  RadioOption,
+  Question,
   QuestionOption,
+  RadioOption,
+  Survey,
+  TableCell,
+  TableRow,
 } from '@/types/survey';
 
 // ============================================================
@@ -87,7 +87,7 @@ export function flattenQuestionsToColumns(survey: Survey): ExportColumn[] {
   // 질문별 열 생성
   const sortedQuestions = [...survey.questions].sort((a, b) => a.order - b.order);
 
-  sortedQuestions.forEach(question => {
+  sortedQuestions.forEach((question) => {
     if (question.type === 'table') {
       columns.push(...expandTableToColumns(question));
     } else if (question.type === 'checkbox') {
@@ -126,7 +126,7 @@ function expandCheckboxToColumns(question: Question): ExportColumn[] {
   const qLabel = question.exportLabel || question.title;
 
   if (question.options) {
-    question.options.forEach(option => {
+    question.options.forEach((option) => {
       const optCode = option.optionCode || option.value;
       const code = `${qCode}_${optCode}`;
       const header = `${qLabel}_${option.label}`;
@@ -178,7 +178,7 @@ function expandTableToColumns(question: Question): ExportColumn[] {
 
   if (!question.tableRowsData) return columns;
 
-  question.tableRowsData.forEach(row => {
+  question.tableRowsData.forEach((row) => {
     const rowCode = row.rowCode || row.id.slice(0, 4);
     const rowLabel = row.label;
 
@@ -194,7 +194,7 @@ function expandTableToColumns(question: Question): ExportColumn[] {
 
       if (cell.type === 'checkbox' && cell.checkboxOptions) {
         // 체크박스 셀: 각 옵션별 열 생성
-        cell.checkboxOptions.forEach(option => {
+        cell.checkboxOptions.forEach((option) => {
           const optCode = option.optionCode || option.value;
           const code = `${qCode}_${rowCode}_${cellCode}_${optCode}`;
           const header = `${qCode}_${rowLabel}_${cellLabel}_${option.label}`;
@@ -254,12 +254,12 @@ function expandTableToColumns(question: Question): ExportColumn[] {
 export function flattenResponsesToRows(
   responses: ResponseData[],
   columns: ExportColumn[],
-  survey: Survey
+  survey: Survey,
 ): FlatRow[] {
-  return responses.map(response => {
+  return responses.map((response) => {
     const row: FlatRow = {};
 
-    columns.forEach(col => {
+    columns.forEach((col) => {
       row[col.header] = getValueForColumn(col, response, survey);
     });
 
@@ -273,7 +273,7 @@ export function flattenResponsesToRows(
 function getValueForColumn(
   column: ExportColumn,
   response: ResponseData,
-  survey: Survey
+  survey: Survey,
 ): string | number | boolean {
   const { questionResponses } = response;
 
@@ -352,7 +352,7 @@ function getMetaValue(code: string, response: ResponseData): string | number {
  */
 function getTableCellValue(
   answer: unknown,
-  tableInfo: NonNullable<ExportColumn['tableInfo']>
+  tableInfo: NonNullable<ExportColumn['tableInfo']>,
 ): unknown {
   if (!answer || typeof answer !== 'object') return undefined;
 
@@ -376,12 +376,12 @@ function getTableCellValue(
  * 값 포맷팅 (옵션 라벨로 변환)
  */
 function formatValue(value: unknown, questionId: string, survey: Survey): string {
-  const question = survey.questions.find(q => q.id === questionId);
+  const question = survey.questions.find((q) => q.id === questionId);
   if (!question) return String(value);
 
   // Radio/Select 옵션 라벨 변환
   if (question.options && typeof value === 'string') {
-    const option = question.options.find(o => o.value === value);
+    const option = question.options.find((o) => o.value === value);
     if (option) return option.label;
   }
 
@@ -395,27 +395,27 @@ function formatTableCellValue(
   value: unknown,
   tableInfo: NonNullable<ExportColumn['tableInfo']>,
   questionId: string,
-  survey: Survey
+  survey: Survey,
 ): string {
   if (value === undefined || value === null) return '';
 
-  const question = survey.questions.find(q => q.id === questionId);
+  const question = survey.questions.find((q) => q.id === questionId);
   if (!question) return String(value);
 
   // 셀 찾기
-  const row = question.tableRowsData?.find(r => r.id === tableInfo.rowId);
-  const cell = row?.cells.find(c => c.id === tableInfo.cellId);
+  const row = question.tableRowsData?.find((r) => r.id === tableInfo.rowId);
+  const cell = row?.cells.find((c) => c.id === tableInfo.cellId);
   if (!cell) return String(value);
 
   // Radio 옵션 라벨 변환
   if (cell.type === 'radio' && cell.radioOptions && typeof value === 'string') {
-    const option = cell.radioOptions.find(o => o.value === value);
+    const option = cell.radioOptions.find((o) => o.value === value);
     if (option) return option.label;
   }
 
   // Select 옵션 라벨 변환
   if (cell.type === 'select' && cell.selectOptions && typeof value === 'string') {
-    const option = cell.selectOptions.find(o => o.value === value);
+    const option = cell.selectOptions.find((o) => o.value === value);
     if (option) return option.label;
   }
 
@@ -431,7 +431,7 @@ function formatTableCellValue(
  */
 export function generateFlatExcelWorkbook(
   survey: Survey,
-  responses: ResponseData[]
+  responses: ResponseData[],
 ): XLSX.WorkBook {
   const workbook = XLSX.utils.book_new();
 
@@ -445,8 +445,8 @@ export function generateFlatExcelWorkbook(
   const ws = XLSX.utils.json_to_sheet(rows);
 
   // 열 너비 자동 조정
-  const colWidths = columns.map(col => ({
-    wch: Math.min(Math.max(col.header.length * 1.5, 10), 50)
+  const colWidths = columns.map((col) => ({
+    wch: Math.min(Math.max(col.header.length * 1.5, 10), 50),
   }));
   ws['!cols'] = colWidths;
 
@@ -464,13 +464,13 @@ export function generateFlatExcelWorkbook(
  * Flat Variable Map 생성
  */
 function generateFlatVariableMap(columns: ExportColumn[], survey: Survey) {
-  return columns.map(col => {
-    const question = survey.questions.find(q => q.id === col.questionId);
+  return columns.map((col) => {
+    const question = survey.questions.find((q) => q.id === col.questionId);
 
     return {
       'Column Code': col.code,
       'Column Header': col.header,
-      'Type': col.type,
+      Type: col.type,
       'Question ID': col.questionId,
       'Question Title': question?.title || '',
       'Question Code': question?.questionCode || '',
@@ -485,14 +485,11 @@ function generateFlatVariableMap(columns: ExportColumn[], survey: Survey) {
 /**
  * Flat 엑셀 파일 다운로드용 Blob 생성
  */
-export function generateFlatExcelBlob(
-  survey: Survey,
-  responses: ResponseData[]
-): Blob {
+export function generateFlatExcelBlob(survey: Survey, responses: ResponseData[]): Blob {
   const workbook = generateFlatExcelWorkbook(survey, responses);
   const buffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
   return new Blob([buffer], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
 }
 

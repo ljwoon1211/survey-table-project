@@ -1,10 +1,12 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { TableColumn, TableRow } from "@/types/survey";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Image, Video, FileText } from "lucide-react";
-import { getProxiedImageUrl } from "@/lib/image-utils";
+import { useEffect, useState } from 'react';
+
+import { FileText, Image, Video } from 'lucide-react';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { getProxiedImageUrl } from '@/lib/image-utils';
+import { TableColumn, TableRow } from '@/types/survey';
 
 // 이미지 셀 컴포넌트 (에러 상태 관리)
 function ImageCell({ imageUrl, content }: { imageUrl: string; content?: string }) {
@@ -16,24 +18,24 @@ function ImageCell({ imageUrl, content }: { imageUrl: string; content?: string }
   }, [imageUrl]);
 
   return (
-    <div className="flex flex-col items-center gap-2 w-full h-full">
+    <div className="flex h-full w-full flex-col items-center gap-2">
       <div key={imageUrl}>
         {error ? (
-          <div className="flex items-center gap-1 text-red-500 text-sm">
-            <Image className="w-4 h-4" />
+          <div className="flex items-center gap-1 text-sm text-red-500">
+            <Image className="h-4 w-4" />
             <span>이미지 오류</span>
           </div>
         ) : (
           <img
             src={getProxiedImageUrl(imageUrl)}
             alt="셀 이미지"
-            className="w-full h-auto max-h-full object-contain rounded"
-            style={{ maxWidth: "100%", maxHeight: "100%" }}
+            className="h-auto max-h-full w-full rounded object-contain"
+            style={{ maxWidth: '100%', maxHeight: '100%' }}
             onError={() => setError(true)}
           />
         )}
       </div>
-      {content && <div className="text-sm text-gray-700 mt-2 text-left">{content}</div>}
+      {content && <div className="mt-2 text-left text-sm text-gray-700">{content}</div>}
     </div>
   );
 }
@@ -57,7 +59,7 @@ export function TablePreview({
       <Card className={className}>
         <CardContent className="p-8">
           <div className="text-center text-gray-500">
-            <FileText className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+            <FileText className="mx-auto mb-4 h-12 w-12 text-gray-400" />
             <p>테이블을 구성해주세요</p>
             <p className="text-sm">열과 행을 추가하여 테이블을 만들어보세요</p>
           </div>
@@ -67,16 +69,16 @@ export function TablePreview({
   }
 
   // 셀 내용 렌더링 함수
-  const renderCellContent = (cell: TableRow["cells"][number]) => {
-    if (!cell) return <span className="text-gray-400 text-sm">-</span>;
+  const renderCellContent = (cell: TableRow['cells'][number]) => {
+    if (!cell) return <span className="text-sm text-gray-400">-</span>;
 
     switch (cell.type) {
-      case "checkbox":
+      case 'checkbox':
         return cell.checkboxOptions && cell.checkboxOptions.length > 0 ? (
-          <div className="space-y-2 w-full">
+          <div className="w-full space-y-2">
             {/* 셀 텍스트 설명 (있는 경우) */}
             {cell.content && cell.content.trim() && (
-              <div className="text-sm text-gray-700 mb-3 font-medium whitespace-pre-wrap break-words">
+              <div className="mb-3 text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
                 {cell.content}
               </div>
             )}
@@ -98,12 +100,12 @@ export function TablePreview({
           </div>
         );
 
-      case "radio":
+      case 'radio':
         return cell.radioOptions && cell.radioOptions.length > 0 ? (
-          <div className="space-y-2 w-full">
+          <div className="w-full space-y-2">
             {/* 셀 텍스트 설명 (있는 경우) */}
             {cell.content && cell.content.trim() && (
-              <div className="text-sm text-gray-700 mb-3 font-medium whitespace-pre-wrap break-words">
+              <div className="mb-3 text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
                 {cell.content}
               </div>
             )}
@@ -125,16 +127,16 @@ export function TablePreview({
           </div>
         );
 
-      case "select":
+      case 'select':
         return cell.selectOptions && cell.selectOptions.length > 0 ? (
-          <div className="w-full h-full flex flex-col space-y-2">
+          <div className="flex h-full w-full flex-col space-y-2">
             {/* 셀 텍스트 설명 (있는 경우) */}
             {cell.content && cell.content.trim() && (
-              <div className="text-sm text-gray-700 font-medium whitespace-pre-wrap break-words">
+              <div className="text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
                 {cell.content}
               </div>
             )}
-            <select className="w-full h-full p-2 text-sm border border-gray-300 rounded" disabled>
+            <select className="h-full w-full rounded border border-gray-300 p-2 text-sm" disabled>
               <option value="">선택하세요...</option>
               {cell.selectOptions.map((option) => (
                 <option key={option.id} value={option.value}>
@@ -149,25 +151,25 @@ export function TablePreview({
           </div>
         );
 
-      case "image":
+      case 'image':
         return cell.imageUrl ? (
           <ImageCell imageUrl={cell.imageUrl} content={cell.content} />
         ) : (
           <div className="flex items-center gap-2 text-gray-500">
-            <Image className="w-4 h-4" />
+            <Image className="h-4 w-4" />
             <span className="text-sm">이미지 없음</span>
           </div>
         );
 
-      case "video":
+      case 'video':
         return cell.videoUrl ? (
           <div className="flex flex-col items-center gap-2">
-            {cell.videoUrl.includes("youtube.com") || cell.videoUrl.includes("youtu.be") ? (
+            {cell.videoUrl.includes('youtube.com') || cell.videoUrl.includes('youtu.be') ? (
               <div className="w-full max-w-xs">
                 <div className="aspect-video">
                   <iframe
                     src={getYouTubeEmbedUrl(cell.videoUrl)}
-                    className="w-full h-full rounded"
+                    className="h-full w-full rounded"
                     frameBorder="0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
@@ -175,12 +177,12 @@ export function TablePreview({
                   />
                 </div>
               </div>
-            ) : cell.videoUrl.includes("vimeo.com") ? (
+            ) : cell.videoUrl.includes('vimeo.com') ? (
               <div className="w-full max-w-xs">
                 <div className="aspect-video">
                   <iframe
-                    src={cell.videoUrl.replace("vimeo.com/", "player.vimeo.com/video/")}
-                    className="w-full h-full rounded"
+                    src={cell.videoUrl.replace('vimeo.com/', 'player.vimeo.com/video/')}
+                    className="h-full w-full rounded"
                     frameBorder="0"
                     allow="autoplay; fullscreen; picture-in-picture"
                     allowFullScreen
@@ -189,44 +191,44 @@ export function TablePreview({
                 </div>
               </div>
             ) : cell.videoUrl.match(/\.(mp4|webm|ogg)$/i) ? (
-              <video src={cell.videoUrl} controls className="w-full max-w-xs max-h-32 rounded">
+              <video src={cell.videoUrl} controls className="max-h-32 w-full max-w-xs rounded">
                 동영상을 지원하지 않는 브라우저입니다.
               </video>
             ) : (
               <div className="flex items-center gap-2 text-yellow-600">
-                <Video className="w-4 h-4" />
+                <Video className="h-4 w-4" />
                 <span className="text-sm">동영상 링크 오류</span>
               </div>
             )}
             {cell.content && (
-              <div className="text-sm text-gray-700 mt-2 text-left">{cell.content}</div>
+              <div className="mt-2 text-left text-sm text-gray-700">{cell.content}</div>
             )}
           </div>
         ) : (
           <div className="flex items-center gap-2 text-gray-500">
-            <Video className="w-4 h-4" />
+            <Video className="h-4 w-4" />
             <span className="text-sm">동영상 없음</span>
           </div>
         );
 
-      case "input":
+      case 'input':
         return (
-          <div className="w-full h-full flex flex-col space-y-2">
+          <div className="flex h-full w-full flex-col space-y-2">
             {/* 셀 텍스트 설명 (있는 경우) */}
             {cell.content && cell.content.trim() && (
-              <div className="text-sm text-gray-700 font-medium whitespace-pre-wrap break-words">
+              <div className="text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
                 {cell.content}
               </div>
             )}
             <input
               type="text"
-              placeholder={cell.placeholder || "답변을 입력하세요..."}
+              placeholder={cell.placeholder || '답변을 입력하세요...'}
               maxLength={cell.inputMaxLength}
               disabled
-              className="w-full h-full p-2 text-sm border border-gray-300 rounded bg-gray-50"
+              className="h-full w-full rounded border border-gray-300 bg-gray-50 p-2 text-sm"
             />
             {cell.inputMaxLength && (
-              <div className="text-xs text-gray-500 mt-1 text-right">
+              <div className="mt-1 text-right text-xs text-gray-500">
                 최대 {cell.inputMaxLength}자
               </div>
             )}
@@ -235,11 +237,11 @@ export function TablePreview({
 
       default:
         return cell.content ? (
-          <div className="whitespace-pre-wrap text-sm leading-relaxed break-words w-full">
+          <div className="w-full text-sm leading-relaxed break-words whitespace-pre-wrap">
             {cell.content}
           </div>
         ) : (
-          <span className="text-gray-400 text-sm"></span>
+          <span className="text-sm text-gray-400"></span>
         );
     }
   };
@@ -265,7 +267,7 @@ export function TablePreview({
         <div className="overflow-x-auto">
           <table
             className="w-full border-collapse border border-gray-300 text-sm"
-            style={{ tableLayout: "fixed" }}
+            style={{ tableLayout: 'fixed' }}
           >
             {/* 열 너비 정의 */}
             <colgroup>
@@ -280,10 +282,10 @@ export function TablePreview({
                 {columns.map((column) => (
                   <th
                     key={column.id}
-                    className="border border-gray-300 p-3 bg-gray-50 font-medium text-center"
+                    className="border border-gray-300 bg-gray-50 p-3 text-center font-medium"
                     style={{ width: `${column.width || 150}px` }}
                   >
-                    {column.label || <span className="text-gray-400 italic text-sm"></span>}
+                    {column.label || <span className="text-sm text-gray-400 italic"></span>}
                   </th>
                 ))}
               </tr>
@@ -314,7 +316,7 @@ export function TablePreview({
                         colSpan={cell.colspan || 1}
                       >
                         <div
-                          className={`w-full h-full flex flex-col ${
+                          className={`flex h-full w-full flex-col ${
                             cell.verticalAlign === 'top'
                               ? 'justify-start'
                               : cell.verticalAlign === 'middle'
@@ -325,10 +327,10 @@ export function TablePreview({
                           <div
                             className={`w-full ${
                               cell.horizontalAlign === 'left'
-                                ? 'flex justify-start items-start'
+                                ? 'flex items-start justify-start'
                                 : cell.horizontalAlign === 'center'
-                                  ? 'flex justify-center items-center'
-                                  : 'flex justify-end items-end'
+                                  ? 'flex items-center justify-center'
+                                  : 'flex items-end justify-end'
                             }`}
                           >
                             {renderCellContent(cell)}

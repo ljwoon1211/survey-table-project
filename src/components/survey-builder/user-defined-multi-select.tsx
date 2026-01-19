@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+
 import { ChevronDown } from 'lucide-react';
-import { SelectLevel, QuestionOption } from '@/types/survey';
+
+import { QuestionOption, SelectLevel } from '@/types/survey';
 
 interface UserDefinedMultiSelectProps {
   levels: SelectLevel[];
@@ -17,7 +19,7 @@ export function UserDefinedMultiSelect({
   values,
   onChange,
   disabled = false,
-  className = ""
+  className = '',
 }: UserDefinedMultiSelectProps) {
   const [currentValues, setCurrentValues] = useState<string[]>(values);
 
@@ -54,11 +56,13 @@ export function UserDefinedMultiSelect({
 
       // parentValue와 연관된 옵션들만 필터링
       // 이는 사용자가 설정한 옵션의 value 값으로 연동됩니다
-      return level.options?.filter(option => {
-        // 옵션의 value가 parent의 value로 시작하는지 확인
-        // 예: parent가 "seoul"이면 "seoul-gangnam", "seoul-songpa" 등이 매칭
-        return option.value.startsWith(parentValue + '-');
-      }) || [];
+      return (
+        level.options?.filter((option) => {
+          // 옵션의 value가 parent의 value로 시작하는지 확인
+          // 예: parent가 "seoul"이면 "seoul-gangnam", "seoul-songpa" 등이 매칭
+          return option.value.startsWith(parentValue + '-');
+        }) || []
+      );
     }
   };
 
@@ -70,17 +74,15 @@ export function UserDefinedMultiSelect({
 
         return (
           <div key={level.id} className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">
-              {level.label}
-            </label>
+            <label className="block text-sm font-medium text-gray-700">{level.label}</label>
             <div className="relative">
               <select
                 value={currentValues[index] || ''}
                 onChange={(e) => handleLevelChange(index, e.target.value)}
                 disabled={isDisabled}
-                className={`w-full p-3 border border-gray-200 rounded-lg bg-white appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
+                className={`w-full appearance-none rounded-lg border border-gray-200 bg-white p-3 transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none ${
                   isDisabled
-                    ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                    ? 'cursor-not-allowed bg-gray-50 text-gray-400'
                     : 'hover:border-gray-300'
                 }`}
               >
@@ -92,7 +94,7 @@ export function UserDefinedMultiSelect({
                 ))}
               </select>
               <ChevronDown
-                className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 pointer-events-none transition-colors ${
+                className={`pointer-events-none absolute top-1/2 right-3 h-5 w-5 -translate-y-1/2 transform transition-colors ${
                   isDisabled ? 'text-gray-300' : 'text-gray-400'
                 }`}
               />
@@ -112,30 +114,28 @@ interface UserDefinedMultiSelectPreviewProps {
 
 export function UserDefinedMultiSelectPreview({
   levels,
-  className = ""
+  className = '',
 }: UserDefinedMultiSelectPreviewProps) {
   return (
     <div className={`space-y-3 ${className}`}>
       {levels.map((level, index) => (
         <div key={level.id} className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">
-            {level.label}
-          </label>
+          <label className="block text-sm font-medium text-gray-700">{level.label}</label>
           <div className="relative">
             <select
               disabled
-              className="w-full p-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-400 cursor-not-allowed appearance-none"
+              className="w-full cursor-not-allowed appearance-none rounded-lg border border-gray-200 bg-gray-50 p-3 text-gray-400"
             >
               <option>{level.placeholder || `${level.label} 선택`}</option>
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-300 pointer-events-none" />
+            <ChevronDown className="pointer-events-none absolute top-1/2 right-3 h-5 w-5 -translate-y-1/2 transform text-gray-300" />
           </div>
         </div>
       ))}
 
       {levels.length > 0 && levels[0].options && levels[0].options.length > 0 && (
         <div className="mt-3 text-xs text-gray-500">
-          {levels[0].label}: {levels[0].options.map(opt => opt.label).join(', ')}
+          {levels[0].label}: {levels[0].options.map((opt) => opt.label).join(', ')}
           {levels[0].options.length > 3 && '...'}
         </div>
       )}

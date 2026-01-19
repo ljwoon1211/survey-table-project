@@ -1,14 +1,16 @@
-import { notFound } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft, Settings } from "lucide-react";
-import { getSurveyWithDetails } from "@/data/surveys";
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+
+import { ArrowLeft, Settings } from 'lucide-react';
+
+import { AnalyticsDashboardClient } from '@/components/analytics';
+import { Button } from '@/components/ui/button';
 import {
-  getCompletedResponses,
-  exportResponsesAsJson,
   exportResponsesAsCsv,
-} from "@/data/responses";
-import { AnalyticsDashboardClient } from "@/components/analytics";
-import { Button } from "@/components/ui/button";
+  exportResponsesAsJson,
+  getCompletedResponses,
+} from '@/data/responses';
+import { getSurveyWithDetails } from '@/data/surveys';
 
 interface AnalyticsPageProps {
   params: Promise<{ surveyId: string }>;
@@ -29,31 +31,31 @@ export default async function SurveyAnalyticsPage({ params }: AnalyticsPageProps
 
   // 내보내기 함수 (서버 액션)
   async function handleExportJson() {
-    "use server";
+    'use server';
     return exportResponsesAsJson(surveyId);
   }
 
   async function handleExportCsv() {
-    "use server";
+    'use server';
     return exportResponsesAsCsv(surveyId);
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+      <header className="sticky top-0 z-10 border-b border-gray-200 bg-white">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between">
             <div className="flex items-center gap-4">
               <Link href="/analytics">
                 <Button variant="ghost" size="sm">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  <ArrowLeft className="mr-2 h-4 w-4" />
                   설문 목록
                 </Button>
               </Link>
               <div className="h-6 w-px bg-gray-200" />
               <div>
-                <h1 className="text-lg font-semibold text-gray-900 truncate max-w-md">
+                <h1 className="max-w-md truncate text-lg font-semibold text-gray-900">
                   {survey.title}
                 </h1>
               </div>
@@ -61,7 +63,7 @@ export default async function SurveyAnalyticsPage({ params }: AnalyticsPageProps
             <div className="flex items-center gap-2">
               <Link href={`/admin/surveys/${surveyId}/edit`}>
                 <Button variant="outline" size="sm">
-                  <Settings className="w-4 h-4 mr-2" />
+                  <Settings className="mr-2 h-4 w-4" />
                   설문 편집
                 </Button>
               </Link>
@@ -71,7 +73,7 @@ export default async function SurveyAnalyticsPage({ params }: AnalyticsPageProps
       </header>
 
       {/* 메인 콘텐츠 */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <AnalyticsDashboardClient
           survey={{
             id: survey.id,
@@ -94,7 +96,7 @@ export async function generateMetadata({ params }: AnalyticsPageProps) {
 
   if (!survey) {
     return {
-      title: "설문을 찾을 수 없습니다",
+      title: '설문을 찾을 수 없습니다',
     };
   }
 

@@ -1,46 +1,49 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Question, QuestionOption, SelectLevel } from "@/types/survey";
-import { useSurveyBuilderStore } from "@/stores/survey-store";
-import { extractImageUrlsFromQuestion } from "@/lib/image-extractor";
-import { deleteImagesFromR2 } from "@/lib/image-utils";
+import { useCallback, useEffect, useState } from 'react';
+
 import {
-  updateQuestion as updateQuestionAction,
-  createQuestion as createQuestionAction,
-} from "@/actions/survey-actions";
-import { isValidUUID, generateId } from "@/lib/utils";
-import { UserDefinedMultiSelectPreview } from "./user-defined-multi-select";
-import { DynamicTableEditor } from "./dynamic-table-editor";
-import { TablePreview } from "./table-preview";
-import { NoticeEditor } from "./notice-editor";
-import { NoticeRenderer } from "./notice-renderer";
-import { BranchRuleEditor } from "./branch-rule-editor";
-import { TableValidationEditor } from "./table-validation-editor";
-import { QuestionConditionEditor } from "./question-condition-editor";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Plus,
-  X,
-  GripVertical,
-  Type,
-  FileText,
-  Circle,
+  AlertTriangle,
   CheckSquare,
   ChevronDown,
-  Table,
-  Image,
-  Video,
-  Settings,
-  Info,
-  AlertTriangle,
+  Circle,
   Eye,
-} from "lucide-react";
+  FileText,
+  GripVertical,
+  Image,
+  Info,
+  Plus,
+  Settings,
+  Table,
+  Type,
+  Video,
+  X,
+} from 'lucide-react';
+
+import {
+  createQuestion as createQuestionAction,
+  updateQuestion as updateQuestionAction,
+} from '@/actions/survey-actions';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { extractImageUrlsFromQuestion } from '@/lib/image-extractor';
+import { deleteImagesFromR2 } from '@/lib/image-utils';
+import { generateId, isValidUUID } from '@/lib/utils';
+import { useSurveyBuilderStore } from '@/stores/survey-store';
+import { Question, QuestionOption, SelectLevel } from '@/types/survey';
+
+import { BranchRuleEditor } from './branch-rule-editor';
+import { DynamicTableEditor } from './dynamic-table-editor';
+import { NoticeEditor } from './notice-editor';
+import { NoticeRenderer } from './notice-renderer';
+import { QuestionConditionEditor } from './question-condition-editor';
+import { TablePreview } from './table-preview';
+import { TableValidationEditor } from './table-validation-editor';
+import { UserDefinedMultiSelectPreview } from './user-defined-multi-select';
 
 interface QuestionEditModalProps {
   questionId: string | null;
@@ -76,22 +79,22 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         description: question.description,
         required: question.required,
         groupId: question.groupId,
-        questionCode: question.questionCode || "",
-        exportLabel: question.exportLabel || "",
-        tableType: question.tableType,
-        loopConfig: question.loopConfig,
+        questionCode: (question as any).questionCode || '',
+        exportLabel: (question as any).exportLabel || '',
+        tableType: (question as any).tableType,
+        loopConfig: (question as any).loopConfig,
         options: optionsWithDeepBranchRule,
-        selectLevels: question.selectLevels ? [...question.selectLevels] : [],
-        tableTitle: question.tableTitle,
-        tableColumns: question.tableColumns ? [...question.tableColumns] : [],
-        tableRowsData: question.tableRowsData ? [...question.tableRowsData] : [],
-        allowOtherOption: question.allowOtherOption || false,
-        minSelections: question.minSelections,
-        maxSelections: question.maxSelections,
-        noticeContent: question.noticeContent || "",
-        requiresAcknowledgment: question.requiresAcknowledgment || false,
-        placeholder: question.placeholder || "",
-        tableValidationRules: question.tableValidationRules || [],
+        selectLevels: (question as any).selectLevels ? [...(question as any).selectLevels] : [],
+        tableTitle: (question as any).tableTitle,
+        tableColumns: (question as any).tableColumns ? [...(question as any).tableColumns] : [],
+        tableRowsData: (question as any).tableRowsData ? [...(question as any).tableRowsData] : [],
+        allowOtherOption: (question as any).allowOtherOption || false,
+        minSelections: (question as any).minSelections,
+        maxSelections: (question as any).maxSelections,
+        noticeContent: (question as any).noticeContent || '',
+        requiresAcknowledgment: (question as any).requiresAcknowledgment || false,
+        placeholder: question.placeholder || '',
+        tableValidationRules: (question as any).tableValidationRules || [],
         displayCondition: question.displayCondition,
       });
 
@@ -105,20 +108,20 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
   const validateForm = useCallback(() => {
     if (!question) return false;
 
-    const needsOptions = ["radio", "checkbox", "select"].includes(question.type);
-    const needsSelectLevels = question.type === "multiselect";
+    const needsOptions = ['radio', 'checkbox', 'select'].includes(question.type);
+    const needsSelectLevels = question.type === 'multiselect';
     const errors: Record<string, string> = {};
 
     if (!formData.title?.trim()) {
-      errors.title = "질문 제목은 필수입니다.";
+      errors.title = '질문 제목은 필수입니다.';
     }
 
     if (needsOptions && (!formData.options || formData.options.length === 0)) {
-      errors.options = "최소 하나의 선택 옵션이 필요합니다.";
+      errors.options = '최소 하나의 선택 옵션이 필요합니다.';
     }
 
     if (needsSelectLevels && (!formData.selectLevels || formData.selectLevels.length === 0)) {
-      errors.selectLevels = "최소 하나의 선택 레벨이 필요합니다.";
+      errors.selectLevels = '최소 하나의 선택 레벨이 필요합니다.';
     }
 
     // 테이블 타입은 title만 있으면 저장 가능 (테이블 데이터는 선택적)
@@ -172,8 +175,8 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
             const createdQuestion = await createQuestionAction({
               surveyId: currentSurvey.id,
               groupId: question?.groupId,
-              type: formData.type || question?.type || "text",
-              title: formData.title || question?.title || "",
+              type: formData.type || question?.type || 'text',
+              title: formData.title || question?.title || '',
               description: formData.description || question?.description,
               required: formData.required ?? question?.required ?? false,
               order: question?.order ?? 0,
@@ -207,14 +210,14 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
             }
           }
         } catch (error) {
-          console.error("질문 저장/업데이트 실패:", error);
+          console.error('질문 저장/업데이트 실패:', error);
           // 저장 실패해도 모달은 닫음 (로컬 상태는 이미 업데이트됨)
         }
       }
 
       onClose();
     } catch (error) {
-      console.error("저장 중 오류가 발생했습니다:", error);
+      console.error('저장 중 오류가 발생했습니다:', error);
     } finally {
       setIsSaving(false);
     }
@@ -223,9 +226,9 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
   // 키보드 이벤트 핸들러
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === 'Escape') {
         onClose();
-      } else if (e.key === "s" && (e.ctrlKey || e.metaKey)) {
+      } else if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         handleSave();
       }
@@ -235,14 +238,14 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
 
   useEffect(() => {
     if (isOpen) {
-      document.addEventListener("keydown", handleKeyDown);
-      return () => document.removeEventListener("keydown", handleKeyDown);
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
     }
   }, [isOpen, handleKeyDown]);
 
   // 기타 옵션 관리 헬퍼 함수들
-  const OTHER_OPTION_ID = "other-option";
-  const OTHER_OPTION_LABEL = "기타";
+  const OTHER_OPTION_ID = 'other-option';
+  const OTHER_OPTION_LABEL = '기타';
 
   const addOtherOptionIfNeeded = (options: QuestionOption[]) => {
     const hasOtherOption = options.some((option) => option.id === OTHER_OPTION_ID);
@@ -252,7 +255,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         {
           id: OTHER_OPTION_ID,
           label: OTHER_OPTION_LABEL,
-          value: "other",
+          value: 'other',
           hasOther: true,
         },
       ];
@@ -282,12 +285,12 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
 
   if (!question) return null;
 
-  const needsOptions = ["radio", "checkbox", "select"].includes(question.type);
-  const needsSelectLevels = question.type === "multiselect";
+  const needsOptions = ['radio', 'checkbox', 'select'].includes(question.type);
+  const needsSelectLevels = question.type === 'multiselect';
 
   // 모달 크기 결정 (테이블 편집시 큰 화면 사용)
-  const isTableType = question.type === "table";
-  const modalSize = isTableType ? "max-w-6xl" : "max-w-3xl";
+  const isTableType = question.type === 'table';
+  const modalSize = isTableType ? 'max-w-6xl' : 'max-w-3xl';
 
   const addOption = () => {
     const newOption: QuestionOption = {
@@ -321,7 +324,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
     const newLevel: SelectLevel = {
       id: generateId(),
       label: `레벨 ${(formData.selectLevels?.length || 0) + 1}`,
-      placeholder: "",
+      placeholder: '',
       order: formData.selectLevels?.length || 0,
       options: [],
     };
@@ -448,20 +451,20 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
       }}
     >
       <DialogContent
-        className={`${modalSize} max-h-[95vh] flex flex-col p-0`}
+        className={`${modalSize} flex max-h-[95vh] flex-col p-0`}
         onInteractOutside={(e) => {
           e.preventDefault();
         }}
       >
         {/* 고정 헤더 */}
-        <DialogHeader className="flex-shrink-0 px-6 py-4 border-b border-gray-200">
+        <DialogHeader className="flex-shrink-0 border-b border-gray-200 px-6 py-4">
           <DialogTitle className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               {getQuestionTypeIcon(question.type)}
               <span>{getQuestionTypeLabel(question.type)} 편집</span>
             </div>
             {/* 키보드 단축키 안내 */}
-            <div className="hidden sm:flex items-center text-xs text-gray-500 space-x-4">
+            <div className="hidden items-center space-x-4 text-xs text-gray-500 sm:flex">
               <span>저장: Ctrl+S</span>
               <span>닫기: ESC</span>
             </div>
@@ -471,25 +474,25 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         {/* 스크롤 가능한 본문 */}
         <div className="flex-1 overflow-y-auto">
           <Tabs defaultValue="basic" className="w-full">
-            <TabsList className="w-full justify-start border-b rounded-none px-6">
+            <TabsList className="w-full justify-start rounded-none border-b px-6">
               <TabsTrigger value="basic" className="flex items-center gap-2">
-                <Settings className="w-4 h-4" />
+                <Settings className="h-4 w-4" />
                 기본 설정
               </TabsTrigger>
               {isTableType && (
                 <TabsTrigger value="validation" className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" />
+                  <AlertTriangle className="h-4 w-4" />
                   검증 규칙
                 </TabsTrigger>
               )}
               <TabsTrigger value="display-condition" className="flex items-center gap-2">
-                <Eye className="w-4 h-4" />
+                <Eye className="h-4 w-4" />
                 표시 조건
               </TabsTrigger>
             </TabsList>
 
             {/* 기본 설정 탭 */}
-            <TabsContent value="basic" className="px-6 py-4 space-y-6">
+            <TabsContent value="basic" className="space-y-6 px-6 py-4">
               {/* 기본 정보 */}
               <div className="space-y-4">
                 <div>
@@ -498,37 +501,37 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                   </Label>
                   <Input
                     id="title"
-                    value={formData.title || ""}
+                    value={formData.title || ''}
                     onChange={(e) => {
                       setFormData((prev) => ({ ...prev, title: e.target.value }));
                       if (validationErrors.title) {
-                        setValidationErrors((prev) => ({ ...prev, title: "" }));
+                        setValidationErrors((prev) => ({ ...prev, title: '' }));
                       }
                     }}
                     placeholder="질문을 입력하세요"
                     className={`mt-2 ${
-                      validationErrors.title ? "border-red-500 focus:border-red-500" : ""
+                      validationErrors.title ? 'border-red-500 focus:border-red-500' : ''
                     }`}
                   />
                   {validationErrors.title && (
-                    <p className="text-red-500 text-sm mt-1">{validationErrors.title}</p>
+                    <p className="mt-1 text-sm text-red-500">{validationErrors.title}</p>
                   )}
                 </div>
 
                 {/* 질문 코드 및 엑셀 라벨 (Flat 내보내기용) */}
-                <div className="grid grid-cols-2 gap-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                <div className="grid grid-cols-2 gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
                   <div>
                     <Label htmlFor="questionCode">질문 코드 (선택사항)</Label>
                     <Input
                       id="questionCode"
-                      value={formData.questionCode || ""}
+                      value={formData.questionCode || ''}
                       onChange={(e) =>
                         setFormData((prev) => ({ ...prev, questionCode: e.target.value }))
                       }
                       placeholder="예: Q1, A2, A8_1"
                       className="mt-2"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="mt-1 text-xs text-gray-500">
                       엑셀 내보내기 시 사용할 질문 식별자 (미입력 시 자동 생성)
                     </p>
                   </div>
@@ -536,14 +539,14 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                     <Label htmlFor="exportLabel">엑셀 라벨 (선택사항)</Label>
                     <Input
                       id="exportLabel"
-                      value={formData.exportLabel || ""}
+                      value={formData.exportLabel || ''}
                       onChange={(e) =>
                         setFormData((prev) => ({ ...prev, exportLabel: e.target.value }))
                       }
                       placeholder="예: 성별, TV보유현황"
                       className="mt-2"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="mt-1 text-xs text-gray-500">
                       엑셀 헤더에 표시될 라벨 (미입력 시 질문 제목 사용)
                     </p>
                   </div>
@@ -553,14 +556,14 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                   <Label htmlFor="group">그룹 선택 (선택사항)</Label>
                   <select
                     id="group"
-                    value={formData.groupId || ""}
+                    value={formData.groupId || ''}
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
                         groupId: e.target.value || undefined,
                       }))
                     }
-                    className="w-full mt-2 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="mt-2 w-full rounded-lg border border-gray-300 p-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">그룹 없음</option>
                     {(() => {
@@ -596,7 +599,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                       return options;
                     })()}
                   </select>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="mt-1 text-xs text-gray-500">
                     이 질문을 특정 그룹에 포함시킬 수 있습니다.
                   </p>
                 </div>
@@ -605,7 +608,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                   <Label htmlFor="description">설명 (선택사항)</Label>
                   <div className="mt-2">
                     <NoticeEditor
-                      content={formData.description || ""}
+                      content={formData.description || ''}
                       onChange={(content) =>
                         setFormData((prev) => ({ ...prev, description: content }))
                       }
@@ -627,19 +630,19 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                 </div>
 
                 {/* 단답형 질문용 placeholder 설정 */}
-                {question.type === "text" && (
+                {question.type === 'text' && (
                   <div>
                     <Label htmlFor="placeholder">안내 문구 (Placeholder)</Label>
                     <Input
                       id="placeholder"
-                      value={formData.placeholder || ""}
+                      value={formData.placeholder || ''}
                       onChange={(e) =>
                         setFormData((prev) => ({ ...prev, placeholder: e.target.value }))
                       }
                       placeholder="예: 이름을 입력하세요"
                       className="mt-2"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="mt-1 text-xs text-gray-500">
                       입력 필드에 표시될 안내 문구를 입력하세요
                     </p>
                   </div>
@@ -685,29 +688,29 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                         onClick={() => {
                           addOption();
                           if (validationErrors.options) {
-                            setValidationErrors((prev) => ({ ...prev, options: "" }));
+                            setValidationErrors((prev) => ({ ...prev, options: '' }));
                           }
                         }}
                         className="flex items-center space-x-1"
                       >
-                        <Plus className="w-4 h-4" />
+                        <Plus className="h-4 w-4" />
                         <span>옵션 추가</span>
                       </Button>
                     </div>
                   </div>
                   {validationErrors.options && (
-                    <p className="text-red-500 text-sm">{validationErrors.options}</p>
+                    <p className="text-sm text-red-500">{validationErrors.options}</p>
                   )}
 
                   <div className="space-y-2">
                     {formData.options?.map((option, index) => (
                       <div
                         key={option.id}
-                        className="border border-gray-200 rounded-lg bg-white hover:shadow-sm transition-shadow"
+                        className="rounded-lg border border-gray-200 bg-white transition-shadow hover:shadow-sm"
                       >
                         <div className="flex items-center space-x-2 p-3">
                           <div className="cursor-grab">
-                            <GripVertical className="w-4 h-4 text-gray-400" />
+                            <GripVertical className="h-4 w-4 text-gray-400" />
                           </div>
 
                           <div className="flex-1">
@@ -715,10 +718,10 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                               value={option.label}
                               onChange={(e) => updateOption(option.id, { label: e.target.value })}
                               placeholder={`옵션 ${index + 1}`}
-                              className="border-none bg-transparent px-0 focus:bg-white focus:border focus:border-blue-200"
+                              className="border-none bg-transparent px-0 focus:border focus:border-blue-200 focus:bg-white"
                             />
                             {option.id === OTHER_OPTION_ID && (
-                              <p className="text-xs text-blue-600 mt-1 px-0">
+                              <p className="mt-1 px-0 text-xs text-blue-600">
                                 🔹 기타 옵션 (수정 가능)
                               </p>
                             )}
@@ -729,9 +732,9 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                             variant="ghost"
                             size="sm"
                             onClick={() => removeOption(option.id)}
-                            className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                            className="text-red-500 hover:bg-red-50 hover:text-red-600"
                           >
-                            <X className="w-4 h-4" />
+                            <X className="h-4 w-4" />
                           </Button>
                         </div>
 
@@ -741,7 +744,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                             <BranchRuleEditor
                               branchRule={option.branchRule}
                               allQuestions={currentSurvey.questions}
-                              currentQuestionId={questionId || ""}
+                              currentQuestionId={questionId || ''}
                               onChange={(branchRule) => updateOption(option.id, { branchRule })}
                             />
                           </div>
@@ -751,7 +754,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                   </div>
 
                   {(formData.options?.length || 0) === 0 && (
-                    <div className="text-center py-8 text-gray-500">
+                    <div className="py-8 text-center text-gray-500">
                       <p className="mb-2">아직 옵션이 없습니다.</p>
                       <Button type="button" variant="outline" onClick={addOption}>
                         첫 번째 옵션 추가
@@ -760,7 +763,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                   )}
 
                   {formData.allowOtherOption && (
-                    <div className="p-3 bg-blue-50 rounded-lg">
+                    <div className="rounded-lg bg-blue-50 p-3">
                       <p className="text-sm text-blue-700">
                         <strong>💡 기타 옵션이 활성화되었습니다.</strong>
                         <br />
@@ -773,8 +776,8 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
               )}
 
               {/* 선택 개수 제한 (checkbox 타입 전용) */}
-              {question?.type === "checkbox" && (
-                <div className="space-y-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+              {question?.type === 'checkbox' && (
+                <div className="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
                   <Label className="text-base font-medium">선택 개수 제한</Label>
                   <p className="text-sm text-gray-600">
                     사용자가 선택할 수 있는 최소/최대 개수를 설정할 수 있습니다.
@@ -790,10 +793,10 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                         type="number"
                         min="1"
                         max={formData.options?.length || 0}
-                        value={formData.minSelections || ""}
+                        value={formData.minSelections || ''}
                         onChange={(e) => {
                           const value =
-                            e.target.value === "" ? undefined : parseInt(e.target.value, 10);
+                            e.target.value === '' ? undefined : parseInt(e.target.value, 10);
                           setFormData((prev) => ({ ...prev, minSelections: value }));
                           // 최소값이 최대값보다 크면 최대값 조정
                           if (
@@ -821,10 +824,10 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                         type="number"
                         min={formData.minSelections ? formData.minSelections : 1}
                         max={formData.options?.length || 0}
-                        value={formData.maxSelections || ""}
+                        value={formData.maxSelections || ''}
                         onChange={(e) => {
                           const value =
-                            e.target.value === "" ? undefined : parseInt(e.target.value, 10);
+                            e.target.value === '' ? undefined : parseInt(e.target.value, 10);
                           setFormData((prev) => ({ ...prev, maxSelections: value }));
                         }}
                         placeholder="제한 없음"
@@ -863,9 +866,9 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
               {/* 다단계 Select 설정 */}
               {needsSelectLevels && (
                 <div className="space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
                     <Label className="flex items-center space-x-2">
-                      <Settings className="w-4 h-4" />
+                      <Settings className="h-4 w-4" />
                       <span>
                         다단계 Select 설정 <span className="text-red-500">*</span>
                       </span>
@@ -877,17 +880,17 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                       onClick={() => {
                         addSelectLevel();
                         if (validationErrors.selectLevels) {
-                          setValidationErrors((prev) => ({ ...prev, selectLevels: "" }));
+                          setValidationErrors((prev) => ({ ...prev, selectLevels: '' }));
                         }
                       }}
-                      className="flex items-center space-x-1 w-full sm:w-auto"
+                      className="flex w-full items-center space-x-1 sm:w-auto"
                     >
-                      <Plus className="w-4 h-4" />
+                      <Plus className="h-4 w-4" />
                       <span>레벨 추가</span>
                     </Button>
                   </div>
                   {validationErrors.selectLevels && (
-                    <p className="text-red-500 text-sm">{validationErrors.selectLevels}</p>
+                    <p className="text-sm text-red-500">{validationErrors.selectLevels}</p>
                   )}
 
                   {formData.selectLevels && formData.selectLevels.length > 0 ? (
@@ -895,10 +898,10 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                       {formData.selectLevels
                         .sort((a, b) => a.order - b.order)
                         .map((level, index) => (
-                          <div key={level.id} className="p-4 border border-gray-200 rounded-lg">
+                          <div key={level.id} className="rounded-lg border border-gray-200 p-4">
                             <div className="flex items-start space-x-3">
                               <div className="cursor-grab">
-                                <GripVertical className="w-4 h-4 text-gray-400" />
+                                <GripVertical className="h-4 w-4 text-gray-400" />
                               </div>
 
                               <div className="flex-1 space-y-4">
@@ -912,14 +915,14 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => removeSelectLevel(level.id)}
-                                    className="text-red-500 hover:text-red-600 hover:bg-red-50 p-1 h-auto"
+                                    className="h-auto p-1 text-red-500 hover:bg-red-50 hover:text-red-600"
                                   >
-                                    <X className="w-3 h-3" />
+                                    <X className="h-3 w-3" />
                                   </Button>
                                 </div>
 
                                 {/* 레벨 설정 */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                   <div>
                                     <Label className="text-xs">레이블</Label>
                                     <Input
@@ -934,7 +937,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                                   <div>
                                     <Label className="text-xs">플레이스홀더</Label>
                                     <Input
-                                      value={level.placeholder || ""}
+                                      value={level.placeholder || ''}
                                       onChange={(e) =>
                                         updateSelectLevel(level.id, { placeholder: e.target.value })
                                       }
@@ -955,7 +958,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                                       onClick={() => addLevelOption(level.id)}
                                       className="h-6 px-2 text-xs"
                                     >
-                                      <Plus className="w-3 h-3 mr-1" />
+                                      <Plus className="mr-1 h-3 w-3" />
                                       추가
                                     </Button>
                                   </div>
@@ -968,10 +971,10 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                                       return (
                                         <div
                                           key={option.id}
-                                          className="p-3 bg-gray-50 rounded-lg space-y-2"
+                                          className="space-y-2 rounded-lg bg-gray-50 p-3"
                                         >
                                           <div className="flex items-center space-x-2">
-                                            <span className="text-xs text-gray-500 w-6">
+                                            <span className="w-6 text-xs text-gray-500">
                                               {optionIndex + 1}.
                                             </span>
                                             <Input
@@ -982,29 +985,29 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                                                 })
                                               }
                                               placeholder="옵션명 (예: 김치찌개)"
-                                              className="flex-1 text-xs h-8"
+                                              className="h-8 flex-1 text-xs"
                                             />
                                             <Button
                                               type="button"
                                               variant="ghost"
                                               size="sm"
                                               onClick={() => removeLevelOption(level.id, option.id)}
-                                              className="text-red-500 hover:text-red-600 hover:bg-red-100 p-1 h-6 w-6"
+                                              className="h-6 w-6 p-1 text-red-500 hover:bg-red-100 hover:text-red-600"
                                             >
-                                              <X className="w-3 h-3" />
+                                              <X className="h-3 w-3" />
                                             </Button>
                                           </div>
 
                                           {!isFirstLevel && parentOptions.length > 0 && (
-                                            <div className="flex items-center space-x-2 ml-8">
-                                              <span className="text-xs text-gray-600 min-w-fit">
+                                            <div className="ml-8 flex items-center space-x-2">
+                                              <span className="min-w-fit text-xs text-gray-600">
                                                 연동할 상위 옵션:
                                               </span>
                                               <select
                                                 value={
-                                                  option.value.includes("-")
-                                                    ? option.value.split("-")[0]
-                                                    : ""
+                                                  option.value.includes('-')
+                                                    ? option.value.split('-')[0]
+                                                    : ''
                                                 }
                                                 onChange={(e) => {
                                                   if (e.target.value) {
@@ -1016,7 +1019,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                                                     );
                                                   }
                                                 }}
-                                                className="text-xs h-6 px-2 border border-gray-200 rounded bg-white flex-1"
+                                                className="h-6 flex-1 rounded border border-gray-200 bg-white px-2 text-xs"
                                               >
                                                 <option value="">상위 옵션 선택...</option>
                                                 {parentOptions.map((parentOption) => (
@@ -1028,7 +1031,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                                                   </option>
                                                 ))}
                                               </select>
-                                              <div className="text-xs text-gray-400 min-w-fit">
+                                              <div className="min-w-fit text-xs text-gray-400">
                                                 → {option.value}
                                               </div>
                                             </div>
@@ -1046,14 +1049,14 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                                     })}
 
                                     {(!level.options || level.options.length === 0) && (
-                                      <div className="text-center py-4 text-gray-400 text-xs">
+                                      <div className="py-4 text-center text-xs text-gray-400">
                                         옵션이 없습니다. 추가해주세요.
                                       </div>
                                     )}
                                   </div>
 
                                   {index > 0 && (
-                                    <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                                    <div className="rounded bg-blue-50 p-2 text-xs text-blue-600">
                                       <strong>💡 자동 연동:</strong> 하위 레벨에서 &ldquo;연동할
                                       상위 옵션&rdquo;을 선택하면 한글 값이 자동 생성됩니다.
                                       <br />
@@ -1068,16 +1071,16 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                         ))}
 
                       {/* 미리보기 */}
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <Label className="text-sm font-medium text-gray-700 mb-3 block">
+                      <div className="rounded-lg bg-gray-50 p-4">
+                        <Label className="mb-3 block text-sm font-medium text-gray-700">
                           미리보기
                         </Label>
                         <UserDefinedMultiSelectPreview levels={formData.selectLevels} />
                       </div>
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-gray-500 border border-gray-200 rounded-lg">
-                      <Settings className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                    <div className="rounded-lg border border-gray-200 py-8 text-center text-gray-500">
+                      <Settings className="mx-auto mb-2 h-8 w-8 text-gray-400" />
                       <p className="mb-2">아직 레벨이 없습니다.</p>
                       <Button type="button" variant="outline" onClick={addSelectLevel}>
                         첫 번째 레벨 추가
@@ -1085,7 +1088,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                     </div>
                   )}
 
-                  <div className="p-3 bg-blue-50 rounded-lg">
+                  <div className="rounded-lg bg-blue-50 p-3">
                     <p className="text-sm text-blue-700">
                       <strong>🔗 다단계 Select 기능:</strong> 카테고리 → 세부항목 같은 계층적 선택을
                       제공합니다.
@@ -1098,12 +1101,12 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
               )}
 
               {/* 공지사항 설정 */}
-              {question.type === "notice" && (
+              {question.type === 'notice' && (
                 <div className="space-y-6">
                   <div>
-                    <Label className="text-base font-medium mb-3 block">공지사항 내용 편집</Label>
+                    <Label className="mb-3 block text-base font-medium">공지사항 내용 편집</Label>
                     <NoticeEditor
-                      content={formData.noticeContent || ""}
+                      content={formData.noticeContent || ''}
                       onChange={(content) =>
                         setFormData((prev) => ({ ...prev, noticeContent: content }))
                       }
@@ -1111,7 +1114,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                   </div>
 
                   {/* 이해 확인 체크 옵션 */}
-                  <div className="flex items-center space-x-2 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div className="flex items-center space-x-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
                     <Switch
                       id="requires-acknowledgment"
                       checked={formData.requiresAcknowledgment || false}
@@ -1139,64 +1142,72 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
               )}
 
               {/* 테이블 설정 */}
-              {question.type === "table" && (
+              {question.type === 'table' && (
                 <div className="space-y-6">
                   <Label className="text-lg font-medium">테이블 설정</Label>
 
                   {/* 테이블 패턴 설정 (Flat 엑셀 내보내기용) */}
-                  <div className="p-4 border border-gray-200 rounded-lg bg-gray-50 space-y-4">
+                  <div className="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
                     <div className="flex items-center justify-between">
                       <Label className="text-base font-medium">테이블 패턴 (엑셀 내보내기용)</Label>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <div
-                        onClick={() => setFormData((prev) => ({ ...prev, tableType: "matrix", loopConfig: undefined }))}
-                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                          formData.tableType !== "loop"
-                            ? "border-blue-500 bg-blue-50"
-                            : "border-gray-200 hover:border-gray-300"
+                        onClick={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            tableType: 'matrix',
+                            loopConfig: undefined,
+                          }))
+                        }
+                        className={`cursor-pointer rounded-lg border-2 p-4 transition-all ${
+                          formData.tableType !== 'loop'
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
                         }`}
                       >
-                        <div className="font-medium text-sm mb-1">Matrix (고정 행)</div>
+                        <div className="mb-1 text-sm font-medium">Matrix (고정 행)</div>
                         <div className="text-xs text-gray-500">
                           UHD TV, 디지털 TV 등 고정된 행 목록
                         </div>
-                        <div className="text-xs text-gray-400 mt-2">
+                        <div className="mt-2 text-xs text-gray-400">
                           예: A2_UHD_보유, A2_DIGITAL_보유
                         </div>
                       </div>
-                      
+
                       <div
-                        onClick={() => setFormData((prev) => ({ 
-                          ...prev, 
-                          tableType: "loop",
-                          loopConfig: prev.loopConfig || { prefix: "TV", maxCount: 10 }
-                        }))}
-                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                          formData.tableType === "loop"
-                            ? "border-blue-500 bg-blue-50"
-                            : "border-gray-200 hover:border-gray-300"
+                        onClick={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            tableType: 'loop',
+                            loopConfig: prev.loopConfig || { prefix: 'TV', maxCount: 10 },
+                          }))
+                        }
+                        className={`cursor-pointer rounded-lg border-2 p-4 transition-all ${
+                          formData.tableType === 'loop'
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
                         }`}
                       >
-                        <div className="font-medium text-sm mb-1">Loop (반복)</div>
-                        <div className="text-xs text-gray-500">
-                          TV1, TV2, TV3... 동적 반복 행
-                        </div>
-                        <div className="text-xs text-gray-400 mt-2">
+                        <div className="mb-1 text-sm font-medium">Loop (반복)</div>
+                        <div className="text-xs text-gray-500">TV1, TV2, TV3... 동적 반복 행</div>
+                        <div className="mt-2 text-xs text-gray-400">
                           예: A8_TV1_종류, A8_TV2_종류
                         </div>
                       </div>
                     </div>
 
                     {/* Loop 설정 (Loop 패턴 선택 시만 표시) */}
-                    {formData.tableType === "loop" && (
-                      <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-200">
+                    {formData.tableType === 'loop' && (
+                      <div className="grid grid-cols-2 gap-4 border-t border-gray-200 pt-3">
                         <div>
-                          <Label htmlFor="loop-prefix" className="text-sm">반복 접두사</Label>
+                          <Label htmlFor="loop-prefix" className="text-sm">
+                            반복 접두사
+                          </Label>
                           <Input
                             id="loop-prefix"
-                            value={formData.loopConfig?.prefix || "TV"}
+                            value={formData.loopConfig?.prefix || 'TV'}
                             onChange={(e) =>
                               setFormData((prev) => ({
                                 ...prev,
@@ -1210,12 +1221,14 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                             placeholder="예: TV, 제품"
                             className="mt-1"
                           />
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="mt-1 text-xs text-gray-500">
                             열 헤더에 사용: TV1, TV2, TV3...
                           </p>
                         </div>
                         <div>
-                          <Label htmlFor="loop-max" className="text-sm">최대 반복 수</Label>
+                          <Label htmlFor="loop-max" className="text-sm">
+                            최대 반복 수
+                          </Label>
                           <Input
                             id="loop-max"
                             type="number"
@@ -1227,21 +1240,19 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                                 ...prev,
                                 loopConfig: {
                                   ...prev.loopConfig,
-                                  prefix: prev.loopConfig?.prefix || "TV",
+                                  prefix: prev.loopConfig?.prefix || 'TV',
                                   maxCount: parseInt(e.target.value) || 10,
                                 },
                               }))
                             }
                             className="mt-1"
                           />
-                          <p className="text-xs text-gray-500 mt-1">
-                            최대 반복 가능 횟수
-                          </p>
+                          <p className="mt-1 text-xs text-gray-500">최대 반복 가능 횟수</p>
                         </div>
                       </div>
                     )}
 
-                    <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                    <div className="rounded bg-blue-50 p-2 text-xs text-blue-600">
                       💡 테이블 패턴은 엑셀 내보내기 시 열 이름 형식에 영향을 줍니다.
                     </div>
                   </div>
@@ -1250,7 +1261,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                     tableTitle={formData.tableTitle}
                     columns={formData.tableColumns}
                     rows={formData.tableRowsData}
-                    currentQuestionId={questionId || ""}
+                    currentQuestionId={questionId || ''}
                     onTableChange={(data) => {
                       setFormData((prev) => ({
                         ...prev,
@@ -1279,28 +1290,28 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
               {/* 미디어 설정 */}
               <div className="space-y-4">
                 <Label>미디어 첨부</Label>
-                <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="flex items-center justify-center space-x-1 w-full sm:w-auto"
+                    className="flex w-full items-center justify-center space-x-1 sm:w-auto"
                     disabled
                   >
-                    <Image className="w-4 h-4" />
+                    <Image className="h-4 w-4" />
                     <span>이미지 추가</span>
-                    <span className="text-xs text-gray-400 ml-1">(준비 중)</span>
+                    <span className="ml-1 text-xs text-gray-400">(준비 중)</span>
                   </Button>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="flex items-center justify-center space-x-1 w-full sm:w-auto"
+                    className="flex w-full items-center justify-center space-x-1 sm:w-auto"
                     disabled
                   >
-                    <Video className="w-4 h-4" />
+                    <Video className="h-4 w-4" />
                     <span>동영상 추가</span>
-                    <span className="text-xs text-gray-400 ml-1">(준비 중)</span>
+                    <span className="ml-1 text-xs text-gray-400">(준비 중)</span>
                   </Button>
                 </div>
               </div>
@@ -1333,7 +1344,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                         displayCondition: conditionGroup,
                       });
                     } catch (error) {
-                      console.error("조건 저장 실패:", error);
+                      console.error('조건 저장 실패:', error);
                     }
                   }
                 }}
@@ -1344,13 +1355,13 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         </div>
 
         {/* 고정 푸터 (액션 버튼) */}
-        <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className="flex-shrink-0 border-t border-gray-200 bg-gray-50 px-6 py-4">
           <div className="flex items-center justify-between">
             {/* 저장 상태 표시 */}
             <div className="flex items-center text-sm text-gray-600">
               {isSaving && (
                 <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-blue-600"></div>
                   <span>저장 중...</span>
                 </div>
               )}
@@ -1371,11 +1382,11 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
               >
                 {isSaving ? (
                   <div className="flex items-center space-x-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
                     <span>저장</span>
                   </div>
                 ) : (
-                  "저장"
+                  '저장'
                 )}
               </Button>
             </div>
@@ -1398,19 +1409,19 @@ function getQuestionTypeIcon(type: string) {
     table: Table,
   };
   const IconComponent = icons[type as keyof typeof icons] || Type;
-  return <IconComponent className="w-5 h-5" />;
+  return <IconComponent className="h-5 w-5" />;
 }
 
 function getQuestionTypeLabel(type: string): string {
   const labels = {
-    notice: "공지사항",
-    text: "단답형",
-    textarea: "장문형",
-    radio: "단일선택",
-    checkbox: "다중선택",
-    select: "드롭다운",
-    multiselect: "다단계선택",
-    table: "테이블",
+    notice: '공지사항',
+    text: '단답형',
+    textarea: '장문형',
+    radio: '단일선택',
+    checkbox: '다중선택',
+    select: '드롭다운',
+    multiselect: '다단계선택',
+    table: '테이블',
   };
   return labels[type as keyof typeof labels] || type;
 }

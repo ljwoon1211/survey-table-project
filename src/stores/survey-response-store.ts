@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
+import { immer } from 'zustand/middleware/immer';
 
 /**
  * 설문 응답 UI 상태 관리
@@ -43,7 +44,7 @@ interface SurveyResponseUIState {
 
 export const useSurveyResponseStore = create<SurveyResponseUIState>()(
   devtools(
-    (set) => ({
+    immer<SurveyResponseUIState>((set) => ({
       currentResponseId: null,
       currentQuestionIndex: 0,
       pendingResponses: {},
@@ -52,67 +53,74 @@ export const useSurveyResponseStore = create<SurveyResponseUIState>()(
       validationErrors: {},
 
       setCurrentResponseId: (responseId) =>
-        set(() => ({ currentResponseId: responseId })),
+        set((state) => {
+          state.currentResponseId = responseId;
+        }),
 
       setCurrentQuestionIndex: (index) =>
-        set(() => ({ currentQuestionIndex: index })),
+        set((state) => {
+          state.currentQuestionIndex = index;
+        }),
 
       goToNextQuestion: () =>
-        set((state) => ({ currentQuestionIndex: state.currentQuestionIndex + 1 })),
+        set((state) => {
+          state.currentQuestionIndex += 1;
+        }),
 
       goToPreviousQuestion: () =>
-        set((state) => ({
-          currentQuestionIndex: Math.max(0, state.currentQuestionIndex - 1)
-        })),
+        set((state) => {
+          state.currentQuestionIndex = Math.max(0, state.currentQuestionIndex - 1);
+        }),
 
       setPendingResponse: (questionId, value) =>
-        set((state) => ({
-          pendingResponses: {
-            ...state.pendingResponses,
-            [questionId]: value,
-          },
-        })),
+        set((state) => {
+          state.pendingResponses[questionId] = value;
+        }),
 
       clearPendingResponses: () =>
-        set(() => ({ pendingResponses: {} })),
+        set((state) => {
+          state.pendingResponses = {};
+        }),
 
       setValidationError: (questionId, error) =>
-        set((state) => ({
-          validationErrors: {
-            ...state.validationErrors,
-            [questionId]: error,
-          },
-        })),
+        set((state) => {
+          state.validationErrors[questionId] = error;
+        }),
 
       clearValidationError: (questionId) =>
         set((state) => {
-          const { [questionId]: _, ...rest } = state.validationErrors;
-          return { validationErrors: rest };
+          delete state.validationErrors[questionId];
         }),
 
       clearAllValidationErrors: () =>
-        set(() => ({ validationErrors: {} })),
+        set((state) => {
+          state.validationErrors = {};
+        }),
 
       setShowValidationErrors: (show) =>
-        set(() => ({ showValidationErrors: show })),
+        set((state) => {
+          state.showValidationErrors = show;
+        }),
 
       setIsSubmitting: (isSubmitting) =>
-        set(() => ({ isSubmitting })),
+        set((state) => {
+          state.isSubmitting = isSubmitting;
+        }),
 
       resetResponseState: () =>
-        set(() => ({
-          currentResponseId: null,
-          currentQuestionIndex: 0,
-          pendingResponses: {},
-          isSubmitting: false,
-          showValidationErrors: false,
-          validationErrors: {},
-        })),
-    }),
+        set((state) => {
+          state.currentResponseId = null;
+          state.currentQuestionIndex = 0;
+          state.pendingResponses = {};
+          state.isSubmitting = false;
+          state.showValidationErrors = false;
+          state.validationErrors = {};
+        }),
+    })) as any,
     {
-      name: 'survey-response-ui-store'
-    }
-  )
+      name: 'survey-response-ui-store',
+    },
+  ),
 );
 
 // 타입 export (하위 호환성)

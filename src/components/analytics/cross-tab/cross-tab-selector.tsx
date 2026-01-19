@@ -1,9 +1,10 @@
-"use client";
+'use client';
 
-import { ArrowRight } from "lucide-react";
-import { Combobox } from "@/components/ui/combobox";
-import type { Question } from "@/types/survey";
-import { isCrossTabableQuestion } from "@/lib/analytics/cross-tab";
+import { ArrowRight } from 'lucide-react';
+
+import { Combobox } from '@/components/ui/combobox';
+import { isCrossTabableQuestion } from '@/lib/analytics/cross-tab';
+import type { Question } from '@/types/survey';
 
 interface CrossTabSelectorProps {
   questions: Question[];
@@ -36,13 +37,13 @@ export function CrossTabSelector({
   }));
 
   return (
-    <div className="flex items-center gap-3 flex-wrap">
+    <div className="flex flex-wrap items-center gap-3">
       {/* 행 질문 선택 */}
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-gray-600 whitespace-nowrap">행:</span>
+        <span className="text-sm font-medium whitespace-nowrap text-gray-600">행:</span>
         <Combobox
           options={rowOptions}
-          value={rowQuestionId || ""}
+          value={rowQuestionId || ''}
           onValueChange={onRowQuestionChange}
           placeholder="행 질문 선택"
           searchPlaceholder="질문 검색..."
@@ -52,14 +53,14 @@ export function CrossTabSelector({
         />
       </div>
 
-      <ArrowRight className="w-4 h-4 text-gray-400" />
+      <ArrowRight className="h-4 w-4 text-gray-400" />
 
       {/* 열 질문 선택 */}
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-gray-600 whitespace-nowrap">열:</span>
+        <span className="text-sm font-medium whitespace-nowrap text-gray-600">열:</span>
         <Combobox
           options={colOptions}
-          value={colQuestionId || ""}
+          value={colQuestionId || ''}
           onValueChange={onColQuestionChange}
           placeholder="열 질문 선택"
           searchPlaceholder="질문 검색..."

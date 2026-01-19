@@ -1,12 +1,14 @@
-"use client";
+'use client';
 
-import React, { useCallback, useState, useEffect } from "react";
-import { flushSync } from "react-dom";
-import { TableCell } from "@/types/survey";
-import { Input } from "@/components/ui/input";
-import { Image, Video } from "lucide-react";
-import { useSurveyBuilderStore } from "@/stores/survey-store";
-import { getProxiedImageUrl } from "@/lib/image-utils";
+import React, { useCallback, useEffect, useState } from 'react';
+import { flushSync } from 'react-dom';
+
+import { Image, Video } from 'lucide-react';
+
+import { Input } from '@/components/ui/input';
+import { getProxiedImageUrl } from '@/lib/image-utils';
+import { useTestResponseStore } from '@/stores/test-response-store';
+import { TableCell } from '@/types/survey';
 
 // 이미지 셀 컴포넌트 (에러 상태 관리)
 function ImageCell({ imageUrl, content }: { imageUrl: string; content?: string }) {
@@ -17,24 +19,24 @@ function ImageCell({ imageUrl, content }: { imageUrl: string; content?: string }
   }, [imageUrl]);
 
   return (
-    <div className="flex flex-col items-center gap-2 w-full h-full">
+    <div className="flex h-full w-full flex-col items-center gap-2">
       <div key={imageUrl}>
         {error ? (
-          <div className="flex items-center gap-1 text-red-500 text-sm">
-            <Image className="w-4 h-4" />
+          <div className="flex items-center gap-1 text-sm text-red-500">
+            <Image className="h-4 w-4" />
             <span>이미지 오류</span>
           </div>
         ) : (
           <img
             src={getProxiedImageUrl(imageUrl)}
             alt="셀 이미지"
-            className="w-full h-auto max-h-full object-contain rounded"
-            style={{ maxWidth: "100%", maxHeight: "100%" }}
+            className="h-auto max-h-full w-full rounded object-contain"
+            style={{ maxWidth: '100%', maxHeight: '100%' }}
             onError={() => setError(true)}
           />
         )}
       </div>
-      {content && <div className="text-sm text-gray-700 mt-2 text-left">{content}</div>}
+      {content && <div className="mt-2 text-left text-sm text-gray-700">{content}</div>}
     </div>
   );
 }
@@ -67,14 +69,12 @@ export function InteractiveTableCell({
   onUpdateResponse,
 }: InteractiveTableCellProps) {
   // 테스트 모드에서 Zustand store 직접 구독
-  const questionResponse = useSurveyBuilderStore((state) => 
-    state.testResponses[questionId]
-  );
+  const questionResponse = useTestResponseStore((state) => state.testResponses[questionId]);
 
   // store에서 가져온 셀 응답
   const storeResponse = isTestMode
     ? (() => {
-        if (typeof questionResponse === "object" && questionResponse !== null) {
+        if (typeof questionResponse === 'object' && questionResponse !== null) {
           return (questionResponse as Record<string, any>)[cell.id];
         }
         return undefined;
@@ -83,7 +83,7 @@ export function InteractiveTableCell({
 
   // 로컬 상태로 UI 즉시 반응 보장
   const [localResponse, setLocalResponse] = useState(storeResponse);
-  
+
   // store 응답이 변경되면 로컬 상태 동기화
   useEffect(() => {
     setLocalResponse(storeResponse);
@@ -99,8 +99,11 @@ export function InteractiveTableCell({
         | string
         | { optionId: string; otherValue?: string; hasOther?: boolean }
       )[];
-      let updatedResponse: (string | { optionId: string; otherValue?: string; hasOther?: boolean })[];
-      const isOtherOption = optionId === "other-option";
+      let updatedResponse: (
+        | string
+        | { optionId: string; otherValue?: string; hasOther?: boolean }
+      )[];
+      const isOtherOption = optionId === 'other-option';
 
       if (checked) {
         // 최대 선택 개수 체크
@@ -117,7 +120,7 @@ export function InteractiveTableCell({
             ...currentCellResponse,
             {
               optionId,
-              otherValue: "",
+              otherValue: '',
               hasOther: true,
             },
           ];
@@ -126,7 +129,7 @@ export function InteractiveTableCell({
         }
       } else {
         updatedResponse = currentCellResponse.filter((item) => {
-          if (typeof item === "object" && item !== null && "optionId" in item) {
+          if (typeof item === 'object' && item !== null && 'optionId' in item) {
             return (item as { optionId: string }).optionId !== optionId;
           }
           return item !== optionId;
@@ -144,7 +147,7 @@ export function InteractiveTableCell({
     (optionId: string) => {
       // 현재 선택 상태 확인
       const isCurrentlySelected = (() => {
-        if (typeof cellResponse === "object" && cellResponse?.optionId) {
+        if (typeof cellResponse === 'object' && cellResponse?.optionId) {
           return (cellResponse as { optionId: string }).optionId === optionId;
         }
         return cellResponse === optionId;
@@ -154,17 +157,17 @@ export function InteractiveTableCell({
       if (isCurrentlySelected) {
         // flushSync로 동기 업데이트 강제 (React 18 자동 배칭 문제 해결)
         flushSync(() => {
-          setLocalResponse("");
+          setLocalResponse('');
         });
-        onUpdateResponse(cell.id, "");
+        onUpdateResponse(cell.id, '');
         return;
       }
 
-      const isOtherOption = optionId === "other-option";
+      const isOtherOption = optionId === 'other-option';
       if (isOtherOption) {
         const newValue = {
           optionId,
-          otherValue: "",
+          otherValue: '',
           hasOther: true,
         };
         flushSync(() => {
@@ -184,11 +187,11 @@ export function InteractiveTableCell({
   // select 변경 핸들러
   const handleSelectChange = useCallback(
     (optionId: string) => {
-      const isOtherOption = optionId === "other-option";
+      const isOtherOption = optionId === 'other-option';
       if (isOtherOption) {
         const newValue = {
           optionId,
-          otherValue: "",
+          otherValue: '',
           hasOther: true,
         };
         setLocalResponse(newValue); // 로컬 상태 먼저 업데이트
@@ -206,24 +209,32 @@ export function InteractiveTableCell({
     (optionId: string, otherValue: string) => {
       if (Array.isArray(cellResponse)) {
         // 체크박스의 경우
-        const updatedResponse = (cellResponse as (string | { optionId: string; otherValue?: string })[]).map(
-          (item) => {
-            if (typeof item === "object" && item !== null && "optionId" in item && item.optionId === optionId) {
-              return { ...item, otherValue };
-            }
-            return item;
-          },
-        );
+        const updatedResponse = (
+          cellResponse as (string | { optionId: string; otherValue?: string })[]
+        ).map((item) => {
+          if (
+            typeof item === 'object' &&
+            item !== null &&
+            'optionId' in item &&
+            item.optionId === optionId
+          ) {
+            return { ...item, otherValue };
+          }
+          return item;
+        });
         setLocalResponse(updatedResponse); // 로컬 상태 먼저 업데이트
         onUpdateResponse(cell.id, updatedResponse);
       } else if (
-        typeof cellResponse === "object" &&
+        typeof cellResponse === 'object' &&
         cellResponse !== null &&
-        "optionId" in cellResponse &&
+        'optionId' in cellResponse &&
         (cellResponse as { optionId: string }).optionId === optionId
       ) {
         // 라디오의 경우
-        const newValue = { ...(cellResponse as { optionId: string; otherValue?: string }), otherValue };
+        const newValue = {
+          ...(cellResponse as { optionId: string; otherValue?: string }),
+          otherValue,
+        };
         setLocalResponse(newValue); // 로컬 상태 먼저 업데이트
         onUpdateResponse(cell.id, newValue);
       }
@@ -240,10 +251,10 @@ export function InteractiveTableCell({
     [cell.id, onUpdateResponse],
   );
 
-  if (!cell) return <span className="text-gray-400 text-sm">-</span>;
+  if (!cell) return <span className="text-sm text-gray-400">-</span>;
 
   switch (cell.type) {
-    case "checkbox":
+    case 'checkbox':
       if (!cell.checkboxOptions || cell.checkboxOptions.length === 0) {
         return (
           <div className="flex items-center gap-2 text-gray-500">
@@ -258,11 +269,12 @@ export function InteractiveTableCell({
       const minSelections = cell.minSelections;
       const isMaxReached =
         maxSelections !== undefined && maxSelections > 0 && currentCount >= maxSelections;
-      const isMinNotMet = minSelections !== undefined && minSelections > 0 && currentCount < minSelections;
+      const isMinNotMet =
+        minSelections !== undefined && minSelections > 0 && currentCount < minSelections;
 
       const canSelect = (optionId: string) => {
         const isChecked = cellResponseArray.some((item) => {
-          if (typeof item === "object" && item !== null && "optionId" in item) {
+          if (typeof item === 'object' && item !== null && 'optionId' in item) {
             return (item as { optionId: string }).optionId === optionId;
           }
           return item === optionId;
@@ -273,30 +285,32 @@ export function InteractiveTableCell({
       };
 
       return (
-        <div className="space-y-2 w-full">
+        <div className="w-full space-y-2">
           {/* 셀 텍스트 설명 (있는 경우) */}
           {cell.content && cell.content.trim() && (
-            <div className="text-sm text-gray-700 mb-3 font-medium whitespace-pre-wrap break-words">
+            <div className="mb-3 text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
               {cell.content}
             </div>
           )}
-          
+
           {cell.checkboxOptions.map((option) => {
             const isChecked = cellResponseArray.some((item) => {
-              if (typeof item === "object" && item !== null && "optionId" in item) {
+              if (typeof item === 'object' && item !== null && 'optionId' in item) {
                 return (item as { optionId: string }).optionId === option.id;
               }
               return item === option.id;
             });
 
             const otherValue =
-              (cellResponseArray.find(
-                (item) =>
-                  typeof item === "object" &&
-                  item !== null &&
-                  "optionId" in item &&
-                  (item as { optionId: string; otherValue?: string }).optionId === option.id,
-              ) as { optionId: string; otherValue?: string } | undefined)?.otherValue || "";
+              (
+                cellResponseArray.find(
+                  (item) =>
+                    typeof item === 'object' &&
+                    item !== null &&
+                    'optionId' in item &&
+                    (item as { optionId: string; otherValue?: string }).optionId === option.id,
+                ) as { optionId: string; otherValue?: string } | undefined
+              )?.otherValue || '';
 
             const disabled = !canSelect(option.id);
 
@@ -310,25 +324,25 @@ export function InteractiveTableCell({
                     disabled={disabled}
                     onChange={(e) => handleCheckboxChange(option.id, e.target.checked)}
                     className={`rounded border-gray-300 text-blue-600 focus:ring-blue-500 ${
-                      disabled ? "opacity-50 cursor-not-allowed" : ""
+                      disabled ? 'cursor-not-allowed opacity-50' : ''
                     }`}
                   />
                   <label
                     htmlFor={`${cell.id}-${option.id}`}
                     className={`text-base select-none ${
-                      disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                      disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
                     }`}
                   >
                     {option.label}
                   </label>
                 </div>
-                {option.id === "other-option" && isChecked && (
+                {option.id === 'other-option' && isChecked && (
                   <div className="ml-6">
                     <Input
                       placeholder="기타 내용 입력..."
                       value={otherValue}
                       onChange={(e) => handleOtherInputChange(option.id, e.target.value)}
-                      className="text-xs h-8"
+                      className="h-8 text-xs"
                     />
                   </div>
                 )}
@@ -337,14 +351,16 @@ export function InteractiveTableCell({
           })}
 
           {(maxSelections !== undefined || minSelections !== undefined) && (
-            <div className="pt-2 border-t border-gray-200 mt-2">
+            <div className="mt-2 border-t border-gray-200 pt-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-600">
                   {maxSelections !== undefined && maxSelections > 0
                     ? `${currentCount}/${maxSelections}개 선택됨`
                     : `${currentCount}개 선택됨`}
                 </span>
-                {isMinNotMet && <span className="text-orange-600">최소 {minSelections}개 이상</span>}
+                {isMinNotMet && (
+                  <span className="text-orange-600">최소 {minSelections}개 이상</span>
+                )}
                 {isMaxReached && <span className="text-blue-600">최대 도달</span>}
               </div>
             </div>
@@ -352,29 +368,29 @@ export function InteractiveTableCell({
         </div>
       );
 
-    case "radio":
+    case 'radio':
       return cell.radioOptions && cell.radioOptions.length > 0 ? (
-        <div className="space-y-2 w-full">
+        <div className="w-full space-y-2">
           {/* 셀 텍스트 설명 (있는 경우) */}
           {cell.content && cell.content.trim() && (
-            <div className="text-sm text-gray-700 mb-3 font-medium whitespace-pre-wrap break-words">
+            <div className="mb-3 text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
               {cell.content}
             </div>
           )}
-          
+
           {cell.radioOptions.map((option) => {
             const isSelected = (() => {
-              if (typeof cellResponse === "object" && cellResponse?.optionId) {
+              if (typeof cellResponse === 'object' && cellResponse?.optionId) {
                 return (cellResponse as { optionId: string }).optionId === option.id;
               }
               return cellResponse === option.id;
             })();
 
             const otherValue =
-              typeof cellResponse === "object" &&
+              typeof cellResponse === 'object' &&
               (cellResponse as { optionId: string; otherValue?: string })?.optionId === option.id
-                ? (cellResponse as { optionId: string; otherValue?: string }).otherValue || ""
-                : "";
+                ? (cellResponse as { optionId: string; otherValue?: string }).otherValue || ''
+                : '';
 
             return (
               <div key={option.id} className="space-y-1">
@@ -386,22 +402,22 @@ export function InteractiveTableCell({
                     checked={isSelected}
                     onChange={() => {}} // React controlled component 경고 방지용 (실제 처리는 onClick에서)
                     onClick={() => handleRadioChange(option.id)}
-                    className="border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    className="cursor-pointer border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <label 
-                    htmlFor={`${cell.id}-${option.id}`} 
-                    className="text-base cursor-pointer select-none"
+                  <label
+                    htmlFor={`${cell.id}-${option.id}`}
+                    className="cursor-pointer text-base select-none"
                   >
                     {option.label}
                   </label>
                 </div>
-                {option.id === "other-option" && isSelected && (
+                {option.id === 'other-option' && isSelected && (
                   <div className="ml-6">
                     <Input
                       placeholder="기타 내용 입력..."
                       value={otherValue}
                       onChange={(e) => handleOtherInputChange(option.id, e.target.value)}
-                      className="text-xs h-8"
+                      className="h-8 text-xs"
                     />
                   </div>
                 )}
@@ -415,24 +431,24 @@ export function InteractiveTableCell({
         </div>
       );
 
-    case "select":
+    case 'select':
       return cell.selectOptions && cell.selectOptions.length > 0 ? (
-        <div className="space-y-2 w-full flex flex-col">
+        <div className="flex w-full flex-col space-y-2">
           {/* 셀 텍스트 설명 (있는 경우) */}
           {cell.content && cell.content.trim() && (
-            <div className="text-sm text-gray-700 mb-2 font-medium whitespace-pre-wrap break-words">
+            <div className="mb-2 text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
               {cell.content}
             </div>
           )}
-          
+
           <select
             value={
-              typeof cellResponse === "object" && (cellResponse as { optionId?: string })?.optionId
+              typeof cellResponse === 'object' && (cellResponse as { optionId?: string })?.optionId
                 ? (cellResponse as { optionId: string }).optionId
-                : (cellResponse as string) || ""
+                : (cellResponse as string) || ''
             }
             onChange={(e) => handleSelectChange(e.target.value)}
-            className="w-full p-2 text-base border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded border border-gray-300 p-2 text-base focus:ring-2 focus:ring-blue-500 focus:outline-none"
           >
             <option value="">선택하세요...</option>
             {cell.selectOptions.map((option) => (
@@ -443,14 +459,15 @@ export function InteractiveTableCell({
           </select>
           {(() => {
             const selectedValue =
-              typeof cellResponse === "object" && (cellResponse as { optionId?: string })?.optionId
+              typeof cellResponse === 'object' && (cellResponse as { optionId?: string })?.optionId
                 ? (cellResponse as { optionId: string }).optionId
                 : (cellResponse as string);
-            const isOtherSelected = selectedValue === "other-option";
+            const isOtherSelected = selectedValue === 'other-option';
             const otherValue =
-              typeof cellResponse === "object" && (cellResponse as { otherValue?: string })?.otherValue
+              typeof cellResponse === 'object' &&
+              (cellResponse as { otherValue?: string })?.otherValue
                 ? (cellResponse as { otherValue: string }).otherValue
-                : "";
+                : '';
 
             return (
               isOtherSelected && (
@@ -458,8 +475,8 @@ export function InteractiveTableCell({
                   <Input
                     placeholder="기타 내용 입력..."
                     value={otherValue}
-                    onChange={(e) => handleOtherInputChange("other-option", e.target.value)}
-                    className="text-xs h-8"
+                    onChange={(e) => handleOtherInputChange('other-option', e.target.value)}
+                    className="h-8 text-xs"
                   />
                 </div>
               )
@@ -472,25 +489,25 @@ export function InteractiveTableCell({
         </div>
       );
 
-    case "image":
+    case 'image':
       return cell.imageUrl ? (
         <ImageCell imageUrl={cell.imageUrl} content={cell.content} />
       ) : (
         <div className="flex items-center gap-2 text-gray-500">
-          <Image className="w-4 h-4" />
+          <Image className="h-4 w-4" />
           <span className="text-sm">이미지 없음</span>
         </div>
       );
 
-    case "video":
+    case 'video':
       return cell.videoUrl ? (
         <div className="flex flex-col items-center gap-2">
-          {cell.videoUrl.includes("youtube.com") || cell.videoUrl.includes("youtu.be") ? (
+          {cell.videoUrl.includes('youtube.com') || cell.videoUrl.includes('youtu.be') ? (
             <div className="w-full max-w-xs">
               <div className="aspect-video">
                 <iframe
                   src={getYouTubeEmbedUrl(cell.videoUrl)}
-                  className="w-full h-full rounded"
+                  className="h-full w-full rounded"
                   frameBorder="0"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
@@ -498,12 +515,12 @@ export function InteractiveTableCell({
                 />
               </div>
             </div>
-          ) : cell.videoUrl.includes("vimeo.com") ? (
+          ) : cell.videoUrl.includes('vimeo.com') ? (
             <div className="w-full max-w-xs">
               <div className="aspect-video">
                 <iframe
-                  src={cell.videoUrl.replace("vimeo.com/", "player.vimeo.com/video/")}
-                  className="w-full h-full rounded"
+                  src={cell.videoUrl.replace('vimeo.com/', 'player.vimeo.com/video/')}
+                  className="h-full w-full rounded"
                   frameBorder="0"
                   allow="autoplay; fullscreen; picture-in-picture"
                   allowFullScreen
@@ -512,39 +529,41 @@ export function InteractiveTableCell({
               </div>
             </div>
           ) : cell.videoUrl.match(/\.(mp4|webm|ogg)$/i) ? (
-            <video src={cell.videoUrl} controls className="w-full max-w-xs max-h-32 rounded">
+            <video src={cell.videoUrl} controls className="max-h-32 w-full max-w-xs rounded">
               동영상을 지원하지 않는 브라우저입니다.
             </video>
           ) : (
             <div className="flex items-center gap-2 text-yellow-600">
-              <Video className="w-4 h-4" />
+              <Video className="h-4 w-4" />
               <span className="text-sm">동영상 링크 오류</span>
             </div>
           )}
-          {cell.content && <div className="text-sm text-gray-700 mt-2 text-left">{cell.content}</div>}
+          {cell.content && (
+            <div className="mt-2 text-left text-sm text-gray-700">{cell.content}</div>
+          )}
         </div>
       ) : (
         <div className="flex items-center gap-2 text-gray-500">
-          <Video className="w-4 h-4" />
+          <Video className="h-4 w-4" />
           <span className="text-sm">동영상 없음</span>
         </div>
       );
 
-    case "input":
+    case 'input':
       return (
-        <div className="space-y-1.5 w-full flex flex-col">
+        <div className="flex w-full flex-col space-y-1.5">
           {/* 셀 텍스트 설명 (있는 경우) */}
           {cell.content && cell.content.trim() && (
-            <div className="text-sm text-gray-700 mb-2 font-medium whitespace-pre-wrap break-words">
+            <div className="mb-2 text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
               {cell.content}
             </div>
           )}
-          
+
           <Input
             type="text"
-            value={(cellResponse as string) || ""}
+            value={(cellResponse as string) || ''}
             onChange={(e) => handleTextChange(e.target.value)}
-            placeholder={cell.placeholder || "답변을 입력하세요..."}
+            placeholder={cell.placeholder || '답변을 입력하세요...'}
             maxLength={cell.inputMaxLength}
             className="w-full text-base"
           />
@@ -553,14 +572,14 @@ export function InteractiveTableCell({
               <p className="text-xs text-gray-500">
                 <span
                   className={
-                    ((cellResponse as string) || "").length >= cell.inputMaxLength
-                      ? "text-red-500 font-medium"
-                      : ""
+                    ((cellResponse as string) || '').length >= cell.inputMaxLength
+                      ? 'font-medium text-red-500'
+                      : ''
                   }
                 >
-                  {((cellResponse as string) || "").length}
+                  {((cellResponse as string) || '').length}
                 </span>
-                {" / "}
+                {' / '}
                 {cell.inputMaxLength}자
               </p>
             </div>
@@ -568,14 +587,14 @@ export function InteractiveTableCell({
         </div>
       );
 
-    case "text":
+    case 'text':
     default:
       return cell.content ? (
-        <div className="whitespace-pre-wrap text-base leading-relaxed break-words w-full">
+        <div className="w-full text-base leading-relaxed break-words whitespace-pre-wrap">
           {cell.content}
         </div>
       ) : (
-        <span className="text-gray-400 text-sm"></span>
+        <span className="text-sm text-gray-400"></span>
       );
   }
 }

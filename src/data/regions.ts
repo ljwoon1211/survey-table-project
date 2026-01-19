@@ -101,13 +101,13 @@ export const REGION_DATA: RegionData[] = [
 
 export function getRegionsByParent(parentId?: string): RegionData[] {
   if (!parentId) {
-    return REGION_DATA.filter(region => region.level === 1);
+    return REGION_DATA.filter((region) => region.level === 1);
   }
-  return REGION_DATA.filter(region => region.parentId === parentId);
+  return REGION_DATA.filter((region) => region.parentId === parentId);
 }
 
 export function getRegionById(id: string): RegionData | undefined {
-  return REGION_DATA.find(region => region.id === id);
+  return REGION_DATA.find((region) => region.id === id);
 }
 
 export function getRegionPath(id: string): RegionData[] {

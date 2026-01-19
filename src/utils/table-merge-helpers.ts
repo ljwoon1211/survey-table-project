@@ -1,4 +1,4 @@
-import { Question, TableRow } from "@/types/survey";
+import { Question, TableRow } from '@/types/survey';
 
 /**
  * 병합된 행 ID들을 가져오는 헬퍼 함수
@@ -10,7 +10,7 @@ import { Question, TableRow } from "@/types/survey";
 export function getMergedRowIds(
   rowId: string,
   tableRowsData: TableRow[] | undefined,
-  colIndex?: number
+  colIndex?: number,
 ): string[] {
   if (!tableRowsData) return [rowId];
 
@@ -91,7 +91,7 @@ export interface RowMergeInfo {
 export function getRowMergeInfo(
   rowId: string,
   tableRowsData: TableRow[] | undefined,
-  colIndex?: number
+  colIndex?: number,
 ): RowMergeInfo {
   if (!tableRowsData || colIndex === undefined) {
     return { isMerged: false, mergedRowIds: [rowId], mergeStartRowId: null };
@@ -168,4 +168,3 @@ export function getRowMergeInfo(
 
   return { isMerged: false, mergedRowIds: [rowId], mergeStartRowId: null };
 }
-

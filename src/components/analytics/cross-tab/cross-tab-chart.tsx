@@ -1,8 +1,9 @@
-"use client";
+'use client';
 
-import { BarChart } from "@tremor/react";
-import type { CrossTabResult, PercentageBase } from "@/lib/analytics/cross-tab";
-import { toCrossTabChartData } from "@/lib/analytics/cross-tab";
+import { BarChart } from '@tremor/react';
+
+import type { CrossTabResult, PercentageBase } from '@/lib/analytics/cross-tab';
+import { toCrossTabChartData } from '@/lib/analytics/cross-tab';
 
 interface CrossTabChartProps {
   result: CrossTabResult;
@@ -15,17 +16,17 @@ export function CrossTabChart({ result, percentageBase }: CrossTabChartProps) {
 
   // 차트 색상
   const colors: (
-    | "blue"
-    | "cyan"
-    | "indigo"
-    | "violet"
-    | "fuchsia"
-    | "rose"
-    | "amber"
-    | "emerald"
-    | "teal"
-    | "sky"
-  )[] = ["blue", "cyan", "indigo", "violet", "fuchsia", "rose", "amber", "emerald", "teal", "sky"];
+    | 'blue'
+    | 'cyan'
+    | 'indigo'
+    | 'violet'
+    | 'fuchsia'
+    | 'rose'
+    | 'amber'
+    | 'emerald'
+    | 'teal'
+    | 'sky'
+  )[] = ['blue', 'cyan', 'indigo', 'violet', 'fuchsia', 'rose', 'amber', 'emerald', 'teal', 'sky'];
 
   return (
     <div className="h-[400px]">

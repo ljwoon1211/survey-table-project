@@ -1,31 +1,32 @@
 'use client';
 
 import { useCallback, useTransition } from 'react';
-import { useQuestionLibraryStore } from '@/stores/question-library-store';
+
 import {
-  getAllSavedQuestions,
-  getQuestionsByCategory as getQuestionsByCategoryFn,
-  searchSavedQuestions,
-  getRecentlyUsedQuestions,
-  getMostUsedQuestions,
-  getAllTags,
-  getQuestionsByTag as getQuestionsByTagFn,
-  getAllCategories,
-} from '@/actions/query-actions';
-import {
-  saveQuestion as saveQuestionAction,
-  updateSavedQuestion as updateSavedQuestionAction,
-  deleteSavedQuestion as deleteSavedQuestionAction,
-  applyQuestion as applyQuestionAction,
   applyMultipleQuestions as applyMultipleQuestionsAction,
+  applyQuestion as applyQuestionAction,
+  createCategory as createCategoryAction,
+  deleteCategory as deleteCategoryAction,
+  deleteSavedQuestion as deleteSavedQuestionAction,
   exportLibrary as exportLibraryAction,
   importLibrary as importLibraryAction,
-  createCategory as createCategoryAction,
-  updateCategory as updateCategoryAction,
-  deleteCategory as deleteCategoryAction,
   initializeDefaultCategories,
   initializePresetQuestions,
+  saveQuestion as saveQuestionAction,
+  updateCategory as updateCategoryAction,
+  updateSavedQuestion as updateSavedQuestionAction,
 } from '@/actions/library-actions';
+import {
+  getAllCategories,
+  getAllSavedQuestions,
+  getAllTags,
+  getMostUsedQuestions,
+  getQuestionsByCategory as getQuestionsByCategoryFn,
+  getQuestionsByTag as getQuestionsByTagFn,
+  getRecentlyUsedQuestions,
+  searchSavedQuestions,
+} from '@/actions/query-actions';
+import { useQuestionLibraryStore } from '@/stores/question-library-store';
 import type { Question } from '@/types/survey';
 
 /**
@@ -43,7 +44,7 @@ export function useLibrarySync() {
         description?: string;
         category: string;
         tags?: string[];
-      }
+      },
     ) => {
       try {
         const saved = await saveQuestionAction(question, metadata);
@@ -53,7 +54,7 @@ export function useLibrarySync() {
         throw error;
       }
     },
-    []
+    [],
   );
 
   // 저장된 질문 업데이트
@@ -66,7 +67,7 @@ export function useLibrarySync() {
         category: string;
         tags: string[];
         question: Question;
-      }>
+      }>,
     ) => {
       try {
         const updated = await updateSavedQuestionAction(id, updates);
@@ -76,7 +77,7 @@ export function useLibrarySync() {
         throw error;
       }
     },
-    []
+    [],
   );
 
   // 저장된 질문 삭제
@@ -266,7 +267,7 @@ export function useCategorySync() {
         color: string;
         icon: string;
         order: number;
-      }>
+      }>,
     ) => {
       try {
         const updated = await updateCategoryAction(id, updates);
@@ -276,7 +277,7 @@ export function useCategorySync() {
         throw error;
       }
     },
-    []
+    [],
   );
 
   // 카테고리 삭제

@@ -5,11 +5,10 @@ const nextConfig: NextConfig = {
 
   reactCompiler: true,
 
-  // 2. 타입스크립트 에러 무시 (빌드 강행)
+  // 2. 타입스크립트 에러 확인 (빌드 시 타입 검증)
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
-
 };
 
 // 4. Sentry 설정 적용 (기본값 유지)

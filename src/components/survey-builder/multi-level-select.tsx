@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+
 import { ChevronDown } from 'lucide-react';
-import { getRegionsByParent, getRegionById, RegionData } from '@/data/regions';
+
+import { RegionData, getRegionById, getRegionsByParent } from '@/data/regions';
 import { SelectLevel } from '@/types/survey';
 
 interface MultiLevelSelectProps {
@@ -18,7 +20,7 @@ export function MultiLevelSelect({
   values,
   onChange,
   disabled = false,
-  className = ""
+  className = '',
 }: MultiLevelSelectProps) {
   const [currentValues, setCurrentValues] = useState<string[]>(values);
 
@@ -63,17 +65,15 @@ export function MultiLevelSelect({
 
         return (
           <div key={level.id} className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">
-              {level.label}
-            </label>
+            <label className="block text-sm font-medium text-gray-700">{level.label}</label>
             <div className="relative">
               <select
                 value={currentValues[index] || ''}
                 onChange={(e) => handleLevelChange(index, e.target.value)}
                 disabled={isDisabled}
-                className={`w-full p-3 border border-gray-200 rounded-lg bg-white appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
+                className={`w-full appearance-none rounded-lg border border-gray-200 bg-white p-3 transition-colors focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none ${
                   isDisabled
-                    ? 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                    ? 'cursor-not-allowed bg-gray-50 text-gray-400'
                     : 'hover:border-gray-300'
                 }`}
               >
@@ -85,7 +85,7 @@ export function MultiLevelSelect({
                 ))}
               </select>
               <ChevronDown
-                className={`absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 pointer-events-none transition-colors ${
+                className={`pointer-events-none absolute top-1/2 right-3 h-5 w-5 -translate-y-1/2 transform transition-colors ${
                   isDisabled ? 'text-gray-300' : 'text-gray-400'
                 }`}
               />
@@ -103,25 +103,20 @@ interface MultiLevelSelectPreviewProps {
   className?: string;
 }
 
-export function MultiLevelSelectPreview({
-  levels,
-  className = ""
-}: MultiLevelSelectPreviewProps) {
+export function MultiLevelSelectPreview({ levels, className = '' }: MultiLevelSelectPreviewProps) {
   return (
     <div className={`space-y-3 ${className}`}>
       {levels.map((level, index) => (
         <div key={level.id} className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">
-            {level.label}
-          </label>
+          <label className="block text-sm font-medium text-gray-700">{level.label}</label>
           <div className="relative">
             <select
               disabled
-              className="w-full p-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-400 cursor-not-allowed appearance-none"
+              className="w-full cursor-not-allowed appearance-none rounded-lg border border-gray-200 bg-gray-50 p-3 text-gray-400"
             >
               <option>{level.placeholder || `${level.label} 선택`}</option>
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-300 pointer-events-none" />
+            <ChevronDown className="pointer-events-none absolute top-1/2 right-3 h-5 w-5 -translate-y-1/2 transform text-gray-300" />
           </div>
         </div>
       ))}

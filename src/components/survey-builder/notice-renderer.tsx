@@ -1,8 +1,9 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Label } from "@/components/ui/label";
-import { convertHtmlImageUrlsToProxy } from "@/lib/image-utils";
+import { useState } from 'react';
+
+import { Label } from '@/components/ui/label';
+import { convertHtmlImageUrlsToProxy } from '@/lib/image-utils';
 
 interface NoticeRendererProps {
   content: string;
@@ -30,37 +31,30 @@ export function NoticeRenderer({
     <div className="space-y-4">
       {/* Rich Text Content Display */}
       <div
-        className="prose prose-sm max-w-none p-6 bg-blue-50 border-2 border-blue-200 rounded-lg overflow-x-auto
-          [&_table]:border-collapse [&_table]:table-auto [&_table]:w-full [&_table]:min-w-full [&_table]:my-4 [&_table]:border-2 [&_table]:border-gray-300
-          [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2 [&_table_td]:align-top [&_table_td]:box-border [&_table_td]:overflow-hidden
-          [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-3 [&_table_th]:py-2 [&_table_th]:align-top [&_table_th]:box-border [&_table_th]:overflow-hidden
-          [&_table_th]:font-normal [&_table_th]:bg-transparent
-          [&_table_p]:m-0
-          [&_p]:min-h-[1.6em]
-          [&_img]:inline-block [&_img]:align-top"
+        className="prose prose-sm max-w-none overflow-x-auto rounded-lg border-2 border-blue-200 bg-blue-50 p-6 [&_img]:inline-block [&_img]:align-top [&_p]:min-h-[1.6em] [&_table]:my-4 [&_table]:w-full [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border-2 [&_table]:border-gray-300 [&_table_p]:m-0 [&_table_td]:box-border [&_table_td]:overflow-hidden [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2 [&_table_td]:align-top [&_table_th]:box-border [&_table_th]:overflow-hidden [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:bg-transparent [&_table_th]:px-3 [&_table_th]:py-2 [&_table_th]:align-top [&_table_th]:font-normal"
         dangerouslySetInnerHTML={{ __html: convertHtmlImageUrlsToProxy(content) }}
         style={{
           // TipTap 스타일 재정의
-          fontSize: "14px",
-          lineHeight: "1.6",
-          WebkitOverflowScrolling: "touch",
+          fontSize: '14px',
+          lineHeight: '1.6',
+          WebkitOverflowScrolling: 'touch',
         }}
       />
 
       {/* Acknowledgment Checkbox */}
       {requiresAcknowledgment && (
-        <div className="flex items-start space-x-3 p-4 bg-white border-2 border-blue-300 rounded-lg">
+        <div className="flex items-start space-x-3 rounded-lg border-2 border-blue-300 bg-white p-4">
           <input
             type="radio"
             id="acknowledgment-check"
             checked={acknowledged}
             onChange={(e) => handleAcknowledgmentChange(e.target.checked)}
-            className="w-5 h-5 text-blue-600 border-gray-300 focus:ring-blue-500 mt-0.5"
+            className="mt-0.5 h-5 w-5 border-gray-300 text-blue-600 focus:ring-blue-500"
             disabled={!isTestMode && !onChange}
           />
           <Label
             htmlFor="acknowledgment-check"
-            className="text-sm font-medium text-gray-900 cursor-pointer flex-1"
+            className="flex-1 cursor-pointer text-sm font-medium text-gray-900"
           >
             위 내용을 읽고 이해했습니다.
           </Label>
@@ -68,7 +62,7 @@ export function NoticeRenderer({
       )}
 
       {requiresAcknowledgment && !acknowledged && (
-        <div className="text-xs text-red-600 p-2 bg-red-50 rounded">
+        <div className="rounded bg-red-50 p-2 text-xs text-red-600">
           ⚠️ 위 내용을 확인하고 체크해주세요.
         </div>
       )}

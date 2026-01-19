@@ -1,116 +1,120 @@
-"use client";
+'use client';
 
-import { useState, useEffect, use } from "react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { useSurveyBuilderStore } from "@/stores/survey-store";
-import { SortableQuestionList } from "@/components/survey-builder/sortable-question-list";
-import { GroupManager } from "@/components/survey-builder/group-manager";
-import { QuestionLibraryPanel } from "@/components/survey-builder/question-library-panel";
-import { SaveQuestionModal } from "@/components/survey-builder/save-question-modal";
-import { ImportExportLibraryModal } from "@/components/survey-builder/import-export-library-modal";
-import { generateOTTSurvey } from "@/utils/ott-survey-generator";
-import { Question } from "@/types/survey";
+import { use, useEffect, useState } from 'react';
+
+import Link from 'next/link';
+
 import {
-  FileText,
-  Share2,
-  Save,
-  ArrowLeft,
-  Plus,
-  Type,
-  List,
-  CheckSquare,
-  Circle,
-  ChevronDown,
-  Table,
-  PlayCircle,
-  Tv,
-  Sparkles,
-  Check,
-  Info,
-  ArrowUp,
-  ArrowDown,
   AlertCircle,
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  Check,
+  CheckSquare,
+  ChevronDown,
+  Circle,
   Copy,
-  RefreshCw,
+  Download,
+  FileText,
   Globe,
+  Info,
+  Library,
+  List,
   Lock,
   Pencil,
-  Library,
-  Download,
-} from "lucide-react";
-import Link from "next/link";
-import { generateSlugFromTitle, validateSlug } from "@/lib/survey-url";
-import { Label } from "@/components/ui/label";
+  PlayCircle,
+  Plus,
+  RefreshCw,
+  Save,
+  Share2,
+  Sparkles,
+  Table,
+  Tv,
+  Type,
+} from 'lucide-react';
+
+import { isSlugAvailable as checkSlugAvailable } from '@/actions/query-actions';
+import { createQuestion as createQuestionAction } from '@/actions/survey-actions';
+import { GroupManager } from '@/components/survey-builder/group-manager';
+import { ImportExportLibraryModal } from '@/components/survey-builder/import-export-library-modal';
+import { QuestionLibraryPanel } from '@/components/survey-builder/question-library-panel';
+import { SaveQuestionModal } from '@/components/survey-builder/save-question-modal';
+import { SortableQuestionList } from '@/components/survey-builder/sortable-question-list';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useSurvey, useSaveSurvey } from "@/hooks/queries/use-surveys";
-import { isSlugAvailable as checkSlugAvailable } from "@/actions/query-actions";
-import { createQuestion as createQuestionAction } from "@/actions/survey-actions";
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useSaveSurvey, useSurvey } from '@/hooks/queries/use-surveys';
+import { generateSlugFromTitle, validateSlug } from '@/lib/survey-url';
+import { useSurveyBuilderStore } from '@/stores/survey-store';
+import { useSurveyUIStore } from '@/stores/ui-store';
+import { Question } from '@/types/survey';
+import { generateOTTSurvey } from '@/utils/ott-survey-generator';
 
 const questionTypes = [
   {
-    type: "notice" as const,
-    label: "공지사항",
+    type: 'notice' as const,
+    label: '공지사항',
     icon: Info,
-    description: "설명 및 안내 문구",
-    color: "bg-blue-100 text-blue-600",
+    description: '설명 및 안내 문구',
+    color: 'bg-blue-100 text-blue-600',
   },
   {
-    type: "text" as const,
-    label: "단답형",
+    type: 'text' as const,
+    label: '단답형',
     icon: Type,
-    description: "짧은 텍스트 입력",
-    color: "bg-sky-100 text-sky-600",
+    description: '짧은 텍스트 입력',
+    color: 'bg-sky-100 text-sky-600',
   },
   {
-    type: "textarea" as const,
-    label: "장문형",
+    type: 'textarea' as const,
+    label: '장문형',
     icon: FileText,
-    description: "긴 텍스트 입력",
-    color: "bg-green-100 text-green-600",
+    description: '긴 텍스트 입력',
+    color: 'bg-green-100 text-green-600',
   },
   {
-    type: "radio" as const,
-    label: "단일선택",
+    type: 'radio' as const,
+    label: '단일선택',
     icon: Circle,
-    description: "하나만 선택 가능",
-    color: "bg-purple-100 text-purple-600",
+    description: '하나만 선택 가능',
+    color: 'bg-purple-100 text-purple-600',
   },
   {
-    type: "checkbox" as const,
-    label: "다중선택",
+    type: 'checkbox' as const,
+    label: '다중선택',
     icon: CheckSquare,
-    description: "여러 개 선택 가능",
-    color: "bg-orange-100 text-orange-600",
+    description: '여러 개 선택 가능',
+    color: 'bg-orange-100 text-orange-600',
   },
   {
-    type: "select" as const,
-    label: "드롭다운",
+    type: 'select' as const,
+    label: '드롭다운',
     icon: ChevronDown,
-    description: "드롭다운 메뉴",
-    color: "bg-pink-100 text-pink-600",
+    description: '드롭다운 메뉴',
+    color: 'bg-pink-100 text-pink-600',
   },
   {
-    type: "multiselect" as const,
-    label: "다단계선택",
+    type: 'multiselect' as const,
+    label: '다단계선택',
     icon: List,
-    description: "다중 드롭다운",
-    color: "bg-teal-100 text-teal-600",
+    description: '다중 드롭다운',
+    color: 'bg-teal-100 text-teal-600',
   },
   {
-    type: "table" as const,
-    label: "테이블",
+    type: 'table' as const,
+    label: '테이블',
     icon: Table,
-    description: "표 형태 질문",
-    color: "bg-indigo-100 text-indigo-600",
+    description: '표 형태 질문',
+    color: 'bg-indigo-100 text-indigo-600',
   },
 ];
 
@@ -122,34 +126,31 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   const { id } = use(params);
   const {
     currentSurvey,
-    selectedQuestionId,
-    isTestMode,
     updateSurveyTitle,
     addQuestion,
     addPreparedQuestion,
-    selectQuestion,
-    toggleTestMode,
     updateSurveySettings,
     updateSurveySlug,
     regeneratePrivateToken,
   } = useSurveyBuilderStore();
 
+  const { selectedQuestionId, isTestMode, selectQuestion, toggleTestMode } = useSurveyUIStore();
   // TanStack Query 훅 사용
   const { data: survey, isLoading: isSurveyLoading, isError } = useSurvey(id);
   const saveSurveyMutation = useSaveSurvey();
 
-  const [titleInput, setTitleInput] = useState("");
-  const [questionNumberInput, setQuestionNumberInput] = useState("");
+  const [titleInput, setTitleInput] = useState('');
+  const [questionNumberInput, setQuestionNumberInput] = useState('');
   const [showScrollButtons, setShowScrollButtons] = useState(false);
-  const [slugInput, setSlugInput] = useState("");
-  const [slugError, setSlugError] = useState("");
+  const [slugInput, setSlugInput] = useState('');
+  const [slugError, setSlugError] = useState('');
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [isEditingSlugInModal, setIsEditingSlugInModal] = useState(false);
   const [addingQuestionIds, setAddingQuestionIds] = useState<Set<string>>(new Set());
   const [copySuccess, setCopySuccess] = useState(false);
 
   // 라이브러리 관련 상태
-  const [leftSidebarTab, setLeftSidebarTab] = useState<"types" | "library">("types");
+  const [leftSidebarTab, setLeftSidebarTab] = useState<'types' | 'library'>('types');
   const [showSaveQuestionModal, setShowSaveQuestionModal] = useState(false);
   const [questionToSave, setQuestionToSave] = useState<Question | null>(null);
   const [showImportExportModal, setShowImportExportModal] = useState(false);
@@ -159,7 +160,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
     if (survey) {
       useSurveyBuilderStore.setState({ currentSurvey: survey });
       setTitleInput(survey.title);
-      setSlugInput(survey.slug || "");
+      setSlugInput(survey.slug || '');
     }
   }, [survey]);
 
@@ -170,14 +171,14 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
 
     // 빈 값이면 즉시 에러 초기화
     if (!value) {
-      setSlugError("");
+      setSlugError('');
       return;
     }
 
     // 클라이언트 사이드 유효성 검사만 즉시 수행
     const validation = validateSlug(value);
     if (!validation.isValid) {
-      setSlugError(validation.error || "");
+      setSlugError(validation.error || '');
       return;
     }
 
@@ -188,7 +189,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   useEffect(() => {
     // 빈 값이거나 유효하지 않은 값이면 검사하지 않음
     if (!slugInput) {
-      setSlugError("");
+      setSlugError('');
       return;
     }
 
@@ -203,12 +204,12 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
       try {
         const isAvailable = await checkSlugAvailable(slugInput, currentSurvey.id);
         if (!isAvailable) {
-          setSlugError("이미 사용 중인 URL입니다. 다른 URL을 입력해주세요.");
+          setSlugError('이미 사용 중인 URL입니다. 다른 URL을 입력해주세요.');
         } else {
-          setSlugError("");
+          setSlugError('');
         }
       } catch (error) {
-        console.error("슬러그 중복 검사 실패:", error);
+        console.error('슬러그 중복 검사 실패:', error);
         // 에러 발생 시 에러 메시지 표시하지 않음 (사용자 경험 고려)
       }
     }, 500); // 0.5초 대기
@@ -232,13 +233,13 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
       }
       setSlugInput(finalSlug);
       updateSurveySlug(finalSlug);
-      setSlugError("");
+      setSlugError('');
     }
   };
 
   // URL 복사
   const handleCopyUrl = () => {
-    const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
     let url: string;
 
     if (currentSurvey.settings.isPublic) {
@@ -255,7 +256,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
 
   // 비공개 토큰 재생성
   const handleRegenerateToken = () => {
-    if (confirm("새로운 비공개 링크를 생성하시겠습니까? 기존 링크는 더 이상 사용할 수 없습니다.")) {
+    if (confirm('새로운 비공개 링크를 생성하시겠습니까? 기존 링크는 더 이상 사용할 수 없습니다.')) {
       regeneratePrivateToken();
     }
   };
@@ -274,17 +275,17 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
       }
     };
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   // OTT 설문지 예제 추가 함수
   const handleAddOTTSurvey = () => {
     const ottQuestion = generateOTTSurvey();
 
-    if (currentSurvey.title === "새 설문조사") {
-      updateSurveyTitle("OTT 서비스 이용 현황 조사");
-      setTitleInput("OTT 서비스 이용 현황 조사");
+    if (currentSurvey.title === '새 설문조사') {
+      updateSurveyTitle('OTT 서비스 이용 현황 조사');
+      setTitleInput('OTT 서비스 이용 현황 조사');
     }
 
     addPreparedQuestion(ottQuestion);
@@ -309,12 +310,12 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
 
   // 맨 위로 스크롤
   const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // 맨 아래로 스크롤
   const scrollToBottom = () => {
-    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
   };
 
   // 특정 질문으로 스크롤
@@ -323,7 +324,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
     if (questionIndex >= 0 && questionIndex < currentSurvey.questions.length) {
       const questionElement = document.querySelector(`[data-question-index="${questionIndex}"]`);
       if (questionElement) {
-        questionElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        questionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
         selectQuestion(currentSurvey.questions[questionIndex].id);
       }
     }
@@ -331,11 +332,11 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
 
   // 질문 번호 입력 핸들러
   const handleQuestionNumberKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
+    if (e.key === 'Enter') {
       const questionNumber = parseInt(questionNumberInput, 10);
       if (!isNaN(questionNumber) && questionNumber > 0) {
         scrollToQuestion(questionNumber);
-        setQuestionNumberInput("");
+        setQuestionNumberInput('');
       }
     }
   };
@@ -384,7 +385,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
             displayCondition: question.displayCondition,
           });
         } catch (error) {
-          console.error("라이브러리에서 질문 추가 실패:", error);
+          console.error('라이브러리에서 질문 추가 실패:', error);
         }
       }
     } finally {
@@ -399,9 +400,9 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   // 로딩 상태
   if (isSurveyLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
           <p className="text-gray-600">설문을 불러오는 중...</p>
         </div>
       </div>
@@ -411,16 +412,16 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   // 설문을 찾을 수 없는 경우
   if (isError || (!isSurveyLoading && !survey)) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-8 h-8 text-red-500" />
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+            <AlertCircle className="h-8 w-8 text-red-500" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">설문을 찾을 수 없습니다</h2>
-          <p className="text-gray-500 mb-6">요청하신 설문이 존재하지 않거나 삭제되었습니다.</p>
+          <h2 className="mb-2 text-xl font-semibold text-gray-900">설문을 찾을 수 없습니다</h2>
+          <p className="mb-6 text-gray-500">요청하신 설문이 존재하지 않거나 삭제되었습니다.</p>
           <Button asChild>
             <Link href="/admin/surveys">
-              <ArrowLeft className="w-4 h-4 mr-2" />
+              <ArrowLeft className="mr-2 h-4 w-4" />
               목록으로 돌아가기
             </Link>
           </Button>
@@ -432,12 +433,12 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation */}
-      <nav className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <nav className="border-b border-gray-200 bg-white px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div className="flex items-center space-x-4">
             <Link href="/admin/surveys">
               <Button variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
+                <ArrowLeft className="mr-2 h-4 w-4" />
                 목록으로
               </Button>
             </Link>
@@ -448,27 +449,27 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                 setTitleInput(e.target.value);
                 updateSurveyTitle(e.target.value);
               }}
-              className="text-lg font-medium border-none bg-transparent px-2 focus:bg-white focus:border focus:border-blue-200"
+              className="border-none bg-transparent px-2 text-lg font-medium focus:border focus:border-blue-200 focus:bg-white"
               placeholder="설문 제목을 입력하세요"
             />
           </div>
 
           <div className="flex items-center space-x-3">
             <Button
-              variant={isTestMode ? "default" : "outline"}
+              variant={isTestMode ? 'default' : 'outline'}
               size="sm"
               onClick={toggleTestMode}
-              className={isTestMode ? "bg-green-600 hover:bg-green-700" : ""}
+              className={isTestMode ? 'bg-green-600 hover:bg-green-700' : ''}
             >
-              <PlayCircle className="w-4 h-4 mr-2" />
-              {isTestMode ? "테스트 중" : "테스트"}
+              <PlayCircle className="mr-2 h-4 w-4" />
+              {isTestMode ? '테스트 중' : '테스트'}
             </Button>
             <Button variant="outline" size="sm" onClick={handleSaveSurvey}>
-              <Save className="w-4 h-4 mr-2" />
+              <Save className="mr-2 h-4 w-4" />
               저장
             </Button>
             <Button size="sm">
-              <Share2 className="w-4 h-4 mr-2" />
+              <Share2 className="mr-2 h-4 w-4" />
               공유
             </Button>
           </div>
@@ -476,34 +477,34 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
       </nav>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="mx-auto max-w-7xl p-6">
         <div className="grid grid-cols-12 gap-6">
           {/* Left Sidebar - Question Types & Library */}
-          <div className="col-span-3 bg-white rounded-xl shadow-sm border border-gray-200 max-h-[calc(100vh-140px)] overflow-hidden flex flex-col">
+          <div className="col-span-3 flex max-h-[calc(100vh-140px)] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <Tabs
               value={leftSidebarTab}
-              onValueChange={(v) => setLeftSidebarTab(v as "types" | "library")}
-              className="flex flex-col h-full"
+              onValueChange={(v) => setLeftSidebarTab(v as 'types' | 'library')}
+              className="flex h-full flex-col"
             >
-              <TabsList className="grid w-full grid-cols-2 p-1 mb-0">
+              <TabsList className="mb-0 grid w-full grid-cols-2 p-1">
                 <TabsTrigger value="types" className="text-xs">
-                  <Plus className="w-3 h-3 mr-1" />
+                  <Plus className="mr-1 h-3 w-3" />
                   질문 생성
                 </TabsTrigger>
                 <TabsTrigger value="library" className="text-xs">
-                  <Library className="w-3 h-3 mr-1" />
+                  <Library className="mr-1 h-3 w-3" />
                   보관함
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="types" className="flex-1 overflow-y-auto p-4 pt-2 m-0">
+              <TabsContent value="types" className="m-0 flex-1 overflow-y-auto p-4 pt-2">
                 <div className="space-y-3">
                   {questionTypes.map((questionType) => {
                     const IconComponent = questionType.icon;
                     return (
                       <Card
                         key={questionType.type}
-                        className="p-4 cursor-pointer hover-lift border-gray-200 hover:border-blue-200 transition-all duration-200"
+                        className="hover-lift cursor-pointer border-gray-200 p-4 transition-all duration-200 hover:border-blue-200"
                         onClick={async () => {
                           // 로컬 스토어에 추가
                           addQuestion(questionType.type);
@@ -536,7 +537,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                                   displayCondition: newQuestion.displayCondition,
                                 });
                               } catch (error) {
-                                console.error("질문 생성 실패:", error);
+                                console.error('질문 생성 실패:', error);
                               }
                             }
                           }
@@ -544,15 +545,15 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                       >
                         <div className="flex items-start space-x-3">
                           <div
-                            className={`w-10 h-10 rounded-lg flex items-center justify-center ${questionType.color}`}
+                            className={`flex h-10 w-10 items-center justify-center rounded-lg ${questionType.color}`}
                           >
-                            <IconComponent className="w-5 h-5" />
+                            <IconComponent className="h-5 w-5" />
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-gray-900 text-sm">
+                          <div className="min-w-0 flex-1">
+                            <h4 className="text-sm font-medium text-gray-900">
                               {questionType.label}
                             </h4>
-                            <p className="text-xs text-gray-500 mt-1">{questionType.description}</p>
+                            <p className="mt-1 text-xs text-gray-500">{questionType.description}</p>
                           </div>
                         </div>
                       </Card>
@@ -561,22 +562,22 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                 </div>
 
                 {/* OTT 설문지 예제 버튼 */}
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <h4 className="text-sm font-medium text-gray-700 mb-3">설문 예제</h4>
+                <div className="mt-6 border-t border-gray-200 pt-6">
+                  <h4 className="mb-3 text-sm font-medium text-gray-700">설문 예제</h4>
                   <Card
-                    className="p-4 cursor-pointer hover-lift border-gray-200 hover:border-orange-200 transition-all duration-200"
+                    className="hover-lift cursor-pointer border-gray-200 p-4 transition-all duration-200 hover:border-orange-200"
                     onClick={handleAddOTTSurvey}
                   >
                     <div className="flex items-start space-x-3">
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-orange-100 text-orange-600">
-                        <Tv className="w-5 h-5" />
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 text-orange-600">
+                        <Tv className="h-5 w-5" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-gray-900 text-sm flex items-center gap-1">
+                      <div className="min-w-0 flex-1">
+                        <h4 className="flex items-center gap-1 text-sm font-medium text-gray-900">
                           OTT 설문지
-                          <Sparkles className="w-3 h-3 text-yellow-500" />
+                          <Sparkles className="h-3 w-3 text-yellow-500" />
                         </h4>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="mt-1 text-xs text-gray-500">
                           업로드한 이미지와 동일한 OTT 서비스 설문지
                         </p>
                       </div>
@@ -584,9 +585,9 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                   </Card>
                 </div>
 
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <h4 className="text-sm font-medium text-gray-700 mb-3">설문 정보</h4>
-                  <div className="text-xs text-gray-500 space-y-1">
+                <div className="mt-6 border-t border-gray-200 pt-6">
+                  <h4 className="mb-3 text-sm font-medium text-gray-700">설문 정보</h4>
+                  <div className="space-y-1 text-xs text-gray-500">
                     <p>그룹 수: {(currentSurvey.groups || []).length}개</p>
                     <p>질문 수: {currentSurvey.questions.length}개</p>
                     <p>마지막 수정: {currentSurvey.updatedAt.toLocaleDateString()}</p>
@@ -596,21 +597,21 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
 
               <TabsContent
                 value="library"
-                className="flex-1 flex flex-col overflow-hidden p-4 pt-2 m-0"
+                className="m-0 flex flex-1 flex-col overflow-hidden p-4 pt-2"
               >
-                <div className="flex-1 overflow-y-auto min-h-0">
+                <div className="min-h-0 flex-1 overflow-y-auto">
                   <QuestionLibraryPanel onAddQuestion={handleAddFromLibrary} />
                 </div>
 
                 {/* 내보내기/가져오기 버튼 */}
-                <div className="flex-shrink-0 mt-4 pt-4 border-t border-gray-200">
+                <div className="mt-4 flex-shrink-0 border-t border-gray-200 pt-4">
                   <Button
                     variant="outline"
                     size="sm"
                     className="w-full"
                     onClick={() => setShowImportExportModal(true)}
                   >
-                    <Download className="w-4 h-4 mr-2" />
+                    <Download className="mr-2 h-4 w-4" />
                     내보내기 / 가져오기
                   </Button>
                 </div>
@@ -619,15 +620,15 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
           </div>
 
           {/* Center - Survey Preview/Edit */}
-          <div className="col-span-6 bg-white rounded-xl shadow-sm border border-gray-200 max-h-[calc(100vh-140px)] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
+          <div className="col-span-6 max-h-[calc(100vh-140px)] overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="border-b border-gray-200 p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <h3 className="text-lg font-semibold text-gray-900">
-                    {isTestMode ? "질문 테스트" : "설문 편집"}
+                    {isTestMode ? '질문 테스트' : '설문 편집'}
                   </h3>
                   {isTestMode && (
-                    <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                    <span className="rounded-full bg-green-100 px-2 py-1 text-xs text-green-800">
                       테스트 모드
                     </span>
                   )}
@@ -641,7 +642,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                         onChange={(e) => setQuestionNumberInput(e.target.value)}
                         onKeyPress={handleQuestionNumberKeyPress}
                         placeholder="질문 번호"
-                        className="w-24 h-8 text-sm"
+                        className="h-8 w-24 text-sm"
                       />
                       <span className="text-xs text-gray-500">
                         / {currentSurvey.questions.length}
@@ -655,19 +656,19 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
 
             <div className="p-6">
               {currentSurvey.questions.length === 0 ? (
-                <div className="text-center py-16">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Plus className="w-8 h-8 text-gray-400" />
+                <div className="py-16 text-center">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+                    <Plus className="h-8 w-8 text-gray-400" />
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">질문을 추가해보세요</h3>
-                  <p className="text-gray-500 mb-6">
+                  <h3 className="mb-2 text-lg font-medium text-gray-900">질문을 추가해보세요</h3>
+                  <p className="mb-6 text-gray-500">
                     왼쪽에서 원하는 질문 유형을 클릭하거나 보관함에서 불러올 수 있습니다.
                   </p>
-                  <div className="flex gap-2 justify-center">
+                  <div className="flex justify-center gap-2">
                     <Button
                       onClick={async () => {
                         // 로컬 스토어에 추가
-                        addQuestion("text");
+                        addQuestion('text');
 
                         // 서버에 질문 생성 API 호출
                         if (currentSurvey.id) {
@@ -697,16 +698,16 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                                 displayCondition: newQuestion.displayCondition,
                               });
                             } catch (error) {
-                              console.error("질문 생성 실패:", error);
+                              console.error('질문 생성 실패:', error);
                             }
                           }
                         }
                       }}
                     >
-                      <Plus className="w-4 h-4 mr-2" />첫 번째 질문 추가
+                      <Plus className="mr-2 h-4 w-4" />첫 번째 질문 추가
                     </Button>
-                    <Button variant="outline" onClick={() => setLeftSidebarTab("library")}>
-                      <Library className="w-4 h-4 mr-2" />
+                    <Button variant="outline" onClick={() => setLeftSidebarTab('library')}>
+                      <Library className="mr-2 h-4 w-4" />
                       보관함에서 불러오기
                     </Button>
                   </div>
@@ -723,20 +724,20 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
           </div>
 
           {/* Right Sidebar - Settings */}
-          <div className="col-span-3 bg-white rounded-xl shadow-sm border border-gray-200 p-6 max-h-[calc(100vh-140px)] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900 mb-6">설정</h3>
+          <div className="col-span-3 max-h-[calc(100vh-140px)] overflow-y-auto rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h3 className="mb-6 text-lg font-semibold text-gray-900">설정</h3>
 
             <div className="space-y-6">
               {/* 설문 설정 */}
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-3">설문 설정</h4>
+                <h4 className="mb-3 text-sm font-medium text-gray-700">설문 설정</h4>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       {currentSurvey.settings.isPublic ? (
-                        <Globe className="w-4 h-4 text-green-600" />
+                        <Globe className="h-4 w-4 text-green-600" />
                       ) : (
-                        <Lock className="w-4 h-4 text-gray-500" />
+                        <Lock className="h-4 w-4 text-gray-500" />
                       )}
                       <label className="text-sm text-gray-600">공개 설문</label>
                     </div>
@@ -766,7 +767,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
               </div>
 
               {/* 그룹 관리 */}
-              <div className="pt-6 border-t border-gray-200">
+              <div className="border-t border-gray-200 pt-6">
                 <GroupManager className="max-h-[400px]" />
               </div>
             </div>
@@ -776,22 +777,22 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
 
       {/* Floating Scroll Buttons */}
       {showScrollButtons && (
-        <div className="fixed right-6 bottom-6 flex flex-col space-y-2 z-50">
+        <div className="fixed right-6 bottom-6 z-50 flex flex-col space-y-2">
           <Button
             onClick={scrollToTop}
             size="sm"
-            className="w-12 h-12 rounded-full shadow-lg bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 transition-all duration-200 hover:scale-110"
+            className="h-12 w-12 rounded-full border border-gray-200 bg-white text-gray-700 shadow-lg transition-all duration-200 hover:scale-110 hover:bg-gray-50"
             title="맨 위로"
           >
-            <ArrowUp className="w-5 h-5" />
+            <ArrowUp className="h-5 w-5" />
           </Button>
           <Button
             onClick={scrollToBottom}
             size="sm"
-            className="w-12 h-12 rounded-full shadow-lg bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 transition-all duration-200 hover:scale-110"
+            className="h-12 w-12 rounded-full border border-gray-200 bg-white text-gray-700 shadow-lg transition-all duration-200 hover:scale-110 hover:bg-gray-50"
             title="맨 아래로"
           >
-            <ArrowDown className="w-5 h-5" />
+            <ArrowDown className="h-5 w-5" />
           </Button>
         </div>
       )}
@@ -801,15 +802,15 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                <Check className="w-5 h-5 text-green-600" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
+                <Check className="h-5 w-5 text-green-600" />
               </div>
               설문이 저장되었습니다!
             </DialogTitle>
             <DialogDescription>
               {currentSurvey.settings.isPublic
-                ? "공개 설문 URL을 복사하여 공유하세요."
-                : "비공개 링크를 아는 사람만 설문에 접근할 수 있습니다."}
+                ? '공개 설문 URL을 복사하여 공유하세요.'
+                : '비공개 링크를 아는 사람만 설문에 접근할 수 있습니다.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -818,13 +819,13 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
               // 공개 설문 URL
               <>
                 <div>
-                  <Label className="text-sm font-medium flex items-center gap-2 mb-2">
-                    <Globe className="w-4 h-4 text-green-600" />
+                  <Label className="mb-2 flex items-center gap-2 text-sm font-medium">
+                    <Globe className="h-4 w-4 text-green-600" />
                     공개 설문 URL
                   </Label>
-                  <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                    <p className="text-sm text-gray-700 break-all">
-                      {typeof window !== "undefined" ? window.location.origin : ""}/survey/
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <p className="text-sm break-all text-gray-700">
+                      {typeof window !== 'undefined' ? window.location.origin : ''}/survey/
                       <span className="font-medium text-blue-600">
                         {slugInput || generateSlugFromTitle(titleInput)}
                       </span>
@@ -841,7 +842,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                         value={slugInput || generateSlugFromTitle(titleInput)}
                         onChange={(e) => handleSlugChange(e.target.value)}
                         placeholder="my-survey"
-                        className={`flex-1 ${slugError ? "border-red-300" : ""}`}
+                        className={`flex-1 ${slugError ? 'border-red-300' : ''}`}
                       />
                       <Button
                         variant="outline"
@@ -849,12 +850,12 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                         onClick={handleAutoGenerateSlug}
                         title="자동 생성"
                       >
-                        <RefreshCw className="w-4 h-4" />
+                        <RefreshCw className="h-4 w-4" />
                       </Button>
                     </div>
                     {slugError && (
-                      <p className="text-xs text-red-500 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" />
+                      <p className="flex items-center gap-1 text-xs text-red-500">
+                        <AlertCircle className="h-3 w-3" />
                         {slugError}
                       </p>
                     )}
@@ -865,16 +866,16 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                   <Button
                     onClick={handleCopyUrl}
                     className="flex-1"
-                    variant={copySuccess ? "default" : "outline"}
+                    variant={copySuccess ? 'default' : 'outline'}
                   >
                     {copySuccess ? (
                       <>
-                        <Check className="w-4 h-4 mr-2" />
+                        <Check className="mr-2 h-4 w-4" />
                         복사됨!
                       </>
                     ) : (
                       <>
-                        <Copy className="w-4 h-4 mr-2" />
+                        <Copy className="mr-2 h-4 w-4" />
                         URL 복사
                       </>
                     )}
@@ -883,8 +884,8 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                     variant="outline"
                     onClick={() => setIsEditingSlugInModal(!isEditingSlugInModal)}
                   >
-                    <Pencil className="w-4 h-4 mr-2" />
-                    {isEditingSlugInModal ? "완료" : "URL 변경"}
+                    <Pencil className="mr-2 h-4 w-4" />
+                    {isEditingSlugInModal ? '완료' : 'URL 변경'}
                   </Button>
                 </div>
               </>
@@ -892,18 +893,18 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
               // 비공개 설문 URL
               <>
                 <div>
-                  <Label className="text-sm font-medium flex items-center gap-2 mb-2">
-                    <Lock className="w-4 h-4 text-amber-600" />
+                  <Label className="mb-2 flex items-center gap-2 text-sm font-medium">
+                    <Lock className="h-4 w-4 text-amber-600" />
                     비공개 설문 URL
                   </Label>
-                  <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
-                    <p className="text-sm text-gray-700 break-all font-mono">
-                      {typeof window !== "undefined" ? window.location.origin : ""}/survey/
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <p className="font-mono text-sm break-all text-gray-700">
+                      {typeof window !== 'undefined' ? window.location.origin : ''}/survey/
                       {currentSurvey.privateToken}
                     </p>
                   </div>
-                  <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" />이 링크를 아는 사람만 설문에 접근할 수
+                  <p className="mt-2 flex items-center gap-1 text-xs text-amber-600">
+                    <AlertCircle className="h-3 w-3" />이 링크를 아는 사람만 설문에 접근할 수
                     있습니다
                   </p>
                 </div>
@@ -912,33 +913,33 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                   <Button
                     onClick={handleCopyUrl}
                     className="flex-1"
-                    variant={copySuccess ? "default" : "outline"}
+                    variant={copySuccess ? 'default' : 'outline'}
                   >
                     {copySuccess ? (
                       <>
-                        <Check className="w-4 h-4 mr-2" />
+                        <Check className="mr-2 h-4 w-4" />
                         복사됨!
                       </>
                     ) : (
                       <>
-                        <Copy className="w-4 h-4 mr-2" />
+                        <Copy className="mr-2 h-4 w-4" />
                         URL 복사
                       </>
                     )}
                   </Button>
                   <Button variant="outline" onClick={handleRegenerateToken}>
-                    <RefreshCw className="w-4 h-4 mr-2" />새 링크 생성
+                    <RefreshCw className="mr-2 h-4 w-4" />새 링크 생성
                   </Button>
                 </div>
               </>
             )}
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t">
+          <div className="flex justify-end gap-2 border-t pt-2">
             <Button variant="outline" onClick={() => setShowSaveModal(false)}>
               확인
             </Button>
-            <Button onClick={() => (window.location.href = "/admin/surveys")}>설문 목록으로</Button>
+            <Button onClick={() => (window.location.href = '/admin/surveys')}>설문 목록으로</Button>
           </div>
         </DialogContent>
       </Dialog>

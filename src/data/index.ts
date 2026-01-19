@@ -39,4 +39,4 @@ export {
 } from './library';
 
 // regions는 기존 파일 유지
-export { regions } from './regions';
+export { REGION_DATA as regions } from './regions';

@@ -1,23 +1,25 @@
-"use client";
+'use client';
 
-import { useRef } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { useRef } from 'react';
+
+import {
+  QuestionConditionEditor,
+  QuestionConditionEditorRef,
+} from '@/components/survey-builder/question-condition-editor';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { QuestionGroup, QuestionConditionGroup, Question } from "@/types/survey";
-import {
-  QuestionConditionEditor,
-  QuestionConditionEditorRef,
-} from "@/components/survey-builder/question-condition-editor";
-import { getAvailableParentGroups } from "./group-helpers";
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Question, QuestionConditionGroup, QuestionGroup } from '@/types/survey';
+
+import { getAvailableParentGroups } from './group-helpers';
 
 interface GroupEditModalProps {
   isOpen: boolean;
@@ -67,13 +69,13 @@ export function GroupEditModal({
         }
       }}
     >
-      <DialogContent className="max-h-[90vh] flex flex-col">
+      <DialogContent className="flex max-h-[90vh] flex-col">
         <DialogHeader>
           <DialogTitle>그룹 편집</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 mt-4 overflow-y-auto flex-1 min-h-0 pr-2">
+        <div className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto pr-2">
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
               그룹 이름 <span className="text-red-500">*</span>
             </label>
             <Input
@@ -81,14 +83,14 @@ export function GroupEditModal({
               onChange={(e) => setGroupName(e.target.value)}
               placeholder="예: 응답자 정보, 1. TV보유 현황"
               onKeyPress={(e) => {
-                if (e.key === "Enter") {
+                if (e.key === 'Enter') {
                   onSubmit();
                 }
               }}
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">그룹 설명 (선택)</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">그룹 설명 (선택)</label>
             <Textarea
               value={groupDescription}
               onChange={(e) => setGroupDescription(e.target.value)}
@@ -98,10 +100,10 @@ export function GroupEditModal({
           </div>
           {/* 상위 그룹 선택 */}
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">상위 그룹 (선택)</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">상위 그룹 (선택)</label>
             <Select
-              value={parentGroupId || "none"}
-              onValueChange={(value) => setParentGroupId(value === "none" ? undefined : value)}
+              value={parentGroupId || 'none'}
+              onValueChange={(value) => setParentGroupId(value === 'none' ? undefined : value)}
             >
               <SelectTrigger className="bg-white">
                 <SelectValue placeholder="상위 그룹 선택" />
@@ -117,17 +119,17 @@ export function GroupEditModal({
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="mt-1 text-xs text-gray-500">
               다른 그룹의 하위 그룹으로 설정하려면 상위 그룹을 선택하세요
             </p>
           </div>
           {/* 표시 조건 설정 */}
-          <div className="pt-4 border-t border-gray-200">
+          <div className="border-t border-gray-200 pt-4">
             <QuestionConditionEditor
               ref={conditionEditorRef}
               question={{
                 id: editingGroup.id,
-                type: "notice",
+                type: 'notice',
                 title: editingGroup.name,
                 required: false,
                 order: 0,
@@ -139,7 +141,7 @@ export function GroupEditModal({
             />
           </div>
         </div>
-        <div className="flex justify-end space-x-2 pt-4 border-t border-gray-200 mt-4 flex-shrink-0">
+        <div className="mt-4 flex flex-shrink-0 justify-end space-x-2 border-t border-gray-200 pt-4">
           <Button variant="outline" onClick={onClose}>
             취소
           </Button>

@@ -1,8 +1,9 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Card, Button } from "@tremor/react";
-import { Download, FileJson, FileSpreadsheet, Loader2, Table } from "lucide-react";
+import { useState } from 'react';
+
+import { Button, Card } from '@tremor/react';
+import { Download, FileJson, FileSpreadsheet, Loader2, Table } from 'lucide-react';
 
 interface ExportPanelProps {
   surveyId: string;
@@ -19,31 +20,33 @@ export function ExportPanel({
   onExportCsv,
   onExportFlatExcel,
   onExportCompactExcel,
-  surveyTitle = "survey",
+  surveyTitle = 'survey',
 }: ExportPanelProps) {
-  const [isExporting, setIsExporting] = useState<"json" | "csv" | "flat-excel" | "compact-excel" | null>(null);
+  const [isExporting, setIsExporting] = useState<
+    'json' | 'csv' | 'flat-excel' | 'compact-excel' | null
+  >(null);
 
-  const handleExport = async (format: "json" | "csv") => {
+  const handleExport = async (format: 'json' | 'csv') => {
     setIsExporting(format);
     try {
-      const data = format === "json" ? await onExportJson() : await onExportCsv();
+      const data = format === 'json' ? await onExportJson() : await onExportCsv();
 
       if (!data) {
-        alert("내보낼 데이터가 없습니다.");
+        alert('내보낼 데이터가 없습니다.');
         return;
       }
 
       const blob = new Blob([data], {
-        type: format === "json" ? "application/json" : "text/csv;charset=utf-8;",
+        type: format === 'json' ? 'application/json' : 'text/csv;charset=utf-8;',
       });
 
       const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
+      const link = document.createElement('a');
       link.href = url;
 
       // 파일명에서 특수문자 제거
-      const safeName = surveyTitle.replace(/[^a-zA-Z0-9가-힣\s]/g, "").slice(0, 50);
-      const timestamp = new Date().toISOString().split("T")[0];
+      const safeName = surveyTitle.replace(/[^a-zA-Z0-9가-힣\s]/g, '').slice(0, 50);
+      const timestamp = new Date().toISOString().split('T')[0];
       link.download = `${safeName}_응답_${timestamp}.${format}`;
 
       document.body.appendChild(link);
@@ -51,8 +54,8 @@ export function ExportPanel({
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Export error:", error);
-      alert("내보내기 중 오류가 발생했습니다.");
+      console.error('Export error:', error);
+      alert('내보내기 중 오류가 발생했습니다.');
     } finally {
       setIsExporting(null);
     }
@@ -61,22 +64,22 @@ export function ExportPanel({
   const handleExportFlatExcel = async () => {
     if (!onExportFlatExcel) return;
 
-    setIsExporting("flat-excel");
+    setIsExporting('flat-excel');
     try {
       const blob = await onExportFlatExcel();
 
       if (!blob) {
-        alert("내보낼 데이터가 없습니다.");
+        alert('내보낼 데이터가 없습니다.');
         return;
       }
 
       const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
+      const link = document.createElement('a');
       link.href = url;
 
       // 파일명에서 특수문자 제거
-      const safeName = surveyTitle.replace(/[^a-zA-Z0-9가-힣\s]/g, "").slice(0, 50);
-      const timestamp = new Date().toISOString().split("T")[0];
+      const safeName = surveyTitle.replace(/[^a-zA-Z0-9가-힣\s]/g, '').slice(0, 50);
+      const timestamp = new Date().toISOString().split('T')[0];
       link.download = `${safeName}_Flat_${timestamp}.xlsx`;
 
       document.body.appendChild(link);
@@ -84,8 +87,8 @@ export function ExportPanel({
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Flat Excel export error:", error);
-      alert("Flat 엑셀 내보내기 중 오류가 발생했습니다.");
+      console.error('Flat Excel export error:', error);
+      alert('Flat 엑셀 내보내기 중 오류가 발생했습니다.');
     } finally {
       setIsExporting(null);
     }
@@ -95,7 +98,7 @@ export function ExportPanel({
     <Card className="p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Download className="w-5 h-5 text-gray-500" />
+          <Download className="h-5 w-5 text-gray-500" />
           <span className="font-medium text-gray-900">데이터 내보내기</span>
         </div>
         <div className="flex gap-2">
@@ -103,10 +106,10 @@ export function ExportPanel({
             <Button
               size="sm"
               variant="primary"
-              icon={isExporting === "flat-excel" ? Loader2 : Table}
+              icon={isExporting === 'flat-excel' ? Loader2 : Table}
               onClick={handleExportFlatExcel}
               disabled={isExporting !== null}
-              className={isExporting === "flat-excel" ? "animate-pulse" : ""}
+              className={isExporting === 'flat-excel' ? 'animate-pulse' : ''}
               title="퀄트릭스 스타일 Flat 형식 (통계 분석용)"
             >
               통계용
@@ -116,31 +119,34 @@ export function ExportPanel({
             <Button
               size="sm"
               variant="secondary"
-              icon={isExporting === "compact-excel" ? Loader2 : FileSpreadsheet}
+              icon={isExporting === 'compact-excel' ? Loader2 : FileSpreadsheet}
               onClick={async () => {
-                setIsExporting("compact-excel");
+                setIsExporting('compact-excel');
                 try {
                   const blob = await onExportCompactExcel();
-                  if (!blob) { alert("내보낼 데이터가 없습니다."); return; }
+                  if (!blob) {
+                    alert('내보낼 데이터가 없습니다.');
+                    return;
+                  }
                   const url = URL.createObjectURL(blob);
-                  const link = document.createElement("a");
+                  const link = document.createElement('a');
                   link.href = url;
-                  const safeName = surveyTitle.replace(/[^a-zA-Z0-9가-힣\s]/g, "").slice(0, 50);
-                  const timestamp = new Date().toISOString().split("T")[0];
+                  const safeName = surveyTitle.replace(/[^a-zA-Z0-9가-힣\s]/g, '').slice(0, 50);
+                  const timestamp = new Date().toISOString().split('T')[0];
                   link.download = `${safeName}_Compact_${timestamp}.xlsx`;
                   document.body.appendChild(link);
                   link.click();
                   document.body.removeChild(link);
                   URL.revokeObjectURL(url);
                 } catch (error) {
-                  console.error("Compact Excel export error:", error);
-                  alert("간결 엑셀 내보내기 중 오류가 발생했습니다.");
+                  console.error('Compact Excel export error:', error);
+                  alert('간결 엑셀 내보내기 중 오류가 발생했습니다.');
                 } finally {
                   setIsExporting(null);
                 }
               }}
               disabled={isExporting !== null}
-              className={isExporting === "compact-excel" ? "animate-pulse" : ""}
+              className={isExporting === 'compact-excel' ? 'animate-pulse' : ''}
               title="간결 형식 (데이터 확인용)"
             >
               간결형
@@ -149,20 +155,20 @@ export function ExportPanel({
           <Button
             size="sm"
             variant="secondary"
-            icon={isExporting === "csv" ? Loader2 : FileSpreadsheet}
-            onClick={() => handleExport("csv")}
+            icon={isExporting === 'csv' ? Loader2 : FileSpreadsheet}
+            onClick={() => handleExport('csv')}
             disabled={isExporting !== null}
-            className={isExporting === "csv" ? "animate-pulse" : ""}
+            className={isExporting === 'csv' ? 'animate-pulse' : ''}
           >
             CSV
           </Button>
           <Button
             size="sm"
             variant="secondary"
-            icon={isExporting === "json" ? Loader2 : FileJson}
-            onClick={() => handleExport("json")}
+            icon={isExporting === 'json' ? Loader2 : FileJson}
+            onClick={() => handleExport('json')}
             disabled={isExporting !== null}
-            className={isExporting === "json" ? "animate-pulse" : ""}
+            className={isExporting === 'json' ? 'animate-pulse' : ''}
           >
             JSON
           </Button>

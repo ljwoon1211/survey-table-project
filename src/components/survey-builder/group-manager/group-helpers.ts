@@ -1,4 +1,4 @@
-import { QuestionGroup } from "@/types/survey";
+import { QuestionGroup } from '@/types/survey';
 
 /**
  * 순환 참조 방지: 특정 그룹이 다른 그룹의 상위로 설정 가능한지 확인
@@ -6,7 +6,7 @@ import { QuestionGroup } from "@/types/survey";
 export function canBeParentOf(
   potentialParentId: string,
   childId: string,
-  groups: QuestionGroup[]
+  groups: QuestionGroup[],
 ): boolean {
   if (potentialParentId === childId) return false;
 
@@ -27,10 +27,9 @@ export function canBeParentOf(
 export function getAvailableParentGroups(
   currentGroupId: string,
   topLevelGroups: QuestionGroup[],
-  allGroups: QuestionGroup[]
+  allGroups: QuestionGroup[],
 ): QuestionGroup[] {
   return topLevelGroups.filter(
-    (g) => g.id !== currentGroupId && canBeParentOf(g.id, currentGroupId, allGroups)
+    (g) => g.id !== currentGroupId && canBeParentOf(g.id, currentGroupId, allGroups),
   );
 }
-

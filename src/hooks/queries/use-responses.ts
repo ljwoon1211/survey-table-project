@@ -1,21 +1,22 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
 import {
-  getResponsesBySurvey,
-  getCompletedResponses,
-  getResponseById,
   calculateResponseSummary,
-  getQuestionStatistics,
-  exportResponsesAsJson,
   exportResponsesAsCsv,
+  exportResponsesAsJson,
+  getCompletedResponses,
+  getQuestionStatistics,
+  getResponseById,
+  getResponsesBySurvey,
 } from '@/actions/query-actions';
 import {
-  startResponse as startResponseAction,
-  updateQuestionResponse as updateQuestionResponseAction,
+  clearSurveyResponses as clearSurveyResponsesAction,
   completeResponse as completeResponseAction,
   deleteResponse as deleteResponseAction,
-  clearSurveyResponses as clearSurveyResponsesAction,
+  startResponse as startResponseAction,
+  updateQuestionResponse as updateQuestionResponseAction,
 } from '@/actions/response-actions';
 
 // ========================
@@ -25,7 +26,8 @@ export const responseKeys = {
   all: ['responses'] as const,
   lists: () => [...responseKeys.all, 'list'] as const,
   listBySurvey: (surveyId: string) => [...responseKeys.lists(), surveyId] as const,
-  completedBySurvey: (surveyId: string) => [...responseKeys.lists(), surveyId, 'completed'] as const,
+  completedBySurvey: (surveyId: string) =>
+    [...responseKeys.lists(), surveyId, 'completed'] as const,
   details: () => [...responseKeys.all, 'detail'] as const,
   detail: (id: string) => [...responseKeys.details(), id] as const,
   summary: (surveyId: string) => [...responseKeys.all, 'summary', surveyId] as const,
@@ -86,7 +88,7 @@ export function useResponseSummary(surveyId: string | undefined) {
  */
 export function useQuestionStatistics(
   surveyId: string | undefined,
-  questionId: string | undefined
+  questionId: string | undefined,
 ) {
   return useQuery({
     queryKey: responseKeys.statistics(surveyId!, questionId!),

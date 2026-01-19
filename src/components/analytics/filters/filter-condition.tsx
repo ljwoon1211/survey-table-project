@@ -1,31 +1,32 @@
-"use client";
+'use client';
 
-import { X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { X } from 'lucide-react';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Combobox } from '@/components/ui/combobox';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Combobox } from "@/components/ui/combobox";
-import type { Question } from "@/types/survey";
-import type { FilterCondition, FilterOperator } from "@/lib/analytics/filter";
+} from '@/components/ui/select';
+import type { FilterCondition, FilterOperator } from '@/lib/analytics/filter';
 import {
   getAvailableOperators,
   getOperatorLabel,
   isFilterableQuestion,
-} from "@/lib/analytics/filter";
+} from '@/lib/analytics/filter';
+import type { Question } from '@/types/survey';
 
 interface FilterConditionRowProps {
   condition: FilterCondition;
   questions: Question[];
   onUpdate: (updates: Partial<FilterCondition>) => void;
   onRemove: () => void;
-  showLogicBadge?: "AND" | "OR";
+  showLogicBadge?: 'AND' | 'OR';
 }
 
 export function FilterConditionRow({
@@ -40,17 +41,17 @@ export function FilterConditionRow({
   const availableOperators = selectedQuestion ? getAvailableOperators(selectedQuestion.type) : [];
 
   // 값 선택이 필요한 연산자인지 확인
-  const needsValue = !["is_empty", "is_not_empty"].includes(condition.operator);
+  const needsValue = !['is_empty', 'is_not_empty'].includes(condition.operator);
 
   // 선택지 옵션 가져오기
   const getOptions = () => {
     if (!selectedQuestion) return [];
 
-    if (["radio", "select", "checkbox"].includes(selectedQuestion.type)) {
+    if (['radio', 'select', 'checkbox'].includes(selectedQuestion.type)) {
       return selectedQuestion.options || [];
     }
 
-    if (selectedQuestion.type === "multiselect" && selectedQuestion.selectLevels) {
+    if (selectedQuestion.type === 'multiselect' && selectedQuestion.selectLevels) {
       return selectedQuestion.selectLevels[0]?.options || [];
     }
 
@@ -75,7 +76,7 @@ export function FilterConditionRow({
   const useComboboxForValues = options.length >= 5;
 
   return (
-    <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg flex-wrap">
+    <div className="flex flex-wrap items-center gap-2 rounded-lg bg-gray-50 p-3">
       {showLogicBadge && (
         <Badge variant="outline" className="text-xs font-medium">
           {showLogicBadge}
@@ -120,7 +121,7 @@ export function FilterConditionRow({
               // 옵션이 5개 이상이면 Combobox
               <Combobox
                 options={valueComboboxOptions}
-                value={Array.isArray(condition.value) ? condition.value[0] : condition.value || ""}
+                value={Array.isArray(condition.value) ? condition.value[0] : condition.value || ''}
                 onValueChange={(value) => onUpdate({ value })}
                 placeholder="값 선택"
                 searchPlaceholder="값 검색..."
@@ -131,7 +132,7 @@ export function FilterConditionRow({
             ) : (
               // 옵션이 5개 미만이면 Select
               <Select
-                value={Array.isArray(condition.value) ? condition.value[0] : condition.value || ""}
+                value={Array.isArray(condition.value) ? condition.value[0] : condition.value || ''}
                 onValueChange={(value: string) => onUpdate({ value })}
               >
                 <SelectTrigger className="w-[180px] bg-white">
@@ -149,7 +150,7 @@ export function FilterConditionRow({
           ) : (
             // 텍스트 입력
             <Input
-              value={typeof condition.value === "string" ? condition.value : ""}
+              value={typeof condition.value === 'string' ? condition.value : ''}
               onChange={(e) => onUpdate({ value: e.target.value })}
               placeholder="값 입력"
               className="w-[180px] bg-white"
@@ -165,7 +166,7 @@ export function FilterConditionRow({
         onClick={onRemove}
         className="text-gray-400 hover:text-red-500"
       >
-        <X className="w-4 h-4" />
+        <X className="h-4 w-4" />
       </Button>
     </div>
   );

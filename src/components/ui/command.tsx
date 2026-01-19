@@ -1,9 +1,11 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import { Command as CommandPrimitive } from "cmdk";
-import { Search } from "lucide-react";
-import { cn } from "@/lib/utils";
+import * as React from 'react';
+
+import { Command as CommandPrimitive } from 'cmdk';
+import { Search } from 'lucide-react';
+
+import { cn } from '@/lib/utils';
 
 const Command = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive>,
@@ -12,8 +14,8 @@ const Command = React.forwardRef<
   <CommandPrimitive
     ref={ref}
     className={cn(
-      "flex h-full w-full flex-col overflow-hidden rounded-lg bg-white text-gray-900",
-      className
+      'flex h-full w-full flex-col overflow-hidden rounded-lg bg-white text-gray-900',
+      className,
     )}
     {...props}
   />
@@ -29,8 +31,8 @@ const CommandInput = React.forwardRef<
     <CommandPrimitive.Input
       ref={ref}
       className={cn(
-        "flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-gray-400 disabled:cursor-not-allowed disabled:opacity-50",
-        className
+        'flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-gray-400 disabled:cursor-not-allowed disabled:opacity-50',
+        className,
       )}
       {...props}
     />
@@ -44,7 +46,7 @@ const CommandList = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <CommandPrimitive.List
     ref={ref}
-    className={cn("max-h-[300px] overflow-y-auto overflow-x-hidden", className)}
+    className={cn('max-h-[300px] overflow-x-hidden overflow-y-auto', className)}
     {...props}
   />
 ));
@@ -54,11 +56,7 @@ const CommandEmpty = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Empty>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Empty>
 >((props, ref) => (
-  <CommandPrimitive.Empty
-    ref={ref}
-    className="py-6 text-center text-sm text-gray-500"
-    {...props}
-  />
+  <CommandPrimitive.Empty ref={ref} className="py-6 text-center text-sm text-gray-500" {...props} />
 ));
 CommandEmpty.displayName = CommandPrimitive.Empty.displayName;
 
@@ -69,8 +67,8 @@ const CommandGroup = React.forwardRef<
   <CommandPrimitive.Group
     ref={ref}
     className={cn(
-      "overflow-hidden p-1 text-gray-900 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-gray-500",
-      className
+      'overflow-hidden p-1 text-gray-900 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-gray-500',
+      className,
     )}
     {...props}
   />
@@ -83,7 +81,7 @@ const CommandSeparator = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <CommandPrimitive.Separator
     ref={ref}
-    className={cn("-mx-1 h-px bg-gray-200", className)}
+    className={cn('-mx-1 h-px bg-gray-200', className)}
     {...props}
   />
 ));
@@ -96,11 +94,11 @@ const CommandItem = React.forwardRef<
   <CommandPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-pointer select-none items-center rounded-md px-2 py-2 text-sm outline-none transition-colors",
-      "hover:bg-gray-100 hover:text-gray-900",
-      "data-[selected=true]:bg-blue-50 data-[selected=true]:text-blue-700",
-      "data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50",
-      className
+      'relative flex cursor-pointer items-center rounded-md px-2 py-2 text-sm transition-colors outline-none select-none',
+      'hover:bg-gray-100 hover:text-gray-900',
+      'data-[selected=true]:bg-blue-50 data-[selected=true]:text-blue-700',
+      'data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50',
+      className,
     )}
     {...props}
   />

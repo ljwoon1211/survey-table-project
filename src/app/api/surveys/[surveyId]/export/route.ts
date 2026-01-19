@@ -1,20 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { surveys, surveyResponses } from '@/db/schema';
+
 import { eq } from 'drizzle-orm';
 import * as XLSX from 'xlsx';
-import { 
-  generateExcelWorkbook, 
-  generateRawDataCombinedWorkbook, 
-  generateRawDataIndividualWorkbook, 
-  generateSummaryWorkbook, 
-  generateVariableMapWorkbook 
+
+import { db } from '@/db';
+import { surveyResponses, surveys } from '@/db/schema';
+import {
+  generateExcelWorkbook,
+  generateRawDataCombinedWorkbook,
+  generateRawDataIndividualWorkbook,
+  generateSummaryWorkbook,
+  generateVariableMapWorkbook,
 } from '@/lib/excel-transformer';
-import { Survey, SurveyResponse } from '@/types/survey';
+import { Survey, SurveyResponse, SurveySubmission } from '@/types/survey';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ surveyId: string }> }
+  { params }: { params: Promise<{ surveyId: string }> },
 ) {
   try {
     const { surveyId } = await params;
@@ -35,7 +37,7 @@ export async function GET(
     }
 
     // 2. 응답 데이터 조회
-    // Variable Map만 다운로드할 때는 응답 데이터가 필요 없지만, 
+    // Variable Map만 다운로드할 때는 응답 데이터가 필요 없지만,
     // 로직 단순화를 위해 일단 조회 (성능 이슈 시 최적화 가능)
     const responses = await db.query.surveyResponses.findMany({
       where: eq(surveyResponses.surveyId, surveyId),
@@ -48,13 +50,22 @@ export async function GET(
 
     // Type에 따른 분기 처리
     if (type === 'raw-all') {
-      workbook = generateRawDataCombinedWorkbook(surveyData as unknown as Survey, responses as unknown as SurveyResponse[]);
+      workbook = generateRawDataCombinedWorkbook(
+        surveyData as unknown as Survey,
+        responses as unknown as SurveySubmission[],
+      );
       filenamePrefix = 'RawData_Combined';
     } else if (type === 'raw-individual') {
-      workbook = generateRawDataIndividualWorkbook(surveyData as unknown as Survey, responses as unknown as SurveyResponse[]);
+      workbook = generateRawDataIndividualWorkbook(
+        surveyData as unknown as Survey,
+        responses as unknown as SurveySubmission[],
+      );
       filenamePrefix = 'RawData_Individual';
     } else if (type === 'summary') {
-      workbook = generateSummaryWorkbook(surveyData as unknown as Survey, responses as unknown as SurveyResponse[]);
+      workbook = generateSummaryWorkbook(
+        surveyData as unknown as Survey,
+        responses as unknown as SurveySubmission[],
+      );
       filenamePrefix = 'Summary';
     } else if (type === 'map') {
       workbook = generateVariableMapWorkbook(surveyData as unknown as Survey);
@@ -69,8 +80,8 @@ export async function GET(
       };
       workbook = generateExcelWorkbook(
         surveyData as unknown as Survey,
-        responses as unknown as SurveyResponse[],
-        options
+        responses as unknown as SurveySubmission[],
+        options,
       );
     }
 
@@ -85,7 +96,6 @@ export async function GET(
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       },
     });
-
   } catch (error) {
     console.error('Export Error:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

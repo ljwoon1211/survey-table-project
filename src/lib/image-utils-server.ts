@@ -2,16 +2,15 @@
  * 서버 사이드 이미지 삭제 유틸리티
  * 서버 액션에서 R2에 직접 접근하여 이미지를 삭제합니다.
  */
-
-import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 // Cloudflare R2는 S3 호환 API를 사용합니다
 const r2Client = new S3Client({
-  region: "auto",
+  region: 'auto',
   endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
   credentials: {
-    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY || "",
-    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_KEY || "",
+    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY || '',
+    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_KEY || '',
   },
 });
 
@@ -28,13 +27,13 @@ export async function deleteImagesFromR2Server(urls: string[]): Promise<boolean>
   // 환경 변수 확인
   const bucketName = process.env.CLOUDFLARE_R2_BUCKET;
   if (!bucketName) {
-    console.error("Cloudflare R2 환경 변수가 설정되지 않았습니다.");
+    console.error('Cloudflare R2 환경 변수가 설정되지 않았습니다.');
     return false;
   }
 
   const publicUrl = process.env.CLOUDFLARE_R2_PUBLIC_URL;
   if (!publicUrl) {
-    console.error("Cloudflare R2 공개 URL이 설정되지 않았습니다.");
+    console.error('Cloudflare R2 공개 URL이 설정되지 않았습니다.');
     return false;
   }
 
@@ -53,7 +52,7 @@ export async function deleteImagesFromR2Server(urls: string[]): Promise<boolean>
       // URL에서 파일 경로 추출
       const urlObj = new URL(url);
       const pathname = urlObj.pathname;
-      const key = pathname.startsWith("/") ? pathname.substring(1) : pathname;
+      const key = pathname.startsWith('/') ? pathname.substring(1) : pathname;
 
       // R2에서 삭제
       const command = new DeleteObjectCommand({

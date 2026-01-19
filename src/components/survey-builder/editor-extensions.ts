@@ -1,24 +1,24 @@
-import StarterKit from "@tiptap/starter-kit";
-import ImageResize from "tiptap-extension-resize-image";
-import Link from "@tiptap/extension-link";
-import { Table } from "@tiptap/extension-table";
-import { TableRow } from "@tiptap/extension-table-row";
-import { TableCell } from "@tiptap/extension-table-cell";
-import { TableHeader } from "@tiptap/extension-table-header";
-import { getProxiedImageUrl } from "@/lib/image-utils";
+import Link from '@tiptap/extension-link';
+import { Table } from '@tiptap/extension-table';
+import { TableCell } from '@tiptap/extension-table-cell';
+import { TableHeader } from '@tiptap/extension-table-header';
+import { TableRow } from '@tiptap/extension-table-row';
+import StarterKit from '@tiptap/starter-kit';
+import ImageResize from 'tiptap-extension-resize-image';
+
+import { getProxiedImageUrl } from '@/lib/image-utils';
 
 // 배경색 속성 추가 함수
 const addBackgroundColorAttribute = () => ({
   backgroundColor: {
     default: null,
-    parseHTML: (element: HTMLElement) =>
-      element.getAttribute("data-background-color"),
+    parseHTML: (element: HTMLElement) => element.getAttribute('data-background-color'),
     renderHTML: (attributes: { backgroundColor?: string | null }) => {
       if (!attributes.backgroundColor) {
         return {};
       }
       return {
-        "data-background-color": attributes.backgroundColor,
+        'data-background-color': attributes.backgroundColor,
         style: `background-color: ${attributes.backgroundColor}`,
       };
     },
@@ -30,8 +30,8 @@ const addColwidthAttribute = () => ({
   colwidth: {
     default: null,
     parseHTML: (element: HTMLElement) => {
-      const colwidth = element.getAttribute("colwidth");
-      return colwidth ? colwidth.split(",").map((item) => parseInt(item, 10)) : null;
+      const colwidth = element.getAttribute('colwidth');
+      return colwidth ? colwidth.split(',').map((item) => parseInt(item, 10)) : null;
     },
     renderHTML: (attributes: { colwidth?: number[] | null }) => {
       if (!attributes.colwidth || !attributes.colwidth.length) {
@@ -39,7 +39,7 @@ const addColwidthAttribute = () => ({
       }
       const width = attributes.colwidth.reduce((a, b) => a + b, 0);
       return {
-        colwidth: attributes.colwidth.join(","),
+        colwidth: attributes.colwidth.join(','),
         style: `width: ${width}px`,
       };
     },
@@ -89,7 +89,7 @@ export function createEditorExtensions() {
         }
       }
 
-      return ["img", HTMLAttributes];
+      return ['img', HTMLAttributes];
     },
     addAttributes() {
       return {
@@ -97,9 +97,9 @@ export function createEditorExtensions() {
         style: {
           default: null,
           parseHTML: (element: HTMLElement) => {
-            const style = element.getAttribute("style") || "";
+            const style = element.getAttribute('style') || '';
             // width가 있으면 max-width도 추가
-            if (style.includes("width") && !style.includes("max-width")) {
+            if (style.includes('width') && !style.includes('max-width')) {
               return `${style}; max-width: 100%;`;
             }
             return style || null;
@@ -109,7 +109,7 @@ export function createEditorExtensions() {
               return {};
             }
             // width가 있으면 max-width도 추가
-            if (attributes.style.includes("width") && !attributes.style.includes("max-width")) {
+            if (attributes.style.includes('width') && !attributes.style.includes('max-width')) {
               return {
                 style: `${attributes.style}; max-width: 100%;`,
               };
@@ -133,7 +133,7 @@ export function createEditorExtensions() {
     Link.configure({
       openOnClick: false,
       HTMLAttributes: {
-        class: "text-blue-600 underline",
+        class: 'text-blue-600 underline',
       },
     }),
     Table.configure({
@@ -145,5 +145,3 @@ export function createEditorExtensions() {
     TableHeaderWithBackground,
   ];
 }
-
-

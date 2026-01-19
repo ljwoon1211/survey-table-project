@@ -1,25 +1,22 @@
 import {
-  Question,
   BranchRule,
-  TableValidationRule,
+  Question,
   QuestionCondition,
   QuestionConditionGroup,
   QuestionGroup,
   SurveyResponse,
-  TableRow
-} from "@/types/survey";
+  TableRow,
+  TableValidationRule,
+} from '@/types/survey';
 
 /**
  * 질문과 응답을 기반으로 적용할 분기 규칙을 찾습니다
  */
-export function getBranchRuleForResponse(
-  question: Question,
-  response: unknown
-): BranchRule | null {
+export function getBranchRuleForResponse(question: Question, response: unknown): BranchRule | null {
   if (!response) return null;
 
   // 테이블 질문인 경우 먼저 검증 규칙 확인
-  if (question.type === "table") {
+  if (question.type === 'table') {
     const validationRule = getTableValidationBranchRule(question, response);
     if (validationRule) {
       return validationRule;
@@ -27,13 +24,13 @@ export function getBranchRuleForResponse(
   }
 
   switch (question.type) {
-    case "radio":
+    case 'radio':
       return getBranchRuleForRadio(question, response);
-    case "checkbox":
+    case 'checkbox':
       return getBranchRuleForCheckbox(question, response);
-    case "select":
+    case 'select':
       return getBranchRuleForSelect(question, response);
-    case "table":
+    case 'table':
       return getBranchRuleForTable(question, response);
     default:
       return null;
@@ -48,7 +45,7 @@ function getBranchRuleForRadio(question: Question, response: unknown): BranchRul
 
   // 응답이 객체인 경우 (기타 옵션)
   const selectedValue =
-    typeof response === "object" && response !== null && "selectedValue" in response
+    typeof response === 'object' && response !== null && 'selectedValue' in response
       ? (response as { selectedValue: string }).selectedValue
       : response;
 
@@ -66,9 +63,9 @@ function getBranchRuleForCheckbox(question: Question, response: unknown): Branch
 
   // 체크된 값들 추출
   const checkedValues = response.map((val: unknown) =>
-    typeof val === "object" && val !== null && "selectedValue" in val
+    typeof val === 'object' && val !== null && 'selectedValue' in val
       ? (val as { selectedValue: string }).selectedValue
-      : val
+      : val,
   );
 
   // 체크된 옵션 중 branchRule이 있는 첫 번째 옵션 찾기
@@ -88,7 +85,7 @@ function getBranchRuleForSelect(question: Question, response: unknown): BranchRu
   if (!question.options) return null;
 
   const selectedValue =
-    typeof response === "object" && response !== null && "selectedValue" in response
+    typeof response === 'object' && response !== null && 'selectedValue' in response
       ? (response as { selectedValue: string }).selectedValue
       : response;
 
@@ -101,7 +98,7 @@ function getBranchRuleForSelect(question: Question, response: unknown): BranchRu
  * 테이블의 각 셀에서 선택된 값의 branchRule 확인
  */
 function getBranchRuleForTable(question: Question, response: unknown): BranchRule | null {
-  if (!question.tableRowsData || typeof response !== "object" || response === null) return null;
+  if (!question.tableRowsData || typeof response !== 'object' || response === null) return null;
 
   // 테이블 응답은 평면 구조: { "cell-id": value, ... }
   const tableResponse = response as Record<string, unknown>;
@@ -112,10 +109,10 @@ function getBranchRuleForTable(question: Question, response: unknown): BranchRul
       if (!cellValue) continue;
 
       // Select 타입 셀 처리
-      if (cell.type === "select" && cell.selectOptions) {
+      if (cell.type === 'select' && cell.selectOptions) {
         // select는 optionId를 저장하므로 optionId로 찾기
         const selectedOptionId =
-          typeof cellValue === "object" && cellValue !== null && "optionId" in cellValue
+          typeof cellValue === 'object' && cellValue !== null && 'optionId' in cellValue
             ? (cellValue as { optionId: string }).optionId
             : cellValue;
 
@@ -126,10 +123,10 @@ function getBranchRuleForTable(question: Question, response: unknown): BranchRul
       }
 
       // Radio 타입 셀 처리
-      if (cell.type === "radio" && cell.radioOptions) {
+      if (cell.type === 'radio' && cell.radioOptions) {
         // 라디오는 optionId를 저장하므로 optionId로 찾기
         const selectedOptionId =
-          typeof cellValue === "object" && cellValue !== null && "optionId" in cellValue
+          typeof cellValue === 'object' && cellValue !== null && 'optionId' in cellValue
             ? (cellValue as { optionId: string }).optionId
             : cellValue;
 
@@ -140,12 +137,12 @@ function getBranchRuleForTable(question: Question, response: unknown): BranchRul
       }
 
       // Checkbox 타입 셀 처리 (첫 번째 체크된 옵션의 branchRule 사용)
-      if (cell.type === "checkbox" && cell.checkboxOptions && Array.isArray(cellValue)) {
+      if (cell.type === 'checkbox' && cell.checkboxOptions && Array.isArray(cellValue)) {
         // 체크박스는 optionId 배열을 저장
         const checkedOptionIds = cellValue.map((val: unknown) =>
-          typeof val === "object" && val !== null && "optionId" in val
+          typeof val === 'object' && val !== null && 'optionId' in val
             ? (val as { optionId: string }).optionId
-            : val
+            : val,
         );
 
         for (const option of cell.checkboxOptions) {
@@ -174,7 +171,7 @@ export function findQuestionIndexById(questions: Question[], questionId: string)
 export function getNextQuestionIndex(
   questions: Question[],
   currentIndex: number,
-  currentResponse: unknown
+  currentResponse: unknown,
 ): number {
   const currentQuestion = questions[currentIndex];
   if (!currentQuestion) return -1;
@@ -183,10 +180,10 @@ export function getNextQuestionIndex(
   const branchRule = getBranchRuleForResponse(currentQuestion, currentResponse);
 
   if (branchRule) {
-    if (branchRule.action === "end") {
+    if (branchRule.action === 'end') {
       // 설문 종료
       return -1;
-    } else if (branchRule.action === "goto" && branchRule.targetQuestionId) {
+    } else if (branchRule.action === 'goto' && branchRule.targetQuestionId) {
       // 특정 질문으로 이동
       const targetIndex = findQuestionIndexById(questions, branchRule.targetQuestionId);
       return targetIndex !== -1 ? targetIndex : currentIndex + 1;
@@ -219,9 +216,9 @@ export function questionIdToNumber(questionId: string): number | null {
 export function checkTableValidationRule(
   question: Question,
   response: unknown,
-  rule: TableValidationRule
+  rule: TableValidationRule,
 ): boolean {
-  if (!question.tableRowsData || typeof response !== "object" || response === null) {
+  if (!question.tableRowsData || typeof response !== 'object' || response === null) {
     return false;
   }
 
@@ -232,10 +229,10 @@ export function checkTableValidationRule(
 
   // 디버깅 로그
   console.group(`🔍 테이블 검증 규칙 체크: ${rule.description || rule.id}`);
-  console.log("검증 타입:", type);
-  console.log("조건:", { rowIds, cellColumnIndex, checkType, expectedValues });
-  console.log("테이블 응답 데이터:", tableResponse);
-  console.log("질문 행 데이터:", question.tableRowsData);
+  console.log('검증 타입:', type);
+  console.log('조건:', { rowIds, cellColumnIndex, checkType, expectedValues });
+  console.log('테이블 응답 데이터:', tableResponse);
+  console.log('질문 행 데이터:', question.tableRowsData);
 
   // 지정된 행(rowIds) 중에서 체크된 행들을 수집
   const checkedRowsInTarget: string[] = [];
@@ -244,16 +241,16 @@ export function checkTableValidationRule(
     if (!rowIds.includes(row.id)) continue;
 
     // 특정 열만 확인하거나 모든 셀 확인
-    let cellsToCheck = cellColumnIndex !== undefined
-      ? [row.cells[cellColumnIndex]]
-      : row.cells;
+    let cellsToCheck = cellColumnIndex !== undefined ? [row.cells[cellColumnIndex]] : row.cells;
 
     // 만약 특정 열(예: 0번 열)을 선택했는데 해당 셀이 텍스트(라벨) 등 비인터랙티브 타입이라면,
     // 사용자 의도를 파악하여 해당 행의 첫 번째 입력 필드(라디오, 체크박스 등)를 대신 확인합니다.
     if (cellColumnIndex !== undefined && cellsToCheck.length === 1) {
       const targetCell = cellsToCheck[0];
       if (targetCell && ['text', 'image', 'video'].includes(targetCell.type)) {
-        const firstInteractive = row.cells.find(c => ['checkbox', 'radio', 'select', 'input'].includes(c.type));
+        const firstInteractive = row.cells.find((c) =>
+          ['checkbox', 'radio', 'select', 'input'].includes(c.type),
+        );
         if (firstInteractive) {
           cellsToCheck = [firstInteractive];
         }
@@ -279,22 +276,26 @@ export function checkTableValidationRule(
             if (expectedValues && expectedValues.length > 0) {
               // 응답은 optionId 배열을 저장하지만, expectedValues는 value 배열을 저장
               // optionId를 value로 변환해야 함
-              const checkedOptionIds = cellValue.map(v =>
-                typeof v === 'object' && v !== null && 'optionId' in v
-                  ? (v as { optionId: string }).optionId
-                  : (typeof v === 'string' ? v : null)
-              ).filter((id): id is string => id !== null);
+              const checkedOptionIds = cellValue
+                .map((v) =>
+                  typeof v === 'object' && v !== null && 'optionId' in v
+                    ? (v as { optionId: string }).optionId
+                    : typeof v === 'string'
+                      ? v
+                      : null,
+                )
+                .filter((id): id is string => id !== null);
 
               if (cell.checkboxOptions) {
                 // optionId로 옵션들을 찾아서 value를 가져옴
                 const checkedValues = checkedOptionIds
-                  .map(optionId => {
-                    const option = cell.checkboxOptions?.find(opt => opt.id === optionId);
+                  .map((optionId) => {
+                    const option = cell.checkboxOptions?.find((opt) => opt.id === optionId);
                     return option?.value;
                   })
                   .filter((v): v is string => v !== undefined);
 
-                if (checkedValues.some(v => expectedValues.includes(v))) {
+                if (checkedValues.some((v) => expectedValues.includes(v))) {
                   isChecked = true;
                 }
               }
@@ -310,13 +311,16 @@ export function checkTableValidationRule(
             if (expectedValues && expectedValues.length > 0) {
               // 응답은 optionId를 저장하지만, expectedValues는 value를 저장
               // optionId를 value로 변환해야 함
-              const selectedOptionId = typeof cellValue === "object" && cellValue !== null && "optionId" in cellValue
-                ? (cellValue as { optionId: string }).optionId
-                : (typeof cellValue === "string" ? cellValue : null);
+              const selectedOptionId =
+                typeof cellValue === 'object' && cellValue !== null && 'optionId' in cellValue
+                  ? (cellValue as { optionId: string }).optionId
+                  : typeof cellValue === 'string'
+                    ? cellValue
+                    : null;
 
               if (selectedOptionId && cell.radioOptions) {
                 // optionId로 옵션을 찾아서 value를 가져옴
-                const selectedOption = cell.radioOptions.find(opt => opt.id === selectedOptionId);
+                const selectedOption = cell.radioOptions.find((opt) => opt.id === selectedOptionId);
                 if (selectedOption && expectedValues.includes(selectedOption.value)) {
                   isChecked = true;
                 }
@@ -333,13 +337,18 @@ export function checkTableValidationRule(
             if (expectedValues && expectedValues.length > 0) {
               // 응답은 optionId를 저장하지만, expectedValues는 value를 저장
               // optionId를 value로 변환해야 함
-              const selectedOptionId = typeof cellValue === "object" && cellValue !== null && "optionId" in cellValue
-                ? (cellValue as { optionId: string }).optionId
-                : (typeof cellValue === 'string' ? cellValue : null);
+              const selectedOptionId =
+                typeof cellValue === 'object' && cellValue !== null && 'optionId' in cellValue
+                  ? (cellValue as { optionId: string }).optionId
+                  : typeof cellValue === 'string'
+                    ? cellValue
+                    : null;
 
               if (selectedOptionId && cell.selectOptions) {
                 // optionId로 옵션을 찾아서 value를 가져옴
-                const selectedOption = cell.selectOptions.find(opt => opt.id === selectedOptionId);
+                const selectedOption = cell.selectOptions.find(
+                  (opt) => opt.id === selectedOptionId,
+                );
                 if (selectedOption) {
                   isChecked = expectedValues.includes(selectedOption.value);
                 }
@@ -372,7 +381,7 @@ export function checkTableValidationRule(
     }
   }
 
-  console.log("지정된 행 중 체크된 행:", checkedRowsInTarget);
+  console.log('지정된 행 중 체크된 행:', checkedRowsInTarget);
 
   // 검증 타입에 따라 조건 확인
   let mainConditionResult: boolean;
@@ -382,16 +391,16 @@ export function checkTableValidationRule(
       // 모든 행 중에서 rowIds에 지정된 행만 체크되어야 함
       const allCheckedRowsInTable: string[] = [];
       for (const row of question.tableRowsData) {
-        let cellsToCheck = cellColumnIndex !== undefined
-          ? [row.cells[cellColumnIndex]]
-          : row.cells;
+        let cellsToCheck = cellColumnIndex !== undefined ? [row.cells[cellColumnIndex]] : row.cells;
 
         // 만약 특정 열(예: 0번 열)을 선택했는데 해당 셀이 텍스트(라벨) 등 비인터랙티브 타입이라면,
         // 사용자 의도를 파악하여 해당 행의 첫 번째 입력 필드(라디오, 체크박스 등)를 대신 확인합니다.
         if (cellColumnIndex !== undefined && cellsToCheck.length === 1) {
           const targetCell = cellsToCheck[0];
           if (targetCell && ['text', 'image', 'video'].includes(targetCell.type)) {
-            const firstInteractive = row.cells.find(c => ['checkbox', 'radio', 'select', 'input'].includes(c.type));
+            const firstInteractive = row.cells.find((c) =>
+              ['checkbox', 'radio', 'select', 'input'].includes(c.type),
+            );
             if (firstInteractive) {
               cellsToCheck = [firstInteractive];
             }
@@ -424,50 +433,53 @@ export function checkTableValidationRule(
       }
 
       // rowIds에 지정된 행들만 체크되고, 다른 행은 체크 안되어야 함
-      console.log("테이블 전체에서 체크된 행:", allCheckedRowsInTable);
-      console.log("지정된 행:", rowIds);
+      console.log('테이블 전체에서 체크된 행:', allCheckedRowsInTable);
+      console.log('지정된 행:', rowIds);
 
       // 독점 체크: 체크된 행이 있고, 모든 체크된 행이 지정된 행에 포함되어야 함
       // (다른 행이 체크되면 안됨)
       mainConditionResult =
         allCheckedRowsInTable.length > 0 &&
-        allCheckedRowsInTable.every(id => rowIds.includes(id));
+        allCheckedRowsInTable.every((id) => rowIds.includes(id));
 
-      console.log("독점 체크 결과:", mainConditionResult);
-      console.log("  - 체크된 행 수:", allCheckedRowsInTable.length);
-      console.log("  - 모든 체크된 행이 지정된 행에 포함됨:", allCheckedRowsInTable.every(id => rowIds.includes(id)));
+      console.log('독점 체크 결과:', mainConditionResult);
+      console.log('  - 체크된 행 수:', allCheckedRowsInTable.length);
+      console.log(
+        '  - 모든 체크된 행이 지정된 행에 포함됨:',
+        allCheckedRowsInTable.every((id) => rowIds.includes(id)),
+      );
       break;
 
     case 'any-of':
       // 여러 행 중 하나라도 체크된 경우
       mainConditionResult = checkedRowsInTarget.length > 0;
-      console.log("any-of 결과:", mainConditionResult);
-      console.log("  - 지정된 행 중 체크된 행 수:", checkedRowsInTarget.length);
+      console.log('any-of 결과:', mainConditionResult);
+      console.log('  - 지정된 행 중 체크된 행 수:', checkedRowsInTarget.length);
       break;
 
     case 'all-of':
       // 특정 행들이 모두 체크된 경우
-      mainConditionResult = rowIds.every(id => checkedRowsInTarget.includes(id));
-      console.log("all-of 결과:", mainConditionResult);
-      console.log("  - 지정된 행:", rowIds);
-      console.log("  - 체크된 행:", checkedRowsInTarget);
-      console.log("  - 모든 지정된 행이 체크됨:", mainConditionResult);
+      mainConditionResult = rowIds.every((id) => checkedRowsInTarget.includes(id));
+      console.log('all-of 결과:', mainConditionResult);
+      console.log('  - 지정된 행:', rowIds);
+      console.log('  - 체크된 행:', checkedRowsInTarget);
+      console.log('  - 모든 지정된 행이 체크됨:', mainConditionResult);
       break;
 
     case 'none-of':
       // 특정 행들이 모두 체크 안된 경우
       mainConditionResult = checkedRowsInTarget.length === 0;
-      console.log("none-of 결과:", mainConditionResult);
-      console.log("  - 지정된 행 중 체크된 행 수:", checkedRowsInTarget.length, "(0이어야 함)");
+      console.log('none-of 결과:', mainConditionResult);
+      console.log('  - 지정된 행 중 체크된 행 수:', checkedRowsInTarget.length, '(0이어야 함)');
       break;
 
     case 'required-combination':
       // 특정 조합이 체크된 경우 (모든 지정된 행이 체크되어야 함)
-      mainConditionResult = rowIds.every(id => checkedRowsInTarget.includes(id));
-      console.log("required-combination 결과:", mainConditionResult);
-      console.log("  - 지정된 행:", rowIds);
-      console.log("  - 체크된 행:", checkedRowsInTarget);
-      console.log("  - 모든 지정된 행이 체크됨:", mainConditionResult);
+      mainConditionResult = rowIds.every((id) => checkedRowsInTarget.includes(id));
+      console.log('required-combination 결과:', mainConditionResult);
+      console.log('  - 지정된 행:', rowIds);
+      console.log('  - 체크된 행:', checkedRowsInTarget);
+      console.log('  - 모든 지정된 행이 체크됨:', mainConditionResult);
       break;
 
     default:
@@ -483,22 +495,23 @@ export function checkTableValidationRule(
 
   // 추가 조건 평가
   const additionalConditions = rule.additionalConditions;
-  console.log("📋 추가 조건 평가 시작");
-  console.log("추가 조건:", additionalConditions);
+  console.log('📋 추가 조건 평가 시작');
+  console.log('추가 조건:', additionalConditions);
 
   // 추가 조건에서 확인할 행들 결정
   // rowIds가 지정되어 있으면 해당 행만, 없으면 메인 조건에서 체크된 행 사용
-  const rowsToCheckForAdditional = additionalConditions.rowIds && additionalConditions.rowIds.length > 0
-    ? additionalConditions.rowIds
-    : checkedRowsInTarget;
+  const rowsToCheckForAdditional =
+    additionalConditions.rowIds && additionalConditions.rowIds.length > 0
+      ? additionalConditions.rowIds
+      : checkedRowsInTarget;
 
   if (rowsToCheckForAdditional.length === 0) {
-    console.log("⚠️ 추가 조건을 확인할 행이 없습니다");
+    console.log('⚠️ 추가 조건을 확인할 행이 없습니다');
     console.groupEnd();
     return false;
   }
 
-  console.log("추가 조건에서 확인할 행:", rowsToCheckForAdditional);
+  console.log('추가 조건에서 확인할 행:', rowsToCheckForAdditional);
 
   // 추가 조건 평가: 같은 행에서 메인 조건과 추가 조건을 모두 만족하는지 확인
   // (메인 조건에서 체크된 행들 중에서, 같은 행에서 추가 조건도 만족하는 행이 있는지 확인)
@@ -507,7 +520,7 @@ export function checkTableValidationRule(
 
   // 메인 조건에서 체크된 행들만 확인 (같은 행에서 두 조건을 모두 만족해야 함)
   for (const rowId of checkedRowsInTarget) {
-    const row = question.tableRowsData.find(r => r.id === rowId);
+    const row = question.tableRowsData.find((r) => r.id === rowId);
     if (!row) continue;
 
     const cell = row.cells[additionalColIndex];
@@ -523,22 +536,29 @@ export function checkTableValidationRule(
     switch (cell.type) {
       case 'checkbox':
         if (Array.isArray(cellValue) && cellValue.length > 0) {
-          if (additionalConditions.expectedValues && additionalConditions.expectedValues.length > 0) {
-            const checkedOptionIds = cellValue.map(v =>
-              typeof v === 'object' && v !== null && 'optionId' in v
-                ? (v as { optionId: string }).optionId
-                : (typeof v === 'string' ? v : null)
-            ).filter((id): id is string => id !== null);
+          if (
+            additionalConditions.expectedValues &&
+            additionalConditions.expectedValues.length > 0
+          ) {
+            const checkedOptionIds = cellValue
+              .map((v) =>
+                typeof v === 'object' && v !== null && 'optionId' in v
+                  ? (v as { optionId: string }).optionId
+                  : typeof v === 'string'
+                    ? v
+                    : null,
+              )
+              .filter((id): id is string => id !== null);
 
             if (cell.checkboxOptions) {
               const checkedValues = checkedOptionIds
-                .map(optionId => {
-                  const option = cell.checkboxOptions?.find(opt => opt.id === optionId);
+                .map((optionId) => {
+                  const option = cell.checkboxOptions?.find((opt) => opt.id === optionId);
                   return option?.value;
                 })
                 .filter((v): v is string => v !== undefined);
 
-              if (checkedValues.some(v => additionalConditions.expectedValues!.includes(v))) {
+              if (checkedValues.some((v) => additionalConditions.expectedValues!.includes(v))) {
                 isChecked = true;
               }
             }
@@ -550,14 +570,23 @@ export function checkTableValidationRule(
 
       case 'radio':
         if (cellValue) {
-          if (additionalConditions.expectedValues && additionalConditions.expectedValues.length > 0) {
-            const selectedOptionId = typeof cellValue === "object" && cellValue !== null && "optionId" in cellValue
-              ? (cellValue as { optionId: string }).optionId
-              : (typeof cellValue === "string" ? cellValue : null);
+          if (
+            additionalConditions.expectedValues &&
+            additionalConditions.expectedValues.length > 0
+          ) {
+            const selectedOptionId =
+              typeof cellValue === 'object' && cellValue !== null && 'optionId' in cellValue
+                ? (cellValue as { optionId: string }).optionId
+                : typeof cellValue === 'string'
+                  ? cellValue
+                  : null;
 
             if (selectedOptionId && cell.radioOptions) {
-              const selectedOption = cell.radioOptions.find(opt => opt.id === selectedOptionId);
-              if (selectedOption && additionalConditions.expectedValues.includes(selectedOption.value)) {
+              const selectedOption = cell.radioOptions.find((opt) => opt.id === selectedOptionId);
+              if (
+                selectedOption &&
+                additionalConditions.expectedValues.includes(selectedOption.value)
+              ) {
                 isChecked = true;
               }
             }
@@ -569,13 +598,19 @@ export function checkTableValidationRule(
 
       case 'select':
         if (cellValue) {
-          if (additionalConditions.expectedValues && additionalConditions.expectedValues.length > 0) {
-            const selectedOptionId = typeof cellValue === "object" && cellValue !== null && "optionId" in cellValue
-              ? (cellValue as { optionId: string }).optionId
-              : (typeof cellValue === 'string' ? cellValue : null);
+          if (
+            additionalConditions.expectedValues &&
+            additionalConditions.expectedValues.length > 0
+          ) {
+            const selectedOptionId =
+              typeof cellValue === 'object' && cellValue !== null && 'optionId' in cellValue
+                ? (cellValue as { optionId: string }).optionId
+                : typeof cellValue === 'string'
+                  ? cellValue
+                  : null;
 
             if (selectedOptionId && cell.selectOptions) {
-              const selectedOption = cell.selectOptions.find(opt => opt.id === selectedOptionId);
+              const selectedOption = cell.selectOptions.find((opt) => opt.id === selectedOptionId);
               if (selectedOption) {
                 isChecked = additionalConditions.expectedValues.includes(selectedOption.value);
               }
@@ -590,7 +625,10 @@ export function checkTableValidationRule(
         if (cellValue) {
           const strValue = String(cellValue).trim();
           if (strValue !== '') {
-            if (additionalConditions.expectedValues && additionalConditions.expectedValues.length > 0) {
+            if (
+              additionalConditions.expectedValues &&
+              additionalConditions.expectedValues.length > 0
+            ) {
               isChecked = additionalConditions.expectedValues.includes(strValue);
             } else {
               isChecked = true;
@@ -607,10 +645,10 @@ export function checkTableValidationRule(
     }
   }
 
-  console.log("추가 조건 결과:", additionalConditionResult);
+  console.log('추가 조건 결과:', additionalConditionResult);
   const finalResult = mainConditionResult && additionalConditionResult;
-  console.log("최종 결과 (메인 조건 AND 추가 조건):", finalResult);
-  console.log("  - 같은 행에서 두 조건을 모두 만족하는 행이 있는지 확인");
+  console.log('최종 결과 (메인 조건 AND 추가 조건):', finalResult);
+  console.log('  - 같은 행에서 두 조건을 모두 만족하는 행이 있는지 확인');
   console.groupEnd();
 
   return finalResult;
@@ -621,7 +659,7 @@ export function checkTableValidationRule(
  */
 export function getTableValidationBranchRule(
   question: Question,
-  response: unknown
+  response: unknown,
 ): BranchRule | null {
   if (!question.tableValidationRules || question.tableValidationRules.length === 0) {
     return null;
@@ -637,9 +675,10 @@ export function getTableValidationBranchRule(
       if (rule.targetQuestionMap && rule.additionalConditions) {
         const tableResponse = response as Record<string, unknown>;
         const additionalColIndex = rule.additionalConditions.cellColumnIndex;
-        const rowsToCheck = rule.additionalConditions.rowIds && rule.additionalConditions.rowIds.length > 0
-          ? rule.additionalConditions.rowIds
-          : question.tableRowsData?.map(r => r.id) || [];
+        const rowsToCheck =
+          rule.additionalConditions.rowIds && rule.additionalConditions.rowIds.length > 0
+            ? rule.additionalConditions.rowIds
+            : question.tableRowsData?.map((r) => r.id) || [];
 
         // 추가 조건에서 선택된 값 찾기
         for (const row of question.tableRowsData || []) {
@@ -657,12 +696,17 @@ export function getTableValidationBranchRule(
           switch (cell.type) {
             case 'radio':
               if (cellValue) {
-                const selectedOptionId = typeof cellValue === "object" && cellValue !== null && "optionId" in cellValue
-                  ? (cellValue as { optionId: string }).optionId
-                  : (typeof cellValue === "string" ? cellValue : null);
+                const selectedOptionId =
+                  typeof cellValue === 'object' && cellValue !== null && 'optionId' in cellValue
+                    ? (cellValue as { optionId: string }).optionId
+                    : typeof cellValue === 'string'
+                      ? cellValue
+                      : null;
 
                 if (selectedOptionId && cell.radioOptions) {
-                  const selectedOption = cell.radioOptions.find(opt => opt.id === selectedOptionId);
+                  const selectedOption = cell.radioOptions.find(
+                    (opt) => opt.id === selectedOptionId,
+                  );
                   if (selectedOption) {
                     selectedValue = selectedOption.value;
                   }
@@ -672,12 +716,17 @@ export function getTableValidationBranchRule(
 
             case 'select':
               if (cellValue) {
-                const selectedOptionId = typeof cellValue === "object" && cellValue !== null && "optionId" in cellValue
-                  ? (cellValue as { optionId: string }).optionId
-                  : (typeof cellValue === 'string' ? cellValue : null);
+                const selectedOptionId =
+                  typeof cellValue === 'object' && cellValue !== null && 'optionId' in cellValue
+                    ? (cellValue as { optionId: string }).optionId
+                    : typeof cellValue === 'string'
+                      ? cellValue
+                      : null;
 
                 if (selectedOptionId && cell.selectOptions) {
-                  const selectedOption = cell.selectOptions.find(opt => opt.id === selectedOptionId);
+                  const selectedOption = cell.selectOptions.find(
+                    (opt) => opt.id === selectedOptionId,
+                  );
                   if (selectedOption) {
                     selectedValue = selectedOption.value;
                   }
@@ -688,14 +737,20 @@ export function getTableValidationBranchRule(
             case 'checkbox':
               // 체크박스는 첫 번째 체크된 옵션의 값 사용
               if (Array.isArray(cellValue) && cellValue.length > 0) {
-                const checkedOptionIds = cellValue.map(v =>
-                  typeof v === 'object' && v !== null && 'optionId' in v
-                    ? (v as { optionId: string }).optionId
-                    : (typeof v === 'string' ? v : null)
-                ).filter((id): id is string => id !== null);
+                const checkedOptionIds = cellValue
+                  .map((v) =>
+                    typeof v === 'object' && v !== null && 'optionId' in v
+                      ? (v as { optionId: string }).optionId
+                      : typeof v === 'string'
+                        ? v
+                        : null,
+                  )
+                  .filter((id): id is string => id !== null);
 
                 if (checkedOptionIds.length > 0 && cell.checkboxOptions) {
-                  const firstOption = cell.checkboxOptions.find(opt => opt.id === checkedOptionIds[0]);
+                  const firstOption = cell.checkboxOptions.find(
+                    (opt) => opt.id === checkedOptionIds[0],
+                  );
                   if (firstOption) {
                     selectedValue = firstOption.value;
                   }
@@ -739,11 +794,11 @@ export function shouldDisplayGroup(
   group: QuestionGroup,
   allResponses: Record<string, unknown>,
   allQuestions: Question[],
-  allGroups: QuestionGroup[]
+  allGroups: QuestionGroup[],
 ): boolean {
   // 1. 상위 그룹 조건 확인 (재귀)
   if (group.parentGroupId) {
-    const parentGroup = allGroups.find(g => g.id === group.parentGroupId);
+    const parentGroup = allGroups.find((g) => g.id === group.parentGroupId);
     if (parentGroup) {
       if (!shouldDisplayGroup(parentGroup, allResponses, allQuestions, allGroups)) {
         return false; // 상위 그룹이 숨겨지면 하위 그룹도 숨김
@@ -760,19 +815,17 @@ export function shouldDisplayGroup(
 
   // 조건들을 평가 (enabled가 false인 조건은 제외)
   const results = conditions
-    .filter(condition => condition.enabled !== false)
-    .map(condition =>
-      evaluateQuestionCondition(condition, allResponses, allQuestions)
-    );
+    .filter((condition) => condition.enabled !== false)
+    .map((condition) => evaluateQuestionCondition(condition, allResponses, allQuestions));
 
   // 논리 타입에 따라 결과 결합
   switch (logicType) {
     case 'AND':
-      return results.every(result => result);
+      return results.every((result) => result);
     case 'OR':
-      return results.some(result => result);
+      return results.some((result) => result);
     case 'NOT':
-      return !results.some(result => result);
+      return !results.some((result) => result);
     default:
       return true;
   }
@@ -784,7 +837,7 @@ export function shouldDisplayGroup(
 export function shouldDisplayRow(
   row: TableRow,
   allResponses: Record<string, unknown>,
-  allQuestions: Question[]
+  allQuestions: Question[],
 ): boolean {
   if (!row.displayCondition) {
     return true; // 조건이 없으면 표시
@@ -794,19 +847,17 @@ export function shouldDisplayRow(
 
   // 조건들을 평가 (enabled가 false인 조건은 제외)
   const results = conditions
-    .filter(condition => condition.enabled !== false)
-    .map(condition =>
-      evaluateQuestionCondition(condition, allResponses, allQuestions)
-    );
+    .filter((condition) => condition.enabled !== false)
+    .map((condition) => evaluateQuestionCondition(condition, allResponses, allQuestions));
 
   // 논리 타입에 따라 결과 결합
   switch (logicType) {
     case 'AND':
-      return results.every(result => result);
+      return results.every((result) => result);
     case 'OR':
-      return results.some(result => result);
+      return results.some((result) => result);
     case 'NOT':
-      return !results.some(result => result);
+      return !results.some((result) => result);
     default:
       return true;
   }
@@ -821,11 +872,11 @@ export function shouldDisplayQuestion(
   question: Question,
   allResponses: Record<string, unknown>,
   allQuestions: Question[],
-  allGroups?: QuestionGroup[]
+  allGroups?: QuestionGroup[],
 ): boolean {
   // 1. 그룹 조건 확인
   if (allGroups && question.groupId) {
-    const group = allGroups.find(g => g.id === question.groupId);
+    const group = allGroups.find((g) => g.id === question.groupId);
     if (group) {
       if (!shouldDisplayGroup(group, allResponses, allQuestions, allGroups)) {
         return false; // 그룹이 숨겨지면 질문도 숨김
@@ -842,19 +893,17 @@ export function shouldDisplayQuestion(
 
   // 조건들을 평가 (enabled가 false인 조건은 제외)
   const results = conditions
-    .filter(condition => condition.enabled !== false)
-    .map(condition =>
-      evaluateQuestionCondition(condition, allResponses, allQuestions)
-    );
+    .filter((condition) => condition.enabled !== false)
+    .map((condition) => evaluateQuestionCondition(condition, allResponses, allQuestions));
 
   // 논리 타입에 따라 결과 결합
   switch (logicType) {
     case 'AND':
-      return results.every(result => result);
+      return results.every((result) => result);
     case 'OR':
-      return results.some(result => result);
+      return results.some((result) => result);
     case 'NOT':
-      return !results.some(result => result);
+      return !results.some((result) => result);
     default:
       return true;
   }
@@ -866,7 +915,7 @@ export function shouldDisplayQuestion(
 function evaluateQuestionCondition(
   condition: QuestionCondition,
   allResponses: Record<string, unknown>,
-  allQuestions: Question[]
+  allQuestions: Question[],
 ): boolean {
   // enabled가 false면 false 반환
   if (condition.enabled === false) {
@@ -878,7 +927,7 @@ function evaluateQuestionCondition(
     return false;
   }
 
-  const sourceQuestion = allQuestions.find(q => q.id === condition.sourceQuestionId);
+  const sourceQuestion = allQuestions.find((q) => q.id === condition.sourceQuestionId);
   if (!sourceQuestion) {
     return false;
   }
@@ -894,7 +943,7 @@ function evaluateQuestionCondition(
       const result = checkTableCellCondition(
         sourceQuestion,
         sourceResponse,
-        condition.tableConditions
+        condition.tableConditions,
       );
       mainConditionResult = result.satisfied;
       break;
@@ -929,16 +978,17 @@ function evaluateQuestionCondition(
     const result = checkTableCellCondition(
       sourceQuestion,
       sourceResponse,
-      condition.tableConditions
+      condition.tableConditions,
     );
     checkedRowsInTarget = result.checkedRows;
   }
 
   // 추가 조건에서 확인할 행들 결정
   // rowIds가 지정되어 있으면 해당 행만, 없으면 메인 조건에서 체크된 행 사용
-  const rowsToCheckForAdditional = additionalConditions.rowIds && additionalConditions.rowIds.length > 0
-    ? additionalConditions.rowIds
-    : checkedRowsInTarget;
+  const rowsToCheckForAdditional =
+    additionalConditions.rowIds && additionalConditions.rowIds.length > 0
+      ? additionalConditions.rowIds
+      : checkedRowsInTarget;
 
   if (rowsToCheckForAdditional.length === 0) {
     return false;
@@ -950,7 +1000,7 @@ function evaluateQuestionCondition(
 
   // 메인 조건에서 체크된 행들만 확인 (같은 행에서 두 조건을 모두 만족해야 함)
   for (const rowId of checkedRowsInTarget) {
-    const row = sourceQuestion.tableRowsData.find(r => r.id === rowId);
+    const row = sourceQuestion.tableRowsData.find((r) => r.id === rowId);
     if (!row) continue;
 
     const cell = row.cells[additionalColIndex];
@@ -965,22 +1015,29 @@ function evaluateQuestionCondition(
     switch (cell.type) {
       case 'checkbox':
         if (Array.isArray(cellValue) && cellValue.length > 0) {
-          if (additionalConditions.expectedValues && additionalConditions.expectedValues.length > 0) {
-            const checkedOptionIds = cellValue.map(v =>
-              typeof v === 'object' && v !== null && 'optionId' in v
-                ? (v as { optionId: string }).optionId
-                : (typeof v === 'string' ? v : null)
-            ).filter((id): id is string => id !== null);
+          if (
+            additionalConditions.expectedValues &&
+            additionalConditions.expectedValues.length > 0
+          ) {
+            const checkedOptionIds = cellValue
+              .map((v) =>
+                typeof v === 'object' && v !== null && 'optionId' in v
+                  ? (v as { optionId: string }).optionId
+                  : typeof v === 'string'
+                    ? v
+                    : null,
+              )
+              .filter((id): id is string => id !== null);
 
             if (cell.checkboxOptions) {
               const checkedValues = checkedOptionIds
-                .map(optionId => {
-                  const option = cell.checkboxOptions?.find(opt => opt.id === optionId);
+                .map((optionId) => {
+                  const option = cell.checkboxOptions?.find((opt) => opt.id === optionId);
                   return option?.value;
                 })
                 .filter((v): v is string => v !== undefined);
 
-              if (checkedValues.some(v => additionalConditions.expectedValues!.includes(v))) {
+              if (checkedValues.some((v) => additionalConditions.expectedValues!.includes(v))) {
                 isChecked = true;
               }
             }
@@ -992,14 +1049,23 @@ function evaluateQuestionCondition(
 
       case 'radio':
         if (cellValue) {
-          if (additionalConditions.expectedValues && additionalConditions.expectedValues.length > 0) {
-            const selectedOptionId = typeof cellValue === "object" && cellValue !== null && "optionId" in cellValue
-              ? (cellValue as { optionId: string }).optionId
-              : (typeof cellValue === "string" ? cellValue : null);
+          if (
+            additionalConditions.expectedValues &&
+            additionalConditions.expectedValues.length > 0
+          ) {
+            const selectedOptionId =
+              typeof cellValue === 'object' && cellValue !== null && 'optionId' in cellValue
+                ? (cellValue as { optionId: string }).optionId
+                : typeof cellValue === 'string'
+                  ? cellValue
+                  : null;
 
             if (selectedOptionId && cell.radioOptions) {
-              const selectedOption = cell.radioOptions.find(opt => opt.id === selectedOptionId);
-              if (selectedOption && additionalConditions.expectedValues.includes(selectedOption.value)) {
+              const selectedOption = cell.radioOptions.find((opt) => opt.id === selectedOptionId);
+              if (
+                selectedOption &&
+                additionalConditions.expectedValues.includes(selectedOption.value)
+              ) {
                 isChecked = true;
               }
             }
@@ -1011,13 +1077,19 @@ function evaluateQuestionCondition(
 
       case 'select':
         if (cellValue) {
-          if (additionalConditions.expectedValues && additionalConditions.expectedValues.length > 0) {
-            const selectedOptionId = typeof cellValue === "object" && cellValue !== null && "optionId" in cellValue
-              ? (cellValue as { optionId: string }).optionId
-              : (typeof cellValue === 'string' ? cellValue : null);
+          if (
+            additionalConditions.expectedValues &&
+            additionalConditions.expectedValues.length > 0
+          ) {
+            const selectedOptionId =
+              typeof cellValue === 'object' && cellValue !== null && 'optionId' in cellValue
+                ? (cellValue as { optionId: string }).optionId
+                : typeof cellValue === 'string'
+                  ? cellValue
+                  : null;
 
             if (selectedOptionId && cell.selectOptions) {
-              const selectedOption = cell.selectOptions.find(opt => opt.id === selectedOptionId);
+              const selectedOption = cell.selectOptions.find((opt) => opt.id === selectedOptionId);
               if (selectedOption) {
                 isChecked = additionalConditions.expectedValues.includes(selectedOption.value);
               }
@@ -1032,7 +1104,10 @@ function evaluateQuestionCondition(
         if (cellValue) {
           const strValue = String(cellValue).trim();
           if (strValue !== '') {
-            if (additionalConditions.expectedValues && additionalConditions.expectedValues.length > 0) {
+            if (
+              additionalConditions.expectedValues &&
+              additionalConditions.expectedValues.length > 0
+            ) {
               isChecked = additionalConditions.expectedValues.includes(strValue);
             } else {
               isChecked = true;
@@ -1077,7 +1152,7 @@ function checkValueMatch(response: unknown, requiredValues: string[]): boolean {
 
   // 배열 (checkbox 등)
   if (Array.isArray(response)) {
-    return response.some(val => {
+    return response.some((val) => {
       if (typeof val === 'string') {
         return requiredValues.includes(val);
       }
@@ -1108,7 +1183,7 @@ function checkTableCellCondition(
     cellColumnIndex?: number;
     checkType: 'any' | 'all' | 'none';
     expectedValues?: string[];
-  }
+  },
 ): { satisfied: boolean; checkedRows: string[] } {
   if (!tableConditions || !question.tableRowsData) {
     return { satisfied: false, checkedRows: [] };
@@ -1128,9 +1203,7 @@ function checkTableCellCondition(
   for (const row of question.tableRowsData) {
     if (!rowIds.includes(row.id)) continue;
 
-    const cellsToCheck = cellColumnIndex !== undefined
-      ? [row.cells[cellColumnIndex]]
-      : row.cells;
+    const cellsToCheck = cellColumnIndex !== undefined ? [row.cells[cellColumnIndex]] : row.cells;
 
     for (const cell of cellsToCheck) {
       if (!cell) continue;
@@ -1144,21 +1217,25 @@ function checkTableCellCondition(
 
       if (cell.type === 'checkbox' && Array.isArray(cellValue) && cellValue.length > 0) {
         if (expectedValues && expectedValues.length > 0) {
-          const checkedOptionIds = cellValue.map(v =>
-            typeof v === 'object' && v !== null && 'optionId' in v
-              ? (v as { optionId: string }).optionId
-              : (typeof v === 'string' ? v : null)
-          ).filter((id): id is string => id !== null);
+          const checkedOptionIds = cellValue
+            .map((v) =>
+              typeof v === 'object' && v !== null && 'optionId' in v
+                ? (v as { optionId: string }).optionId
+                : typeof v === 'string'
+                  ? v
+                  : null,
+            )
+            .filter((id): id is string => id !== null);
 
           if (cell.checkboxOptions) {
             const checkedValues = checkedOptionIds
-              .map(optionId => {
-                const option = cell.checkboxOptions?.find(opt => opt.id === optionId);
+              .map((optionId) => {
+                const option = cell.checkboxOptions?.find((opt) => opt.id === optionId);
                 return option?.value;
               })
               .filter((v): v is string => v !== undefined);
 
-            if (checkedValues.some(v => expectedValues.includes(v))) {
+            if (checkedValues.some((v) => expectedValues.includes(v))) {
               isChecked = true;
             }
           }
@@ -1167,12 +1244,15 @@ function checkTableCellCondition(
         }
       } else if (cell.type === 'radio' && cellValue) {
         if (expectedValues && expectedValues.length > 0) {
-          const selectedOptionId = typeof cellValue === "object" && cellValue !== null && "optionId" in cellValue
-            ? (cellValue as { optionId: string }).optionId
-            : (typeof cellValue === "string" ? cellValue : null);
+          const selectedOptionId =
+            typeof cellValue === 'object' && cellValue !== null && 'optionId' in cellValue
+              ? (cellValue as { optionId: string }).optionId
+              : typeof cellValue === 'string'
+                ? cellValue
+                : null;
 
           if (selectedOptionId && cell.radioOptions) {
-            const selectedOption = cell.radioOptions.find(opt => opt.id === selectedOptionId);
+            const selectedOption = cell.radioOptions.find((opt) => opt.id === selectedOptionId);
             if (selectedOption && expectedValues.includes(selectedOption.value)) {
               isChecked = true;
             }
@@ -1182,12 +1262,15 @@ function checkTableCellCondition(
         }
       } else if (cell.type === 'select' && cellValue) {
         if (expectedValues && expectedValues.length > 0) {
-          const selectedOptionId = typeof cellValue === "object" && cellValue !== null && "optionId" in cellValue
-            ? (cellValue as { optionId: string }).optionId
-            : (typeof cellValue === 'string' ? cellValue : null);
+          const selectedOptionId =
+            typeof cellValue === 'object' && cellValue !== null && 'optionId' in cellValue
+              ? (cellValue as { optionId: string }).optionId
+              : typeof cellValue === 'string'
+                ? cellValue
+                : null;
 
           if (selectedOptionId && cell.selectOptions) {
-            const selectedOption = cell.selectOptions.find(opt => opt.id === selectedOptionId);
+            const selectedOption = cell.selectOptions.find((opt) => opt.id === selectedOptionId);
             if (selectedOption) {
               isChecked = expectedValues.includes(selectedOption.value);
             }
@@ -1195,7 +1278,11 @@ function checkTableCellCondition(
         } else {
           isChecked = true;
         }
-      } else if (cell.type === 'input' && typeof cellValue === 'string' && cellValue.trim() !== '') {
+      } else if (
+        cell.type === 'input' &&
+        typeof cellValue === 'string' &&
+        cellValue.trim() !== ''
+      ) {
         if (expectedValues && expectedValues.length > 0) {
           isChecked = expectedValues.includes(cellValue.trim());
         } else {
@@ -1217,7 +1304,7 @@ function checkTableCellCondition(
       satisfied = checkedRows.length > 0;
       break;
     case 'all':
-      satisfied = rowIds.every(id => checkedRows.includes(id));
+      satisfied = rowIds.every((id) => checkedRows.includes(id));
       break;
     case 'none':
       satisfied = checkedRows.length === 0;

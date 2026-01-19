@@ -2,14 +2,13 @@
 
 /**
  * 클라이언트에서 호출 가능한 조회용 Server Actions
- * 
+ *
  * 주의: 이 파일의 함수들은 TanStack Query에서 사용하기 위한 것입니다.
  * Server Component에서는 @/data/* 함수들을 직접 사용하세요.
  */
-
-import * as surveyData from '@/data/surveys';
-import * as responseData from '@/data/responses';
 import * as libraryData from '@/data/library';
+import * as responseData from '@/data/responses';
+import * as surveyData from '@/data/surveys';
 
 // ========================
 // Survey 조회

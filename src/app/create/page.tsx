@@ -1,112 +1,114 @@
-"use client";
+'use client';
 
-import { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { useSurveyBuilderStore } from "@/stores/survey-store";
-import { useSurveys, useSaveSurvey, useDeleteSurvey } from "@/hooks/queries/use-surveys";
-import { generateId } from "@/lib/utils";
-import { SortableQuestionList } from "@/components/survey-builder/sortable-question-list";
-import { GroupManager } from "@/components/survey-builder/group-manager";
-import { generateOTTSurvey } from "@/utils/ott-survey-generator";
+import { useEffect, useRef, useState } from 'react';
+
+import Link from 'next/link';
+
 import {
-  FileText,
-  Share2,
-  Save,
-  ArrowLeft,
-  Plus,
-  Type,
-  List,
-  CheckSquare,
-  Circle,
-  ChevronDown,
-  Table,
-  PlayCircle,
-  Tv,
-  Sparkles,
-  FolderOpen,
-  Check,
-  Trash2,
-  Info,
-  ArrowUp,
   ArrowDown,
-} from "lucide-react";
-import Link from "next/link";
+  ArrowLeft,
+  ArrowUp,
+  Check,
+  CheckSquare,
+  ChevronDown,
+  Circle,
+  FileText,
+  FolderOpen,
+  Info,
+  List,
+  PlayCircle,
+  Plus,
+  Save,
+  Share2,
+  Sparkles,
+  Table,
+  Trash2,
+  Tv,
+  Type,
+} from 'lucide-react';
+
+import { GroupManager } from '@/components/survey-builder/group-manager';
+import { SortableQuestionList } from '@/components/survey-builder/sortable-question-list';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { useDeleteSurvey, useSaveSurvey, useSurveys } from '@/hooks/queries/use-surveys';
+import { generateId } from '@/lib/utils';
+import { useSurveyBuilderStore } from '@/stores/survey-store';
+import { useSurveyUIStore } from '@/stores/ui-store';
+import { generateOTTSurvey } from '@/utils/ott-survey-generator';
 
 const questionTypes = [
   {
-    type: "notice" as const,
-    label: "공지사항",
+    type: 'notice' as const,
+    label: '공지사항',
     icon: Info,
-    description: "설명 및 안내 문구",
-    color: "bg-blue-100 text-blue-600",
+    description: '설명 및 안내 문구',
+    color: 'bg-blue-100 text-blue-600',
   },
   {
-    type: "text" as const,
-    label: "단답형",
+    type: 'text' as const,
+    label: '단답형',
     icon: Type,
-    description: "짧은 텍스트 입력",
-    color: "bg-sky-100 text-sky-600",
+    description: '짧은 텍스트 입력',
+    color: 'bg-sky-100 text-sky-600',
   },
   {
-    type: "textarea" as const,
-    label: "장문형",
+    type: 'textarea' as const,
+    label: '장문형',
     icon: FileText,
-    description: "긴 텍스트 입력",
-    color: "bg-green-100 text-green-600",
+    description: '긴 텍스트 입력',
+    color: 'bg-green-100 text-green-600',
   },
   {
-    type: "radio" as const,
-    label: "단일선택",
+    type: 'radio' as const,
+    label: '단일선택',
     icon: Circle,
-    description: "하나만 선택 가능",
-    color: "bg-purple-100 text-purple-600",
+    description: '하나만 선택 가능',
+    color: 'bg-purple-100 text-purple-600',
   },
   {
-    type: "checkbox" as const,
-    label: "다중선택",
+    type: 'checkbox' as const,
+    label: '다중선택',
     icon: CheckSquare,
-    description: "여러 개 선택 가능",
-    color: "bg-orange-100 text-orange-600",
+    description: '여러 개 선택 가능',
+    color: 'bg-orange-100 text-orange-600',
   },
   {
-    type: "select" as const,
-    label: "드롭다운",
+    type: 'select' as const,
+    label: '드롭다운',
     icon: ChevronDown,
-    description: "드롭다운 메뉴",
-    color: "bg-pink-100 text-pink-600",
+    description: '드롭다운 메뉴',
+    color: 'bg-pink-100 text-pink-600',
   },
   {
-    type: "multiselect" as const,
-    label: "다단계선택",
+    type: 'multiselect' as const,
+    label: '다단계선택',
     icon: List,
-    description: "다중 드롭다운",
-    color: "bg-teal-100 text-teal-600",
+    description: '다중 드롭다운',
+    color: 'bg-teal-100 text-teal-600',
   },
   {
-    type: "table" as const,
-    label: "테이블",
+    type: 'table' as const,
+    label: '테이블',
     icon: Table,
-    description: "표 형태 질문",
-    color: "bg-indigo-100 text-indigo-600",
+    description: '표 형태 질문',
+    color: 'bg-indigo-100 text-indigo-600',
   },
 ];
 
 export default function CreateSurveyPage() {
   const {
     currentSurvey,
-    selectedQuestionId,
-    isTestMode,
     updateSurveyTitle,
     updateSurveyDescription,
     addQuestion,
     addPreparedQuestion,
-    selectQuestion,
-    toggleTestMode,
     updateSurveySettings,
     resetSurvey,
   } = useSurveyBuilderStore();
+
+  const { selectedQuestionId, isTestMode, selectQuestion, toggleTestMode } = useSurveyUIStore();
 
   const { data: surveys = [] } = useSurveys();
   const { mutateAsync: saveSurvey } = useSaveSurvey();
@@ -114,8 +116,8 @@ export default function CreateSurveyPage() {
 
   const [titleInput, setTitleInput] = useState(currentSurvey.title);
   const [showSavedSurveys, setShowSavedSurveys] = useState(false);
-  const [saveMessage, setSaveMessage] = useState("");
-  const [questionNumberInput, setQuestionNumberInput] = useState("");
+  const [saveMessage, setSaveMessage] = useState('');
+  const [questionNumberInput, setQuestionNumberInput] = useState('');
   const [showScrollButtons, setShowScrollButtons] = useState(false);
   const mainContentRef = useRef<HTMLDivElement>(null);
 
@@ -129,8 +131,8 @@ export default function CreateSurveyPage() {
       }
     };
 
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   // OTT 설문지 예제 추가 함수
@@ -138,9 +140,9 @@ export default function CreateSurveyPage() {
     const ottQuestion = generateOTTSurvey();
 
     // 설문 제목을 OTT 관련으로 업데이트
-    if (currentSurvey.title === "새 설문조사") {
-      updateSurveyTitle("OTT 서비스 이용 현황 조사");
-      setTitleInput("OTT 서비스 이용 현황 조사");
+    if (currentSurvey.title === '새 설문조사') {
+      updateSurveyTitle('OTT 서비스 이용 현황 조사');
+      setTitleInput('OTT 서비스 이용 현황 조사');
     }
 
     // 질문을 현재 설문에 추가
@@ -150,14 +152,12 @@ export default function CreateSurveyPage() {
   // 설문 저장
   const handleSaveSurvey = async () => {
     // ID가 없으면 새로 생성
-    const surveyToSave = currentSurvey.id
-      ? currentSurvey
-      : { ...currentSurvey, id: generateId() };
+    const surveyToSave = currentSurvey.id ? currentSurvey : { ...currentSurvey, id: generateId() };
 
     await saveSurvey(surveyToSave);
-    setSaveMessage("저장되었습니다!");
+    setSaveMessage('저장되었습니다!');
 
-    setTimeout(() => setSaveMessage(""), 2000);
+    setTimeout(() => setSaveMessage(''), 2000);
   };
 
   // 설문 불러오기
@@ -171,20 +171,20 @@ export default function CreateSurveyPage() {
 
   // 새 설문 시작
   const handleNewSurvey = () => {
-    if (confirm("현재 작업 중인 설문을 저장하지 않고 새로 시작하시겠습니까?")) {
+    if (confirm('현재 작업 중인 설문을 저장하지 않고 새로 시작하시겠습니까?')) {
       resetSurvey();
-      setTitleInput("새 설문조사");
+      setTitleInput('새 설문조사');
     }
   };
 
   // 맨 위로 스크롤
   const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // 맨 아래로 스크롤
   const scrollToBottom = () => {
-    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
   };
 
   // 특정 질문으로 스크롤
@@ -193,7 +193,7 @@ export default function CreateSurveyPage() {
     if (questionIndex >= 0 && questionIndex < currentSurvey.questions.length) {
       const questionElement = document.querySelector(`[data-question-index="${questionIndex}"]`);
       if (questionElement) {
-        questionElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        questionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
         // 해당 질문 선택
         selectQuestion(currentSurvey.questions[questionIndex].id);
       }
@@ -202,11 +202,11 @@ export default function CreateSurveyPage() {
 
   // 질문 번호 입력 핸들러
   const handleQuestionNumberKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
+    if (e.key === 'Enter') {
       const questionNumber = parseInt(questionNumberInput, 10);
       if (!isNaN(questionNumber) && questionNumber > 0) {
         scrollToQuestion(questionNumber);
-        setQuestionNumberInput("");
+        setQuestionNumberInput('');
       }
     }
   };
@@ -214,12 +214,12 @@ export default function CreateSurveyPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation */}
-      <nav className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <nav className="border-b border-gray-200 bg-white px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div className="flex items-center space-x-4">
             <Link href="/">
               <Button variant="ghost" size="sm">
-                <ArrowLeft className="w-4 h-4 mr-2" />
+                <ArrowLeft className="mr-2 h-4 w-4" />
                 돌아가기
               </Button>
             </Link>
@@ -230,7 +230,7 @@ export default function CreateSurveyPage() {
                 setTitleInput(e.target.value);
                 updateSurveyTitle(e.target.value);
               }}
-              className="text-lg font-medium border-none bg-transparent px-2 focus:bg-white focus:border focus:border-blue-200"
+              className="border-none bg-transparent px-2 text-lg font-medium focus:border focus:border-blue-200 focus:bg-white"
               placeholder="설문 제목을 입력하세요"
             />
           </div>
@@ -242,36 +242,36 @@ export default function CreateSurveyPage() {
                 size="sm"
                 onClick={() => setShowSavedSurveys(!showSavedSurveys)}
               >
-                <FolderOpen className="w-4 h-4 mr-2" />
+                <FolderOpen className="mr-2 h-4 w-4" />
                 불러오기
                 {surveys.length > 0 && (
-                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-600 rounded-full">
+                  <span className="ml-1 rounded-full bg-blue-100 px-1.5 py-0.5 text-xs text-blue-600">
                     {surveys.length}
                   </span>
                 )}
               </Button>
 
               {showSavedSurveys && surveys.length > 0 && (
-                <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                  <div className="p-3 border-b border-gray-200 flex items-center justify-between">
-                    <h4 className="font-medium text-sm">저장된 설문</h4>
+                <div className="absolute right-0 z-50 mt-2 w-80 rounded-lg border border-gray-200 bg-white shadow-lg">
+                  <div className="flex items-center justify-between border-b border-gray-200 p-3">
+                    <h4 className="text-sm font-medium">저장된 설문</h4>
                     <Button size="sm" variant="ghost" onClick={handleNewSurvey} className="text-xs">
-                      <Plus className="w-3 h-3 mr-1" />새 설문
+                      <Plus className="mr-1 h-3 w-3" />새 설문
                     </Button>
                   </div>
                   <div className="max-h-96 overflow-y-auto">
                     {surveys.map((survey) => (
                       <div
                         key={survey.id}
-                        className="p-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 flex items-start justify-between group"
+                        className="group flex items-start justify-between border-b border-gray-100 p-3 last:border-b-0 hover:bg-gray-50"
                       >
                         <button
                           onClick={() => handleLoadSurvey(survey.id)}
                           className="flex-1 text-left"
                         >
-                          <h5 className="font-medium text-sm text-gray-900">{survey.title}</h5>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {survey.questionCount}개 질문 •{" "}
+                          <h5 className="text-sm font-medium text-gray-900">{survey.title}</h5>
+                          <p className="mt-1 text-xs text-gray-500">
+                            {survey.questionCount}개 질문 •{' '}
                             {new Date(survey.updatedAt).toLocaleDateString()}
                           </p>
                         </button>
@@ -280,13 +280,13 @@ export default function CreateSurveyPage() {
                           variant="ghost"
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (confirm("이 설문을 삭제하시겠습니까?")) {
+                            if (confirm('이 설문을 삭제하시겠습니까?')) {
                               deleteSurveyMutation(survey.id);
                             }
                           }}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="opacity-0 transition-opacity group-hover:opacity-100"
                         >
-                          <Trash2 className="w-3 h-3 text-red-500" />
+                          <Trash2 className="h-3 w-3 text-red-500" />
                         </Button>
                       </div>
                     ))}
@@ -296,26 +296,26 @@ export default function CreateSurveyPage() {
             </div>
 
             <Button
-              variant={isTestMode ? "default" : "outline"}
+              variant={isTestMode ? 'default' : 'outline'}
               size="sm"
               onClick={toggleTestMode}
-              className={isTestMode ? "bg-green-600 hover:bg-green-700" : ""}
+              className={isTestMode ? 'bg-green-600 hover:bg-green-700' : ''}
             >
-              <PlayCircle className="w-4 h-4 mr-2" />
-              {isTestMode ? "테스트 중" : "테스트"}
+              <PlayCircle className="mr-2 h-4 w-4" />
+              {isTestMode ? '테스트 중' : '테스트'}
             </Button>
             <Button variant="outline" size="sm" onClick={handleSaveSurvey} className="relative">
-              <Save className="w-4 h-4 mr-2" />
+              <Save className="mr-2 h-4 w-4" />
               저장
               {saveMessage && (
-                <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 px-2 py-1 bg-green-600 text-white text-xs rounded whitespace-nowrap">
-                  <Check className="w-3 h-3 inline mr-1" />
+                <span className="absolute -top-8 left-1/2 -translate-x-1/2 transform rounded bg-green-600 px-2 py-1 text-xs whitespace-nowrap text-white">
+                  <Check className="mr-1 inline h-3 w-3" />
                   {saveMessage}
                 </span>
               )}
             </Button>
             <Button size="sm">
-              <Share2 className="w-4 h-4 mr-2" />
+              <Share2 className="mr-2 h-4 w-4" />
               공유
             </Button>
           </div>
@@ -323,11 +323,11 @@ export default function CreateSurveyPage() {
       </nav>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="mx-auto max-w-7xl p-6">
         <div className="grid grid-cols-12 gap-6">
           {/* Left Sidebar - Question Types */}
-          <div className="col-span-3 bg-white rounded-xl shadow-sm border border-gray-200 p-6 max-h-[calc(100vh-140px)] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900 mb-6">질문 유형</h3>
+          <div className="col-span-3 max-h-[calc(100vh-140px)] overflow-y-auto rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h3 className="mb-6 text-lg font-semibold text-gray-900">질문 유형</h3>
 
             <div className="space-y-3">
               {questionTypes.map((questionType) => {
@@ -335,18 +335,18 @@ export default function CreateSurveyPage() {
                 return (
                   <Card
                     key={questionType.type}
-                    className="p-4 cursor-pointer hover-lift border-gray-200 hover:border-blue-200 transition-all duration-200"
+                    className="hover-lift cursor-pointer border-gray-200 p-4 transition-all duration-200 hover:border-blue-200"
                     onClick={() => addQuestion(questionType.type)}
                   >
                     <div className="flex items-start space-x-3">
                       <div
-                        className={`w-10 h-10 rounded-lg flex items-center justify-center ${questionType.color}`}
+                        className={`flex h-10 w-10 items-center justify-center rounded-lg ${questionType.color}`}
                       >
-                        <IconComponent className="w-5 h-5" />
+                        <IconComponent className="h-5 w-5" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-gray-900 text-sm">{questionType.label}</h4>
-                        <p className="text-xs text-gray-500 mt-1">{questionType.description}</p>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-sm font-medium text-gray-900">{questionType.label}</h4>
+                        <p className="mt-1 text-xs text-gray-500">{questionType.description}</p>
                       </div>
                     </div>
                   </Card>
@@ -355,22 +355,22 @@ export default function CreateSurveyPage() {
             </div>
 
             {/* OTT 설문지 예제 버튼 */}
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">설문 예제</h4>
+            <div className="mt-6 border-t border-gray-200 pt-6">
+              <h4 className="mb-3 text-sm font-medium text-gray-700">설문 예제</h4>
               <Card
-                className="p-4 cursor-pointer hover-lift border-gray-200 hover:border-orange-200 transition-all duration-200"
+                className="hover-lift cursor-pointer border-gray-200 p-4 transition-all duration-200 hover:border-orange-200"
                 onClick={handleAddOTTSurvey}
               >
                 <div className="flex items-start space-x-3">
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-orange-100 text-orange-600">
-                    <Tv className="w-5 h-5" />
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 text-orange-600">
+                    <Tv className="h-5 w-5" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-gray-900 text-sm flex items-center gap-1">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="flex items-center gap-1 text-sm font-medium text-gray-900">
                       OTT 설문지
-                      <Sparkles className="w-3 h-3 text-yellow-500" />
+                      <Sparkles className="h-3 w-3 text-yellow-500" />
                     </h4>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="mt-1 text-xs text-gray-500">
                       업로드한 이미지와 동일한 OTT 서비스 설문지
                     </p>
                   </div>
@@ -378,9 +378,9 @@ export default function CreateSurveyPage() {
               </Card>
             </div>
 
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <h4 className="text-sm font-medium text-gray-700 mb-3">설문 정보</h4>
-              <div className="text-xs text-gray-500 space-y-1">
+            <div className="mt-6 border-t border-gray-200 pt-6">
+              <h4 className="mb-3 text-sm font-medium text-gray-700">설문 정보</h4>
+              <div className="space-y-1 text-xs text-gray-500">
                 <p>그룹 수: {(currentSurvey.groups || []).length}개</p>
                 <p>질문 수: {currentSurvey.questions.length}개</p>
                 <p>마지막 수정: {currentSurvey.updatedAt.toLocaleDateString()}</p>
@@ -389,15 +389,15 @@ export default function CreateSurveyPage() {
           </div>
 
           {/* Center - Survey Preview/Edit */}
-          <div className="col-span-6 bg-white rounded-xl shadow-sm border border-gray-200 max-h-[calc(100vh-140px)] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
+          <div className="col-span-6 max-h-[calc(100vh-140px)] overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="border-b border-gray-200 p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <h3 className="text-lg font-semibold text-gray-900">
-                    {isTestMode ? "질문 테스트" : "설문 편집"}
+                    {isTestMode ? '질문 테스트' : '설문 편집'}
                   </h3>
                   {isTestMode && (
-                    <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                    <span className="rounded-full bg-green-100 px-2 py-1 text-xs text-green-800">
                       테스트 모드
                     </span>
                   )}
@@ -411,7 +411,7 @@ export default function CreateSurveyPage() {
                         onChange={(e) => setQuestionNumberInput(e.target.value)}
                         onKeyPress={handleQuestionNumberKeyPress}
                         placeholder="질문 번호"
-                        className="w-24 h-8 text-sm"
+                        className="h-8 w-24 text-sm"
                       />
                       <span className="text-xs text-gray-500">
                         / {currentSurvey.questions.length}
@@ -425,16 +425,16 @@ export default function CreateSurveyPage() {
 
             <div className="p-6">
               {currentSurvey.questions.length === 0 ? (
-                <div className="text-center py-16">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Plus className="w-8 h-8 text-gray-400" />
+                <div className="py-16 text-center">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+                    <Plus className="h-8 w-8 text-gray-400" />
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">질문을 추가해보세요</h3>
-                  <p className="text-gray-500 mb-6">
+                  <h3 className="mb-2 text-lg font-medium text-gray-900">질문을 추가해보세요</h3>
+                  <p className="mb-6 text-gray-500">
                     왼쪽에서 원하는 질문 유형을 클릭하여 추가할 수 있습니다.
                   </p>
-                  <Button onClick={() => addQuestion("text")}>
-                    <Plus className="w-4 h-4 mr-2" />첫 번째 질문 추가
+                  <Button onClick={() => addQuestion('text')}>
+                    <Plus className="mr-2 h-4 w-4" />첫 번째 질문 추가
                   </Button>
                 </div>
               ) : (
@@ -448,13 +448,13 @@ export default function CreateSurveyPage() {
           </div>
 
           {/* Right Sidebar - Settings */}
-          <div className="col-span-3 bg-white rounded-xl shadow-sm border border-gray-200 p-6 max-h-[calc(100vh-140px)] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900 mb-6">설정</h3>
+          <div className="col-span-3 max-h-[calc(100vh-140px)] overflow-y-auto rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h3 className="mb-6 text-lg font-semibold text-gray-900">설정</h3>
 
             <div className="space-y-6">
               {/* 설문 설정 */}
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-3">설문 설정</h4>
+                <h4 className="mb-3 text-sm font-medium text-gray-700">설문 설정</h4>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <label className="text-sm text-gray-600">공개 설문</label>
@@ -478,7 +478,7 @@ export default function CreateSurveyPage() {
               </div>
 
               {/* 그룹 관리 */}
-              <div className="pt-6 border-t border-gray-200">
+              <div className="border-t border-gray-200 pt-6">
                 <GroupManager className="max-h-[400px]" />
               </div>
             </div>
@@ -488,22 +488,22 @@ export default function CreateSurveyPage() {
 
       {/* Floating Scroll Buttons */}
       {showScrollButtons && (
-        <div className="fixed right-6 bottom-6 flex flex-col space-y-2 z-50">
+        <div className="fixed right-6 bottom-6 z-50 flex flex-col space-y-2">
           <Button
             onClick={scrollToTop}
             size="sm"
-            className="w-12 h-12 rounded-full shadow-lg bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 transition-all duration-200 hover:scale-110"
+            className="h-12 w-12 rounded-full border border-gray-200 bg-white text-gray-700 shadow-lg transition-all duration-200 hover:scale-110 hover:bg-gray-50"
             title="맨 위로"
           >
-            <ArrowUp className="w-5 h-5" />
+            <ArrowUp className="h-5 w-5" />
           </Button>
           <Button
             onClick={scrollToBottom}
             size="sm"
-            className="w-12 h-12 rounded-full shadow-lg bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 transition-all duration-200 hover:scale-110"
+            className="h-12 w-12 rounded-full border border-gray-200 bg-white text-gray-700 shadow-lg transition-all duration-200 hover:scale-110 hover:bg-gray-50"
             title="맨 아래로"
           >
-            <ArrowDown className="w-5 h-5" />
+            <ArrowDown className="h-5 w-5" />
           </Button>
         </div>
       )}

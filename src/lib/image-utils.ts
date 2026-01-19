@@ -23,7 +23,7 @@ export interface ImageOptimizationOptions {
  */
 export async function optimizeImage(
   file: File,
-  options: ImageOptimizationOptions = {}
+  options: ImageOptimizationOptions = {},
 ): Promise<Blob> {
   const {
     maxWidth = MAX_WIDTH,
@@ -57,38 +57,38 @@ export async function optimizeImage(
         }
 
         // Canvas 생성 및 이미지 그리기
-        const canvas = document.createElement("canvas");
+        const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
-        const ctx = canvas.getContext("2d");
+        const ctx = canvas.getContext('2d');
 
         if (!ctx) {
-          reject(new Error("Canvas context를 가져올 수 없습니다."));
+          reject(new Error('Canvas context를 가져올 수 없습니다.'));
           return;
         }
 
         ctx.drawImage(img, 0, 0, width, height);
 
         // WebP로 변환 시도, 실패하면 원본 형식 사용
-        let mimeType = "image/jpeg";
-        if (file.type === "image/png") {
-          mimeType = "image/png";
-        } else if (file.type === "image/webp") {
-          mimeType = "image/webp";
+        let mimeType = 'image/jpeg';
+        if (file.type === 'image/png') {
+          mimeType = 'image/png';
+        } else if (file.type === 'image/webp') {
+          mimeType = 'image/webp';
         }
 
         // JPEG 품질 설정
         let outputQuality = quality;
-        if (mimeType === "image/png") {
+        if (mimeType === 'image/png') {
           // PNG는 quality 파라미터를 지원하지 않으므로 JPEG로 변환
-          mimeType = "image/jpeg";
+          mimeType = 'image/jpeg';
         }
 
         // Blob으로 변환
         canvas.toBlob(
           (blob) => {
             if (!blob) {
-              reject(new Error("이미지 최적화에 실패했습니다."));
+              reject(new Error('이미지 최적화에 실패했습니다.'));
               return;
             }
 
@@ -98,32 +98,32 @@ export async function optimizeImage(
               canvas.toBlob(
                 (reducedBlob) => {
                   if (!reducedBlob) {
-                    reject(new Error("이미지 최적화에 실패했습니다."));
+                    reject(new Error('이미지 최적화에 실패했습니다.'));
                     return;
                   }
                   resolve(reducedBlob);
                 },
                 mimeType,
-                outputQuality
+                outputQuality,
               );
             } else {
               resolve(blob);
             }
           },
           mimeType,
-          outputQuality
+          outputQuality,
         );
       };
 
       img.onerror = () => {
-        reject(new Error("이미지를 로드할 수 없습니다."));
+        reject(new Error('이미지를 로드할 수 없습니다.'));
       };
 
       img.src = e.target?.result as string;
     };
 
     reader.onerror = () => {
-      reject(new Error("파일을 읽을 수 없습니다."));
+      reject(new Error('파일을 읽을 수 없습니다.'));
     };
 
     reader.readAsDataURL(file);
@@ -136,20 +136,28 @@ export async function optimizeImage(
  * @returns 검증 결과
  */
 export function validateImageFile(file: File): { valid: boolean; error?: string } {
-  const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/svg+xml", "image/bmp"];
+  const allowedTypes = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/svg+xml',
+    'image/bmp',
+  ];
   const maxSize = 10 * 1024 * 1024; // 10MB
 
   if (!allowedTypes.includes(file.type)) {
     return {
       valid: false,
-      error: "지원하지 않는 파일 형식입니다. JPG, PNG, GIF, WebP, SVG, BMP만 업로드 가능합니다.",
+      error: '지원하지 않는 파일 형식입니다. JPG, PNG, GIF, WebP, SVG, BMP만 업로드 가능합니다.',
     };
   }
 
   if (file.size > maxSize) {
     return {
       valid: false,
-      error: "파일 크기는 10MB 이하여야 합니다.",
+      error: '파일 크기는 10MB 이하여야 합니다.',
     };
   }
 
@@ -164,17 +172,17 @@ export function validateImageFile(file: File): { valid: boolean; error?: string 
  */
 export function getProxiedImageUrl(imageUrl: string | undefined | null): string {
   if (!imageUrl) {
-    return "";
+    return '';
   }
 
   // 이미 프록시 URL인 경우 그대로 반환
-  if (imageUrl.includes("/api/image/proxy")) {
+  if (imageUrl.includes('/api/image/proxy')) {
     return imageUrl;
   }
 
   // R2 URL 패턴 감지 (r2.cloudflarestorage.com 포함)
   // R2 URL인 경우 프록시 URL로 변환하여 CORS 문제 해결 및 보안 강화
-  const isR2Url = imageUrl.includes("r2.cloudflarestorage.com");
+  const isR2Url = imageUrl.includes('r2.cloudflarestorage.com');
 
   if (isR2Url) {
     // URL 인코딩하여 프록시 URL 생성
@@ -203,7 +211,7 @@ export function convertHtmlImageUrlsToProxy(html: string): string {
     (match, before, src, after) => {
       const proxiedSrc = getProxiedImageUrl(src);
       return `<img${before} src="${proxiedSrc}"${after}>`;
-    }
+    },
   );
 }
 
@@ -218,20 +226,20 @@ export async function deleteImagesFromR2(urls: string[]): Promise<boolean> {
   }
 
   try {
-    const response = await fetch("/api/upload/image/delete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const response = await fetch('/api/upload/image/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ urls }),
     });
 
     if (!response.ok) {
-      console.error("이미지 삭제 실패:", await response.text());
+      console.error('이미지 삭제 실패:', await response.text());
       return false;
     }
 
     return true;
   } catch (error) {
-    console.error("이미지 삭제 중 오류:", error);
+    console.error('이미지 삭제 중 오류:', error);
     return false;
   }
 }

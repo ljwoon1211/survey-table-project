@@ -1,40 +1,38 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { useEffect, useState } from 'react';
+
+import {
+  AlertCircle,
+  CheckSquare,
+  ChevronDown,
+  Circle,
+  FileText,
+  Info,
+  List,
+  Plus,
+  Save,
+  Table,
+  Tag,
+  Type,
+  X,
+} from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  Save,
-  Tag,
-  Plus,
-  X,
-  Circle,
-  CheckSquare,
-  ChevronDown,
-  Type,
-  FileText,
-  List,
-  Table,
-  Info,
-  AlertCircle,
-} from "lucide-react";
-import { Question } from "@/types/survey";
-import { hasBranchLogic } from "@/stores/question-library-store";
-import { cn } from "@/lib/utils";
-import {
-  useSaveQuestion,
-  useCategories,
-  useCreateCategory,
-} from "@/hooks/queries/use-library";
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useCategories, useCreateCategory, useSaveQuestion } from '@/hooks/queries/use-library';
+import { cn } from '@/lib/utils';
+import { hasBranchLogic } from '@/stores/question-library-store';
+import { Question } from '@/types/survey';
 
 // 질문 타입 아이콘 매핑
 const questionTypeIcons: Record<string, React.ElementType> = {
@@ -50,14 +48,14 @@ const questionTypeIcons: Record<string, React.ElementType> = {
 
 // 질문 타입 라벨
 const questionTypeLabels: Record<string, string> = {
-  text: "단답형",
-  textarea: "장문형",
-  radio: "단일선택",
-  checkbox: "다중선택",
-  select: "드롭다운",
-  multiselect: "다단계선택",
-  table: "테이블",
-  notice: "공지사항",
+  text: '단답형',
+  textarea: '장문형',
+  radio: '단일선택',
+  checkbox: '다중선택',
+  select: '드롭다운',
+  multiselect: '다단계선택',
+  table: '테이블',
+  notice: '공지사항',
 };
 
 interface SaveQuestionModalProps {
@@ -77,23 +75,23 @@ export function SaveQuestionModal({
   const saveQuestionMutation = useSaveQuestion();
   const createCategoryMutation = useCreateCategory();
 
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("custom");
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('custom');
   const [tags, setTags] = useState<string[]>([]);
-  const [newTag, setNewTag] = useState("");
+  const [newTag, setNewTag] = useState('');
   const [showNewCategory, setShowNewCategory] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryName, setNewCategoryName] = useState('');
   const [errors, setErrors] = useState<{ name?: string }>({});
 
   // 질문이 변경되면 기본값 설정
   useEffect(() => {
     if (question && open) {
       setName(question.title.slice(0, 50)); // 제목에서 기본 이름 추출
-      setDescription(question.description || "");
-      setSelectedCategory("custom");
+      setDescription(question.description || '');
+      setSelectedCategory('custom');
       setTags([]);
-      setNewTag("");
+      setNewTag('');
       setErrors({});
     }
   }, [question, open]);
@@ -103,7 +101,7 @@ export function SaveQuestionModal({
     const trimmedTag = newTag.trim();
     if (trimmedTag && !tags.includes(trimmedTag)) {
       setTags([...tags, trimmedTag]);
-      setNewTag("");
+      setNewTag('');
     }
   };
 
@@ -114,7 +112,7 @@ export function SaveQuestionModal({
 
   // 태그 입력 키 핸들러
   const handleTagKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
+    if (e.key === 'Enter') {
       e.preventDefault();
       handleAddTag();
     }
@@ -132,11 +130,11 @@ export function SaveQuestionModal({
         if (newCategory?.id) {
           setSelectedCategory(newCategory.id);
         }
-        setNewCategoryName("");
+        setNewCategoryName('');
         setShowNewCategory(false);
         await refetchCategories();
       } catch (error) {
-        console.error("카테고리 추가 실패:", error);
+        console.error('카테고리 추가 실패:', error);
       }
     }
   };
@@ -146,7 +144,7 @@ export function SaveQuestionModal({
     // 유효성 검사
     const newErrors: { name?: string } = {};
     if (!name.trim()) {
-      newErrors.name = "질문 이름을 입력해주세요.";
+      newErrors.name = '질문 이름을 입력해주세요.';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -170,7 +168,7 @@ export function SaveQuestionModal({
       onOpenChange(false);
       onSaved?.();
     } catch (error) {
-      console.error("질문 저장 실패:", error);
+      console.error('질문 저장 실패:', error);
     }
   };
 
@@ -181,10 +179,10 @@ export function SaveQuestionModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-md sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] w-[95vw] max-w-md overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <Save className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+            <Save className="h-4 w-4 text-blue-600 sm:h-5 sm:w-5" />
             질문 저장하기
           </DialogTitle>
           <DialogDescription className="text-xs sm:text-sm">
@@ -192,18 +190,18 @@ export function SaveQuestionModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 sm:space-y-4 py-3 sm:py-4">
+        <div className="space-y-3 py-3 sm:space-y-4 sm:py-4">
           {/* 질문 미리보기 */}
-          <div className="bg-gray-50 rounded-lg p-2.5 sm:p-3 border">
+          <div className="rounded-lg border bg-gray-50 p-2.5 sm:p-3">
             <div className="flex items-start gap-2 sm:gap-3">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center bg-blue-100 text-blue-600 flex-shrink-0">
-                <IconComponent className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600 sm:h-8 sm:w-8">
+                <IconComponent className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 text-xs sm:text-sm line-clamp-2">
+              <div className="min-w-0 flex-1">
+                <p className="line-clamp-2 text-xs font-medium text-gray-900 sm:text-sm">
                   {question.title}
                 </p>
-                <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">
+                <p className="mt-0.5 text-[10px] text-gray-500 sm:text-xs">
                   {questionTypeLabels[question.type]}
                   {question.options && ` · ${question.options.length}개 옵션`}
                 </p>
@@ -213,11 +211,11 @@ export function SaveQuestionModal({
 
           {/* 분기 로직 경고 */}
           {hasLogic && (
-            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-2.5 sm:p-3">
-              <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div className="text-xs sm:text-sm text-amber-700">
+            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 sm:p-3">
+              <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
+              <div className="text-xs text-amber-700 sm:text-sm">
                 <p className="font-medium">분기 로직 포함</p>
-                <p className="text-[10px] sm:text-xs mt-0.5">
+                <p className="mt-0.5 text-[10px] sm:text-xs">
                   이 질문에는 분기 로직이 포함되어 있습니다. 저장 후 다른 설문에서 사용할 때 분기
                   로직을 유지하거나 제거할 수 있습니다.
                 </p>
@@ -238,9 +236,9 @@ export function SaveQuestionModal({
                 if (errors.name) setErrors({ ...errors, name: undefined });
               }}
               placeholder="예: 성별 질문, 만족도 5점 척도"
-              className={cn("h-9 sm:h-10 text-sm", errors.name && "border-red-300")}
+              className={cn('h-9 text-sm sm:h-10', errors.name && 'border-red-300')}
             />
-            {errors.name && <p className="text-[10px] sm:text-xs text-red-500">{errors.name}</p>}
+            {errors.name && <p className="text-[10px] text-red-500 sm:text-xs">{errors.name}</p>}
           </div>
 
           {/* 설명 */}
@@ -254,7 +252,7 @@ export function SaveQuestionModal({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="이 질문에 대한 설명을 입력하세요"
               rows={2}
-              className="text-sm resize-none"
+              className="resize-none text-sm"
             />
           </div>
 
@@ -268,10 +266,10 @@ export function SaveQuestionModal({
                   type="button"
                   onClick={() => setSelectedCategory(category.id)}
                   className={cn(
-                    "px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-full border transition-colors",
+                    'rounded-full border px-2.5 py-1 text-xs transition-colors sm:px-3 sm:py-1.5 sm:text-sm',
                     selectedCategory === category.id
-                      ? "border-blue-500 bg-blue-50 text-blue-700"
-                      : "border-gray-200 hover:border-gray-300 text-gray-600",
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300',
                   )}
                 >
                   {category.name}
@@ -280,35 +278,35 @@ export function SaveQuestionModal({
               <button
                 type="button"
                 onClick={() => setShowNewCategory(true)}
-                className="px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm rounded-full border border-dashed border-gray-300 text-gray-500 hover:border-gray-400 hover:text-gray-600 transition-colors"
+                className="rounded-full border border-dashed border-gray-300 px-2.5 py-1 text-xs text-gray-500 transition-colors hover:border-gray-400 hover:text-gray-600 sm:px-3 sm:py-1.5 sm:text-sm"
               >
-                <Plus className="w-3 h-3 inline mr-0.5 sm:mr-1" />새 카테고리
+                <Plus className="mr-0.5 inline h-3 w-3 sm:mr-1" />새 카테고리
               </button>
             </div>
 
             {/* 새 카테고리 입력 */}
             {showNewCategory && (
-              <div className="flex gap-1.5 sm:gap-2 mt-2">
+              <div className="mt-2 flex gap-1.5 sm:gap-2">
                 <Input
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
                   placeholder="카테고리 이름"
-                  className="flex-1 h-8 sm:h-9 text-sm"
+                  className="h-8 flex-1 text-sm sm:h-9"
                   autoFocus
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
+                    if (e.key === 'Enter') {
                       e.preventDefault();
                       handleAddCategory();
-                    } else if (e.key === "Escape") {
+                    } else if (e.key === 'Escape') {
                       setShowNewCategory(false);
-                      setNewCategoryName("");
+                      setNewCategoryName('');
                     }
                   }}
                 />
                 <Button
                   size="sm"
                   onClick={handleAddCategory}
-                  className="h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm"
+                  className="h-8 px-2 text-xs sm:h-9 sm:px-3 sm:text-sm"
                 >
                   추가
                 </Button>
@@ -317,11 +315,11 @@ export function SaveQuestionModal({
                   variant="ghost"
                   onClick={() => {
                     setShowNewCategory(false);
-                    setNewCategoryName("");
+                    setNewCategoryName('');
                   }}
-                  className="h-8 sm:h-9 w-8 sm:w-9 p-0"
+                  className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
             )}
@@ -331,20 +329,20 @@ export function SaveQuestionModal({
           <div className="space-y-1.5 sm:space-y-2">
             <Label className="text-xs sm:text-sm">태그</Label>
             {tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-2">
+              <div className="mb-2 flex flex-wrap gap-1.5 sm:gap-2">
                 {tags.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 sm:py-1 text-xs sm:text-sm bg-gray-100 text-gray-700 rounded-full"
+                    className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700 sm:py-1 sm:text-sm"
                   >
-                    <Tag className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                    <Tag className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                     {tag}
                     <button
                       type="button"
                       onClick={() => handleRemoveTag(tag)}
                       className="hover:text-red-500"
                     >
-                      <X className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                      <X className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                     </button>
                   </span>
                 ))}
@@ -356,7 +354,7 @@ export function SaveQuestionModal({
                 onChange={(e) => setNewTag(e.target.value)}
                 onKeyDown={handleTagKeyDown}
                 placeholder="태그 입력 후 Enter"
-                className="flex-1 h-8 sm:h-9 text-sm"
+                className="h-8 flex-1 text-sm sm:h-9"
               />
               <Button
                 type="button"
@@ -364,27 +362,27 @@ export function SaveQuestionModal({
                 variant="outline"
                 onClick={handleAddTag}
                 disabled={!newTag.trim()}
-                className="h-8 sm:h-9 w-8 sm:w-9 p-0"
+                className="h-8 w-8 p-0 sm:h-9 sm:w-9"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="h-4 w-4" />
               </Button>
             </div>
-            <p className="text-[10px] sm:text-xs text-gray-400">
+            <p className="text-[10px] text-gray-400 sm:text-xs">
               태그를 추가하면 나중에 질문을 쉽게 찾을 수 있습니다.
             </p>
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 pt-3 sm:pt-4 border-t">
+        <div className="flex justify-end gap-2 border-t pt-3 sm:pt-4">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            className="h-9 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm"
+            className="h-9 px-3 text-xs sm:h-10 sm:px-4 sm:text-sm"
           >
             취소
           </Button>
-          <Button onClick={handleSave} className="h-9 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm">
-            <Save className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+          <Button onClick={handleSave} className="h-9 px-3 text-xs sm:h-10 sm:px-4 sm:text-sm">
+            <Save className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
             저장
           </Button>
         </div>
