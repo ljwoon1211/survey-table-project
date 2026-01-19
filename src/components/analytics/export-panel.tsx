@@ -9,6 +9,7 @@ interface ExportPanelProps {
   onExportJson: () => Promise<string>;
   onExportCsv: () => Promise<string>;
   onExportFlatExcel?: () => Promise<Blob | null>;
+  onExportCompactExcel?: () => Promise<Blob | null>;
   surveyTitle?: string;
 }
 
@@ -17,9 +18,10 @@ export function ExportPanel({
   onExportJson,
   onExportCsv,
   onExportFlatExcel,
+  onExportCompactExcel,
   surveyTitle = "survey",
 }: ExportPanelProps) {
-  const [isExporting, setIsExporting] = useState<"json" | "csv" | "flat-excel" | null>(null);
+  const [isExporting, setIsExporting] = useState<"json" | "csv" | "flat-excel" | "compact-excel" | null>(null);
 
   const handleExport = async (format: "json" | "csv") => {
     setIsExporting(format);
@@ -105,9 +107,43 @@ export function ExportPanel({
               onClick={handleExportFlatExcel}
               disabled={isExporting !== null}
               className={isExporting === "flat-excel" ? "animate-pulse" : ""}
-              title="퀄트릭스 스타일 Flat 형식 엑셀"
+              title="퀄트릭스 스타일 Flat 형식 (통계 분석용)"
             >
-              Flat Excel
+              통계용
+            </Button>
+          )}
+          {onExportCompactExcel && (
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={isExporting === "compact-excel" ? Loader2 : FileSpreadsheet}
+              onClick={async () => {
+                setIsExporting("compact-excel");
+                try {
+                  const blob = await onExportCompactExcel();
+                  if (!blob) { alert("내보낼 데이터가 없습니다."); return; }
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement("a");
+                  link.href = url;
+                  const safeName = surveyTitle.replace(/[^a-zA-Z0-9가-힣\s]/g, "").slice(0, 50);
+                  const timestamp = new Date().toISOString().split("T")[0];
+                  link.download = `${safeName}_Compact_${timestamp}.xlsx`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(url);
+                } catch (error) {
+                  console.error("Compact Excel export error:", error);
+                  alert("간결 엑셀 내보내기 중 오류가 발생했습니다.");
+                } finally {
+                  setIsExporting(null);
+                }
+              }}
+              disabled={isExporting !== null}
+              className={isExporting === "compact-excel" ? "animate-pulse" : ""}
+              title="간결 형식 (데이터 확인용)"
+            >
+              간결형
             </Button>
           )}
           <Button

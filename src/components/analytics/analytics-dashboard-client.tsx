@@ -9,6 +9,7 @@ import type { SurveyAnalytics } from "@/lib/analytics/types";
 import { analyzeSurvey } from "@/lib/analytics/analyzer";
 import { applyFilter, createEmptyFilter, type FilterState } from "@/lib/analytics/filter";
 import { generateFlatExcelBlob, type ResponseData } from "@/lib/analytics/flat-excel-export";
+import { generateCompactExcelBlob } from "@/lib/analytics/compact-excel-export";
 import { SummaryCards } from "./cards/summary-cards";
 import { QuestionAnalytics } from "./question-analytics";
 import { ResponseTimeline } from "./charts/response-timeline";
@@ -46,13 +47,10 @@ export function AnalyticsDashboardClient({
     return analyzeSurvey(survey, filteredResponses);
   }, [survey, filteredResponses]);
 
-  // Flat Excel 내보내기 핸들러
-  const handleExportFlatExcel = useCallback(async (): Promise<Blob | null> => {
-    if (filteredResponses.length === 0) {
-      return null;
-    }
+  // 공통 데이터 변환 함수
+  const prepareExportData = useCallback(() => {
+    if (filteredResponses.length === 0) return null;
 
-    // SurveyResponse를 ResponseData 형식으로 변환
     const responseData: ResponseData[] = filteredResponses.map((r) => ({
       id: r.id,
       surveyId: r.surveyId,
@@ -63,15 +61,28 @@ export function AnalyticsDashboardClient({
       userAgent: r.userAgent || undefined,
     }));
 
-    // Survey 타입으로 변환 (flat-excel-export에서 필요한 필드만)
     const surveyData = {
       id: survey.id,
       title: survey.title,
       questions: survey.questions,
     } as Survey;
 
-    return generateFlatExcelBlob(surveyData, responseData);
+    return { surveyData, responseData };
   }, [survey, filteredResponses]);
+
+  // Flat Excel 내보내기 핸들러 (통계 분석용)
+  const handleExportFlatExcel = useCallback(async (): Promise<Blob | null> => {
+    const data = prepareExportData();
+    if (!data) return null;
+    return generateFlatExcelBlob(data.surveyData, data.responseData);
+  }, [prepareExportData]);
+
+  // Compact Excel 내보내기 핸들러 (데이터 확인용)
+  const handleExportCompactExcel = useCallback(async (): Promise<Blob | null> => {
+    const data = prepareExportData();
+    if (!data) return null;
+    return generateCompactExcelBlob(data.surveyData, data.responseData);
+  }, [prepareExportData]);
 
   // 질문 검색 필터링
   const searchFilteredQuestions = analytics.questions.filter((q) =>
@@ -101,6 +112,7 @@ export function AnalyticsDashboardClient({
           onExportJson={onExportJson}
           onExportCsv={onExportCsv}
           onExportFlatExcel={handleExportFlatExcel}
+          onExportCompactExcel={handleExportCompactExcel}
         />
       </div>
 
