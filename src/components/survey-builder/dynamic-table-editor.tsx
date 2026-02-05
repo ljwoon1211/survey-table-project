@@ -1194,12 +1194,26 @@ export function DynamicTableEditor({
                     >
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <Input
-                            value={column.label}
-                            onChange={(e) => updateColumnLabel(columnIndex, e.target.value)}
-                            className="h-8 border border-gray-200 bg-white text-center text-sm"
-                            placeholder="열 제목 (비워둘 수 있음)"
-                          />
+                          <div className="flex-1 space-y-1">
+                            <Input
+                              value={column.label}
+                              onChange={(e) => updateColumnLabel(columnIndex, e.target.value)}
+                              className="h-8 border border-gray-200 bg-white text-center text-sm"
+                              placeholder="열 제목"
+                            />
+                            <Input
+                              value={column.columnCode || ''}
+                              onChange={(e) => {
+                                const updatedColumns = currentColumns.map((col, idx) =>
+                                  idx === columnIndex ? { ...col, columnCode: e.target.value } : col
+                                );
+                                setCurrentColumns(updatedColumns);
+                                notifyChange(currentTitle, updatedColumns, currentRows);
+                              }}
+                              className="h-5 border-none bg-gray-100 px-1 text-center text-[10px] text-gray-600 focus-visible:ring-0"
+                              placeholder="열 코드 (엑셀용)"
+                            />
+                          </div>
                           <div className="flex items-center">
                             <Button
                               onClick={() => moveColumn(columnIndex, 'left')}
@@ -1306,14 +1320,14 @@ export function DynamicTableEditor({
                           value={row.label}
                           onChange={(e) => updateRowLabel(rowIndex, e.target.value)}
                           className="h-6 bg-white px-1 text-center text-xs"
-                          placeholder="라벨"
+                          placeholder="행 라벨"
                           title={`행 라벨: ${row.label}`}
                         />
                         <Input
                           value={row.rowCode || ''}
                           onChange={(e) => updateRowCode(rowIndex, e.target.value)}
-                          className="h-5 bg-gray-100 px-1 text-center text-[10px] text-gray-600"
-                          placeholder="코드"
+                          className="h-6 bg-gray-100 px-1 text-center text-xs font-medium text-gray-700"
+                          placeholder="행 코드"
                           title={`엑셀 코드: ${row.rowCode || '(자동)'}`}
                         />
                       </div>

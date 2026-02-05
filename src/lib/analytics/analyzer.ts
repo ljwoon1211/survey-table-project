@@ -685,9 +685,9 @@ export function analyzeSurvey(
     weekResponses,
   };
 
-  // 질문별 분석 (notice 제외, 단 requiresAcknowledgment인 경우 포함)
+  // 질문별 분석 (notice 제외)
   const questions = survey.questions
-    .filter((q) => q.type !== 'notice' || q.requiresAcknowledgment)
+    .filter((q) => q.type !== 'notice')
     .map((q) => analyzeQuestion(q, completedResponses));
 
   return {

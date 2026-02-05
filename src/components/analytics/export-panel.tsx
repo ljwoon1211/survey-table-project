@@ -3,7 +3,9 @@
 import { useState } from 'react';
 
 import { Button, Card } from '@tremor/react';
-import { Download, FileJson, FileSpreadsheet, Loader2, Table } from 'lucide-react';
+import { Download, FileJson, FileSpreadsheet, Loader2 } from 'lucide-react';
+
+import { ExportDataModal } from './export-data-modal';
 
 interface ExportPanelProps {
   surveyId: string;
@@ -102,56 +104,13 @@ export function ExportPanel({
           <span className="font-medium text-gray-900">데이터 내보내기</span>
         </div>
         <div className="flex gap-2">
-          {onExportFlatExcel && (
-            <Button
-              size="sm"
-              variant="primary"
-              icon={isExporting === 'flat-excel' ? Loader2 : Table}
-              onClick={handleExportFlatExcel}
-              disabled={isExporting !== null}
-              className={isExporting === 'flat-excel' ? 'animate-pulse' : ''}
-              title="퀄트릭스 스타일 Flat 형식 (통계 분석용)"
-            >
-              통계용
-            </Button>
-          )}
-          {onExportCompactExcel && (
-            <Button
-              size="sm"
-              variant="secondary"
-              icon={isExporting === 'compact-excel' ? Loader2 : FileSpreadsheet}
-              onClick={async () => {
-                setIsExporting('compact-excel');
-                try {
-                  const blob = await onExportCompactExcel();
-                  if (!blob) {
-                    alert('내보낼 데이터가 없습니다.');
-                    return;
-                  }
-                  const url = URL.createObjectURL(blob);
-                  const link = document.createElement('a');
-                  link.href = url;
-                  const safeName = surveyTitle.replace(/[^a-zA-Z0-9가-힣\s]/g, '').slice(0, 50);
-                  const timestamp = new Date().toISOString().split('T')[0];
-                  link.download = `${safeName}_Compact_${timestamp}.xlsx`;
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                  URL.revokeObjectURL(url);
-                } catch (error) {
-                  console.error('Compact Excel export error:', error);
-                  alert('간결 엑셀 내보내기 중 오류가 발생했습니다.');
-                } finally {
-                  setIsExporting(null);
-                }
-              }}
-              disabled={isExporting !== null}
-              className={isExporting === 'compact-excel' ? 'animate-pulse' : ''}
-              title="간결 형식 (데이터 확인용)"
-            >
-              간결형
-            </Button>
-          )}
+          {/* 통합 엑셀 다운로드 (모달 트리거) */}
+          <ExportDataModal
+            surveyId={surveyId}
+            surveyTitle={surveyTitle}
+            onExportCompactExcel={onExportCompactExcel}
+          />
+
           <Button
             size="sm"
             variant="secondary"

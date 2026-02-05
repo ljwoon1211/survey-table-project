@@ -9,6 +9,13 @@ module.exports = {
     // Tremor 컴포넌트
     './node_modules/@tremor/**/*.{js,ts,jsx,tsx}',
   ],
+  // Tremor 차트 색상 클래스 보호
+  safelist: [
+    {
+      pattern: /^(bg|text|fill|stroke|border)-(.+)-(50|100|200|300|400|500|600|700|800|900|950)$/,
+      variants: ['hover', 'focus', 'active', 'dark'],
+    },
+  ],
   theme: {
     container: {
       center: true,

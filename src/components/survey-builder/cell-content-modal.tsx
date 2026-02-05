@@ -104,6 +104,8 @@ export function CellContentModal({
       setColspan(cell.colspan || 1);
       setHorizontalAlign(cell.horizontalAlign || 'left');
       setVerticalAlign(cell.verticalAlign || 'top');
+      setCellCode(cell.cellCode || '');
+      setExportLabel(cell.exportLabel || '');
     }
   }, [isOpen, cell]);
 
@@ -140,6 +142,10 @@ export function CellContentModal({
   );
   const [rowspan, setRowspan] = useState<number | ''>(cell.rowspan || 1);
   const [colspan, setColspan] = useState<number | ''>(cell.colspan || 1);
+
+  // 셀 코드 및 엑셀 라벨
+  const [cellCode, setCellCode] = useState(cell.cellCode || '');
+  const [exportLabel, setExportLabel] = useState(cell.exportLabel || '');
 
   // 기타 옵션 관리 상수들
   const OTHER_OPTION_ID = 'other-option';
@@ -258,6 +264,9 @@ export function CellContentModal({
         // 정렬 속성 추가
         horizontalAlign: horizontalAlign !== 'left' ? horizontalAlign : undefined,
         verticalAlign: verticalAlign !== 'top' ? verticalAlign : undefined,
+        // 셀 코드 및 엑셀 라벨 추가
+        cellCode: cellCode || undefined,
+        exportLabel: exportLabel || undefined,
       };
 
       // 로컬 스토어 업데이트 (셀 저장)
@@ -355,6 +364,8 @@ export function CellContentModal({
     setColspan(cell.colspan || 1);
     setHorizontalAlign(cell.horizontalAlign || 'left');
     setVerticalAlign(cell.verticalAlign || 'top');
+    setCellCode(cell.cellCode || '');
+    setExportLabel(cell.exportLabel || '');
     onClose();
   };
 
@@ -549,6 +560,31 @@ export function CellContentModal({
                 미리보기: {textContent}
               </div>
             )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="cell-code">셀 코드 (엑셀용)</Label>
+              <Input
+                id="cell-code"
+                value={cellCode}
+                onChange={(e) => setCellCode(e.target.value)}
+                placeholder="예: A11-1-1, UHD_YES"
+                className="h-9"
+              />
+              <p className="text-[10px] text-gray-400">지정하지 않으면 자동 생성된 코드가 사용됩니다.</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="export-label">엑셀 라벨 (헤더용)</Label>
+              <Input
+                id="export-label"
+                value={exportLabel}
+                onChange={(e) => setExportLabel(e.target.value)}
+                placeholder="예: UHD 보유 여부"
+                className="h-9"
+              />
+              <p className="text-[10px] text-gray-400">엑셀 열 헤더에 표시될 이름입니다.</p>
+            </div>
           </div>
         </div>
 

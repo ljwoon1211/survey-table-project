@@ -98,6 +98,9 @@ export async function GET(
     });
   } catch (error) {
     console.error('Export Error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown Export Error' },
+      { status: 500 },
+    );
   }
 }

@@ -88,10 +88,10 @@ export function generateRawDataIndividualWorkbook(
     rows.push(['[응답자 정보]']);
     rows.push(['Response ID', res.id]);
     rows.push(['Status', res.isCompleted ? 'Completed' : 'Partial']);
-    rows.push(['Started At', startedAt.toLocaleString()]);
+    rows.push(['Started At', startedAt.toLocaleString('ko-KR')]);
     rows.push([
       'Completed At',
-      res.completedAt ? new Date(res.completedAt).toLocaleString() : '미완료',
+      res.completedAt ? new Date(res.completedAt).toLocaleString('ko-KR') : '미완료',
     ]);
     rows.push(['Duration', `${durationSeconds}초`]);
     rows.push(['Device', res.userAgent ? parseUserAgent(res.userAgent) : 'Unknown']);
@@ -101,6 +101,9 @@ export function generateRawDataIndividualWorkbook(
 
     // 2-2. 질문 답변 매핑
     sortedQuestions.forEach((q) => {
+      // [수정] Notice 타입 제외
+      if (q.type === 'notice') return;
+
       const answer = (res.questionResponses as any)?.[q.id];
 
       if (q.type === 'table' && q.tableRowsData && q.tableColumns) {
@@ -128,26 +131,9 @@ export function generateRawDataIndividualWorkbook(
               }
 
               if (rawVal) {
-                // 값 변환 로직
-                if (cell.type === 'radio' && cell.radioOptions) {
-                  const opt = cell.radioOptions.find((o) => o.value === rawVal);
-                  val = opt ? opt.label : rawVal;
-                } else if (
-                  cell.type === 'checkbox' &&
-                  cell.checkboxOptions &&
-                  Array.isArray(rawVal)
-                ) {
-                  val = rawVal
-                    .map((v: string) => {
-                      const opt = cell.checkboxOptions?.find((o) => o.value === v);
-                      return opt ? opt.label : v;
-                    })
-                    .join(', ');
-                } else if (cell.type === 'select' && cell.selectOptions) {
-                  const opt = cell.selectOptions.find((o) => o.value === rawVal);
-                  val = opt ? opt.label : rawVal;
-                } else {
-                  val = String(rawVal);
+                if (rawVal) {
+                  // 값 변환 로직 (옵션 ID -> 라벨 + 기타 입력 포맷팅)
+                  val = formatExcelCellValue(rawVal, cell);
                 }
               }
             }
@@ -157,18 +143,23 @@ export function generateRawDataIndividualWorkbook(
         });
 
         rows.push([]); // Spacer
+      } else if (q.type === 'multiselect' && q.selectLevels) {
+        // [NEW] 다단계 선택
+        rows.push([`Q. ${q.title}`]);
+        q.selectLevels.forEach((level) => {
+          const answerObj = answer as Record<string, string>;
+          const rawVal = answerObj?.[level.id];
+          let val = '';
+          if (rawVal) {
+            const opt = level.options.find((o) => o.value === rawVal);
+            val = opt ? opt.label : rawVal;
+          }
+          rows.push([`  - ${level.label}`, val || '']);
+        });
+        rows.push([]); // Spacer
       } else {
         // 일반 질문
-        let displayValue = '';
-
-        if (Array.isArray(answer)) {
-          displayValue = answer.join(', ');
-        } else if (typeof answer === 'object' && answer !== null) {
-          displayValue = JSON.stringify(answer);
-        } else {
-          displayValue = answer || '';
-        }
-
+        const displayValue = formatExcelCellValue(answer, q);
         rows.push([`Q. ${q.title}`, displayValue]);
       }
     });
@@ -230,8 +221,8 @@ function generateRawDataCombinedData(survey: Survey, responses: SurveySubmission
 
     const row: Record<string, any> = {
       'Response ID': res.id,
-      'Started At': startedAt.toLocaleString(),
-      'Completed At': res.completedAt ? new Date(res.completedAt).toLocaleString() : '미완료',
+      'Started At': startedAt.toLocaleString('ko-KR'),
+      'Completed At': res.completedAt ? new Date(res.completedAt).toLocaleString('ko-KR') : '미완료',
       'Duration (sec)': durationSeconds,
       Status: res.isCompleted ? 'Completed' : 'Partial',
       Device: res.userAgent ? parseUserAgent(res.userAgent) : 'Unknown',
@@ -239,23 +230,37 @@ function generateRawDataCombinedData(survey: Survey, responses: SurveySubmission
 
     // 1-2. 질문 데이터 매핑
     sortedQuestions.forEach((q) => {
+      // [수정] Notice 타입 제외
+      if (q.type === 'notice') return;
+
       const answer = (res.questionResponses as any)?.[q.id];
 
-      // 디버깅용 로그 (테이블 질문인 경우)
-      if (q.type === 'table' && answer) {
-        console.log(`[Export Debug] Table Q(${q.id}) Answer Keys:`, Object.keys(answer));
-      }
-
+      // 질문 데이터 매핑
       if (q.type === 'table') {
         // 테이블 질문 Flattening: [질문]_[행]_[열]
         if (q.tableRowsData && q.tableColumns) {
           q.tableRowsData.forEach((tRow) => {
             q.tableColumns!.forEach((tCol, colIndex) => {
-              // 헤더 생성: 라벨 사용 + 특수문자 제거
-              const header = `${sanitize(q.title)}_${sanitize(tRow.label)}_${sanitize(tCol.label)}`;
+              // 헤더 생성: 엑셀 라벨 > 셀 코드 > 기존 조합 순
+              // [수정] 입력 불가능한 셀(text, image 등)은 건너뛰기
+              const cell = tRow.cells[colIndex];
+              if (!cell || !isCellInputable(cell)) return;
+
+              let headerString = '';
+
+              if (cell && cell.exportLabel) {
+                headerString = cell.exportLabel;
+              } else if (cell && cell.cellCode) {
+                headerString = cell.cellCode;
+              } else {
+                headerString = `${q.title}_${tRow.label}_${tCol.label}`;
+              }
+
+              const header = sanitize(headerString);
 
               // 해당 위치의 셀 찾기 (columns 순서와 cells 순서가 일치한다고 가정)
-              const cell = tRow.cells[colIndex];
+              // (cell은 위에서 이미 정의됨)
+
               let value = '';
 
               if (cell && answer) {
@@ -268,27 +273,8 @@ function generateRawDataCombinedData(survey: Survey, responses: SurveySubmission
                 }
 
                 if (rawVal) {
-                  // 값 변환 로직 (옵션 ID -> 라벨)
-                  if (cell.type === 'radio' && cell.radioOptions) {
-                    const opt = cell.radioOptions.find((o) => o.value === rawVal);
-                    value = opt ? opt.label : rawVal;
-                  } else if (
-                    cell.type === 'checkbox' &&
-                    cell.checkboxOptions &&
-                    Array.isArray(rawVal)
-                  ) {
-                    value = rawVal
-                      .map((v: string) => {
-                        const opt = cell.checkboxOptions?.find((o) => o.value === v);
-                        return opt ? opt.label : v;
-                      })
-                      .join(', ');
-                  } else if (cell.type === 'select' && cell.selectOptions) {
-                    const opt = cell.selectOptions.find((o) => o.value === rawVal);
-                    value = opt ? opt.label : rawVal;
-                  } else {
-                    value = String(rawVal);
-                  }
+                  // 값 변환 로직 (옵션 ID -> 라벨 + 기타 입력 처리)
+                  value = formatExcelCellValue(rawVal, cell);
                 }
               }
 
@@ -296,20 +282,25 @@ function generateRawDataCombinedData(survey: Survey, responses: SurveySubmission
             });
           });
         }
+      } else if (q.type === 'multiselect' && q.selectLevels) {
+        // [NEW] 다단계 선택 (MultiSelect) Flattening: [질문] - [단계]
+        q.selectLevels.forEach((level) => {
+          const header = sanitize(`${q.title} - ${level.label}`);
+          const answerObj = answer as Record<string, string>;
+          const rawVal = answerObj?.[level.id];
+
+          let val = '';
+          if (rawVal) {
+            const opt = level.options.find((o) => o.value === rawVal);
+            val = opt ? opt.label : rawVal;
+          }
+          row[header] = val;
+        });
       } else {
         // 일반 질문
         const header = sanitize(q.title);
-
-        if (Array.isArray(answer)) {
-          // 복수 선택 (Checkbox) -> 콤마로 연결
-          row[header] = answer.join(', ');
-        } else if (typeof answer === 'object' && answer !== null) {
-          // 기타 객체형일 경우 (안전장치)
-          row[header] = JSON.stringify(answer);
-        } else {
-          // 단일 값 (Text, Radio, Select 등)
-          row[header] = answer || '';
-        }
+        // 포맷팅 헬퍼 사용
+        row[header] = formatExcelCellValue(answer, q);
       }
     });
 
@@ -327,6 +318,9 @@ function generateSummaryData(survey: Survey, responses: SurveySubmission[]) {
   survey.questions
     .sort((a, b) => a.order - b.order)
     .forEach((q) => {
+      // [수정] Notice 타입 제외
+      if (q.type === 'notice') return;
+
       // 질문 헤더
       summary.push({
         구분: `[${q.type}] ${q.title}`,
@@ -340,17 +334,45 @@ function generateSummaryData(survey: Survey, responses: SurveySubmission[]) {
           q.tableColumns!.forEach((col, colIndex) => {
             const cell = row.cells[colIndex];
 
-            if (!cell) return;
+            // [수정] 입력 불가능한 셀 제외
+            if (!cell || !isCellInputable(cell)) return;
 
             // 해당 셀에 데이터가 있는 응답 수 계산
             const count = responses.filter((r) => {
               const ans = (r.questionResponses as any)?.[q.id];
-              // cell.id로 조회하거나, fallback 구조로 조회
-              return ans && (ans[cell.id] || (ans[row.id] && ans[row.id][col.id]));
+              const val = ans && (ans[cell.id] || (ans[row.id] && ans[row.id][col.id]));
+
+              if (!val) return false;
+              if (Array.isArray(val)) return val.length > 0; // Checkbox empty array check
+              if (typeof val === 'string') return val.trim().length > 0; // Empty string check
+              return true; // Numbers, booleans
             }).length;
 
             summary.push({
               구분: `  - ${row.label} > ${col.label}`,
+              '응답 수': count,
+              '비율(%)': ((count / totalResponses) * 100).toFixed(1) + '%',
+            });
+          });
+        });
+      } else if (q.type === 'multiselect' && q.selectLevels) {
+        // [NEW] 다단계 선택 통계
+        q.selectLevels.forEach((level) => {
+          summary.push({
+            구분: `  [${level.label}]`,
+            '응답 수': '',
+            '비율(%)': '',
+          });
+
+          level.options.forEach((opt) => {
+            const count = responses.filter((r) => {
+              const ans = (r.questionResponses as any)?.[q.id];
+              // ans는 { levelId: value } 형태
+              return ans && ans[level.id] === opt.value;
+            }).length;
+
+            summary.push({
+              구분: `    - ${opt.label}`,
               '응답 수': count,
               '비율(%)': ((count / totalResponses) * 100).toFixed(1) + '%',
             });
@@ -389,6 +411,9 @@ function generateVariableMap(survey: Survey) {
   survey.questions
     .sort((a, b) => a.order - b.order)
     .forEach((q) => {
+      // [수정] Notice 타입 제외
+      if (q.type === 'notice') return;
+
       mapData.push({
         'Question ID': q.id,
         Type: q.type,
@@ -398,12 +423,35 @@ function generateVariableMap(survey: Survey) {
 
       if (q.type === 'table') {
         q.tableRowsData?.forEach((row) => {
-          q.tableColumns?.forEach((col) => {
+          q.tableColumns?.forEach((col, colIndex) => {
+            // [수정] 입력 불가능한 셀 제외 (Variable Map에서도)
+            const cell = row.cells[colIndex];
+            if (cell && !isCellInputable(cell)) return;
+
             mapData.push({
               'Question ID': '',
               Type: 'Table Cell',
               Title: `  Row: ${row.label} / Col: ${col.label}`,
               Description: `RowID: ${row.id}, ColID: ${col.id}`,
+            });
+          });
+        });
+      } else if (q.type === 'multiselect' && q.selectLevels) {
+        // [NEW] 다단계 선택 변수맵
+        q.selectLevels.forEach((level) => {
+          mapData.push({
+            'Question ID': '',
+            Type: 'Select Level',
+            Title: `  [Level] ${level.label}`,
+            Description: `Level ID: ${level.id}`,
+          });
+
+          level.options.forEach((opt) => {
+            mapData.push({
+              'Question ID': '',
+              Type: 'Option',
+              Title: `    ${opt.label}`,
+              Description: `Value: ${opt.value}`,
             });
           });
         });
@@ -435,12 +483,15 @@ function generateVerbatimData(survey: Survey, responses: SurveySubmission[]) {
 
   responses.forEach((res) => {
     textQuestions.forEach((q) => {
+      // [수정] notice 제외 (위 필터에서 이미 제외됨)
+
       if (q.type === 'table') {
         // 테이블 내 텍스트/입력 셀 찾기
         q.tableRowsData?.forEach((row) => {
           q.tableColumns?.forEach((col, colIndex) => {
             const cell = row.cells[colIndex];
-            if (!cell) return;
+            // [수정] 테이블 내에서는 input(텍스트) 타입만 주관식으로 처리
+            if (!cell || cell.type !== 'input') return;
 
             const ans = (res.questionResponses as any)?.[q.id];
             let val = ans?.[cell.id];
@@ -477,12 +528,15 @@ function generateVerbatimData(survey: Survey, responses: SurveySubmission[]) {
 
 // --- Helpers ---
 
+// [NEW] 입력 가능한 셀인지 확인하는 헬퍼 함수
+function isCellInputable(cell: any): boolean {
+  return ['checkbox', 'radio', 'select', 'input'].includes(cell.type);
+}
+
 function sanitize(str: string) {
   // 엑셀 헤더로 쓸 수 없는 문자나 너무 긴 공백 제거
   return str
     .replace(/[\r\n]+/g, ' ')
-    .trim()
-    .substring(0, 100);
 }
 
 function parseUserAgent(ua: string) {
@@ -491,4 +545,56 @@ function parseUserAgent(ua: string) {
   if (ua.includes('Macintosh')) return 'PC (Mac)';
   if (ua.includes('Linux')) return 'PC (Linux)';
   return 'PC (Other)';
+}
+
+// [NEW] 엑셀 값 포맷팅 헬퍼 (기타 응답 및 옵션 라벨 처리)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function formatExcelCellValue(value: any, context?: any): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+
+  // 배열 (Checkbox 등)
+  if (Array.isArray(value)) {
+    return value.map((v) => formatExcelCellValue(v, context)).join(', ');
+  }
+
+  // 객체 (기타 응답 등)
+  if (typeof value === 'object') {
+    // 1. 기타(Other) 응답 처리: { hasOther: true, selectedValue: ..., otherValue: ... }
+    if (value.hasOther === true) {
+      const selected = String(value.selectedValue || '');
+      const input = String(value.otherValue || '').trim();
+
+      // 라벨 매핑 시도
+      let label = selected;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const options = context?.options || context?.radioOptions || context?.selectOptions || context?.checkboxOptions;
+      if (options) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const opt = options.find((o: any) => o.value === selected);
+        if (opt) label = opt.label;
+      }
+
+      return input ? `${label} (${input})` : label;
+    }
+
+    // 2. 일반 값 매핑 시도 (혹시 객체로 들어온 경우)
+    if (value.value !== undefined) return String(value.value);
+
+    return JSON.stringify(value);
+  }
+
+  // 기본 라벨 매핑 (값 -> 라벨)
+  if (context) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const options = context.options || context.radioOptions || context.selectOptions || context.checkboxOptions;
+    if (options && typeof value === 'string') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const opt = options.find((o: any) => o.value === value);
+      if (opt) return opt.label;
+    }
+  }
+
+  return String(value);
 }

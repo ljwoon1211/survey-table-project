@@ -53,6 +53,28 @@ function flattenQuestionsToCompactColumns(survey: Survey): CompactColumn[] {
   sortedQuestions.forEach((question) => {
     if (question.type === 'table') {
       columns.push(...expandTableToCompactColumns(question));
+    } else if (question.type === 'multiselect' && question.selectLevels) {
+      // [NEW] 다단계 선택 지원
+      const qCode = question.questionCode || question.id.slice(0, 8);
+
+      question.selectLevels.forEach((level) => {
+        const header = `${question.exportLabel || question.title} - ${level.label}`;
+        const code = `${qCode}_${level.id}`; // e.g. Q1_levelId
+
+        columns.push({
+          code,
+          header: sanitizeHeader(header),
+          questionId: question.id,
+          // 하지만 여기서는 column.code로 levelId를 직접 넘기기 위해 type을 확장하거나
+          // question.selectLevels를 참조하는 로직이 필요함.
+          // 간단하게 'multiselect-level' 타입을 추가하는 편이 나음.
+          // 편의상 questionId만 쓰고 내부에서 구분하거나, type을 확장.
+          // 여기서는 type='multiselect-level'로 확장하여 처리
+          type: 'multiselect-level' as any,
+          // @ts-ignore: Adding custom property for multiselect
+          levelId: level.id,
+        });
+      });
     } else if (question.type === 'notice') {
       // notice 타입은 내보내기에서 제외
     } else {
@@ -93,11 +115,18 @@ function expandTableToCompactColumns(question: Question): CompactColumn[] {
       if (!isCellInputable(cell)) return;
 
       const cellCode = cell.cellCode || `c${cellIndex}`;
+      // 셀 라벨은 엑셀 헤더용 라벨 > 셀 내용 > 셀 코드 순으로 우선순위 적용
       const cellLabel = cell.exportLabel || cell.content || cellCode;
 
-      // 하나의 셀 = 하나의 열 (옵션 확장 없음)
-      const code = `${qCode}_${rowCode}_${cellCode}`;
-      const header = `${qCode}_${rowLabel}_${cellLabel}`;
+      // 1. 셀 코드가 직접 지정된 경우: 해당 코드를 그대로 사용 (최우선)
+      // 2. 지정되지 않은 경우: 질문코드_행코드_셀코드 조합
+      const code = cell.cellCode ? cell.cellCode : `${qCode}_${rowCode}_${cellCode}`;
+
+      // 1. 엑셀 라벨이 직접 지정된 경우: 해당 라벨을 그대로 사용 (최우선)
+      // 2. 지정되지 않은 경우: 질문코드_행라벨_셀라벨 조합
+      const header = cell.exportLabel
+        ? cell.exportLabel
+        : `${qCode}_${rowLabel}_${cellLabel}`;
 
       columns.push({
         code,
@@ -156,6 +185,26 @@ function getCompactValueForColumn(
   }
 
   const answer = questionResponses[column.questionId];
+
+  // [NEW] 다단계 선택 처리
+  // @ts-ignore
+  if (column.type === 'multiselect-level' && column.levelId) {
+    if (!answer || typeof answer !== 'object') return '';
+    // @ts-ignore
+    const rawVal = (answer as Record<string, string>)[column.levelId];
+    if (!rawVal) return '';
+
+    // 라벨 변환
+    const question = survey.questions.find((q) => q.id === column.questionId);
+    // @ts-ignore
+    const level = question?.selectLevels?.find((l) => l.id === column.levelId);
+    if (level) {
+      const opt = level.options.find((o) => o.value === rawVal);
+      return opt ? opt.label : rawVal;
+    }
+    return rawVal;
+  }
+
   if (answer === undefined || answer === null) return '';
 
   // 일반 질문
@@ -227,9 +276,39 @@ function formatCompactValue(value: unknown, questionId: string, survey: Survey):
   const question = survey.questions.find((q) => q.id === questionId);
   if (!question) return String(value ?? '');
 
+  // [NEW] 기타(Other) 응답 처리
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    const valObj = value as any;
+    if (valObj.hasOther === true) {
+      const selected = String(valObj.selectedValue || '');
+      const input = String(valObj.otherValue || '').trim();
+      let label = selected;
+
+      if (question.options) {
+        const option = question.options.find((o) => o.value === selected);
+        if (option) label = option.label;
+      }
+
+      return input ? `${label} (${input})` : label;
+    }
+  }
+
   // 배열 (체크박스 다중 선택)
   if (Array.isArray(value)) {
     const labels = value.map((v) => {
+      // 배열 내부 요소가 객체(기타 응답)일 수도 있음 (복수선택+기타) - 현재 구조상 드물지만 대비
+      if (typeof v === 'object' && v.hasOther) {
+        const selected = String(v.selectedValue || '');
+        const input = String(v.otherValue || '').trim();
+        // 라벨 찾기
+        let label = selected;
+        if (question.options) {
+          const option = question.options.find((o) => o.value === selected);
+          if (option) label = option.label;
+        }
+        return input ? `${label} (${input})` : label;
+      }
+
       if (question.options) {
         const option = question.options.find((o) => o.value === v);
         if (option) return option.label;
@@ -267,9 +346,40 @@ function formatCompactCellValue(
   const cell = row?.cells.find((c) => c.id === tableInfo.cellId);
   if (!cell) return String(value);
 
+  // [NEW] 기타(Other) 응답 처리
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    const valObj = value as any;
+    if (valObj.hasOther === true) {
+      const selected = String(valObj.selectedValue || '');
+      const input = String(valObj.otherValue || '').trim();
+      let label = selected;
+
+      const options = cell.checkboxOptions || cell.radioOptions || cell.selectOptions;
+      if (options) {
+        const option = options.find((o: any) => o.value === selected);
+        if (option) label = option.label;
+      }
+
+      return input ? `${label} (${input})` : label;
+    }
+  }
+
   // 배열 (체크박스 다중 선택) → 콤마로 합침
   if (Array.isArray(value)) {
     const labels = value.map((v) => {
+      // 배열 내부 기타 처리
+      if (typeof v === 'object' && v.hasOther) {
+        const selected = String(v.selectedValue || '');
+        const input = String(v.otherValue || '').trim();
+        const options = cell.checkboxOptions;
+        let label = selected;
+        if (options) {
+          const option = options.find((o) => o.value === selected);
+          if (option) label = option.label;
+        }
+        return input ? `${label} (${input})` : label;
+      }
+
       if (cell.checkboxOptions) {
         const option = cell.checkboxOptions.find((o) => o.value === v);
         if (option) return option.label;

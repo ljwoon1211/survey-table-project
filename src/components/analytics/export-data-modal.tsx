@@ -18,9 +18,10 @@ import {
 interface Props {
   surveyId: string;
   surveyTitle: string;
+  onExportCompactExcel?: () => Promise<Blob | null>;
 }
 
-export function ExportDataModal({ surveyId, surveyTitle }: Props) {
+export function ExportDataModal({ surveyId, surveyTitle, onExportCompactExcel }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [exportingType, setExportingType] = useState<string | null>(null);
 
@@ -28,32 +29,52 @@ export function ExportDataModal({ surveyId, surveyTitle }: Props) {
     try {
       setExportingType(type);
 
-      // API 호출 (파일 다운로드 트리거)
-      const response = await fetch(`/api/surveys/${surveyId}/export?type=${type}`);
-
-      if (!response.ok) throw new Error('Export failed');
-
-      // Blob 변환 및 다운로드 링크 생성
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-
-      // 파일명 설정 (헤더에서 가져오거나 기본값 사용)
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = `${surveyTitle}_Export.xlsx`;
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
-        if (filenameMatch) {
-          filename = decodeURIComponent(filenameMatch[1]);
+      if (type === 'compact' && onExportCompactExcel) {
+        // Client-side Compact Export
+        const blob = await onExportCompactExcel();
+        if (!blob) {
+          alert('내보낼 데이터가 없습니다.');
+          return;
         }
-      }
 
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const safeName = surveyTitle.replace(/[^a-zA-Z0-9가-힣\s]/g, '').slice(0, 50);
+        const timestamp = new Date().toISOString().split('T')[0];
+        a.download = `${safeName}_Compact_${timestamp}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else {
+        // Server-side API Export
+        const response = await fetch(`/api/surveys/${surveyId}/export?type=${type}`);
+
+        if (!response.ok) throw new Error('Export failed');
+
+        // Blob 변환 및 다운로드 링크 생성
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+
+        // 파일명 설정 (헤더에서 가져오거나 기본값 사용)
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = `${surveyTitle}_Export.xlsx`;
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+          if (filenameMatch) {
+            filename = decodeURIComponent(filenameMatch[1]);
+          }
+        }
+
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
 
       // 다운로드 후 모달 닫기 여부는 선택사항 (연속 다운로드를 위해 유지)
     } catch (error) {
@@ -79,36 +100,47 @@ export function ExportDataModal({ surveyId, surveyTitle }: Props) {
         </DialogHeader>
 
         <div className="grid grid-cols-1 gap-4 py-4">
-          {/* 1. Raw Data (통합) */}
+          {/* 1. 통계 분석용 (Legacy/Flat) */}
           <ExportCard
-            title="Raw Data (통합)"
-            description="모든 응답 데이터를 하나의 시트에 모아봅니다. 통계 패키지(SPSS, R 등) 분석이나 피벗 테이블 생성에 적합합니다."
+            title="통계 분석용 (Legacy)"
+            description="모든 응답을 하나의 시트에 모읍니다. SPSS/SAS 등 통계 패키지 분석이나 피벗 테이블 생성에 최적화된 형식입니다."
             icon={<Table className="h-5 w-5 text-blue-600" />}
             isLoading={exportingType === 'raw-all'}
             onClick={() => handleExport('raw-all')}
           />
 
-          {/* 2. Raw Data (개별) */}
+          {/* 2. 데이터 확인용 (Compact) */}
+          {onExportCompactExcel && (
+            <ExportCard
+              title="데이터 확인용 (Compact)"
+              description="사람이 보기 편한 간결한 형식입니다. 불필요한 코드를 줄이고 가독성을 높였습니다."
+              icon={<FileSpreadsheet className="h-5 w-5 text-indigo-600" />}
+              isLoading={exportingType === 'compact'}
+              onClick={() => handleExport('compact')}
+            />
+          )}
+
+          {/* 3. 응답별 상세 보기 (Individual) */}
           <ExportCard
-            title="Raw Data (개별)"
-            description="응답자별로 시트를 나누어 상세 내용을 확인합니다. 테이블형 문항이 설문지와 동일한 형태로 시각화되어 가독성이 좋습니다."
+            title="응답별 상세 보기 (Individual)"
+            description="응답자별로 시트를 나누어 상세 내용을 확인합니다. 설문지와 동일한 형태로 시각화되어 가독성이 좋습니다."
             icon={<FileSpreadsheet className="h-5 w-5 text-green-600" />}
             isLoading={exportingType === 'raw-individual'}
             onClick={() => handleExport('raw-individual')}
           />
 
-          {/* 3. Summary */}
+          {/* 4. 요약 리포트 (Summary) */}
           <ExportCard
-            title="Summary Report"
+            title="요약 리포트 (Summary)"
             description="문항별 응답 빈도와 비율(%)이 계산된 요약 리포트입니다."
             icon={<BarChart3 className="h-5 w-5 text-orange-600" />}
             isLoading={exportingType === 'summary'}
             onClick={() => handleExport('summary')}
           />
 
-          {/* 4. Variable Map */}
+          {/* 5. 코딩북 (Variable Map) */}
           <ExportCard
-            title="Variable Map"
+            title="코딩북 (Variable Map)"
             description="설문 문항 ID, 라벨, 보기 값 등에 대한 변수 정의서입니다."
             icon={<FileText className="h-5 w-5 text-gray-600" />}
             isLoading={exportingType === 'map'}
