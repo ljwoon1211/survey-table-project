@@ -89,6 +89,7 @@ export interface QuestionOption {
   label: string;
   value: string;
   optionCode?: string; // ✨ 엑셀 내보내기용 옵션 코드 (예: "opt1", "삼성UHDTV")
+  spssNumericCode?: number; // ✨ SPSS 숫자코드 (옵션 생성 시 할당, 순서 변경해도 유지)
   hasOther?: boolean;
   // 조건부 분기
   branchRule?: BranchRule;
@@ -129,6 +130,7 @@ export interface CheckboxOption {
   label: string;
   value: string;
   optionCode?: string; // ✨ 엑셀 내보내기용 옵션 코드
+  spssNumericCode?: number; // ✨ SPSS 숫자코드
   checked?: boolean;
   hasOther?: boolean;
   // 조건부 분기
@@ -140,6 +142,7 @@ export interface RadioOption {
   label: string;
   value: string;
   optionCode?: string; // ✨ 엑셀 내보내기용 옵션 코드
+  spssNumericCode?: number; // ✨ SPSS 숫자코드
   selected?: boolean;
   hasOther?: boolean;
   // 조건부 분기
@@ -187,7 +190,8 @@ export interface QuestionGroup {
 
 export interface Question {
   id: string;
-  questionCode?: string; // ✨ 사용자 정의 ID (예: "Q1", "A2", "A8_1")
+  questionCode?: string; // ✨ SPSS 변수명 (예: "Q1", "Q2M1", "Q1_U1_R0_C0")
+  isCustomSpssVarName?: boolean; // ✨ 수동 편집 여부 (true면 자동 재할당 시 보존)
   exportLabel?: string; // ✨ 엑셀 헤더용 라벨 (예: "성별", "TV보유현황")
   type: QuestionType;
   title: string;

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { BarChart3, FileSpreadsheet, FileText, Loader2, Table } from 'lucide-react';
+import { BarChart3, Database, FileSpreadsheet, FileText, Loader2, Table } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -19,9 +19,15 @@ interface Props {
   surveyId: string;
   surveyTitle: string;
   onExportCompactExcel?: () => Promise<Blob | null>;
+  onExportSpssExcel?: () => Promise<Blob | null>;
 }
 
-export function ExportDataModal({ surveyId, surveyTitle, onExportCompactExcel }: Props) {
+export function ExportDataModal({
+  surveyId,
+  surveyTitle,
+  onExportCompactExcel,
+  onExportSpssExcel,
+}: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [exportingType, setExportingType] = useState<string | null>(null);
 
@@ -43,6 +49,24 @@ export function ExportDataModal({ surveyId, surveyTitle, onExportCompactExcel }:
         const safeName = surveyTitle.replace(/[^a-zA-Z0-9가-힣\s]/g, '').slice(0, 50);
         const timestamp = new Date().toISOString().split('T')[0];
         a.download = `${safeName}_Compact_${timestamp}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else if (type === 'spss' && onExportSpssExcel) {
+        // Client-side SPSS Export
+        const blob = await onExportSpssExcel();
+        if (!blob) {
+          alert('내보낼 데이터가 없습니다.');
+          return;
+        }
+
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const safeName = surveyTitle.replace(/[^a-zA-Z0-9가-힣\s]/g, '').slice(0, 50);
+        const timestamp = new Date().toISOString().split('T')[0];
+        a.download = `${safeName}_SPSS_${timestamp}.xlsx`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
@@ -109,7 +133,18 @@ export function ExportDataModal({ surveyId, surveyTitle, onExportCompactExcel }:
             onClick={() => handleExport('raw-all')}
           />
 
-          {/* 2. 데이터 확인용 (Compact) */}
+          {/* 2. SPSS 호환 형식 */}
+          {onExportSpssExcel && (
+            <ExportCard
+              title="SPSS 호환 형식"
+              description="복수응답을 옵션별 독립 변수로 분리하고, 값을 숫자 코딩한 SPSS 통계 분석용 형식입니다. 코딩북 시트가 포함됩니다."
+              icon={<Database className="h-5 w-5 text-purple-600" />}
+              isLoading={exportingType === 'spss'}
+              onClick={() => handleExport('spss')}
+            />
+          )}
+
+          {/* 3. 데이터 확인용 (Compact) */}
           {onExportCompactExcel && (
             <ExportCard
               title="데이터 확인용 (Compact)"

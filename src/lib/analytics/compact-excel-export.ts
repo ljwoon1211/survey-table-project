@@ -255,18 +255,7 @@ function getTableCellValue(answer: unknown, tableInfo: { rowId: string; cellId: 
 
   const answerObj = answer as Record<string, unknown>;
 
-  // 1. cell.id로 직접 조회
-  if (answerObj[tableInfo.cellId] !== undefined) {
-    return answerObj[tableInfo.cellId];
-  }
-
-  // 2. Fallback: rowId > cellId 구조
-  const rowAnswer = answerObj[tableInfo.rowId];
-  if (rowAnswer && typeof rowAnswer === 'object') {
-    return (rowAnswer as Record<string, unknown>)[tableInfo.cellId];
-  }
-
-  return undefined;
+  return answerObj[tableInfo.cellId];
 }
 
 /**

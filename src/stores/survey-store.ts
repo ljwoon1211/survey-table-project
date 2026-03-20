@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 
+import { regenerateAfterDelete, regenerateAfterReorder } from '@/lib/spss/variable-generator';
 import { generatePrivateToken, generateSlugFromTitle } from '@/lib/survey-url';
 import { generateId } from '@/lib/utils';
 import {
@@ -255,6 +256,9 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
 
         set((state) => {
           state.currentSurvey.questions.push(newQuestion);
+          state.currentSurvey.questions = regenerateAfterReorder(
+            state.currentSurvey.questions,
+          );
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
         });
@@ -271,6 +275,9 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
 
         set((state) => {
           state.currentSurvey.questions.push(questionWithOrder);
+          state.currentSurvey.questions = regenerateAfterReorder(
+            state.currentSurvey.questions,
+          );
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
         });
@@ -290,6 +297,9 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
         set((state) => {
           state.currentSurvey.questions = state.currentSurvey.questions.filter(
             (q) => q.id !== questionId,
+          );
+          state.currentSurvey.questions = regenerateAfterDelete(
+            state.currentSurvey.questions,
           );
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
@@ -314,7 +324,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           // 남은 질문들 추가 (혹시 모를 누락 방지)
           Array.from(questionMap.values()).forEach((q) => reorderedQuestions.push(q));
 
-          state.currentSurvey.questions = reorderedQuestions;
+          state.currentSurvey.questions = regenerateAfterReorder(reorderedQuestions);
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
         }),

@@ -13,6 +13,7 @@ interface ExportPanelProps {
   onExportCsv: () => Promise<string>;
   onExportFlatExcel?: () => Promise<Blob | null>;
   onExportCompactExcel?: () => Promise<Blob | null>;
+  onExportSpssExcel?: () => Promise<Blob | null>;
   surveyTitle?: string;
 }
 
@@ -22,6 +23,7 @@ export function ExportPanel({
   onExportCsv,
   onExportFlatExcel,
   onExportCompactExcel,
+  onExportSpssExcel,
   surveyTitle = 'survey',
 }: ExportPanelProps) {
   const [isExporting, setIsExporting] = useState<
@@ -109,6 +111,7 @@ export function ExportPanel({
             surveyId={surveyId}
             surveyTitle={surveyTitle}
             onExportCompactExcel={onExportCompactExcel}
+            onExportSpssExcel={onExportSpssExcel}
           />
 
           <Button

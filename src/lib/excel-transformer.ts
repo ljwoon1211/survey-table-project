@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 
-import { Question, Survey, SurveySubmission, TableColumn, TableRow } from '@/types/survey';
+import { buildDataRows, generateSPSSColumns } from '@/lib/analytics/spss-excel-export';
+import { Survey, SurveySubmission } from '@/types/survey';
 
 interface ExportOptions {
   includeRawData: boolean;
@@ -52,14 +53,79 @@ export function generateExcelWorkbook(
 
 /**
  * 1. Raw Data (통합) 워크북 생성
+ * 1행: 질문 label, 2행: SPSS 변수명, 3행~: 응답 데이터
  */
 export function generateRawDataCombinedWorkbook(
   survey: Survey,
   responses: SurveySubmission[],
 ): XLSX.WorkBook {
   const workbook = XLSX.utils.book_new();
-  const rawData = generateRawDataCombinedData(survey, responses);
-  const ws = XLSX.utils.json_to_sheet(rawData);
+
+  const questions = [...survey.questions].sort((a, b) => a.order - b.order);
+  const columns = generateSPSSColumns(questions);
+  const dataRows = buildDataRows(columns, questions, responses);
+
+  // 메타데이터 컬럼 정의
+  const metaLabels = ['Response ID', 'Started At', 'Completed At', 'Duration (sec)', 'Status', 'Device'];
+  const metaVarNames = ['RES_ID', 'STARTED', 'COMPLETED', 'DURATION', 'STATUS', 'DEVICE'];
+
+  // 1행: 메타 label + 질문 label
+  const headerRow1 = [...metaLabels, ...columns.map((col) => col.questionText)];
+  // 2행: 메타 변수명 + SPSS 변수명
+  const headerRow2 = [...metaVarNames, ...columns.map((col) => col.spssVarName)];
+
+  // 데이터 행: 메타데이터 + 응답 데이터
+  const metaColCount = metaLabels.length;
+  const fullDataRows = responses.map((res, idx) => {
+    const startedAt = new Date(res.startedAt);
+    const completedAt = res.completedAt ? new Date(res.completedAt) : null;
+    const durationSeconds = completedAt
+      ? Math.floor((completedAt.getTime() - startedAt.getTime()) / 1000)
+      : null;
+
+    const metaCols: (string | number | null)[] = [
+      res.id,
+      startedAt.toLocaleString('ko-KR'),
+      completedAt ? completedAt.toLocaleString('ko-KR') : '미완료',
+      durationSeconds,
+      res.isCompleted ? 'Completed' : 'Partial',
+      res.userAgent ? parseUserAgent(res.userAgent) : 'Unknown',
+    ];
+
+    return [...metaCols, ...dataRows[idx]];
+  });
+
+  const aoa: (string | number | null)[][] = [headerRow1, headerRow2, ...fullDataRows];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // 동일 질문 텍스트 셀 병합 (메타 컬럼 오프셋 반영)
+  const merges: XLSX.Range[] = [];
+  let mergeStart = 0;
+  for (let i = 1; i <= columns.length; i++) {
+    if (
+      i < columns.length &&
+      columns[i].questionText === columns[mergeStart].questionText &&
+      columns[i].questionId === columns[mergeStart].questionId
+    ) {
+      continue;
+    }
+    if (i - mergeStart > 1) {
+      merges.push({
+        s: { r: 0, c: mergeStart + metaColCount },
+        e: { r: 0, c: i - 1 + metaColCount },
+      });
+    }
+    mergeStart = i;
+  }
+  if (merges.length > 0) ws['!merges'] = merges;
+
+  // 열 너비
+  const metaWidths = metaLabels.map((l) => ({ wch: Math.max(l.length, 14) }));
+  const questionWidths = columns.map((col) => ({
+    wch: Math.max(col.spssVarName.length, 12),
+  }));
+  ws['!cols'] = [...metaWidths, ...questionWidths];
+
   XLSX.utils.book_append_sheet(workbook, ws, 'Raw Data');
   return workbook;
 }
@@ -117,24 +183,15 @@ export function generateRawDataIndividualWorkbook(
         // 행 데이터
         q.tableRowsData.forEach((row) => {
           const cells = [row.label];
-          q.tableColumns!.forEach((col, colIndex) => {
+          q.tableColumns!.forEach((_col, colIndex) => {
             let val = '';
             const cell = row.cells[colIndex];
 
             if (cell && answer) {
-              // 1. cell.id로 조회
-              let rawVal = answer[cell.id];
-
-              // 2. Fallback
-              if (!rawVal && answer[row.id] && answer[row.id][col.id]) {
-                rawVal = answer[row.id][col.id];
-              }
+              const rawVal = answer[cell.id];
 
               if (rawVal) {
-                if (rawVal) {
-                  // 값 변환 로직 (옵션 ID -> 라벨 + 기타 입력 포맷팅)
-                  val = formatExcelCellValue(rawVal, cell);
-                }
+                val = formatExcelCellValue(rawVal, cell);
               }
             }
             cells.push(val);
@@ -202,6 +259,7 @@ export function generateVariableMapWorkbook(survey: Survey): XLSX.WorkBook {
   const workbook = XLSX.utils.book_new();
   const mapData = generateVariableMap(survey);
   const ws = XLSX.utils.json_to_sheet(mapData);
+  ws['!cols'] = [{ wch: 38 }, { wch: 14 }, { wch: 22 }, { wch: 40 }, { wch: 50 }];
   XLSX.utils.book_append_sheet(workbook, ws, 'Variable Map');
   return workbook;
 }
@@ -264,16 +322,9 @@ function generateRawDataCombinedData(survey: Survey, responses: SurveySubmission
               let value = '';
 
               if (cell && answer) {
-                // 1. cell.id로 직접 조회 (가장 정확)
-                let rawVal = answer[cell.id];
-
-                // 2. Fallback: 혹시 rowId > colId 구조로 저장된 경우 (구버전 데이터 등)
-                if (!rawVal && answer[tRow.id] && answer[tRow.id][tCol.id]) {
-                  rawVal = answer[tRow.id][tCol.id];
-                }
+                const rawVal = answer[cell.id];
 
                 if (rawVal) {
-                  // 값 변환 로직 (옵션 ID -> 라벨 + 기타 입력 처리)
                   value = formatExcelCellValue(rawVal, cell);
                 }
               }
@@ -340,7 +391,7 @@ function generateSummaryData(survey: Survey, responses: SurveySubmission[]) {
             // 해당 셀에 데이터가 있는 응답 수 계산
             const count = responses.filter((r) => {
               const ans = (r.questionResponses as any)?.[q.id];
-              const val = ans && (ans[cell.id] || (ans[row.id] && ans[row.id][col.id]));
+              const val = ans && ans[cell.id];
 
               if (!val) return false;
               if (Array.isArray(val)) return val.length > 0; // Checkbox empty array check
@@ -406,62 +457,95 @@ function generateSummaryData(survey: Survey, responses: SurveySubmission[]) {
  * 3. Variable Map 생성
  */
 function generateVariableMap(survey: Survey) {
-  const mapData: any[] = [];
+  const mapData: Record<string, string>[] = [];
 
   survey.questions
     .sort((a, b) => a.order - b.order)
     .forEach((q) => {
-      // [수정] Notice 타입 제외
-      if (q.type === 'notice') return;
+      // Notice 타입 제외 (requiresAcknowledgment 없는 경우)
+      if (q.type === 'notice' && !q.requiresAcknowledgment) return;
+
+      // 값 라벨 생성
+      let valueLabels = '';
+      if (q.type === 'notice' && q.requiresAcknowledgment) {
+        valueLabels = '동의=확인함, 빈값=미확인';
+      } else if ((q.type === 'radio' || q.type === 'select' || q.type === 'checkbox') && q.options) {
+        valueLabels = q.options
+          .map((o, i) => `${o.spssNumericCode ?? i + 1}=${o.label}`)
+          .join(', ');
+      }
 
       mapData.push({
-        'Question ID': q.id,
-        Type: q.type,
-        Title: q.title,
-        Description: q.description || '',
+        '질문 ID': q.id,
+        '타입': q.type,
+        'SPSS 변수명': q.questionCode || '',
+        '질문 제목': q.title,
+        '값 라벨': valueLabels,
       });
 
-      if (q.type === 'table') {
-        q.tableRowsData?.forEach((row) => {
-          q.tableColumns?.forEach((col, colIndex) => {
-            // [수정] 입력 불가능한 셀 제외 (Variable Map에서도)
+      // 옵션 행 (radio, select, checkbox)
+      if (q.options && ['radio', 'select', 'checkbox'].includes(q.type)) {
+        q.options.forEach((opt, i) => {
+          mapData.push({
+            '질문 ID': '',
+            '타입': 'Option',
+            'SPSS 변수명': q.type === 'checkbox' ? `${q.questionCode}M${i + 1}` : '',
+            '질문 제목': `  ${opt.spssNumericCode ?? i + 1}. ${opt.label}`,
+            '값 라벨': `Value: ${opt.value}`,
+          });
+        });
+        // 기타 옵션
+        if (q.allowOtherOption) {
+          mapData.push({
+            '질문 ID': '',
+            '타입': 'Other',
+            'SPSS 변수명': `${q.questionCode}_etc`,
+            '질문 제목': '  기타 입력',
+            '값 라벨': '(기타 텍스트)',
+          });
+        }
+      }
+
+      // 테이블 질문
+      if (q.type === 'table' && q.tableRowsData && q.tableColumns) {
+        q.tableRowsData.forEach((row) => {
+          q.tableColumns!.forEach((col, colIndex) => {
             const cell = row.cells[colIndex];
-            if (cell && !isCellInputable(cell)) return;
+            if (!cell || !isCellInputable(cell)) return;
+
+            const varName = cell.exportLabel || cell.cellCode
+              || `${q.questionCode}_${row.rowCode || row.label}_${col.columnCode || col.label}`;
+
+            let cellValueLabels = '';
+            if (cell.type === 'checkbox') {
+              cellValueLabels = '1=선택, 빈값=미선택';
+            } else {
+              const opts = cell.radioOptions || cell.selectOptions;
+              if (opts && opts.length > 0) {
+                cellValueLabels = opts.map((o, i) => `${o.spssNumericCode ?? i + 1}=${o.label}`).join(', ');
+              }
+            }
 
             mapData.push({
-              'Question ID': '',
-              Type: 'Table Cell',
-              Title: `  Row: ${row.label} / Col: ${col.label}`,
-              Description: `RowID: ${row.id}, ColID: ${col.id}`,
+              '질문 ID': '',
+              '타입': `Table (${cell.type})`,
+              'SPSS 변수명': varName,
+              '질문 제목': `  ${row.label} - ${col.label}`,
+              '값 라벨': cellValueLabels || `(${cell.type})`,
             });
           });
         });
-      } else if (q.type === 'multiselect' && q.selectLevels) {
-        // [NEW] 다단계 선택 변수맵
+      }
+
+      // 다단계 선택
+      if (q.type === 'multiselect' && q.selectLevels) {
         q.selectLevels.forEach((level) => {
           mapData.push({
-            'Question ID': '',
-            Type: 'Select Level',
-            Title: `  [Level] ${level.label}`,
-            Description: `Level ID: ${level.id}`,
-          });
-
-          level.options.forEach((opt) => {
-            mapData.push({
-              'Question ID': '',
-              Type: 'Option',
-              Title: `    ${opt.label}`,
-              Description: `Value: ${opt.value}`,
-            });
-          });
-        });
-      } else if (q.options) {
-        q.options.forEach((opt) => {
-          mapData.push({
-            'Question ID': '',
-            Type: 'Option',
-            Title: `  ${opt.label}`,
-            Description: `Value: ${opt.value}`,
+            '질문 ID': '',
+            '타입': 'Select Level',
+            'SPSS 변수명': '',
+            '질문 제목': `  [Level] ${level.label}`,
+            '값 라벨': level.options.map((o) => o.label).join(', '),
           });
         });
       }
@@ -494,12 +578,7 @@ function generateVerbatimData(survey: Survey, responses: SurveySubmission[]) {
             if (!cell || cell.type !== 'input') return;
 
             const ans = (res.questionResponses as any)?.[q.id];
-            let val = ans?.[cell.id];
-
-            // Fallback
-            if (!val && ans?.[row.id]?.[col.id]) {
-              val = ans[row.id][col.id];
-            }
+            const val = ans?.[cell.id];
 
             if (val) {
               verbatim.push({

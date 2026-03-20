@@ -1,6 +1,6 @@
 {
-  "id": "4073392f-baf3-43d2-8e7b-dff4472ced59",
-  "prevId": "19f70b6e-0334-47d4-b9de-79c62e2c939c",
+  "id": "20eb80db-6d33-483d-8037-a025533452af",
+  "prevId": "4073392f-baf3-43d2-8e7b-dff4472ced59",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -285,6 +285,25 @@
         },
         "placeholder": {
           "name": "placeholder",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "question_code": {
+          "name": "question_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_custom_spss_var_name": {
+          "name": "is_custom_spss_var_name",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "export_label": {
+          "name": "export_label",
           "type": "text",
           "primaryKey": false,
           "notNull": false

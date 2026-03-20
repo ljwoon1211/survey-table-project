@@ -11,7 +11,7 @@ import {
   getSurveyBySlug,
   getSurveyWithDetails,
 } from '@/actions/query-actions';
-import { completeResponse } from '@/actions/response-actions';
+import { completeResponse, startResponse } from '@/actions/response-actions';
 import { InteractiveTableResponse } from '@/components/survey-builder/interactive-table-response';
 import { NoticeRenderer } from '@/components/survey-builder/notice-renderer';
 import { UserDefinedMultiLevelSelect } from '@/components/survey-builder/user-defined-multi-level-select';
@@ -21,7 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { useLineCountDetection } from '@/hooks/use-line-count-detection';
 import { parsesurveyIdentifier } from '@/lib/survey-url';
-import { generateId } from '@/lib/utils';
+
 import { useSurveyResponseStore } from '@/stores/survey-response-store';
 import { Question, QuestionOption, Survey } from '@/types/survey';
 import {
@@ -127,13 +127,15 @@ export default function SurveyResponsePage() {
     loadSurvey();
   }, [identifier]);
 
-  // 설문 응답 시작
+  // 설문 응답 시작 - DB에 레코드 생성
   useEffect(() => {
     if (loadedSurvey && !responseStarted) {
-      // 응답 ID 생성 및 스토어에 설정
-      const newResponseId = generateId();
-      setCurrentResponseId(newResponseId);
       setResponseStarted(true);
+      startResponse(loadedSurvey.id).then((dbResponse) => {
+        setCurrentResponseId(dbResponse.id);
+      }).catch((err) => {
+        console.error('응답 시작 오류:', err);
+      });
     }
   }, [loadedSurvey, responseStarted, setCurrentResponseId]);
 
@@ -253,7 +255,9 @@ export default function SurveyResponsePage() {
 
     switch (question.type) {
       case 'notice':
-        return question.requiresAcknowledgment ? response === true : true;
+        if (!question.requiresAcknowledgment) return true;
+        if (response && typeof response === 'object' && 'agreed' in response) return (response as { agreed: boolean }).agreed;
+        return response === true;
       case 'text':
       case 'textarea':
         return typeof response === 'string' && response.trim().length > 0;
@@ -356,7 +360,6 @@ export default function SurveyResponsePage() {
         const exposedQuestionIds = visibleQuestions.map((q) => q.id);
 
         // 2. 노출된 테이블 행 ID 수집
-        // [수정] 행 단위 노출 조건(displayCondition)을 체크하여 실제 노출된 행만 수집
         const exposedRowIds = visibleQuestions
           .filter((q) => q.type === 'table' && q.tableRowsData)
           .flatMap((q) =>
@@ -370,6 +373,7 @@ export default function SurveyResponsePage() {
         console.log('Impression Logging:', { exposedQuestionIds, exposedRowIds });
 
         await completeResponse(currentResponseId, {
+          questionResponses: responses,
           exposedQuestionIds,
           exposedRowIds,
         });
@@ -593,16 +597,23 @@ function QuestionInput({
   onChange: (value: unknown) => void;
 }) {
   switch (question.type) {
-    case 'notice':
+    case 'notice': {
+      // notice 응답은 { agreed: boolean, agreedAt?: string } 형태로 저장
+      const noticeVal = value && typeof value === 'object' && 'agreed' in (value as Record<string, unknown>)
+        ? (value as { agreed: boolean; agreedAt?: string })
+        : { agreed: typeof value === 'boolean' ? value : false };
       return (
         <NoticeRenderer
           content={question.noticeContent || ''}
           requiresAcknowledgment={question.requiresAcknowledgment}
-          value={typeof value === 'boolean' ? value : false}
-          onChange={(v) => onChange(v)}
+          value={noticeVal.agreed}
+          onChange={(v) =>
+            onChange(v ? { agreed: true, agreedAt: new Date().toISOString() } : { agreed: false })
+          }
           isTestMode={false}
         />
       );
+    }
 
     case 'text':
       return (

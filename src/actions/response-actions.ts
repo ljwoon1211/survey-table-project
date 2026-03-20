@@ -61,14 +61,26 @@ export async function updateQuestionResponse(
 // 응답 완료
 export async function completeResponse(
   responseId: string,
-  metadata?: { exposedQuestionIds?: string[]; exposedRowIds?: string[] },
+  data?: {
+    questionResponses?: Record<string, unknown>;
+    exposedQuestionIds?: string[];
+    exposedRowIds?: string[];
+  },
 ) {
   const [updated] = await db
     .update(surveyResponses)
     .set({
       isCompleted: true,
       completedAt: new Date(),
-      ...(metadata ? { metadata } : {}),
+      ...(data?.questionResponses ? { questionResponses: data.questionResponses } : {}),
+      ...((data?.exposedQuestionIds || data?.exposedRowIds)
+        ? {
+            metadata: {
+              ...(data?.exposedQuestionIds ? { exposedQuestionIds: data.exposedQuestionIds } : {}),
+              ...(data?.exposedRowIds ? { exposedRowIds: data.exposedRowIds } : {}),
+            },
+          }
+        : {}),
     })
     .where(eq(surveyResponses.id, responseId))
     .returning();

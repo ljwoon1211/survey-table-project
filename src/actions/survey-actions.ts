@@ -774,6 +774,9 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
           tableValidationRules:
             question.tableValidationRules as NewQuestion['tableValidationRules'],
           displayCondition: question.displayCondition as NewQuestion['displayCondition'],
+          questionCode: question.questionCode,
+          isCustomSpssVarName: question.isCustomSpssVarName,
+          exportLabel: question.exportLabel,
           updatedAt: new Date(),
         }));
 
@@ -804,6 +807,9 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
               placeholder: sql`excluded.placeholder`,
               tableValidationRules: sql`excluded.table_validation_rules`,
               displayCondition: sql`excluded.display_condition`,
+              questionCode: sql`excluded.question_code`,
+              isCustomSpssVarName: sql`excluded.is_custom_spss_var_name`,
+              exportLabel: sql`excluded.export_label`,
               updatedAt: sql`excluded.updated_at`,
             },
           });

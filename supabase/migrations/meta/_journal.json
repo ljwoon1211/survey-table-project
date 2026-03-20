@@ -22,6 +22,13 @@
       "when": 1767797819414,
       "tag": "0003_add_group_display_condition",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1773897627175,
+      "tag": "0003_melted_butterfly",
+      "breakpoints": true
     }
   ]
 }

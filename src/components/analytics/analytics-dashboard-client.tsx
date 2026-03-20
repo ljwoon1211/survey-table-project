@@ -8,6 +8,7 @@ import { BarChart3, Filter, Grid3X3, List, Search, TrendingUp } from 'lucide-rea
 import type { SurveyResponse } from '@/db/schema';
 import { analyzeSurvey } from '@/lib/analytics/analyzer';
 import { generateCompactExcelBlob } from '@/lib/analytics/compact-excel-export';
+import { buildSpssExcelBlob } from '@/lib/analytics/spss-excel-export';
 import { type FilterState, applyFilter, createEmptyFilter } from '@/lib/analytics/filter';
 import { type ResponseData, generateFlatExcelBlob } from '@/lib/analytics/flat-excel-export';
 import type { SurveyAnalytics } from '@/lib/analytics/types';
@@ -87,6 +88,24 @@ export function AnalyticsDashboardClient({
     return generateCompactExcelBlob(data.surveyData, data.responseData);
   }, [prepareExportData]);
 
+  // SPSS 호환 Excel 내보내기 핸들러
+  const handleExportSpssExcel = useCallback(async (): Promise<Blob | null> => {
+    if (filteredResponses.length === 0) return null;
+
+    const submissions = filteredResponses.map((r) => ({
+      id: r.id,
+      surveyId: r.surveyId,
+      questionResponses: (r.questionResponses as Record<string, unknown>) || {},
+      isCompleted: r.isCompleted ?? true,
+      startedAt: r.createdAt || new Date(),
+      completedAt: r.completedAt || undefined,
+      currentGroupOrder: 0,
+      updatedAt: r.createdAt || new Date(),
+    }));
+
+    return buildSpssExcelBlob(survey.questions, submissions);
+  }, [survey.questions, filteredResponses]);
+
   // 질문 검색 필터링
   const searchFilteredQuestions = analytics.questions.filter((q) =>
     q.questionTitle.toLowerCase().includes(searchTerm.toLowerCase()),
@@ -116,6 +135,7 @@ export function AnalyticsDashboardClient({
           onExportCsv={onExportCsv}
           onExportFlatExcel={handleExportFlatExcel}
           onExportCompactExcel={handleExportCompactExcel}
+          onExportSpssExcel={handleExportSpssExcel}
         />
       </div>
 
