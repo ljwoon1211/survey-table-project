@@ -157,7 +157,7 @@ export function GroupManager({ className }: GroupManagerProps) {
       // DB에 그룹 저장
       if (currentSurvey.id && isUUID(currentSurvey.id)) {
         try {
-          const { createQuestionGroup } = await import('@/actions/survey-actions');
+          const { createQuestionGroup } = await import('@/actions/question-group-actions');
           const createdGroup = await createQuestionGroup({
             surveyId: currentSurvey.id,
             name: groupName.trim(),
@@ -248,7 +248,7 @@ export function GroupManager({ className }: GroupManagerProps) {
 
       // DB에 저장 (그룹 ID가 UUID인 경우에만)
       if (currentSurvey.id && isUUID(currentSurvey.id) && isUUID(editingGroup.id)) {
-        import('@/actions/survey-actions').then(({ updateQuestionGroup }) => {
+        import('@/actions/question-group-actions').then(({ updateQuestionGroup }) => {
           updateQuestionGroup(editingGroup.id, {
             displayCondition: conditionGroup,
           }).catch((error) => {
@@ -307,7 +307,7 @@ export function GroupManager({ className }: GroupManagerProps) {
           (!newParentGroupId || isUUID(newParentGroupId))
         ) {
           try {
-            const { updateQuestionGroup } = await import('@/actions/survey-actions');
+            const { updateQuestionGroup } = await import('@/actions/question-group-actions');
             await updateQuestionGroup(editingGroup.id, {
               name: groupName.trim(),
               description: groupDescription.trim() || undefined,
@@ -334,7 +334,7 @@ export function GroupManager({ className }: GroupManagerProps) {
         // DB에 저장 (그룹 ID가 UUID인 경우에만)
         if (currentSurvey.id && isUUID(currentSurvey.id) && isUUID(editingGroup.id)) {
           try {
-            const { updateQuestionGroup } = await import('@/actions/survey-actions');
+            const { updateQuestionGroup } = await import('@/actions/question-group-actions');
             await updateQuestionGroup(editingGroup.id, {
               name: groupName.trim(),
               description: groupDescription.trim() || undefined,
@@ -366,7 +366,7 @@ export function GroupManager({ className }: GroupManagerProps) {
       // DB에서 그룹 삭제 (deleteQuestionGroup이 재귀적으로 하위 그룹도 함께 처리)
       if (currentSurvey.id && isUUID(currentSurvey.id)) {
         try {
-          const { deleteQuestionGroup } = await import('@/actions/survey-actions');
+          const { deleteQuestionGroup } = await import('@/actions/question-group-actions');
           // 최상위 그룹만 삭제하면, 서버 액션에서 하위 그룹도 함께 처리됨
           await deleteQuestionGroup(groupId);
         } catch (error) {
@@ -424,7 +424,7 @@ export function GroupManager({ className }: GroupManagerProps) {
         // DB에 저장 (UUID인 그룹 ID만 필터링)
         if (currentSurvey.id && isUUID(currentSurvey.id)) {
           try {
-            const { reorderGroups: reorderGroupsAction } = await import('@/actions/survey-actions');
+            const { reorderGroups: reorderGroupsAction } = await import('@/actions/question-group-actions');
             const uuidGroupIds = newGroupIds.filter((id) => isUUID(id));
             if (uuidGroupIds.length > 0) {
               await reorderGroupsAction(currentSurvey.id, uuidGroupIds);
@@ -463,7 +463,7 @@ export function GroupManager({ className }: GroupManagerProps) {
           // DB에 저장 (그룹 ID가 UUID인 경우에만)
           if (currentSurvey.id && isUUID(currentSurvey.id)) {
             try {
-              const { updateQuestionGroup } = await import('@/actions/survey-actions');
+              const { updateQuestionGroup } = await import('@/actions/question-group-actions');
               await Promise.all(
                 newOrder
                   .filter((group) => isUUID(group.id))

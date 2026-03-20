@@ -17,7 +17,7 @@ import {
   deleteSurvey as deleteSurveyAction,
   duplicateSurvey as duplicateSurveyAction,
   saveSurveyWithDetails,
-} from '@/actions/survey-actions';
+} from '@/actions/survey-crud-actions';
 import {
   useSurveyBuilderStore,
   useSurveyListStore,

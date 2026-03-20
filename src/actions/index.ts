@@ -4,15 +4,23 @@ export {
   updateSurvey,
   deleteSurvey,
   duplicateSurvey,
+  saveSurveyWithDetails,
+  publishSurvey,
+} from './survey-crud-actions';
+
+export {
   createQuestionGroup,
   updateQuestionGroup,
   deleteQuestionGroup,
+  reorderGroups,
+} from './question-group-actions';
+
+export {
   createQuestion,
   updateQuestion,
   deleteQuestion,
   reorderQuestions,
-  saveSurveyWithDetails,
-} from './survey-actions';
+} from './question-actions';
 
 // Response Mutations (Server Actions)
 export {

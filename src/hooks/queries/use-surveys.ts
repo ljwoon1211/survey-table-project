@@ -14,7 +14,7 @@ import {
   duplicateSurvey as duplicateSurveyAction,
   saveSurveyWithDetails,
   updateSurvey,
-} from '@/actions/survey-actions';
+} from '@/actions/survey-crud-actions';
 import type { Survey } from '@/types/survey';
 
 // ========================

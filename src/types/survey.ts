@@ -233,6 +233,8 @@ export interface Survey {
   description?: string;
   slug?: string; // 공개 설문용 커스텀 URL 슬러그
   privateToken?: string; // 비공개 설문용 보안 토큰 (UUID)
+  status?: string; // draft | published
+  currentVersionId?: string | null; // 현재 배포된 버전 ID
   groups?: QuestionGroup[]; // 질문 그룹 목록
   questions: Question[];
   settings: SurveySettings;

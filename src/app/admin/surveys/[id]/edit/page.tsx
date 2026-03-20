@@ -25,6 +25,7 @@ import {
   PlayCircle,
   Plus,
   RefreshCw,
+  Rocket,
   Save,
   Share2,
   Sparkles,
@@ -34,7 +35,8 @@ import {
 } from 'lucide-react';
 
 import { isSlugAvailable as checkSlugAvailable } from '@/actions/query-actions';
-import { createQuestion as createQuestionAction } from '@/actions/survey-actions';
+import { createQuestion as createQuestionAction } from '@/actions/question-actions';
+import { publishSurvey } from '@/actions/survey-crud-actions';
 import { GroupManager } from '@/components/survey-builder/group-manager';
 import { ImportExportLibraryModal } from '@/components/survey-builder/import-export-library-modal';
 import { QuestionLibraryPanel } from '@/components/survey-builder/question-library-panel';
@@ -126,12 +128,14 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   const { id } = use(params);
   const {
     currentSurvey,
+    isModifiedSincePublish,
     updateSurveyTitle,
     addQuestion,
     addPreparedQuestion,
     updateSurveySettings,
     updateSurveySlug,
     regeneratePrivateToken,
+    markPublished,
   } = useSurveyBuilderStore();
 
   const { selectedQuestionId, isTestMode, selectQuestion, toggleTestMode } = useSurveyUIStore();
@@ -154,6 +158,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   const [showSaveQuestionModal, setShowSaveQuestionModal] = useState(false);
   const [questionToSave, setQuestionToSave] = useState<Question | null>(null);
   const [showImportExportModal, setShowImportExportModal] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   // 설문 불러오기 - TanStack Query 데이터가 로드되면 스토어에 설정
   useEffect(() => {
@@ -306,6 +311,35 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
         setIsEditingSlugInModal(false);
       },
     });
+  };
+
+  // 설문 배포
+  const handlePublishSurvey = async () => {
+    if (!currentSurvey.id) return;
+
+    const confirmed = window.confirm(
+      '설문을 배포하시겠습니까?\n배포하면 현재 설문 상태가 스냅샷으로 저장되고, 응답자는 배포된 버전으로 응답하게 됩니다.'
+    );
+    if (!confirmed) return;
+
+    setIsPublishing(true);
+    try {
+      // 배포 전 저장
+      await new Promise<void>((resolve, reject) => {
+        saveSurveyMutation.mutate(currentSurvey, {
+          onSuccess: () => resolve(),
+          onError: (err) => reject(err),
+        });
+      });
+
+      const version = await publishSurvey(currentSurvey.id);
+      markPublished();
+      alert(`설문이 배포되었습니다. (버전 ${version.versionNumber})`);
+    } catch (error) {
+      alert(`배포 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   // 맨 위로 스크롤
@@ -468,6 +502,16 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
               <Save className="mr-2 h-4 w-4" />
               저장
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePublishSurvey}
+              disabled={isPublishing}
+              className="border-blue-300 text-blue-600 hover:bg-blue-50"
+            >
+              <Rocket className="mr-2 h-4 w-4" />
+              {isPublishing ? '배포 중...' : '배포'}
+            </Button>
             <Button size="sm">
               <Share2 className="mr-2 h-4 w-4" />
               공유
@@ -475,6 +519,26 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
           </div>
         </div>
       </nav>
+
+      {/* 배포 후 수정 경고 배너 */}
+      {isModifiedSincePublish && (
+        <div className="flex items-center justify-between border-b border-amber-200 bg-amber-50 px-6 py-2 text-sm text-amber-800">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
+            <span>배포된 설문이 수정되었습니다. 변경사항을 반영하려면 재배포가 필요합니다.</span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePublishSurvey}
+            disabled={isPublishing}
+            className="border-amber-300 text-amber-800 hover:bg-amber-100"
+          >
+            <Rocket className="mr-2 h-3 w-3" />
+            {isPublishing ? '배포 중...' : '재배포'}
+          </Button>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="mx-auto max-w-7xl p-6">

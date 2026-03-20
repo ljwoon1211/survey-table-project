@@ -256,7 +256,7 @@ export async function getSurveyListWithCounts() {
         slug: survey.slug,
         privateToken: survey.privateToken,
         questionCount: questionList.length,
-        responseCount: 0, // TODO: 응답 수 조회 추가
+        responseCount: 0,
         createdAt: survey.createdAt,
         updatedAt: survey.updatedAt,
         isPublic: survey.isPublic,

@@ -25,7 +25,7 @@ import {
 import {
   createQuestion as createQuestionAction,
   updateQuestion as updateQuestionAction,
-} from '@/actions/survey-actions';
+} from '@/actions/question-actions';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,

@@ -37,14 +37,13 @@ import {
   createQuestion as createQuestionAction,
   deleteQuestion as deleteQuestionAction,
   reorderQuestions as reorderQuestionsAction,
-} from '@/actions/survey-actions';
+} from '@/actions/question-actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { extractImageUrlsFromQuestion } from '@/lib/image-extractor';
 import { convertHtmlImageUrlsToProxy, deleteImagesFromR2 } from '@/lib/image-utils';
-import { generateId } from '@/lib/utils';
-import { isValidUUID } from '@/lib/utils';
+import { generateId, isEmptyHtml, isValidUUID } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { useTestResponseStore } from '@/stores/test-response-store';
 import { useSurveyUIStore } from '@/stores/ui-store';
@@ -194,14 +193,14 @@ function SortableQuestion({
         {/* Question content */}
         <div className="mb-4">
           <h4 className="mb-2 text-base font-medium text-gray-900">{question.title}</h4>
-          {question.description && (
+          {!isEmptyHtml(question.description) && (
             <div
               className="prose prose-sm mb-3 max-w-none overflow-x-auto text-sm text-gray-600 [&_p]:min-h-[1.6em] [&_table]:my-2 [&_table]:w-full [&_table]:table-fixed [&_table]:border-collapse [&_table]:border-2 [&_table]:border-gray-300 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2 [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:bg-transparent [&_table_th]:px-3 [&_table_th]:py-2 [&_table_th]:font-normal"
               style={{
                 WebkitOverflowScrolling: 'touch',
               }}
               dangerouslySetInnerHTML={{
-                __html: convertHtmlImageUrlsToProxy(question.description),
+                __html: convertHtmlImageUrlsToProxy(question.description!),
               }}
             />
           )}
@@ -318,13 +317,13 @@ function QuestionTestCard({ question, index }: { question: Question; index: numb
           {question.required && <span className="text-sm text-red-500">*</span>}
         </div>
         <h3 className="mb-1 text-lg font-medium text-gray-900">{question.title}</h3>
-        {question.description && (
+        {!isEmptyHtml(question.description) && (
           <div
             className="prose prose-sm mb-4 max-w-none overflow-x-auto text-sm text-gray-600 [&_p]:min-h-[1.6em] [&_table]:my-2 [&_table]:w-full [&_table]:table-fixed [&_table]:border-collapse [&_table]:border-2 [&_table]:border-gray-300 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2 [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:bg-transparent [&_table_th]:px-3 [&_table_th]:py-2 [&_table_th]:font-normal"
             style={{
               WebkitOverflowScrolling: 'touch',
             }}
-            dangerouslySetInnerHTML={{ __html: convertHtmlImageUrlsToProxy(question.description) }}
+            dangerouslySetInnerHTML={{ __html: convertHtmlImageUrlsToProxy(question.description!) }}
           />
         )}
       </div>

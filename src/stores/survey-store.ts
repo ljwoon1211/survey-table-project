@@ -20,9 +20,11 @@ export interface SurveyBuilderState {
   // 현재 편집 중인 설문 (메모리에만 유지, TanStack Query로 서버와 동기화)
   currentSurvey: Survey;
   isDirty: boolean; // 변경사항 있음 표시
+  isModifiedSincePublish: boolean; // 배포 후 수정되었는지
 
   // 서버에서 불러온 데이터 설정
   setSurvey: (survey: Survey) => void;
+  markPublished: () => void; // 배포 완료 후 호출
 
   // 액션들
   updateSurveyTitle: (title: string, autoUpdateSlug?: boolean) => void;
@@ -79,12 +81,20 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
     immer<SurveyBuilderState>((set, get) => ({
       currentSurvey: createDefaultSurvey(),
       isDirty: false,
+      isModifiedSincePublish: false,
 
       // 서버에서 불러온 설문 데이터 설정
       setSurvey: (survey: Survey) =>
         set((state) => {
           state.currentSurvey = survey;
           state.isDirty = false;
+          state.isModifiedSincePublish = false;
+        }),
+
+      markPublished: () =>
+        set((state) => {
+          state.currentSurvey.status = 'published';
+          state.isModifiedSincePublish = false;
         }),
 
       updateSurveyTitle: (title: string, autoUpdateSlug: boolean = false) =>
@@ -96,6 +106,9 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
             state.currentSurvey.slug = generateSlugFromTitle(title);
           }
           state.isDirty = true;
+          if (state.currentSurvey.status === 'published') {
+            state.isModifiedSincePublish = true;
+          }
         }),
 
       updateSurveyDescription: (description: string) =>
@@ -103,6 +116,9 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           state.currentSurvey.description = description;
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
+          if (state.currentSurvey.status === 'published') {
+            state.isModifiedSincePublish = true;
+          }
         }),
 
       updateSurveySlug: (slug: string) =>
@@ -110,6 +126,9 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           state.currentSurvey.slug = slug;
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
+          if (state.currentSurvey.status === 'published') {
+            state.isModifiedSincePublish = true;
+          }
         }),
 
       updatePrivateToken: (token: string) =>
@@ -117,6 +136,9 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           state.currentSurvey.privateToken = token;
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
+          if (state.currentSurvey.status === 'published') {
+            state.isModifiedSincePublish = true;
+          }
         }),
 
       regeneratePrivateToken: () => {
@@ -125,6 +147,9 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           state.currentSurvey.privateToken = newToken;
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
+          if (state.currentSurvey.status === 'published') {
+            state.isModifiedSincePublish = true;
+          }
         });
         return newToken;
       },
@@ -153,6 +178,9 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           state.currentSurvey.groups.push(newGroup);
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
+          if (state.currentSurvey.status === 'published') {
+            state.isModifiedSincePublish = true;
+          }
         });
       },
 
@@ -163,6 +191,9 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
             Object.assign(group, updates);
             state.currentSurvey.updatedAt = new Date();
             state.isDirty = true;
+          if (state.currentSurvey.status === 'published') {
+            state.isModifiedSincePublish = true;
+          }
           }
         }),
 
@@ -191,6 +222,9 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
 
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
+          if (state.currentSurvey.status === 'published') {
+            state.isModifiedSincePublish = true;
+          }
         }),
 
       reorderGroups: (groupIds: string[]) =>
@@ -219,6 +253,9 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           state.currentSurvey.groups = [...topLevelGroups, ...remainingGroups];
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
+          if (state.currentSurvey.status === 'published') {
+            state.isModifiedSincePublish = true;
+          }
         }),
 
       toggleGroupCollapse: (groupId: string) =>
@@ -261,6 +298,9 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           );
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
+          if (state.currentSurvey.status === 'published') {
+            state.isModifiedSincePublish = true;
+          }
         });
       },
 
@@ -280,6 +320,9 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           );
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
+          if (state.currentSurvey.status === 'published') {
+            state.isModifiedSincePublish = true;
+          }
         });
       },
 
@@ -290,6 +333,9 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
             Object.assign(question, updates);
             state.currentSurvey.updatedAt = new Date();
             state.isDirty = true;
+          if (state.currentSurvey.status === 'published') {
+            state.isModifiedSincePublish = true;
+          }
           }
         }),
 
@@ -303,6 +349,9 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           );
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
+          if (state.currentSurvey.status === 'published') {
+            state.isModifiedSincePublish = true;
+          }
         }),
 
       reorderQuestions: (questionIds: string[]) =>
@@ -327,6 +376,9 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           state.currentSurvey.questions = regenerateAfterReorder(reorderedQuestions);
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
+          if (state.currentSurvey.status === 'published') {
+            state.isModifiedSincePublish = true;
+          }
         }),
 
       updateSurveySettings: (settings: Partial<SurveySettings>) =>
@@ -334,12 +386,16 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           Object.assign(state.currentSurvey.settings, settings);
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
+          if (state.currentSurvey.status === 'published') {
+            state.isModifiedSincePublish = true;
+          }
         }),
 
       resetSurvey: () =>
         set((state) => {
           state.currentSurvey = createDefaultSurvey();
           state.isDirty = false;
+          state.isModifiedSincePublish = false;
         }),
 
       markClean: () =>

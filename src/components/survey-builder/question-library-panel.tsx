@@ -51,7 +51,7 @@ import {
   useSavedQuestions,
   useSearchQuestions,
 } from '@/hooks/queries/use-library';
-import { cn } from '@/lib/utils';
+import { cn, isEmptyHtml } from '@/lib/utils';
 import { hasBranchLogic, removeBranchLogic } from '@/stores/question-library-store';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { Question, SavedQuestion } from '@/types/survey';
@@ -522,7 +522,7 @@ export function QuestionLibraryPanel({
             <div className="space-y-4 py-4">
               <div className="rounded-lg border bg-gray-50 p-4">
                 <h4 className="mb-2 font-medium text-gray-900">{previewQuestion.question.title}</h4>
-                {previewQuestion.question.description && (
+                {!isEmptyHtml(previewQuestion.question.description) && (
                   <p className="mb-3 text-sm text-gray-500">
                     {previewQuestion.question.description}
                   </p>

@@ -19,6 +19,15 @@ export function isValidUUID(id: string): boolean {
  * UUID v4 생성 (클라이언트/서버 모두 지원)
  * @returns UUID v4 문자열
  */
+/**
+ * TipTap 에디터가 빈 상태일 때 생성하는 HTML인지 확인
+ */
+export function isEmptyHtml(html: string | undefined | null): boolean {
+  if (!html) return true;
+  const trimmed = html.trim();
+  return trimmed === '' || trimmed === '<p></p>' || trimmed === '<p><br></p>' || trimmed === '<p><br/></p>';
+}
+
 export function generateId(): string {
   // crypto.randomUUID()가 지원되면 사용
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {

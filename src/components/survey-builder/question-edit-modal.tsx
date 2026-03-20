@@ -23,7 +23,7 @@ import {
 import {
   createQuestion as createQuestionAction,
   updateQuestion as updateQuestionAction,
-} from '@/actions/survey-actions';
+} from '@/actions/question-actions';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';

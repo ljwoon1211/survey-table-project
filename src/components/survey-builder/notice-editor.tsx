@@ -142,7 +142,7 @@ export function NoticeEditor({
       }
 
       previousContentRef.current = currentHtml;
-      onChange(currentHtml);
+      onChange(editor.isEmpty ? '' : currentHtml);
     },
     onSelectionUpdate: () => {
       // 선택이 변경될 때마다 컴포넌트 리렌더링
