@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, ilike, lte } from 'drizzle-orm';
 
 import { db } from '@/db';
-import { questionGroups, questions, surveys } from '@/db/schema';
+import { questionGroups, questions, surveys, surveyVersions } from '@/db/schema';
 import type { QuestionGroup, Question as QuestionType, Survey as SurveyType } from '@/types/survey';
 
 // ========================
@@ -166,6 +166,76 @@ export async function getSurveyWithDetails(surveyId: string): Promise<SurveyType
   };
 
   return surveyData;
+}
+
+// 응답 페이지용 설문 조회 (배포 버전 스냅샷 우선, fallback 기존 방식)
+export async function getSurveyForResponse(
+  surveyId: string,
+): Promise<{ survey: SurveyType; versionId: string | null } | null> {
+  const survey = await getSurveyById(surveyId);
+  if (!survey) return null;
+
+  // 배포된 버전이 있으면 스냅샷 기반으로 반환
+  if (survey.currentVersionId) {
+    const version = await db.query.surveyVersions.findFirst({
+      where: eq(surveyVersions.id, survey.currentVersionId),
+    });
+
+    if (version && version.snapshot) {
+      const snapshot = version.snapshot as {
+        title: string;
+        description?: string;
+        questions: QuestionType[];
+        groups: Array<{
+          id: string;
+          surveyId: string;
+          name: string;
+          description?: string;
+          order: number;
+          parentGroupId?: string;
+          color?: string;
+          collapsed?: boolean;
+          displayCondition?: QuestionGroup['displayCondition'];
+        }>;
+        settings: {
+          isPublic: boolean;
+          allowMultipleResponses: boolean;
+          showProgressBar: boolean;
+          shuffleQuestions: boolean;
+          requireLogin: boolean;
+          endDate?: string;
+          maxResponses?: number;
+          thankYouMessage: string;
+        };
+      };
+
+      const surveyData: SurveyType = {
+        id: survey.id,
+        title: snapshot.title,
+        description: snapshot.description,
+        slug: survey.slug ?? undefined,
+        privateToken: survey.privateToken ?? undefined,
+        groups: snapshot.groups,
+        questions: snapshot.questions,
+        settings: {
+          ...snapshot.settings,
+          endDate: snapshot.settings.endDate
+            ? new Date(snapshot.settings.endDate)
+            : undefined,
+        },
+        createdAt: survey.createdAt,
+        updatedAt: survey.updatedAt,
+      };
+
+      return { survey: surveyData, versionId: version.id };
+    }
+  }
+
+  // 미배포 설문: 기존 방식 fallback
+  const surveyData = await getSurveyWithDetails(surveyId);
+  if (!surveyData) return null;
+
+  return { survey: surveyData, versionId: null };
 }
 
 // 전체 설문 목록 조회 (요약 정보)

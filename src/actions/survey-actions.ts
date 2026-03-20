@@ -2,9 +2,14 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 
-import { getQuestionGroupsBySurvey, getQuestionsBySurvey, getSurveyById } from '@/data/surveys';
+import {
+  getQuestionGroupsBySurvey,
+  getQuestionsBySurvey,
+  getSurveyById,
+  getSurveyWithDetails,
+} from '@/data/surveys';
 import { db } from '@/db';
 import {
   NewQuestion,
@@ -13,6 +18,7 @@ import {
   questionGroups,
   questions,
   surveys,
+  surveyVersions,
 } from '@/db/schema';
 import { requireAuth } from '@/lib/auth';
 import { extractImageUrlsFromQuestion, extractImageUrlsFromQuestions } from '@/lib/image-extractor';
@@ -24,6 +30,7 @@ import type {
   Survey as SurveyType,
 } from '@/types/survey';
 import type { Question } from '@/types/survey';
+import { buildSurveySnapshot } from '@/lib/versioning/snapshot-builder';
 
 // ========================
 // 설문 변경 액션 (Mutations)
@@ -821,5 +828,72 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
     revalidatePath(`/admin/surveys/${surveyId}`);
 
     return { surveyId };
+  });
+}
+
+// ========================
+// 설문 배포 (Publish)
+// ========================
+
+export async function publishSurvey(surveyId: string, changeNote?: string) {
+  await requireAuth();
+
+  const surveyData = await getSurveyWithDetails(surveyId);
+  if (!surveyData) {
+    throw new Error('설문을 찾을 수 없습니다.');
+  }
+
+  if (!surveyData.questions || surveyData.questions.length === 0) {
+    throw new Error('질문이 없는 설문은 배포할 수 없습니다.');
+  }
+
+  const snapshot = buildSurveySnapshot(surveyData);
+
+  return await db.transaction(async (tx) => {
+    // 1. 기존 published 버전 → superseded
+    await tx
+      .update(surveyVersions)
+      .set({ status: 'superseded' })
+      .where(
+        and(
+          eq(surveyVersions.surveyId, surveyId),
+          eq(surveyVersions.status, 'published'),
+        ),
+      );
+
+    // 2. 다음 버전 번호 계산
+    const latestVersion = await tx.query.surveyVersions.findFirst({
+      where: eq(surveyVersions.surveyId, surveyId),
+      orderBy: [desc(surveyVersions.versionNumber)],
+      columns: { versionNumber: true },
+    });
+    const nextVersionNumber = (latestVersion?.versionNumber ?? 0) + 1;
+
+    // 3. 새 버전 INSERT
+    const [newVersion] = await tx
+      .insert(surveyVersions)
+      .values({
+        surveyId,
+        versionNumber: nextVersionNumber,
+        status: 'published',
+        snapshot,
+        changeNote: changeNote || null,
+      })
+      .returning();
+
+    // 4. surveys 테이블 상태 업데이트
+    await tx
+      .update(surveys)
+      .set({
+        status: 'published',
+        currentVersionId: newVersion.id,
+        updatedAt: new Date(),
+      })
+      .where(eq(surveys.id, surveyId));
+
+    revalidatePath('/admin/surveys');
+    revalidatePath(`/admin/surveys/${surveyId}`);
+
+    return newVersion;
   });
 }

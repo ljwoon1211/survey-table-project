@@ -9,6 +9,7 @@ import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle, Loader2, Lock } from '
 import {
   getSurveyByPrivateToken,
   getSurveyBySlug,
+  getSurveyForResponse,
   getSurveyWithDetails,
 } from '@/actions/query-actions';
 import { completeResponse, startResponse } from '@/actions/response-actions';
@@ -72,6 +73,7 @@ export default function SurveyResponsePage() {
   const [isCompleted, setIsCompleted] = useState(false);
   const [questionHistory, setQuestionHistory] = useState<number[]>([]);
   const [responseStarted, setResponseStarted] = useState(false);
+  const [versionId, setVersionId] = useState<string | null>(null);
 
   // URL 식별자로 설문 조회
   useEffect(() => {
@@ -83,37 +85,42 @@ export default function SurveyResponsePage() {
         // URL 식별자 타입 판별
         const { type, value } = parsesurveyIdentifier(identifier);
 
-        let survey: Survey | null = null;
+        let surveyId: string | null = null;
 
         switch (type) {
           case 'slug': {
             const dbSurvey = await getSurveyBySlug(value);
-            if (dbSurvey) {
-              survey = await getSurveyWithDetails(dbSurvey.id);
-            }
+            if (dbSurvey) surveyId = dbSurvey.id;
             break;
           }
           case 'privateToken': {
             const dbSurvey = await getSurveyByPrivateToken(value);
-            if (dbSurvey) {
-              survey = await getSurveyWithDetails(dbSurvey.id);
-            }
+            if (dbSurvey) surveyId = dbSurvey.id;
             break;
           }
           case 'id':
-            survey = await getSurveyWithDetails(value);
+            surveyId = value;
             break;
         }
 
-        if (!survey) {
+        if (!surveyId) {
           setLoadError('요청하신 설문을 찾을 수 없습니다.');
           setLoadedSurvey(null);
-        } else if (!survey.settings.isPublic && type === 'slug') {
-          // 비공개 설문인데 slug로 접근한 경우
+          return;
+        }
+
+        // 배포 버전 스냅샷 우선, 미배포 시 기존 방식 fallback
+        const result = await getSurveyForResponse(surveyId);
+
+        if (!result) {
+          setLoadError('요청하신 설문을 찾을 수 없습니다.');
+          setLoadedSurvey(null);
+        } else if (!result.survey.settings.isPublic && type === 'slug') {
           setLoadError('이 설문은 비공개 설문입니다. 올바른 링크로 접근해주세요.');
           setLoadedSurvey(null);
         } else {
-          setLoadedSurvey(survey);
+          setLoadedSurvey(result.survey);
+          setVersionId(result.versionId);
         }
       } catch (error) {
         console.error('설문 로딩 오류:', error);
@@ -127,17 +134,17 @@ export default function SurveyResponsePage() {
     loadSurvey();
   }, [identifier]);
 
-  // 설문 응답 시작 - DB에 레코드 생성
+  // 설문 응답 시작 - DB에 레코드 생성 (versionId 포함)
   useEffect(() => {
     if (loadedSurvey && !responseStarted) {
       setResponseStarted(true);
-      startResponse(loadedSurvey.id).then((dbResponse) => {
+      startResponse(loadedSurvey.id, undefined, versionId ?? undefined).then((dbResponse) => {
         setCurrentResponseId(dbResponse.id);
       }).catch((err) => {
         console.error('응답 시작 오류:', err);
       });
     }
-  }, [loadedSurvey, responseStarted, setCurrentResponseId]);
+  }, [loadedSurvey, responseStarted, setCurrentResponseId, versionId]);
 
   // 현재 설문의 질문들
   const questions = useMemo(() => loadedSurvey?.questions || [], [loadedSurvey]);

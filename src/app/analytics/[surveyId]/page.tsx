@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import {
   exportResponsesAsCsv,
   exportResponsesAsJson,
-  getCompletedResponses,
+  getResponsesWithAnswers,
+  getSurveyVersions,
 } from '@/data/responses';
 import { getSurveyWithDetails } from '@/data/surveys';
 
@@ -19,10 +20,11 @@ interface AnalyticsPageProps {
 export default async function SurveyAnalyticsPage({ params }: AnalyticsPageProps) {
   const { surveyId } = await params;
 
-  // 설문 및 응답 데이터 조회
-  const [survey, responses] = await Promise.all([
+  // 설문 및 응답 데이터 조회 (response_answers 우선, JSONB fallback)
+  const [survey, responses, versions] = await Promise.all([
     getSurveyWithDetails(surveyId),
-    getCompletedResponses(surveyId),
+    getResponsesWithAnswers(surveyId),
+    getSurveyVersions(surveyId),
   ]);
 
   if (!survey) {
@@ -81,6 +83,7 @@ export default async function SurveyAnalyticsPage({ params }: AnalyticsPageProps
             questions: survey.questions,
           }}
           responses={responses}
+          versions={versions}
           onExportJson={handleExportJson}
           onExportCsv={handleExportCsv}
         />

@@ -58,6 +58,10 @@ export async function getSurveyListWithCounts() {
   return surveyData.getSurveyListWithCounts();
 }
 
+export async function getSurveyForResponse(surveyId: string) {
+  return surveyData.getSurveyForResponse(surveyId);
+}
+
 // ========================
 // Response 조회
 // ========================
@@ -68,6 +72,14 @@ export async function getResponsesBySurvey(surveyId: string) {
 
 export async function getCompletedResponses(surveyId: string) {
   return responseData.getCompletedResponses(surveyId);
+}
+
+export async function getResponsesWithAnswers(surveyId: string, versionId?: string | null) {
+  return responseData.getResponsesWithAnswers(surveyId, versionId);
+}
+
+export async function getSurveyVersions(surveyId: string) {
+  return responseData.getSurveyVersions(surveyId);
 }
 
 export async function getResponseById(responseId: string) {

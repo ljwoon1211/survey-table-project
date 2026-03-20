@@ -21,6 +21,14 @@ import { ExportPanel } from './export-panel';
 import { FilterPanel } from './filters';
 import { QuestionAnalytics } from './question-analytics';
 
+interface SurveyVersionInfo {
+  id: string;
+  versionNumber: number;
+  status: string;
+  changeNote: string | null;
+  publishedAt: Date;
+}
+
 interface AnalyticsDashboardClientProps {
   survey: {
     id: string;
@@ -28,6 +36,7 @@ interface AnalyticsDashboardClientProps {
     questions: Question[];
   };
   responses: SurveyResponse[];
+  versions?: SurveyVersionInfo[];
   onExportJson: () => Promise<string>;
   onExportCsv: () => Promise<string>;
 }
@@ -35,16 +44,26 @@ interface AnalyticsDashboardClientProps {
 export function AnalyticsDashboardClient({
   survey,
   responses,
+  versions,
   onExportJson,
   onExportCsv,
 }: AnalyticsDashboardClientProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<FilterState>(createEmptyFilter());
+  const [selectedVersionId, setSelectedVersionId] = useState<string | ''>('');
 
-  // 필터링된 응답
+  // 버전 필터링
+  const versionFilteredResponses = useMemo(() => {
+    if (!selectedVersionId) return responses;
+    return responses.filter(
+      (r) => (r as typeof r & { versionId?: string | null }).versionId === selectedVersionId,
+    );
+  }, [responses, selectedVersionId]);
+
+  // 필터링된 응답 (버전 필터 → 조건 필터 순서)
   const filteredResponses = useMemo(() => {
-    return applyFilter(filter, responses, survey.questions);
-  }, [filter, responses, survey.questions]);
+    return applyFilter(filter, versionFilteredResponses, survey.questions);
+  }, [filter, versionFilteredResponses, survey.questions]);
 
   // 필터링된 응답으로 분석 데이터 재계산
   const analytics: SurveyAnalytics = useMemo(() => {
@@ -119,14 +138,32 @@ export function AnalyticsDashboardClient({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{analytics.surveyTitle}</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            설문 응답 분석 대시보드
-            {hasActiveFilter && (
-              <span className="ml-2 text-blue-600">
-                (필터 적용됨: {filteredResponses.length}/{responses.length}명)
-              </span>
+          <div className="mt-1 flex items-center gap-3">
+            <p className="text-sm text-gray-500">
+              설문 응답 분석 대시보드
+              {hasActiveFilter && (
+                <span className="ml-2 text-blue-600">
+                  (필터 적용됨: {filteredResponses.length}/{responses.length}명)
+                </span>
+              )}
+            </p>
+            {versions && versions.length > 0 && (
+              <select
+                className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-700"
+                value={selectedVersionId}
+                onChange={(e) => setSelectedVersionId(e.target.value)}
+              >
+                <option value="">전체 버전</option>
+                {versions.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    v{v.versionNumber}
+                    {v.status === 'published' ? ' (현재)' : ''}
+                    {v.changeNote ? ` - ${v.changeNote}` : ''}
+                  </option>
+                ))}
+              </select>
             )}
-          </p>
+          </div>
         </div>
         <ExportPanel
           surveyId={analytics.surveyId}

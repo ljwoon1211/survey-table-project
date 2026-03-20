@@ -5,8 +5,9 @@ import { revalidatePath } from 'next/cache';
 import { eq, sql } from 'drizzle-orm';
 
 import { db } from '@/db';
-import { NewSurveyResponse, surveyResponses } from '@/db/schema';
+import { NewSurveyResponse, questions, responseAnswers, surveyResponses } from '@/db/schema';
 import { requireAuth } from '@/lib/auth';
+import { normalizeToAnswers } from '@/lib/response-normalizer';
 
 // ========================
 // 응답 변경 액션 (Mutations)
@@ -18,12 +19,17 @@ import { requireAuth } from '@/lib/auth';
 // - completeResponse
 
 // 응답 시작
-export async function startResponse(surveyId: string, sessionId?: string) {
+export async function startResponse(
+  surveyId: string,
+  sessionId?: string,
+  versionId?: string,
+) {
   const newResponse: NewSurveyResponse = {
     surveyId,
     questionResponses: {},
     isCompleted: false,
     sessionId: sessionId || `session-${Date.now()}`,
+    versionId: versionId || null,
   };
 
   const [response] = await db.insert(surveyResponses).values(newResponse).returning();
@@ -58,7 +64,9 @@ export async function updateQuestionResponse(
   return updated;
 }
 
-// 응답 완료
+// 응답 완료 (JSONB + response_answers 이중 쓰기)
+// 읽기: response_answers 우선 (getResponsesWithAnswers), JSONB fallback
+// JSONB 쓰기는 마이그레이션 완료 + 모든 읽기 경로 전환 후 제거 예정
 export async function completeResponse(
   responseId: string,
   data?: {
@@ -67,26 +75,52 @@ export async function completeResponse(
     exposedRowIds?: string[];
   },
 ) {
-  const [updated] = await db
-    .update(surveyResponses)
-    .set({
-      isCompleted: true,
-      completedAt: new Date(),
-      ...(data?.questionResponses ? { questionResponses: data.questionResponses } : {}),
-      ...((data?.exposedQuestionIds || data?.exposedRowIds)
-        ? {
-            metadata: {
-              ...(data?.exposedQuestionIds ? { exposedQuestionIds: data.exposedQuestionIds } : {}),
-              ...(data?.exposedRowIds ? { exposedRowIds: data.exposedRowIds } : {}),
-            },
-          }
-        : {}),
-    })
-    .where(eq(surveyResponses.id, responseId))
-    .returning();
+  const result = await db.transaction(async (tx) => {
+    // 1. 기존 JSONB 방식 저장
+    const [updated] = await tx
+      .update(surveyResponses)
+      .set({
+        isCompleted: true,
+        completedAt: new Date(),
+        ...(data?.questionResponses ? { questionResponses: data.questionResponses } : {}),
+        ...((data?.exposedQuestionIds || data?.exposedRowIds)
+          ? {
+              metadata: {
+                ...(data?.exposedQuestionIds
+                  ? { exposedQuestionIds: data.exposedQuestionIds }
+                  : {}),
+                ...(data?.exposedRowIds ? { exposedRowIds: data.exposedRowIds } : {}),
+              },
+            }
+          : {}),
+      })
+      .where(eq(surveyResponses.id, responseId))
+      .returning();
+
+    // 2. response_answers 정규화 저장 (이중 쓰기)
+    if (data?.questionResponses && Object.keys(data.questionResponses).length > 0) {
+      // 해당 응답의 설문 질문 목록 조회
+      const questionList = await tx.query.questions.findMany({
+        where: eq(questions.surveyId, updated.surveyId),
+        columns: { id: true, type: true },
+      });
+
+      const normalizedAnswers = normalizeToAnswers(
+        responseId,
+        data.questionResponses,
+        questionList,
+      );
+
+      if (normalizedAnswers.length > 0) {
+        await tx.insert(responseAnswers).values(normalizedAnswers);
+      }
+    }
+
+    return updated;
+  });
 
   revalidatePath('/analytics');
-  return updated;
+  return result;
 }
 
 // 응답 삭제 (관리자 전용)

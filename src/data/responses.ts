@@ -1,7 +1,8 @@
-import { and, count, desc, eq } from 'drizzle-orm';
+import { and, count, desc, eq, isNull } from 'drizzle-orm';
 
 import { db } from '@/db';
-import { surveyResponses } from '@/db/schema';
+import { responseAnswers, surveyResponses, surveyVersions } from '@/db/schema';
+import { answersToQuestionResponses } from '@/lib/analytics/response-adapter';
 
 // ========================
 // 응답 조회 함수
@@ -51,6 +52,61 @@ export async function getCompletedResponseCountBySurvey(surveyId: string) {
     .where(and(eq(surveyResponses.surveyId, surveyId), eq(surveyResponses.isCompleted, true)));
 
   return result[0]?.count || 0;
+}
+
+// 버전별 완료된 응답 조회 (response_answers JOIN + 어댑터 변환)
+export async function getResponsesWithAnswers(
+  surveyId: string,
+  versionId?: string | null,
+) {
+  // 버전 필터 조건 구성
+  const conditions = [
+    eq(surveyResponses.surveyId, surveyId),
+    eq(surveyResponses.isCompleted, true),
+  ];
+
+  if (versionId) {
+    conditions.push(eq(surveyResponses.versionId, versionId));
+  }
+
+  const responses = await db.query.surveyResponses.findMany({
+    where: and(...conditions),
+    with: {
+      answers: true,
+    },
+    orderBy: [desc(surveyResponses.completedAt)],
+  });
+
+  // response_answers가 있으면 어댑터로 변환, 없으면 기존 JSONB 사용
+  return responses.map((r) => {
+    const answers = (r as typeof r & { answers?: typeof responseAnswers.$inferSelect[] }).answers;
+    if (answers && answers.length > 0) {
+      return {
+        ...r,
+        questionResponses: answersToQuestionResponses(answers),
+      };
+    }
+    return r;
+  });
+}
+
+// 설문의 버전 목록 조회
+export async function getSurveyVersions(surveyId: string) {
+  const versions = await db.query.surveyVersions.findMany({
+    where: and(
+      eq(surveyVersions.surveyId, surveyId),
+      isNull(surveyVersions.deletedAt),
+    ),
+    orderBy: [desc(surveyVersions.versionNumber)],
+    columns: {
+      id: true,
+      versionNumber: true,
+      status: true,
+      changeNote: true,
+      publishedAt: true,
+    },
+  });
+  return versions;
 }
 
 // ========================

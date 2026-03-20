@@ -19,6 +19,13 @@ export const surveys = pgTable('surveys', {
   maxResponses: integer('max_responses'),
   thankYouMessage: text('thank_you_message').default('응답해주셔서 감사합니다!').notNull(),
 
+  // 버전 관리
+  status: text('status').notNull().default('draft'), // 'draft' | 'published' | 'closed'
+  currentVersionId: uuid('current_version_id'), // 현재 활성 배포 버전
+
+  // soft delete
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -121,6 +128,51 @@ export const surveyResponses = pgTable('survey_responses', {
     [key: string]: unknown;
   }>(),
 
+  // 버전 연결
+  versionId: uuid('version_id'),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// 설문 버전 스냅샷 테이블
+export const surveyVersions = pgTable('survey_versions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  surveyId: uuid('survey_id')
+    .notNull()
+    .references(() => surveys.id, { onDelete: 'cascade' }),
+
+  versionNumber: integer('version_number').notNull(),
+  status: text('status').notNull().default('published'), // 'published' | 'superseded' | 'closed'
+
+  // 배포 시점의 전체 설문 구조 (불변 — 수정 금지)
+  snapshot: jsonb('snapshot').notNull().$type<SurveyVersionSnapshot>(),
+
+  changeNote: text('change_note'),
+  publishedAt: timestamp('published_at', { withTimezone: true }).defaultNow().notNull(),
+  closedAt: timestamp('closed_at', { withTimezone: true }),
+
+  // soft delete
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// 정규화된 응답 테이블
+export const responseAnswers = pgTable('response_answers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  responseId: uuid('response_id')
+    .notNull()
+    .references(() => surveyResponses.id, { onDelete: 'cascade' }),
+  questionId: uuid('question_id').notNull(),
+
+  // 값 저장 (타입별 분리)
+  textValue: text('text_value'),
+  arrayValue: jsonb('array_value').$type<string[]>(),
+  objectValue: jsonb('object_value').$type<Record<string, unknown>>(),
+
+  // 역정규화 (빠른 필터링)
+  questionType: text('question_type').notNull(),
+
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -162,6 +214,7 @@ export const surveysRelations = relations(surveys, ({ many }) => ({
   questions: many(questions),
   groups: many(questionGroups),
   responses: many(surveyResponses),
+  versions: many(surveyVersions),
 }));
 
 export const questionsRelations = relations(questions, ({ one }) => ({
@@ -191,16 +244,66 @@ export const questionGroupsRelations = relations(questionGroups, ({ one, many })
   questions: many(questions),
 }));
 
-export const surveyResponsesRelations = relations(surveyResponses, ({ one }) => ({
+export const surveyResponsesRelations = relations(surveyResponses, ({ one, many }) => ({
   survey: one(surveys, {
     fields: [surveyResponses.surveyId],
     references: [surveys.id],
+  }),
+  version: one(surveyVersions, {
+    fields: [surveyResponses.versionId],
+    references: [surveyVersions.id],
+  }),
+  answers: many(responseAnswers),
+}));
+
+export const surveyVersionsRelations = relations(surveyVersions, ({ one, many }) => ({
+  survey: one(surveys, {
+    fields: [surveyVersions.surveyId],
+    references: [surveys.id],
+  }),
+  responses: many(surveyResponses),
+}));
+
+export const responseAnswersRelations = relations(responseAnswers, ({ one }) => ({
+  response: one(surveyResponses, {
+    fields: [responseAnswers.responseId],
+    references: [surveyResponses.id],
   }),
 }));
 
 // ========================
 // TypeScript 타입 정의
 // ========================
+
+// 버전 스냅샷 타입
+interface SurveyVersionSnapshot {
+  title: string;
+  description?: string;
+  questions: QuestionData[];
+  groups: QuestionGroupData[];
+  settings: {
+    isPublic: boolean;
+    allowMultipleResponses: boolean;
+    showProgressBar: boolean;
+    shuffleQuestions: boolean;
+    requireLogin: boolean;
+    endDate?: string;
+    maxResponses?: number;
+    thankYouMessage: string;
+  };
+}
+
+interface QuestionGroupData {
+  id: string;
+  surveyId: string;
+  name: string;
+  description?: string;
+  order: number;
+  parentGroupId?: string;
+  color?: string;
+  collapsed?: boolean;
+  displayCondition?: QuestionConditionGroup;
+}
 
 // 분기 규칙
 interface BranchRule {
@@ -385,3 +488,9 @@ export type NewSavedQuestion = typeof savedQuestions.$inferInsert;
 
 export type QuestionCategory = typeof questionCategories.$inferSelect;
 export type NewQuestionCategory = typeof questionCategories.$inferInsert;
+
+export type SurveyVersion = typeof surveyVersions.$inferSelect;
+export type NewSurveyVersion = typeof surveyVersions.$inferInsert;
+
+export type ResponseAnswer = typeof responseAnswers.$inferSelect;
+export type NewResponseAnswer = typeof responseAnswers.$inferInsert;
