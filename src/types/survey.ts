@@ -165,6 +165,9 @@ export interface TableColumn {
   label: string;
   width?: number; // 열 너비 (픽셀 단위)
   minWidth?: number; // 최소 너비
+  // 컬럼 헤더 병합 관련 속성
+  colspan?: number; // 헤더 가로 병합
+  isHeaderHidden?: boolean; // 다른 컬럼의 colspan에 의해 숨겨진 헤더
 }
 
 export interface SelectLevel {

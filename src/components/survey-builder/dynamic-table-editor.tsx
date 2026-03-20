@@ -8,10 +8,12 @@ import {
   CheckSquare,
   Circle,
   Clipboard,
+  Combine,
   Copy,
   Image,
   Plus,
   Trash2,
+  Unlink,
   Video,
 } from 'lucide-react';
 
@@ -147,6 +149,68 @@ export function DynamicTableEditor({
       });
     },
     [onTableChange],
+  );
+
+  // 컬럼 헤더의 isHeaderHidden 재계산
+  const recalculateHiddenHeaders = useCallback((cols: TableColumn[]): TableColumn[] => {
+    return cols.map((col, i) => {
+      let shouldBeHidden = false;
+      for (let j = 0; j < i; j++) {
+        const checkCol = cols[j];
+        const colspan = checkCol.colspan || 1;
+        if (colspan > 1 && i >= j && i < j + colspan) {
+          shouldBeHidden = true;
+          break;
+        }
+      }
+      return { ...col, isHeaderHidden: shouldBeHidden || undefined };
+    });
+  }, []);
+
+  // 컬럼 헤더 병합 (현재 컬럼과 오른쪽 컬럼 병합)
+  const mergeColumnHeaders = useCallback(
+    (columnIndex: number) => {
+      const cols = [...currentColumns];
+      const currentCol = cols[columnIndex];
+      const currentColspan = currentCol.colspan || 1;
+      const nextVisibleIndex = columnIndex + currentColspan;
+
+      if (nextVisibleIndex >= cols.length) return;
+
+      const targetCol = cols[nextVisibleIndex];
+      const targetColspan = targetCol.colspan || 1;
+
+      cols[columnIndex] = {
+        ...currentCol,
+        colspan: currentColspan + targetColspan,
+      };
+
+      cols[nextVisibleIndex] = {
+        ...targetCol,
+        colspan: undefined,
+      };
+
+      const updatedCols = recalculateHiddenHeaders(cols);
+      setCurrentColumns(updatedCols);
+      notifyChange(currentTitle, updatedCols, currentRows);
+    },
+    [currentColumns, currentTitle, currentRows, recalculateHiddenHeaders, notifyChange],
+  );
+
+  // 컬럼 헤더 병합 해제
+  const unmergeColumnHeader = useCallback(
+    (columnIndex: number) => {
+      const cols = [...currentColumns];
+      cols[columnIndex] = {
+        ...cols[columnIndex],
+        colspan: undefined,
+      };
+
+      const updatedCols = recalculateHiddenHeaders(cols);
+      setCurrentColumns(updatedCols);
+      notifyChange(currentTitle, updatedCols, currentRows);
+    },
+    [currentColumns, currentTitle, currentRows, recalculateHiddenHeaders, notifyChange],
   );
 
   // 제목 업데이트
@@ -1184,124 +1248,170 @@ export function DynamicTableEditor({
                     </div>
                   </th>
 
-                  {currentColumns.map((column, columnIndex) => (
-                    <th
-                      key={column.id}
-                      className="relative border border-gray-300 bg-gray-50 p-2"
-                      style={{
-                        width: column.width ? `${column.width}px` : '150px',
-                      }}
-                    >
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 space-y-1">
-                            <Input
-                              value={column.label}
-                              onChange={(e) => updateColumnLabel(columnIndex, e.target.value)}
-                              className="h-8 border border-gray-200 bg-white text-center text-sm"
-                              placeholder="열 제목"
-                            />
-                            <Input
-                              value={column.columnCode || ''}
-                              onChange={(e) => {
-                                const updatedColumns = currentColumns.map((col, idx) =>
-                                  idx === columnIndex ? { ...col, columnCode: e.target.value } : col
-                                );
-                                setCurrentColumns(updatedColumns);
-                                notifyChange(currentTitle, updatedColumns, currentRows);
-                              }}
-                              className="h-5 border-none bg-gray-100 px-1 text-center text-[10px] text-gray-600 focus-visible:ring-0"
-                              placeholder="열 코드 (엑셀용)"
-                            />
-                          </div>
-                          <div className="flex items-center">
-                            <Button
-                              onClick={() => moveColumn(columnIndex, 'left')}
-                              disabled={columnIndex === 0}
-                              size="sm"
-                              variant="ghost"
-                              className="h-6 w-5 p-0 text-gray-400 hover:text-gray-700 disabled:opacity-30"
-                              title="왼쪽으로 이동"
-                            >
-                              <ArrowLeft className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              onClick={() => moveColumn(columnIndex, 'right')}
-                              disabled={columnIndex === currentColumns.length - 1}
-                              size="sm"
-                              variant="ghost"
-                              className="h-6 w-5 p-0 text-gray-400 hover:text-gray-700 disabled:opacity-30"
-                              title="오른쪽으로 이동"
-                            >
-                              <ArrowRight className="h-3 w-3" />
-                            </Button>
-                            {currentColumns.length > 1 && (
+                  {currentColumns.map((column, columnIndex) => {
+                    // 병합으로 숨겨진 헤더는 렌더링하지 않음
+                    if (column.isHeaderHidden) return null;
+
+                    const headerColspan = column.colspan || 1;
+                    const isHeaderMerged = headerColspan > 1;
+                    // 병합된 컬럼들의 너비 합산
+                    const mergedWidth = isHeaderMerged
+                      ? currentColumns
+                          .slice(columnIndex, columnIndex + headerColspan)
+                          .reduce((sum, col) => sum + (col.width || 150), 0)
+                      : (column.width || 150);
+                    const canMergeRight = columnIndex + headerColspan < currentColumns.length;
+
+                    return (
+                      <th
+                        key={column.id}
+                        className="relative border border-gray-300 bg-gray-50 p-2"
+                        style={{ width: `${mergedWidth}px` }}
+                        colSpan={headerColspan}
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 space-y-1">
+                              <Input
+                                value={column.label}
+                                onChange={(e) => updateColumnLabel(columnIndex, e.target.value)}
+                                className="h-8 border border-gray-200 bg-white text-center text-sm"
+                                placeholder="열 제목"
+                              />
+                              <Input
+                                value={column.columnCode || ''}
+                                onChange={(e) => {
+                                  const updatedColumns = currentColumns.map((col, idx) =>
+                                    idx === columnIndex ? { ...col, columnCode: e.target.value } : col
+                                  );
+                                  setCurrentColumns(updatedColumns);
+                                  notifyChange(currentTitle, updatedColumns, currentRows);
+                                }}
+                                className="h-5 border-none bg-gray-100 px-1 text-center text-[10px] text-gray-600 focus-visible:ring-0"
+                                placeholder="열 코드 (엑셀용)"
+                              />
+                            </div>
+                            <div className="flex items-center">
                               <Button
-                                onClick={() => deleteColumn(columnIndex)}
+                                onClick={() => moveColumn(columnIndex, 'left')}
+                                disabled={columnIndex === 0}
                                 size="sm"
                                 variant="ghost"
-                                className="ml-1 h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                                className="h-6 w-5 p-0 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                                title="왼쪽으로 이동"
                               >
-                                <Trash2 className="h-3 w-3" />
+                                <ArrowLeft className="h-3 w-3" />
                               </Button>
-                            )}
+                              <Button
+                                onClick={() => moveColumn(columnIndex, 'right')}
+                                disabled={columnIndex === currentColumns.length - 1}
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 w-5 p-0 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                                title="오른쪽으로 이동"
+                              >
+                                <ArrowRight className="h-3 w-3" />
+                              </Button>
+                              {currentColumns.length > 1 && (
+                                <Button
+                                  onClick={() => deleteColumn(columnIndex)}
+                                  size="sm"
+                                  variant="ghost"
+                                  className="ml-1 h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-gray-500">
+                            <div className="flex items-center gap-1">
+                              <span>열 #{columnIndex + 1}</span>
+                              {isHeaderMerged && (
+                                <span className="font-medium text-orange-600">
+                                  🔗 {headerColspan}열 병합
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {/* 헤더 병합/해제 버튼 */}
+                              {isHeaderMerged && (
+                                <Button
+                                  onClick={() => unmergeColumnHeader(columnIndex)}
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-5 px-1 text-orange-600 hover:text-orange-800"
+                                  title="헤더 병합 해제"
+                                >
+                                  <Unlink className="h-3 w-3" />
+                                </Button>
+                              )}
+                              {canMergeRight && (
+                                <Button
+                                  onClick={() => mergeColumnHeaders(columnIndex)}
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-5 px-1 text-gray-400 hover:text-blue-600"
+                                  title="오른쪽 열과 헤더 병합"
+                                >
+                                  <Combine className="h-3 w-3" />
+                                </Button>
+                              )}
+                              {editingColumnWidth?.columnIndex === columnIndex ? (
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    min={0}
+                                    value={editingColumnWidth.value}
+                                    onChange={(e) => {
+                                      setEditingColumnWidth({
+                                        columnIndex,
+                                        value: e.target.value,
+                                      });
+                                    }}
+                                    onBlur={() => {
+                                      const width = parseInt(editingColumnWidth.value);
+                                      if (!isNaN(width) && width >= 0) {
+                                        handleColumnWidthChange(columnIndex, width);
+                                      }
+                                      setEditingColumnWidth(null);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        const width = parseInt(editingColumnWidth.value);
+                                        if (!isNaN(width) && width >= 0) {
+                                          handleColumnWidthChange(columnIndex, width);
+                                        }
+                                        setEditingColumnWidth(null);
+                                      } else if (e.key === 'Escape') {
+                                        setEditingColumnWidth(null);
+                                      }
+                                    }}
+                                    className="h-5 w-14 px-1 text-xs"
+                                    autoFocus
+                                  />
+                                  <span>px</span>
+                                </div>
+                              ) : (
+                                <span
+                                  className="cursor-pointer hover:text-blue-600 hover:underline"
+                                  onClick={() => {
+                                    setEditingColumnWidth({
+                                      columnIndex,
+                                      value: String(column.width || 150),
+                                    });
+                                  }}
+                                  title="클릭하여 너비 변경"
+                                >
+                                  {column.width ? `${column.width}px` : '150px'}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center justify-between text-xs text-gray-500">
-                          <span>열 #{columnIndex + 1}</span>
-                          {editingColumnWidth?.columnIndex === columnIndex ? (
-                            <div className="flex items-center gap-1">
-                              <Input
-                                type="number"
-                                min={0}
-                                value={editingColumnWidth.value}
-                                onChange={(e) => {
-                                  setEditingColumnWidth({
-                                    columnIndex,
-                                    value: e.target.value,
-                                  });
-                                }}
-                                onBlur={() => {
-                                  const width = parseInt(editingColumnWidth.value);
-                                  if (!isNaN(width) && width >= 0) {
-                                    handleColumnWidthChange(columnIndex, width);
-                                  }
-                                  setEditingColumnWidth(null);
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    const width = parseInt(editingColumnWidth.value);
-                                    if (!isNaN(width) && width >= 0) {
-                                      handleColumnWidthChange(columnIndex, width);
-                                    }
-                                    setEditingColumnWidth(null);
-                                  } else if (e.key === 'Escape') {
-                                    setEditingColumnWidth(null);
-                                  }
-                                }}
-                                className="h-5 w-14 px-1 text-xs"
-                                autoFocus
-                              />
-                              <span>px</span>
-                            </div>
-                          ) : (
-                            <span
-                              className="cursor-pointer hover:text-blue-600 hover:underline"
-                              onClick={() => {
-                                setEditingColumnWidth({
-                                  columnIndex,
-                                  value: String(column.width || 150),
-                                });
-                              }}
-                              title="클릭하여 너비 변경"
-                            >
-                              {column.width ? `${column.width}px` : '150px'}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </th>
-                  ))}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
 
@@ -1314,8 +1424,8 @@ export function DynamicTableEditor({
                     className="group/row"
                   >
                     {/* 행 이름(라벨) 입력칸 */}
-                    <td className="sticky left-0 z-10 w-[70px] min-w-[70px] border border-gray-300 bg-gray-50 p-1">
-                      <div className="space-y-1">
+                    <td className="group/label sticky left-0 z-10 w-[70px] min-w-[70px] border border-gray-300 bg-gray-50 p-1">
+                      <div className="relative space-y-1">
                         <Input
                           value={row.label}
                           onChange={(e) => updateRowLabel(rowIndex, e.target.value)}
@@ -1330,6 +1440,15 @@ export function DynamicTableEditor({
                           placeholder="행 코드"
                           title={`엑셀 코드: ${row.rowCode || '(자동)'}`}
                         />
+                        {currentRows.length > 1 && (
+                          <button
+                            onClick={() => deleteRow(rowIndex)}
+                            className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white shadow-sm hover:bg-red-600 group-hover/label:flex"
+                            title="행 삭제"
+                          >
+                            <Trash2 className="h-2.5 w-2.5" />
+                          </button>
+                        )}
                       </div>
                     </td>
 

@@ -279,15 +279,23 @@ export function TablePreview({
             {/* 헤더 */}
             <thead>
               <tr>
-                {columns.map((column) => (
-                  <th
-                    key={column.id}
-                    className="border border-gray-300 bg-gray-50 p-3 text-center font-medium"
-                    style={{ width: `${column.width || 150}px` }}
-                  >
-                    {column.label || <span className="text-sm text-gray-400 italic"></span>}
-                  </th>
-                ))}
+                {columns.map((column, colIndex) => {
+                  if (column.isHeaderHidden) return null;
+                  const headerColspan = column.colspan || 1;
+                  const mergedWidth = headerColspan > 1
+                    ? columns.slice(colIndex, colIndex + headerColspan).reduce((sum, col) => sum + (col.width || 150), 0)
+                    : (column.width || 150);
+                  return (
+                    <th
+                      key={column.id}
+                      className="border border-gray-300 bg-gray-50 p-3 text-center font-medium"
+                      style={{ width: `${mergedWidth}px` }}
+                      colSpan={headerColspan}
+                    >
+                      {column.label || <span className="text-sm text-gray-400 italic"></span>}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
 
