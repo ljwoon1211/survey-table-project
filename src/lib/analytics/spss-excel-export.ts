@@ -63,7 +63,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
         columns.push({
           spssVarName: `${q.questionCode}M${i + 1}`,
           questionText: q.title,
-          optionLabel: `${i + 1}. ${opt.label}`,
+          optionLabel: opt.label,
           questionId: q.id,
           type: 'checkbox-item',
           optionIndex: i,
@@ -82,7 +82,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
       }
     } else if (q.type === 'radio' || q.type === 'select') {
       const optionLabel = q.options
-        ? q.options.map((o, i) => `${i + 1}. ${o.label}`).join(' / ')
+        ? q.options.map((o) => o.label).join(' / ')
         : '';
       columns.push({
         spssVarName: q.questionCode,
@@ -122,7 +122,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
           } else {
             const opts = cell.radioOptions || cell.selectOptions;
             if (opts && opts.length > 0) {
-              optionLabel = opts.map((o, i) => `${o.spssNumericCode ?? i + 1}. ${o.label}`).join(' / ');
+              optionLabel = opts.map((o) => o.label).join(' / ');
             }
           }
 

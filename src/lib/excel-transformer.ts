@@ -71,8 +71,10 @@ export function generateRawDataCombinedWorkbook(
 
   // 1행: 메타 label + 질문 label
   const headerRow1 = [...metaLabels, ...columns.map((col) => col.questionText)];
-  // 2행: 메타 변수명 + SPSS 변수명
-  const headerRow2 = [...metaVarNames, ...columns.map((col) => col.spssVarName)];
+  // 2행: 메타 빈칸 + 응답 라벨
+  const headerRow2 = [...metaLabels.map(() => ''), ...columns.map((col) => col.optionLabel)];
+  // 3행: 메타 변수명 + SPSS 변수명
+  const headerRow3 = [...metaVarNames, ...columns.map((col) => col.spssVarName)];
 
   // 데이터 행: 메타데이터 + 응답 데이터
   const metaColCount = metaLabels.length;
@@ -95,7 +97,7 @@ export function generateRawDataCombinedWorkbook(
     return [...metaCols, ...dataRows[idx]];
   });
 
-  const aoa: (string | number | null)[][] = [headerRow1, headerRow2, ...fullDataRows];
+  const aoa: (string | number | null)[][] = [headerRow1, headerRow2, headerRow3, ...fullDataRows];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
 
   // 동일 질문 텍스트 셀 병합 (메타 컬럼 오프셋 반영)
