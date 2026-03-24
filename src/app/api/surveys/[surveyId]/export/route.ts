@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { eq } from 'drizzle-orm';
+import { count, eq } from 'drizzle-orm';
 import * as XLSX from 'xlsx';
 
 import { db } from '@/db';
@@ -12,7 +12,13 @@ import {
   generateSummaryWorkbook,
   generateVariableMapWorkbook,
 } from '@/lib/excel-transformer';
-import { Survey, SurveyResponse, SurveySubmission } from '@/types/survey';
+import { Question, Survey, SurveySubmission } from '@/types/survey';
+
+// Vercel serverless 최대 실행시간 30초 (기본 10초)
+export const maxDuration = 30;
+
+const ALLOWED_EXPORT_TYPES = ['raw-all', 'raw-individual', 'summary', 'map', 'sav'] as const;
+type ExportType = (typeof ALLOWED_EXPORT_TYPES)[number];
 
 export async function GET(
   request: NextRequest,
@@ -21,8 +27,13 @@ export async function GET(
   try {
     const { surveyId } = await params;
     const searchParams = request.nextUrl.searchParams;
-    const type = searchParams.get('type');
+    const type = searchParams.get('type') as ExportType | null;
     const include = searchParams.get('include') || '';
+
+    // type 파라미터 화이트리스트 검증
+    if (type && !ALLOWED_EXPORT_TYPES.includes(type as ExportType)) {
+      return NextResponse.json({ error: '지원하지 않는 내보내기 형식입니다.' }, { status: 400 });
+    }
 
     // 1. 설문 데이터 조회
     const surveyData = await db.query.surveys.findFirst({
@@ -36,13 +47,30 @@ export async function GET(
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
     }
 
-    // 2. 응답 데이터 조회
-    // Variable Map만 다운로드할 때는 응답 데이터가 필요 없지만,
-    // 로직 단순화를 위해 일단 조회 (성능 이슈 시 최적화 가능)
-    const responses = await db.query.surveyResponses.findMany({
-      where: eq(surveyResponses.surveyId, surveyId),
-      orderBy: (responses, { desc }) => [desc(responses.createdAt)],
-    });
+    // 2. 응답 데이터 조회 (Variable Map은 응답 불필요 → 스킵)
+    const needsResponses = type !== 'map';
+    let responses: typeof surveyResponses.$inferSelect[] = [];
+
+    if (needsResponses) {
+      // 대용량 응답 사전 체크
+      const MAX_EXPORT_RESPONSES = 10000;
+      const [{ total }] = await db
+        .select({ total: count() })
+        .from(surveyResponses)
+        .where(eq(surveyResponses.surveyId, surveyId));
+
+      if (total > MAX_EXPORT_RESPONSES) {
+        return NextResponse.json(
+          { error: `응답이 ${MAX_EXPORT_RESPONSES.toLocaleString()}건을 초과하여 내보내기할 수 없습니다. (현재 ${total.toLocaleString()}건)` },
+          { status: 413 },
+        );
+      }
+
+      responses = await db.query.surveyResponses.findMany({
+        where: eq(surveyResponses.surveyId, surveyId),
+        orderBy: (responses, { desc }) => [desc(responses.createdAt)],
+      });
+    }
 
     // 3. 엑셀 워크북 생성
     let workbook: XLSX.WorkBook;
@@ -70,6 +98,20 @@ export async function GET(
     } else if (type === 'map') {
       workbook = generateVariableMapWorkbook(surveyData as unknown as Survey);
       filenamePrefix = 'VariableMap';
+    } else if (type === 'sav') {
+      // SPSS .sav 네이티브 파일 생성 (별도 return)
+      const { generateSavBuffer } = await import('@/lib/spss/sav-builder');
+      const savBuffer = await generateSavBuffer(
+        surveyData.questions as unknown as Question[],
+        responses as unknown as SurveySubmission[],
+      );
+      const savFilename = `${encodeURIComponent(surveyData.title)}_SPSS_${new Date().toISOString().slice(0, 10)}.sav`;
+      return new NextResponse(new Uint8Array(savBuffer), {
+        headers: {
+          'Content-Disposition': `attachment; filename="${savFilename}"`,
+          'Content-Type': 'application/octet-stream',
+        },
+      });
     } else {
       // Legacy support (include param)
       const options = {
@@ -99,7 +141,7 @@ export async function GET(
   } catch (error) {
     console.error('Export Error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown Export Error' },
+      { error: '데이터 내보내기 중 오류가 발생했습니다.' },
       { status: 500 },
     );
   }

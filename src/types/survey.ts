@@ -228,6 +228,9 @@ export interface Question {
   tableValidationRules?: TableValidationRule[];
   // 질문 표시 조건 (이 질문을 표시하기 위한 조건)
   displayCondition?: QuestionConditionGroup;
+  // SPSS .sav 내보내기 오버라이드 (없으면 질문 타입 기반 자동 판단)
+  spssVarType?: 'Numeric' | 'String' | 'Date' | 'DateTime';
+  spssMeasure?: 'Nominal' | 'Ordinal' | 'Continuous';
 }
 
 export interface Survey {

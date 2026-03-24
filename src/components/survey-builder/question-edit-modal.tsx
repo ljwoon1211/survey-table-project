@@ -98,6 +98,8 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         placeholder: question.placeholder || '',
         tableValidationRules: (question as any).tableValidationRules || [],
         displayCondition: question.displayCondition,
+        spssVarType: (question as any).spssVarType,
+        spssMeasure: (question as any).spssMeasure,
       });
 
       // 옵션들 중 하나라도 branchRule이 있으면 조건부 분기 설정 표시
@@ -595,6 +597,59 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                         <p className="mt-1 text-xs text-gray-500">
                           엑셀 헤더에 표시될 라벨 (미입력 시 질문 제목 사용)
                         </p>
+                      </div>
+                    </div>
+
+                    {/* SPSS .sav 변수 타입 / 측정 수준 오버라이드 */}
+                    <div className="mt-3 grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="spssVarType">변수 타입</Label>
+                        <select
+                          id="spssVarType"
+                          value={formData.spssVarType || ''}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              spssVarType: (e.target.value || undefined) as any,
+                            }))
+                          }
+                          className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                        >
+                          <option value="">
+                            자동 (
+                            {question?.type === 'text' || question?.type === 'textarea'
+                              ? 'String'
+                              : question?.type === 'radio' ||
+                                  question?.type === 'select' ||
+                                  question?.type === 'checkbox'
+                                ? 'Numeric'
+                                : 'String'}
+                            )
+                          </option>
+                          <option value="Numeric">Numeric</option>
+                          <option value="String">String</option>
+                          <option value="Date">Date</option>
+                          <option value="DateTime">DateTime</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label htmlFor="spssMeasure">측정 수준</Label>
+                        <select
+                          id="spssMeasure"
+                          value={formData.spssMeasure || ''}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              spssMeasure: (e.target.value || undefined) as any,
+                            }))
+                          }
+                          className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                        >
+                          <option value="">자동 (Nominal)</option>
+                          <option value="Nominal">Nominal (명목형)</option>
+                          <option value="Ordinal">Ordinal (순서형)</option>
+                          <option value="Continuous">Continuous (연속형)</option>
+                        </select>
                       </div>
                     </div>
                   </div>

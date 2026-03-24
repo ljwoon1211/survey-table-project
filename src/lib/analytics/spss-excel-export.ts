@@ -115,26 +115,40 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
             || cell.cellCode
             || `${q.questionCode}_${tRow.rowCode || tRow.label}_${q.tableColumns[colIdx].columnCode || q.tableColumns[colIdx].label}`;
 
-          // 옵션 라벨 (radio/select는 옵션 목록 표시, checkbox는 선택/미선택)
-          let optionLabel = '';
-          if (cell.type === 'checkbox') {
-            optionLabel = '1=선택, 빈값=미선택';
+          // checkbox 셀: checkboxOptions가 있으면 옵션별 분리 변수 생성
+          if (cell.type === 'checkbox' && cell.checkboxOptions && cell.checkboxOptions.length > 0) {
+            for (let optIdx = 0; optIdx < cell.checkboxOptions.length; optIdx++) {
+              const opt = cell.checkboxOptions[optIdx];
+              columns.push({
+                spssVarName: `${varName}M${optIdx + 1}`,
+                questionText: q.title,
+                optionLabel: opt.label,
+                questionId: q.id,
+                type: 'table-cell',
+                tableCellId: cell.id,
+                tableCellType: 'checkbox',
+                optionIndex: optIdx,
+                optionValue: opt.value,
+              });
+            }
           } else {
+            // radio/select/input: 기존 로직
+            let optionLabel = '';
             const opts = cell.radioOptions || cell.selectOptions;
             if (opts && opts.length > 0) {
               optionLabel = opts.map((o) => o.label).join(' / ');
             }
-          }
 
-          columns.push({
-            spssVarName: varName,
-            questionText: q.title,
-            optionLabel: optionLabel || `${tRow.label} - ${q.tableColumns[colIdx].label}`,
-            questionId: q.id,
-            type: 'table-cell',
-            tableCellId: cell.id,
-            tableCellType: cell.type,
-          });
+            columns.push({
+              spssVarName: varName,
+              questionText: q.title,
+              optionLabel: optionLabel || `${tRow.label} - ${q.tableColumns[colIdx].label}`,
+              questionId: q.id,
+              type: 'table-cell',
+              tableCellId: cell.id,
+              tableCellType: cell.type,
+            });
+          }
         }
       }
     } else {
@@ -149,6 +163,21 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
   }
 
   return columns;
+}
+
+/**
+ * 테이블 질문에서 특정 셀의 checkboxOptions를 찾는다.
+ */
+function findTableCellCheckboxOptions(question: Question, cellId: string) {
+  if (!question.tableRowsData) return undefined;
+  for (const row of question.tableRowsData) {
+    for (const cell of row.cells) {
+      if (cell.id === cellId) {
+        return cell.checkboxOptions;
+      }
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -234,6 +263,17 @@ export function buildDataRows(
           if (!cellId) return null;
           const cellVal = tableAnswer[cellId];
           if (cellVal == null) return null;
+
+          // checkbox 옵션별 분리 변수: 해당 옵션 선택 여부만 반환
+          if (col.tableCellType === 'checkbox' && col.optionIndex != null && col.optionValue != null) {
+            const selectedValues = Array.isArray(cellVal) ? cellVal : [cellVal];
+            const isSelected = selectedValues.some((v: unknown) => v === col.optionValue);
+            // 셀의 checkboxOptions에서 spssNumericCode 조회
+            const cellOptions = findTableCellCheckboxOptions(question, cellId);
+            const code = cellOptions?.[col.optionIndex]?.spssNumericCode ?? col.optionIndex + 1;
+            return isSelected ? code : null;
+          }
+
           return transformTableCell(col.tableCellType || 'input', cellVal);
         }
 
