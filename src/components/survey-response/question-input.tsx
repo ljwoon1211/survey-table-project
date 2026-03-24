@@ -8,6 +8,14 @@ import { UserDefinedMultiLevelSelect } from '@/components/survey-builder/user-de
 import { Input } from '@/components/ui/input';
 import { Question, QuestionOption } from '@/types/survey';
 
+interface QuestionInputProps {
+  question: Question;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  allResponses?: Record<string, unknown>;
+  allQuestions?: Question[];
+}
+
 // 타입 정의
 export type OtherChoiceValue = {
   selectedValue: string;
@@ -33,11 +41,9 @@ export function QuestionInput({
   question,
   value,
   onChange,
-}: {
-  question: Question;
-  value: unknown;
-  onChange: (value: unknown) => void;
-}) {
+  allResponses,
+  allQuestions,
+}: QuestionInputProps) {
   switch (question.type) {
     case 'notice': {
       const noticeVal = value && typeof value === 'object' && 'agreed' in (value as Record<string, unknown>)
@@ -131,6 +137,8 @@ export function QuestionInput({
           onChange={(v) => onChange(v)}
           isTestMode={false}
           className="border-0 shadow-none"
+          allResponses={allResponses}
+          allQuestions={allQuestions}
         />
       ) : (
         <div className="py-4 text-center text-gray-500">테이블이 구성되지 않았습니다.</div>

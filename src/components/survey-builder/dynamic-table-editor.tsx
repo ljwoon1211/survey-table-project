@@ -10,6 +10,7 @@ import {
   Clipboard,
   Combine,
   Copy,
+  Eye,
   Image,
   Plus,
   Trash2,
@@ -19,18 +20,28 @@ import {
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { generateId } from '@/lib/utils';
-import { TableCell, TableColumn, TableRow } from '@/types/survey';
+import { Question, QuestionConditionGroup, TableCell, TableColumn, TableRow } from '@/types/survey';
 
 import { CellContentModal } from './cell-content-modal';
+import { QuestionConditionEditor } from './question-condition-editor';
 
 interface DynamicTableEditorProps {
   tableTitle?: string;
   columns?: TableColumn[];
   rows?: TableRow[];
   currentQuestionId?: string;
+  allQuestions?: Question[];
   onTableChange: (data: {
     tableTitle: string;
     tableColumns: TableColumn[];
@@ -43,6 +54,7 @@ export function DynamicTableEditor({
   columns = [],
   rows = [],
   currentQuestionId = '',
+  allQuestions = [],
   onTableChange,
 }: DynamicTableEditorProps) {
   // isHidden 속성을 재계산하는 헬퍼 함수
@@ -557,6 +569,35 @@ export function DynamicTableEditor({
 
     setCurrentRows(updatedRows);
     notifyChange(currentTitle, currentColumns, updatedRows);
+  };
+
+  // 행 조건부 표시 설정
+  const [rowConditionModalOpen, setRowConditionModalOpen] = useState(false);
+  const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
+
+  const openRowConditionModal = (rowIndex: number) => {
+    setEditingRowIndex(rowIndex);
+    setRowConditionModalOpen(true);
+  };
+
+  const updateRowCondition = (rowIndex: number, conditionGroup: QuestionConditionGroup | undefined) => {
+    const updatedRows = currentRows.map((row, index) =>
+      index === rowIndex ? { ...row, displayCondition: conditionGroup } : row,
+    );
+
+    setCurrentRows(updatedRows);
+    notifyChange(currentTitle, currentColumns, updatedRows);
+  };
+
+  // 현재 편집 중인 질문을 Question 객체로 변환 (QuestionConditionEditor용)
+  const currentQuestionAsQuestion: Question = {
+    id: currentQuestionId,
+    type: 'table',
+    title: currentTitle,
+    order: 0,
+    required: false,
+    tableColumns: currentColumns,
+    tableRowsData: currentRows,
   };
 
   // 셀 복사
@@ -1440,6 +1481,23 @@ export function DynamicTableEditor({
                           placeholder="행 코드"
                           title={`엑셀 코드: ${row.rowCode || '(자동)'}`}
                         />
+                        {allQuestions.length > 0 && (
+                          <button
+                            onClick={() => openRowConditionModal(rowIndex)}
+                            className={`mx-auto flex h-5 w-5 items-center justify-center rounded transition-colors ${
+                              row.displayCondition && row.displayCondition.conditions.length > 0
+                                ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                                : 'text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+                            }`}
+                            title={
+                              row.displayCondition && row.displayCondition.conditions.length > 0
+                                ? `조건부 표시 (${row.displayCondition.conditions.length}개 조건)`
+                                : '조건부 표시 설정'
+                            }
+                          >
+                            <Eye className="h-3 w-3" />
+                          </button>
+                        )}
                         {currentRows.length > 1 && (
                           <button
                             onClick={() => deleteRow(rowIndex)}
@@ -1662,6 +1720,43 @@ export function DynamicTableEditor({
           }}
         />
       )}
+
+      {/* 행 조건부 표시 설정 모달 */}
+      <Dialog open={rowConditionModalOpen} onOpenChange={setRowConditionModalOpen}>
+        <DialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              행 조건부 표시 설정
+              {editingRowIndex !== null && currentRows[editingRowIndex] && (
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  - {currentRows[editingRowIndex].label || `행 ${editingRowIndex + 1}`}
+                </span>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              다른 질문의 응답에 따라 이 행의 표시 여부를 설정합니다.
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingRowIndex !== null && currentRows[editingRowIndex] && (
+            <QuestionConditionEditor
+              question={currentQuestionAsQuestion}
+              initialCondition={currentRows[editingRowIndex].displayCondition}
+              onUpdate={(conditionGroup) => {
+                updateRowCondition(editingRowIndex, conditionGroup);
+              }}
+              allQuestions={allQuestions}
+              allowAllQuestions
+            />
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRowConditionModalOpen(false)}>
+              닫기
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

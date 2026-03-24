@@ -538,6 +538,8 @@ export default function SurveyResponsePage() {
                 question={currentQuestion}
                 value={responses[currentQuestion.id]}
                 onChange={(value) => handleResponse(currentQuestion.id, value)}
+                allResponses={responses as Record<string, unknown>}
+                allQuestions={questions}
               />
             </div>
           </CardContent>

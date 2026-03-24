@@ -1203,6 +1203,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                     columns={formData.tableColumns}
                     rows={formData.tableRowsData}
                     currentQuestionId={questionId || ''}
+                    allQuestions={currentSurvey.questions}
                     onTableChange={(data) => {
                       setFormData((prev) => ({
                         ...prev,

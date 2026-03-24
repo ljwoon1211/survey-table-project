@@ -6,7 +6,9 @@ import { CheckCircle2, ChevronLeft, ChevronRight, FileText } from 'lucide-react'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTestResponseStore } from '@/stores/test-response-store';
-import { TableColumn, TableRow } from '@/types/survey';
+import { Question, TableColumn, TableRow } from '@/types/survey';
+import { shouldDisplayRow } from '@/utils/branch-logic';
+import { recalculateRowspansForVisibleRows } from '@/utils/table-merge-helpers';
 
 import { InteractiveTableCell } from './interactive-table-cell';
 
@@ -19,6 +21,8 @@ interface InteractiveTableResponseProps {
   onChange?: (value: Record<string, any>) => void;
   className?: string;
   isTestMode?: boolean;
+  allResponses?: Record<string, unknown>;
+  allQuestions?: Question[];
 }
 
 export function InteractiveTableResponse({
@@ -30,6 +34,8 @@ export function InteractiveTableResponse({
   onChange,
   className,
   isTestMode = false,
+  allResponses,
+  allQuestions,
 }: InteractiveTableResponseProps) {
   // Zustand 선택적 구독으로 변경
   // testResponses 전체를 구독하여 testResponses[questionId] 내부의 속성 변경도 감지
@@ -50,6 +56,24 @@ export function InteractiveTableResponse({
     }
     return (value || {}) as Record<string, any>;
   }, [isTestMode, questionId, testResponses, value]);
+
+  // displayCondition 기반 가시 행 필터링 + rowspan 재계산
+  const visibleRows = useMemo(() => {
+    if (!allResponses || !allQuestions || rows.length === 0) return rows;
+
+    // displayCondition이 있는 행이 하나도 없으면 원본 반환
+    const hasConditions = rows.some((row) => row.displayCondition);
+    if (!hasConditions) return rows;
+
+    const visibleRowIds = new Set<string>();
+    for (const row of rows) {
+      if (shouldDisplayRow(row, allResponses, allQuestions)) {
+        visibleRowIds.add(row.id);
+      }
+    }
+
+    return recalculateRowspansForVisibleRows(rows, visibleRowIds);
+  }, [rows, allResponses, allQuestions]);
 
   // 스크롤 인디케이터 업데이트
   useEffect(() => {
@@ -150,7 +174,7 @@ export function InteractiveTableResponse({
   const renderMobileCardView = () => {
     return (
       <div className="space-y-6">
-        {rows.map((row, rowIndex) => {
+        {visibleRows.map((row, rowIndex) => {
           const completed = isRowCompleted(row);
           // 첫 번째 셀은 보통 행의 제목(Row Header) 역할을 합니다.
           const firstCell = row.cells[0];
@@ -335,7 +359,7 @@ export function InteractiveTableResponse({
 
             {/* 본문 */}
             <tbody>
-              {rows.map((row, rowIndex) => {
+              {visibleRows.map((row, rowIndex) => {
                 const completed = isRowCompleted(row);
                 return (
                   <tr

@@ -26,6 +26,7 @@ interface QuestionConditionEditorProps {
   onUpdate: (conditionGroup: QuestionConditionGroup | undefined) => void;
   allQuestions: Question[];
   allowAllQuestions?: boolean; // 그룹 편집 등에서 모든 질문 참조 허용
+  initialCondition?: QuestionConditionGroup; // 외부에서 조건 주입 (테이블 행 조건 등)
 }
 
 export interface QuestionConditionEditorRef {
@@ -35,9 +36,10 @@ export interface QuestionConditionEditorRef {
 export const QuestionConditionEditor = forwardRef<
   QuestionConditionEditorRef,
   QuestionConditionEditorProps
->(({ question, onUpdate, allQuestions, allowAllQuestions = false }, ref) => {
+>(({ question, onUpdate, allQuestions, allowAllQuestions = false, initialCondition }, ref) => {
+  const effectiveCondition = initialCondition ?? question.displayCondition;
   const [conditionGroup, setConditionGroup] = useState<QuestionConditionGroup | undefined>(
-    question.displayCondition || {
+    effectiveCondition || {
       conditions: [],
       logicType: 'AND',
     },
@@ -46,9 +48,10 @@ export const QuestionConditionEditor = forwardRef<
   // 조건 이름을 로컬 상태로 관리 (리렌더링 방지)
   const [conditionNames, setConditionNames] = useState<Record<string, string>>({});
 
-  // question.displayCondition이 변경될 때 conditionGroup과 conditionNames 초기화
+  // displayCondition이 변경될 때 conditionGroup과 conditionNames 초기화
   useEffect(() => {
-    const newConditionGroup = question.displayCondition || {
+    const source = initialCondition ?? question.displayCondition;
+    const newConditionGroup = source || {
       conditions: [],
       logicType: 'AND',
     };
@@ -64,7 +67,7 @@ export const QuestionConditionEditor = forwardRef<
       });
     }
     setConditionNames(initialNames);
-  }, [question.displayCondition]);
+  }, [initialCondition, question.displayCondition]);
 
   const addCondition = () => {
     const conditionCount = conditionGroup?.conditions.length || 0;
