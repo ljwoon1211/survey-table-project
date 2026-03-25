@@ -273,6 +273,7 @@ function QuestionPreview({ question }: { question: Question }) {
           tableTitle={question.tableTitle}
           columns={question.tableColumns}
           rows={question.tableRowsData}
+          tableHeaderGrid={question.tableHeaderGrid}
           className="border-0 shadow-none"
         />
       ) : (
@@ -786,6 +787,7 @@ function QuestionTestInput({
           tableTitle={question.tableTitle}
           columns={question.tableColumns}
           rows={question.tableRowsData}
+          tableHeaderGrid={question.tableHeaderGrid}
           value={typeof value === 'object' && value !== null ? value : undefined}
           onChange={onChange}
           isTestMode={true}

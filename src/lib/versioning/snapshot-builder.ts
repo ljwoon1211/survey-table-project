@@ -35,6 +35,7 @@ interface SnapshotQuestion {
   tableTitle?: string;
   tableColumns?: Question['tableColumns'];
   tableRowsData?: Question['tableRowsData'];
+  tableHeaderGrid?: Question['tableHeaderGrid'];
   imageUrl?: string;
   videoUrl?: string;
   order: number;
@@ -86,6 +87,7 @@ export function buildSurveySnapshot(survey: Survey): SurveySnapshot {
       tableTitle: q.tableTitle,
       tableColumns: q.tableColumns,
       tableRowsData: q.tableRowsData,
+      tableHeaderGrid: q.tableHeaderGrid,
       imageUrl: q.imageUrl,
       videoUrl: q.videoUrl,
       order: q.order,

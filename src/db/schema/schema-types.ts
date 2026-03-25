@@ -117,6 +117,14 @@ export interface TableColumn {
   minWidth?: number;
 }
 
+// 다단계 헤더 셀
+export interface HeaderCell {
+  id: string;
+  label: string;
+  colspan: number;
+  rowspan: number;
+}
+
 // 테이블 검증 규칙
 export interface TableValidationRule {
   id: string;
@@ -181,6 +189,7 @@ export interface QuestionData {
   tableTitle?: string;
   tableColumns?: TableColumn[];
   tableRowsData?: TableRow[];
+  tableHeaderGrid?: HeaderCell[][];
   imageUrl?: string;
   videoUrl?: string;
   order: number;

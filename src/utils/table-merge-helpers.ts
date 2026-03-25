@@ -1,4 +1,4 @@
-import { Question, TableRow } from '@/types/survey';
+import { HeaderCell, Question, TableColumn, TableRow } from '@/types/survey';
 
 /**
  * 병합된 행 ID들을 가져오는 헬퍼 함수
@@ -253,4 +253,89 @@ export function recalculateRowspansForVisibleRows(
   }
 
   return visibleRows;
+}
+
+/**
+ * tableColumns에서 기본 단일 행 headerGrid를 생성 (폴백용)
+ * 기존 colspan 설정이 있으면 반영
+ */
+export function buildDefaultHeaderGrid(columns: TableColumn[]): HeaderCell[][] {
+  const cells: HeaderCell[] = columns
+    .filter((col) => !col.isHeaderHidden)
+    .map((col) => ({
+      id: `hc-${col.id}`,
+      label: col.label,
+      colspan: col.colspan || 1,
+      rowspan: 1,
+    }));
+
+  return [cells];
+}
+
+/**
+ * headerGrid 유효성 검증
+ * - 각 행의 colspan 합이 총 컬럼 수와 일치하는지
+ * - rowspan이 범위를 초과하지 않는지
+ */
+export function validateHeaderGrid(grid: HeaderCell[][], columnCount: number): boolean {
+  if (!grid || grid.length === 0) return false;
+
+  const totalRows = grid.length;
+
+  // 각 행의 colspan 합 검증
+  // rowspan으로 점유된 슬롯을 추적하는 2D 그리드
+  const occupied: boolean[][] = Array.from({ length: totalRows }, () =>
+    Array(columnCount).fill(false),
+  );
+
+  for (let rowIdx = 0; rowIdx < totalRows; rowIdx++) {
+    const row = grid[rowIdx];
+    let colPos = 0;
+
+    for (const cell of row) {
+      // 이미 rowspan으로 점유된 슬롯 건너뛰기
+      while (colPos < columnCount && occupied[rowIdx][colPos]) {
+        colPos++;
+      }
+
+      if (colPos >= columnCount) return false; // 넘침
+
+      const cs = cell.colspan;
+      const rs = cell.rowspan;
+
+      // rowspan 범위 검증
+      if (rowIdx + rs > totalRows) return false;
+
+      // 슬롯 점유 마킹
+      for (let r = 0; r < rs; r++) {
+        for (let c = 0; c < cs; c++) {
+          if (colPos + c >= columnCount) return false; // colspan 넘침
+          if (occupied[rowIdx + r][colPos + c]) return false; // 겹침
+          occupied[rowIdx + r][colPos + c] = true;
+        }
+      }
+
+      colPos += cs;
+    }
+  }
+
+  // 모든 슬롯이 정확히 점유되었는지 확인
+  for (let r = 0; r < totalRows; r++) {
+    for (let c = 0; c < columnCount; c++) {
+      if (!occupied[r][c]) return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * headerGrid의 최하위 행에서 실제 리프 셀 수를 계산
+ * (최하위 행의 colspan 합 = 데이터 컬럼 수여야 함)
+ */
+export function getHeaderGridColumnCount(grid: HeaderCell[][]): number {
+  if (!grid || grid.length === 0) return 0;
+
+  // 첫 번째 행의 colspan 합이 총 컬럼 수
+  return grid[0].reduce((sum, cell) => sum + cell.colspan, 0);
 }

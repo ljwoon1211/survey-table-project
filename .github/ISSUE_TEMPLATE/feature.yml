@@ -1,0 +1,70 @@
+name: Feature Request
+description: 새 기능 또는 기존 기능 개선
+title: "[Feature] "
+labels: ["type:feature"]
+body:
+  - type: textarea
+    id: background
+    attributes:
+      label: "배경 (Background)"
+      description: "이 기능이 필요한 이유와 맥락"
+    validations:
+      required: true
+  - type: textarea
+    id: requirements
+    attributes:
+      label: "요구사항 (Requirements)"
+      description: "구체적인 기능 요구사항 (체크리스트)"
+      value: |
+        - [ ] 요구사항 1
+        - [ ] 요구사항 2
+    validations:
+      required: true
+  - type: textarea
+    id: tech-spec
+    attributes:
+      label: "기술 명세 (Tech Spec)"
+      description: "수정할 파일, 스키마 변경, API 변경 등"
+      value: |
+        ### 수정 대상 파일
+        -
+
+        ### 스키마 변경
+        -
+
+        ### 의존성
+        -
+  - type: textarea
+    id: test-plan
+    attributes:
+      label: "테스트 계획 (Test Plan)"
+      description: "어떻게 검증할 것인지"
+      value: |
+        - [ ] 수동 테스트 시나리오
+        - [ ] 엣지 케이스 확인
+  - type: dropdown
+    id: area
+    attributes:
+      label: "영역 (Area)"
+      options:
+        - builder
+        - response
+        - analytics
+        - export
+        - table
+        - library
+        - infra
+        - auth
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "우선순위"
+      options:
+        - P0-Critical
+        - P1-High
+        - P2-Medium
+        - P3-Low
+  - type: input
+    id: story-points
+    attributes:
+      label: "Story Points (1/2/3/5/8/13)"

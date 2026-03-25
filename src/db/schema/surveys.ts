@@ -2,6 +2,7 @@ import { relations } from 'drizzle-orm';
 import { boolean, integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 import type {
+  HeaderCell,
   QuestionConditionGroup,
   QuestionData,
   QuestionOption,
@@ -83,6 +84,7 @@ export const questions = pgTable('questions', {
   tableTitle: text('table_title'),
   tableColumns: jsonb('table_columns').$type<TableColumn[]>(),
   tableRowsData: jsonb('table_rows_data').$type<TableRow[]>(),
+  tableHeaderGrid: jsonb('table_header_grid').$type<HeaderCell[][]>(),
 
   // 미디어
   imageUrl: text('image_url'),

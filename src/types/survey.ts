@@ -170,6 +170,14 @@ export interface TableColumn {
   isHeaderHidden?: boolean; // 다른 컬럼의 colspan에 의해 숨겨진 헤더
 }
 
+// 다단계 헤더 셀 (headerGrid용)
+export interface HeaderCell {
+  id: string;
+  label: string;
+  colspan: number; // 가로 병합 (기본 1)
+  rowspan: number; // 세로 병합 (기본 1)
+}
+
 export interface SelectLevel {
   id: string;
   label: string;
@@ -212,6 +220,7 @@ export interface Question {
   tableTitle?: string;
   tableColumns?: TableColumn[];
   tableRowsData?: TableRow[];
+  tableHeaderGrid?: HeaderCell[][]; // 다단계 헤더 그리드 (없으면 tableColumns로 단일 행 폴백)
   imageUrl?: string;
   videoUrl?: string;
   order: number;

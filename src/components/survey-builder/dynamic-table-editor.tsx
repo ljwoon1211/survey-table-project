@@ -31,21 +31,32 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { generateId } from '@/lib/utils';
-import { Question, QuestionConditionGroup, TableCell, TableColumn, TableRow } from '@/types/survey';
+import {
+  HeaderCell,
+  Question,
+  QuestionConditionGroup,
+  TableCell,
+  TableColumn,
+  TableRow,
+} from '@/types/survey';
+import { buildDefaultHeaderGrid } from '@/utils/table-merge-helpers';
 
 import { CellContentModal } from './cell-content-modal';
+import { HeaderGridEditor } from './header-grid-editor';
 import { QuestionConditionEditor } from './question-condition-editor';
 
 interface DynamicTableEditorProps {
   tableTitle?: string;
   columns?: TableColumn[];
   rows?: TableRow[];
+  tableHeaderGrid?: HeaderCell[][];
   currentQuestionId?: string;
   allQuestions?: Question[];
   onTableChange: (data: {
     tableTitle: string;
     tableColumns: TableColumn[];
     tableRowsData: TableRow[];
+    tableHeaderGrid?: HeaderCell[][];
   }) => void;
 }
 
@@ -53,6 +64,7 @@ export function DynamicTableEditor({
   tableTitle = '',
   columns = [],
   rows = [],
+  tableHeaderGrid: initialHeaderGrid,
   currentQuestionId = '',
   allQuestions = [],
   onTableChange,
@@ -151,6 +163,12 @@ export function DynamicTableEditor({
     value: string;
   } | null>(null);
 
+  // 다단계 헤더 관련 상태
+  const [useMultiRowHeader, setUseMultiRowHeader] = useState(!!initialHeaderGrid);
+  const [currentHeaderGrid, setCurrentHeaderGrid] = useState<HeaderCell[][] | undefined>(
+    initialHeaderGrid,
+  );
+
   // 변경 사항을 부모에게 전달
   const notifyChange = useCallback(
     (title: string, cols: TableColumn[], rowsData: TableRow[]) => {
@@ -158,9 +176,10 @@ export function DynamicTableEditor({
         tableTitle: title,
         tableColumns: cols,
         tableRowsData: rowsData,
+        tableHeaderGrid: currentHeaderGrid,
       });
     },
-    [onTableChange],
+    [onTableChange, currentHeaderGrid],
   );
 
   // 컬럼 헤더의 isHeaderHidden 재계산
@@ -1175,6 +1194,64 @@ export function DynamicTableEditor({
           onChange={(e) => updateTitle(e.target.value)}
           placeholder="테이블 제목을 입력하세요"
         />
+      </div>
+
+      {/* 다단계 헤더 설정 */}
+      <div className="space-y-3 rounded-lg border border-gray-200 p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <Label className="text-sm font-medium">다단계 헤더</Label>
+            <p className="text-xs text-gray-500">
+              여러 행으로 구성된 계층적 헤더 (종사자 수 → 사무직/생산직 → 남/여 등)
+            </p>
+          </div>
+          <label className="relative inline-flex cursor-pointer items-center">
+            <input
+              type="checkbox"
+              checked={useMultiRowHeader}
+              onChange={(e) => {
+                const enabled = e.target.checked;
+                setUseMultiRowHeader(enabled);
+                if (enabled && !currentHeaderGrid) {
+                  const defaultGrid = buildDefaultHeaderGrid(currentColumns);
+                  setCurrentHeaderGrid(defaultGrid);
+                  onTableChange({
+                    tableTitle: currentTitle,
+                    tableColumns: currentColumns,
+                    tableRowsData: currentRows,
+                    tableHeaderGrid: defaultGrid,
+                  });
+                } else if (!enabled) {
+                  setCurrentHeaderGrid(undefined);
+                  onTableChange({
+                    tableTitle: currentTitle,
+                    tableColumns: currentColumns,
+                    tableRowsData: currentRows,
+                    tableHeaderGrid: undefined,
+                  });
+                }
+              }}
+              className="peer sr-only"
+            />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+          </label>
+        </div>
+
+        {useMultiRowHeader && currentHeaderGrid && (
+          <HeaderGridEditor
+            headerGrid={currentHeaderGrid}
+            columnCount={currentColumns.length}
+            onChange={(newGrid) => {
+              setCurrentHeaderGrid(newGrid);
+              onTableChange({
+                tableTitle: currentTitle,
+                tableColumns: currentColumns,
+                tableRowsData: currentRows,
+                tableHeaderGrid: newGrid,
+              });
+            }}
+          />
+        )}
       </div>
 
       {/* 테이블 정보 요약 */}

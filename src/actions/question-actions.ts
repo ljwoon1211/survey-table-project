@@ -32,6 +32,7 @@ export async function createQuestion(data: {
   tableTitle?: string;
   tableColumns?: QuestionType['tableColumns'];
   tableRowsData?: QuestionType['tableRowsData'];
+  tableHeaderGrid?: QuestionType['tableHeaderGrid'];
   imageUrl?: string;
   videoUrl?: string;
   allowOtherOption?: boolean;
@@ -62,6 +63,7 @@ export async function createQuestion(data: {
     tableTitle: data.tableTitle,
     tableColumns: data.tableColumns as NewQuestion['tableColumns'],
     tableRowsData: data.tableRowsData as NewQuestion['tableRowsData'],
+    tableHeaderGrid: data.tableHeaderGrid as NewQuestion['tableHeaderGrid'],
     imageUrl: data.imageUrl,
     videoUrl: data.videoUrl,
     allowOtherOption: data.allowOtherOption,
@@ -93,6 +95,7 @@ export async function updateQuestion(
     tableTitle: string;
     tableColumns: QuestionType['tableColumns'];
     tableRowsData: QuestionType['tableRowsData'];
+    tableHeaderGrid: QuestionType['tableHeaderGrid'];
     imageUrl: string;
     videoUrl: string;
     allowOtherOption: boolean;

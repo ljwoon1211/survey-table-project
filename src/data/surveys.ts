@@ -136,6 +136,7 @@ export async function getSurveyWithDetails(surveyId: string): Promise<SurveyType
       tableTitle: q.tableTitle ?? undefined,
       tableColumns: q.tableColumns as QuestionType['tableColumns'],
       tableRowsData: q.tableRowsData as QuestionType['tableRowsData'],
+      tableHeaderGrid: q.tableHeaderGrid as QuestionType['tableHeaderGrid'],
       imageUrl: q.imageUrl ?? undefined,
       videoUrl: q.videoUrl ?? undefined,
       order: q.order,

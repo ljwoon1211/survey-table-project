@@ -129,6 +129,7 @@ export function QuestionInput({
           tableTitle={question.tableTitle}
           columns={question.tableColumns}
           rows={question.tableRowsData}
+          tableHeaderGrid={question.tableHeaderGrid}
           value={
             typeof value === 'object' && value !== null
               ? (value as Record<string, unknown>)

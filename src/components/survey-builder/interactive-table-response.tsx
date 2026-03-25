@@ -6,7 +6,7 @@ import { CheckCircle2, ChevronLeft, ChevronRight, FileText } from 'lucide-react'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTestResponseStore } from '@/stores/test-response-store';
-import { Question, TableColumn, TableRow } from '@/types/survey';
+import { HeaderCell, Question, TableColumn, TableRow } from '@/types/survey';
 import { shouldDisplayRow } from '@/utils/branch-logic';
 import { recalculateRowspansForVisibleRows } from '@/utils/table-merge-helpers';
 
@@ -17,6 +17,7 @@ interface InteractiveTableResponseProps {
   tableTitle?: string;
   columns?: TableColumn[];
   rows?: TableRow[];
+  tableHeaderGrid?: HeaderCell[][];
   value?: Record<string, any>;
   onChange?: (value: Record<string, any>) => void;
   className?: string;
@@ -30,6 +31,7 @@ export function InteractiveTableResponse({
   tableTitle,
   columns = [],
   rows = [],
+  tableHeaderGrid,
   value,
   onChange,
   className,
@@ -336,25 +338,44 @@ export function InteractiveTableResponse({
 
             {/* 헤더 */}
             <thead>
-              <tr className="bg-gray-50">
-                {columns.map((column, colIndex) => {
-                  if (column.isHeaderHidden) return null;
-                  const headerColspan = column.colspan || 1;
-                  const mergedWidth = headerColspan > 1
-                    ? columns.slice(colIndex, colIndex + headerColspan).reduce((sum, col) => sum + (col.width || 150), 0)
-                    : (column.width || 150);
-                  return (
-                    <th
-                      key={column.id}
-                      className="h-full border-r border-b border-gray-300 px-4 py-3 text-center align-middle font-semibold text-gray-800"
-                      style={{ width: `${mergedWidth}px` }}
-                      colSpan={headerColspan}
-                    >
-                      {column.label || <span className="text-sm text-gray-400 italic"></span>}
-                    </th>
-                  );
-                })}
-              </tr>
+              {tableHeaderGrid && tableHeaderGrid.length > 0 ? (
+                // 다단계 헤더
+                tableHeaderGrid.map((headerRow, rowIdx) => (
+                  <tr key={`header-row-${rowIdx}`} className="bg-gray-50">
+                    {headerRow.map((cell) => (
+                      <th
+                        key={cell.id}
+                        className="h-full border-r border-b border-gray-300 px-4 py-3 text-center align-middle font-semibold text-gray-800"
+                        colSpan={cell.colspan}
+                        rowSpan={cell.rowspan}
+                      >
+                        {cell.label || <span className="text-sm text-gray-400 italic"></span>}
+                      </th>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                // 기존 단일 행 헤더 (폴백)
+                <tr className="bg-gray-50">
+                  {columns.map((column, colIndex) => {
+                    if (column.isHeaderHidden) return null;
+                    const headerColspan = column.colspan || 1;
+                    const mergedWidth = headerColspan > 1
+                      ? columns.slice(colIndex, colIndex + headerColspan).reduce((sum, col) => sum + (col.width || 150), 0)
+                      : (column.width || 150);
+                    return (
+                      <th
+                        key={column.id}
+                        className="h-full border-r border-b border-gray-300 px-4 py-3 text-center align-middle font-semibold text-gray-800"
+                        style={{ width: `${mergedWidth}px` }}
+                        colSpan={headerColspan}
+                      >
+                        {column.label || <span className="text-sm text-gray-400 italic"></span>}
+                      </th>
+                    );
+                  })}
+                </tr>
+              )}
             </thead>
 
             {/* 본문 */}

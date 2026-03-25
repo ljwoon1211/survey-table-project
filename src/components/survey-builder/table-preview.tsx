@@ -6,7 +6,7 @@ import { FileText, Image, Video } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getProxiedImageUrl } from '@/lib/image-utils';
-import { TableColumn, TableRow } from '@/types/survey';
+import { HeaderCell, TableColumn, TableRow } from '@/types/survey';
 
 // 이미지 셀 컴포넌트 (에러 상태 관리)
 function ImageCell({ imageUrl, content }: { imageUrl: string; content?: string }) {
@@ -44,6 +44,7 @@ interface TablePreviewProps {
   tableTitle?: string;
   columns?: TableColumn[];
   rows?: TableRow[];
+  tableHeaderGrid?: HeaderCell[][];
   className?: string;
 }
 
@@ -51,6 +52,7 @@ export function TablePreview({
   tableTitle,
   columns = [],
   rows = [],
+  tableHeaderGrid,
   className,
 }: TablePreviewProps) {
   // 테이블이 비어있는 경우
@@ -278,25 +280,42 @@ export function TablePreview({
 
             {/* 헤더 */}
             <thead>
-              <tr>
-                {columns.map((column, colIndex) => {
-                  if (column.isHeaderHidden) return null;
-                  const headerColspan = column.colspan || 1;
-                  const mergedWidth = headerColspan > 1
-                    ? columns.slice(colIndex, colIndex + headerColspan).reduce((sum, col) => sum + (col.width || 150), 0)
-                    : (column.width || 150);
-                  return (
-                    <th
-                      key={column.id}
-                      className="border border-gray-300 bg-gray-50 p-3 text-center font-medium"
-                      style={{ width: `${mergedWidth}px` }}
-                      colSpan={headerColspan}
-                    >
-                      {column.label || <span className="text-sm text-gray-400 italic"></span>}
-                    </th>
-                  );
-                })}
-              </tr>
+              {tableHeaderGrid && tableHeaderGrid.length > 0 ? (
+                tableHeaderGrid.map((headerRow, rowIdx) => (
+                  <tr key={`header-row-${rowIdx}`}>
+                    {headerRow.map((cell) => (
+                      <th
+                        key={cell.id}
+                        className="border border-gray-300 bg-gray-50 p-3 text-center font-medium"
+                        colSpan={cell.colspan}
+                        rowSpan={cell.rowspan}
+                      >
+                        {cell.label || <span className="text-sm text-gray-400 italic"></span>}
+                      </th>
+                    ))}
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  {columns.map((column, colIndex) => {
+                    if (column.isHeaderHidden) return null;
+                    const headerColspan = column.colspan || 1;
+                    const mergedWidth = headerColspan > 1
+                      ? columns.slice(colIndex, colIndex + headerColspan).reduce((sum, col) => sum + (col.width || 150), 0)
+                      : (column.width || 150);
+                    return (
+                      <th
+                        key={column.id}
+                        className="border border-gray-300 bg-gray-50 p-3 text-center font-medium"
+                        style={{ width: `${mergedWidth}px` }}
+                        colSpan={headerColspan}
+                      >
+                        {column.label || <span className="text-sm text-gray-400 italic"></span>}
+                      </th>
+                    );
+                  })}
+                </tr>
+              )}
             </thead>
 
             {/* 본문 */}

@@ -1,0 +1,1 @@
+ALTER TABLE "questions" ADD COLUMN "table_header_grid" jsonb;

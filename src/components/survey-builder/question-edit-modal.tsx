@@ -90,6 +90,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         tableTitle: (question as any).tableTitle,
         tableColumns: (question as any).tableColumns ? [...(question as any).tableColumns] : [],
         tableRowsData: (question as any).tableRowsData ? [...(question as any).tableRowsData] : [],
+        tableHeaderGrid: (question as any).tableHeaderGrid || undefined,
         allowOtherOption: (question as any).allowOtherOption || false,
         minSelections: (question as any).minSelections,
         maxSelections: (question as any).maxSelections,
@@ -189,6 +190,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
               tableTitle: formData.tableTitle || question?.tableTitle,
               tableColumns: formData.tableColumns || question?.tableColumns,
               tableRowsData: formData.tableRowsData || question?.tableRowsData,
+              tableHeaderGrid: formData.tableHeaderGrid ?? question?.tableHeaderGrid,
               imageUrl: formData.imageUrl || question?.imageUrl,
               videoUrl: formData.videoUrl || question?.videoUrl,
               allowOtherOption: formData.allowOtherOption ?? question?.allowOtherOption,
@@ -1257,6 +1259,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                     tableTitle={formData.tableTitle}
                     columns={formData.tableColumns}
                     rows={formData.tableRowsData}
+                    tableHeaderGrid={formData.tableHeaderGrid}
                     currentQuestionId={questionId || ''}
                     allQuestions={currentSurvey.questions}
                     onTableChange={(data) => {
@@ -1265,6 +1268,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                         tableTitle: data.tableTitle,
                         tableColumns: data.tableColumns,
                         tableRowsData: data.tableRowsData,
+                        tableHeaderGrid: data.tableHeaderGrid,
                       }));
                     }}
                   />
@@ -1277,6 +1281,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                         tableTitle={formData.tableTitle}
                         columns={formData.tableColumns}
                         rows={formData.tableRowsData}
+                        tableHeaderGrid={formData.tableHeaderGrid}
                         className="border-2 border-dashed border-gray-300"
                       />
                     </div>
