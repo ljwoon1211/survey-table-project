@@ -514,8 +514,10 @@ function generateVariableMap(survey: Survey) {
           q.tableColumns!.forEach((col, colIndex) => {
             const cell = row.cells[colIndex];
             if (!cell || !isCellInputable(cell)) return;
+            // 셀코드가 의도적으로 비어있으면 내보내기에서 제외 (표시용 셀)
+            if (cell.isCustomCellCode === true && !cell.cellCode) return;
 
-            const varName = cell.exportLabel || cell.cellCode
+            const varName = cell.cellCode || cell.exportLabel
               || `${q.questionCode}_${row.rowCode || row.label}_${col.columnCode || col.label}`;
 
             let cellValueLabels = '';

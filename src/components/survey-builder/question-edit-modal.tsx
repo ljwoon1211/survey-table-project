@@ -1262,6 +1262,8 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                     tableHeaderGrid={formData.tableHeaderGrid}
                     currentQuestionId={questionId || ''}
                     allQuestions={currentSurvey.questions}
+                    questionCode={formData.questionCode}
+                    questionTitle={formData.title}
                     onTableChange={(data) => {
                       setFormData((prev) => ({
                         ...prev,

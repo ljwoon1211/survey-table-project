@@ -39,6 +39,12 @@ import {
   TableColumn,
   TableRow,
 } from '@/types/survey';
+import {
+  generateAllCellCodes,
+  generateCellCodesForColumn,
+  generateCellCodesForRow,
+  regenerateCellCodeForPaste,
+} from '@/utils/table-cell-code-generator';
 import { buildDefaultHeaderGrid } from '@/utils/table-merge-helpers';
 
 import { CellContentModal } from './cell-content-modal';
@@ -477,6 +483,8 @@ interface DynamicTableEditorProps {
   tableHeaderGrid?: HeaderCell[][];
   currentQuestionId?: string;
   allQuestions?: Question[];
+  questionCode?: string;
+  questionTitle?: string;
   onTableChange: (data: {
     tableTitle: string;
     tableColumns: TableColumn[];
@@ -492,6 +500,8 @@ export function DynamicTableEditor({
   tableHeaderGrid: initialHeaderGrid,
   currentQuestionId = '',
   allQuestions = [],
+  questionCode,
+  questionTitle,
   onTableChange,
 }: DynamicTableEditorProps) {
   // isHidden 속성을 재계산하는 헬퍼 함수 (O(nm) - 병합 셀 Set 기반)
@@ -622,6 +632,19 @@ export function DynamicTableEditor({
       if (pendingChangeRef.current) clearTimeout(pendingChangeRef.current);
     };
   }, []);
+
+  // questionCode / questionTitle 변경 시 전체 비커스텀 셀코드 재계산
+  const prevQuestionInfoRef = useRef({ questionCode, questionTitle });
+  useEffect(() => {
+    const prev = prevQuestionInfoRef.current;
+    if (prev.questionCode === questionCode && prev.questionTitle === questionTitle) return;
+    prevQuestionInfoRef.current = { questionCode, questionTitle };
+
+    const updatedRows = generateAllCellCodes(questionCode, questionTitle, currentColumns, currentRows);
+    setCurrentRows(updatedRows);
+    notifyChangeImmediate(currentTitle, currentColumns, updatedRows);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [questionCode, questionTitle]);
 
   // 기본 notifyChange는 즉시 실행 (기존 호출부 호환)
   const notifyChange = notifyChangeImmediate;
@@ -770,6 +793,7 @@ export function DynamicTableEditor({
     const newColumn: TableColumn = {
       id: generateId(),
       label: `열 ${currentColumns.length + 1}`,
+      columnCode: `c${currentColumns.length + 1}`,
       width: 150, // 기본 너비
     };
 
@@ -941,12 +965,21 @@ export function DynamicTableEditor({
     const newRow: TableRow = {
       id: newRowId,
       label: `행 ${nextNumber}`, // 중복 방지된 라벨 사용
+      rowCode: `r${currentRows.length + 1}`,
       height: 60, // 기본 행 높이
       minHeight: 40, // 최소 행 높이
       cells,
     };
 
-    const updatedRows = [...currentRows, newRow];
+    // 새 행의 셀코드 자동생성
+    const newRowWithCodes = generateCellCodesForRow(
+      questionCode,
+      questionTitle,
+      currentColumns,
+      newRow,
+    );
+
+    const updatedRows = [...currentRows, newRowWithCodes];
     setCurrentRows(updatedRows);
     notifyChange(currentTitle, currentColumns, updatedRows);
   };
@@ -1027,9 +1060,12 @@ export function DynamicTableEditor({
 
   // 행 코드 업데이트 (엑셀 내보내기용, 텍스트 입력 → debounce)
   const updateRowCode = (rowIndex: number, rowCode: string) => {
-    const updatedRows = currentRows.map((row, index) =>
-      index === rowIndex ? { ...row, rowCode } : row,
-    );
+    const updatedRows = currentRows.map((row, index) => {
+      if (index !== rowIndex) return row;
+      const updatedRow = { ...row, rowCode };
+      // 행코드 변경 시 해당 행의 비커스텀 셀코드 재계산
+      return generateCellCodesForRow(questionCode, questionTitle, currentColumns, updatedRow);
+    });
 
     setCurrentRows(updatedRows);
     notifyChangeDebounced(currentTitle, currentColumns, updatedRows);
@@ -1091,10 +1127,18 @@ export function DynamicTableEditor({
       if (!targetCell) return;
 
       // 복사한 셀의 내용을 붙여넣되, ID는 대상 셀의 것을 유지
-      const pastedCell: TableCell = {
-        ...copiedCell,
-        id: targetCell.id,
-      };
+      // 새 위치 기준으로 셀코드 재생성
+      const targetRow = currentRows[rowIndex];
+      const targetColumn = currentColumns[cellIndex];
+      const pastedCell: TableCell = regenerateCellCodeForPaste(
+        { ...copiedCell, id: targetCell.id },
+        questionCode,
+        questionTitle,
+        targetRow?.rowCode,
+        targetRow?.label,
+        targetColumn?.columnCode,
+        targetColumn?.label,
+      );
 
       // 먼저 해당 셀을 업데이트
       let updatedRows = currentRows.map((row, rIndex) =>
@@ -1697,11 +1741,22 @@ export function DynamicTableEditor({
                               <Input
                                 value={column.columnCode || ''}
                                 onChange={(e) => {
+                                  const newColumnCode = e.target.value;
                                   const updatedColumns = currentColumns.map((col, idx) =>
-                                    idx === columnIndex ? { ...col, columnCode: e.target.value } : col
+                                    idx === columnIndex ? { ...col, columnCode: newColumnCode } : col
+                                  );
+                                  // 열코드 변경 시 해당 열의 비커스텀 셀코드 재계산
+                                  const updatedCol = { ...column, columnCode: newColumnCode };
+                                  const updatedRows = generateCellCodesForColumn(
+                                    questionCode,
+                                    questionTitle,
+                                    updatedCol,
+                                    columnIndex,
+                                    currentRows,
                                   );
                                   setCurrentColumns(updatedColumns);
-                                  notifyChangeDebounced(currentTitle, updatedColumns, currentRows);
+                                  setCurrentRows(updatedRows);
+                                  notifyChangeDebounced(currentTitle, updatedColumns, updatedRows);
                                 }}
                                 className="h-5 border-none bg-gray-100 px-1 text-center text-[10px] text-gray-600 focus-visible:ring-0"
                                 placeholder="열 코드 (엑셀용)"
@@ -1860,32 +1915,37 @@ export function DynamicTableEditor({
       </Card>
 
       {/* 셀 내용 편집 모달 */}
-      {selectedCell && (
-        <CellContentModal
-          isOpen={!!selectedCell}
-          onClose={() => setSelectedCell(null)}
-          currentQuestionId={currentQuestionId}
-          cell={
-            currentRows
-              .find((row) => row.id === selectedCell.rowId)
-              ?.cells.find((cell) => cell.id === selectedCell.cellId) || {
-              id: '',
-              content: '',
-              type: 'text',
+      {selectedCell && (() => {
+        const selectedRow = currentRows.find((row) => row.id === selectedCell.rowId);
+        const rowIndex = currentRows.findIndex((row) => row.id === selectedCell.rowId);
+        const cellIndex = selectedRow?.cells.findIndex((c) => c.id === selectedCell.cellId) ?? -1;
+        const selectedColumn = cellIndex >= 0 ? currentColumns[cellIndex] : undefined;
+        return (
+          <CellContentModal
+            isOpen={!!selectedCell}
+            onClose={() => setSelectedCell(null)}
+            currentQuestionId={currentQuestionId}
+            questionCode={questionCode}
+            questionTitle={questionTitle}
+            rowCode={selectedRow?.rowCode}
+            rowLabel={selectedRow?.label}
+            columnCode={selectedColumn?.columnCode}
+            columnLabel={selectedColumn?.label}
+            cell={
+              selectedRow?.cells.find((cell) => cell.id === selectedCell.cellId) || {
+                id: '',
+                content: '',
+                type: 'text',
+              }
             }
-          }
-          onSave={(cell) => {
-            // 일반 셀 업데이트
-            const rowIndex = currentRows.findIndex((row) => row.id === selectedCell.rowId);
-            const cellIndex = currentRows[rowIndex]?.cells.findIndex(
-              (c) => c.id === selectedCell.cellId,
-            );
-            if (rowIndex !== -1 && cellIndex !== -1) {
-              updateCell(rowIndex, cellIndex, cell);
-            }
-          }}
-        />
-      )}
+            onSave={(cell) => {
+              if (rowIndex !== -1 && cellIndex !== -1) {
+                updateCell(rowIndex, cellIndex, cell);
+              }
+            }}
+          />
+        );
+      })()}
 
       {/* 행 조건부 표시 설정 모달 */}
       <Dialog open={rowConditionModalOpen} onOpenChange={setRowConditionModalOpen}>

@@ -15,6 +15,9 @@ export interface SPSSExportColumn {
   optionValue?: string;
   tableCellId?: string;
   tableCellType?: string;
+  // 셀 단위 SPSS 오버라이드
+  cellSpssVarType?: 'Numeric' | 'String' | 'Date' | 'DateTime';
+  cellSpssMeasure?: 'Nominal' | 'Ordinal' | 'Continuous';
 }
 
 export interface CodingBookEntry {
@@ -109,10 +112,12 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
           if (!cell) continue;
           // 입력 불가능한 셀(text, image, video)은 건너뛰기
           if (!['checkbox', 'radio', 'select', 'input'].includes(cell.type)) continue;
+          // 셀코드가 의도적으로 비어있으면 내보내기에서 제외 (표시용 셀)
+          if (cell.isCustomCellCode === true && !cell.cellCode) continue;
 
-          // 변수명: exportLabel > cellCode > questionCode_rowLabel_colLabel
-          const varName = cell.exportLabel
-            || cell.cellCode
+          // 변수명: cellCode > exportLabel > questionCode_rowCode_colCode (폴백)
+          const varName = cell.cellCode
+            || cell.exportLabel
             || `${q.questionCode}_${tRow.rowCode || tRow.label}_${q.tableColumns[colIdx].columnCode || q.tableColumns[colIdx].label}`;
 
           // checkbox 셀: checkboxOptions가 있으면 옵션별 분리 변수 생성
@@ -129,6 +134,8 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
                 tableCellType: 'checkbox',
                 optionIndex: optIdx,
                 optionValue: opt.value,
+                cellSpssVarType: cell.spssVarType,
+                cellSpssMeasure: cell.spssMeasure,
               });
             }
           } else {
@@ -147,6 +154,8 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
               type: 'table-cell',
               tableCellId: cell.id,
               tableCellType: cell.type,
+              cellSpssVarType: cell.spssVarType,
+              cellSpssMeasure: cell.spssMeasure,
             });
           }
         }

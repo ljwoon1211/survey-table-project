@@ -43,8 +43,16 @@ import { getProxiedImageUrl, optimizeImage, validateImageFile } from '@/lib/imag
 import { generateId, isValidUUID } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { CheckboxOption, QuestionOption, RadioOption, TableCell } from '@/types/survey';
+import {
+  generateCellCode,
+  generateExportLabel,
+  inferSpssMeasure,
+  inferSpssVarType,
+} from '@/utils/table-cell-code-generator';
 
 import { BranchRuleEditor } from './branch-rule-editor';
+
+const INTERACTIVE_CELL_TYPES = new Set(['checkbox', 'radio', 'select', 'input']);
 
 interface CellContentModalProps {
   isOpen: boolean;
@@ -52,6 +60,12 @@ interface CellContentModalProps {
   cell: TableCell;
   onSave: (cell: TableCell) => void;
   currentQuestionId?: string;
+  questionCode?: string;
+  questionTitle?: string;
+  rowCode?: string;
+  rowLabel?: string;
+  columnCode?: string;
+  columnLabel?: string;
 }
 
 export function CellContentModal({
@@ -60,6 +74,12 @@ export function CellContentModal({
   cell,
   onSave,
   currentQuestionId = '',
+  questionCode,
+  questionTitle,
+  rowCode,
+  rowLabel,
+  columnCode,
+  columnLabel,
 }: CellContentModalProps) {
   const { currentSurvey } = useSurveyBuilderStore();
   const [isSaving, setIsSaving] = useState(false);
@@ -105,7 +125,11 @@ export function CellContentModal({
       setHorizontalAlign(cell.horizontalAlign || 'left');
       setVerticalAlign(cell.verticalAlign || 'top');
       setCellCode(cell.cellCode || '');
+      setIsCustomCellCode(cell.isCustomCellCode ?? !!cell.cellCode);
       setExportLabel(cell.exportLabel || '');
+      setIsCustomExportLabel(cell.isCustomExportLabel ?? !!cell.exportLabel);
+      setSpssVarType(cell.spssVarType);
+      setSpssMeasure(cell.spssMeasure);
     }
   }, [isOpen, cell]);
 
@@ -145,7 +169,17 @@ export function CellContentModal({
 
   // 셀 코드 및 엑셀 라벨
   const [cellCode, setCellCode] = useState(cell.cellCode || '');
+  const [isCustomCellCode, setIsCustomCellCode] = useState(cell.isCustomCellCode ?? !!cell.cellCode);
   const [exportLabel, setExportLabel] = useState(cell.exportLabel || '');
+  const [isCustomExportLabel, setIsCustomExportLabel] = useState(cell.isCustomExportLabel ?? !!cell.exportLabel);
+
+  // SPSS 변수 타입 / 측정 수준 (셀 단위)
+  const [spssVarType, setSpssVarType] = useState<TableCell['spssVarType']>(cell.spssVarType);
+  const [spssMeasure, setSpssMeasure] = useState<TableCell['spssMeasure']>(cell.spssMeasure);
+
+  // 자동생성 셀코드/라벨 계산
+  const autoCellCode = generateCellCode(questionCode, rowCode, columnCode);
+  const autoExportLabel = generateExportLabel(questionTitle, columnLabel, rowLabel);
 
   // 기타 옵션 관리 상수들
   const OTHER_OPTION_ID = 'other-option';
@@ -266,7 +300,12 @@ export function CellContentModal({
         verticalAlign: verticalAlign !== 'top' ? verticalAlign : undefined,
         // 셀 코드 및 엑셀 라벨 추가
         cellCode: cellCode || undefined,
+        isCustomCellCode: isCustomCellCode === false ? false : isCustomCellCode || undefined,
         exportLabel: exportLabel || undefined,
+        isCustomExportLabel: isCustomExportLabel === false ? false : isCustomExportLabel || undefined,
+        // SPSS 변수 타입 / 측정 수준 (입력 셀만)
+        spssVarType: INTERACTIVE_CELL_TYPES.has(contentType) ? spssVarType : undefined,
+        spssMeasure: INTERACTIVE_CELL_TYPES.has(contentType) ? spssMeasure : undefined,
       };
 
       // 로컬 스토어 업데이트 (셀 저장)
@@ -365,7 +404,11 @@ export function CellContentModal({
     setHorizontalAlign(cell.horizontalAlign || 'left');
     setVerticalAlign(cell.verticalAlign || 'top');
     setCellCode(cell.cellCode || '');
+    setIsCustomCellCode(cell.isCustomCellCode ?? !!cell.cellCode);
     setExportLabel(cell.exportLabel || '');
+    setIsCustomExportLabel(cell.isCustomExportLabel ?? !!cell.exportLabel);
+    setSpssVarType(cell.spssVarType);
+    setSpssMeasure(cell.spssMeasure);
     onClose();
   };
 
@@ -562,29 +605,116 @@ export function CellContentModal({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="cell-code">셀 코드 (엑셀용)</Label>
-              <Input
-                id="cell-code"
-                value={cellCode}
-                onChange={(e) => setCellCode(e.target.value)}
-                placeholder="예: A11-1-1, UHD_YES"
-                className="h-9"
-              />
-              <p className="text-[10px] text-gray-400">지정하지 않으면 자동 생성된 코드가 사용됩니다.</p>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="cell-code">셀 코드</Label>
+                <div className="flex items-center gap-1">
+                  <Input
+                    id="cell-code"
+                    value={cellCode}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCellCode(val);
+                      // 사용자가 자동생성값과 다르게 수정하면 커스텀으로 표시
+                      setIsCustomCellCode(val !== '' && val !== autoCellCode);
+                    }}
+                    placeholder={autoCellCode || '예: Q4-1_r1_c1'}
+                    className="h-9"
+                  />
+                  {isCustomCellCode && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setCellCode(autoCellCode || '');
+                        setIsCustomCellCode(false);
+                      }}
+                      title="자동값으로 초기화"
+                      className="h-9 w-9 shrink-0"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+                {autoCellCode && isCustomCellCode && (
+                  <p className="text-[10px] text-gray-400">자동: {autoCellCode}</p>
+                )}
+                {!cellCode && INTERACTIVE_CELL_TYPES.has(contentType) && (
+                  <p className="text-[10px] text-amber-500">셀코드가 비어있으면 내보내기에서 제외됩니다.</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="export-label">엑셀 라벨</Label>
+                <div className="flex items-center gap-1">
+                  <Input
+                    id="export-label"
+                    value={exportLabel}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setExportLabel(val);
+                      setIsCustomExportLabel(val !== '' && val !== autoExportLabel);
+                    }}
+                    placeholder={autoExportLabel || '예: 가구TV보유_TV종류_UHD'}
+                    className="h-9"
+                  />
+                  {isCustomExportLabel && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        setExportLabel(autoExportLabel || '');
+                        setIsCustomExportLabel(false);
+                      }}
+                      title="자동값으로 초기화"
+                      className="h-9 w-9 shrink-0"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+                {autoExportLabel && isCustomExportLabel && (
+                  <p className="text-[10px] text-gray-400">자동: {autoExportLabel}</p>
+                )}
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="export-label">엑셀 라벨 (헤더용)</Label>
-              <Input
-                id="export-label"
-                value={exportLabel}
-                onChange={(e) => setExportLabel(e.target.value)}
-                placeholder="예: UHD 보유 여부"
-                className="h-9"
-              />
-              <p className="text-[10px] text-gray-400">엑셀 열 헤더에 표시될 이름입니다.</p>
-            </div>
+
+            {/* SPSS 변수 타입 / 측정 수준 (입력 셀만 표시) */}
+            {INTERACTIVE_CELL_TYPES.has(contentType) && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label htmlFor="cell-spss-var-type" className="text-xs">변수 타입</Label>
+                  <select
+                    id="cell-spss-var-type"
+                    value={spssVarType || ''}
+                    onChange={(e) => setSpssVarType((e.target.value || undefined) as TableCell['spssVarType'])}
+                    className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+                  >
+                    <option value="" disabled>선택</option>
+                    <option value="Numeric">Numeric</option>
+                    <option value="String">String</option>
+                    <option value="Date">Date</option>
+                    <option value="DateTime">DateTime</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="cell-spss-measure" className="text-xs">측정 수준</Label>
+                  <select
+                    id="cell-spss-measure"
+                    value={spssMeasure || ''}
+                    onChange={(e) => setSpssMeasure((e.target.value || undefined) as TableCell['spssMeasure'])}
+                    className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
+                  >
+                    <option value="" disabled>선택</option>
+                    <option value="Nominal">Nominal (명목)</option>
+                    <option value="Ordinal">Ordinal (순서)</option>
+                    <option value="Continuous">Continuous (척도)</option>
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -605,6 +735,27 @@ export function CellContentModal({
               setPreviewUrl(imageUrl);
             } else if (newType !== 'image') {
               setPreviewUrl(null);
+            }
+            // 셀 타입 변경 시 SPSS 필드 자동 처리
+            if (INTERACTIVE_CELL_TYPES.has(newType)) {
+              // 입력 타입으로 변경 → 변수 타입/측정 수준 자동 설정 (기존값 없을 때만)
+              if (!spssVarType) setSpssVarType(inferSpssVarType(newType));
+              if (!spssMeasure) setSpssMeasure(inferSpssMeasure(newType));
+              // 셀코드가 없고 커스텀이 아니면 자동생성
+              if (!cellCode && !isCustomCellCode && autoCellCode) {
+                setCellCode(autoCellCode);
+              }
+              if (!exportLabel && !isCustomExportLabel && autoExportLabel) {
+                setExportLabel(autoExportLabel);
+              }
+            } else {
+              // 비입력 타입으로 변경 → 셀코드/라벨/변수타입/측정수준 삭제
+              setCellCode('');
+              setIsCustomCellCode(false);
+              setExportLabel('');
+              setIsCustomExportLabel(false);
+              setSpssVarType(undefined);
+              setSpssMeasure(undefined);
             }
           }}
         >

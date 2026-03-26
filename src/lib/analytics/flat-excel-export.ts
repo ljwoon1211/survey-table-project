@@ -188,6 +188,8 @@ function expandTableToColumns(question: Question): ExportColumn[] {
 
       // 입력 가능한 셀 타입만 처리
       if (!isCellInputable(cell)) return;
+      // 셀코드가 의도적으로 비어있으면 내보내기에서 제외 (표시용 셀)
+      if (cell.isCustomCellCode === true && !cell.cellCode) return;
 
       const cellCode = cell.cellCode || `c${cellIndex}`;
       const cellLabel = cell.exportLabel || cell.content || cellCode;

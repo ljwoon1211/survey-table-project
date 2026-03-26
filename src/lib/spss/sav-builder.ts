@@ -27,15 +27,21 @@ const MIN_STRING_WIDTH = 8;
  * 변수 타입 결정 (오버라이드 우선 → 자동 판단)
  */
 function resolveVarType(col: SPSSExportColumn, question: Question | undefined): VariableType {
-  // 오버라이드가 있으면 우선 적용
+  const varTypeMap: Record<string, VariableType> = {
+    Numeric: VariableType.Numeric,
+    String: VariableType.String,
+    Date: VariableType.Date,
+    DateTime: VariableType.DateTime,
+  };
+
+  // 셀 단위 오버라이드 (테이블 셀)
+  if (col.cellSpssVarType) {
+    return varTypeMap[col.cellSpssVarType] ?? VariableType.Numeric;
+  }
+
+  // 질문 단위 오버라이드
   if (question?.spssVarType) {
-    const map: Record<string, VariableType> = {
-      Numeric: VariableType.Numeric,
-      String: VariableType.String,
-      Date: VariableType.Date,
-      DateTime: VariableType.DateTime,
-    };
-    return map[question.spssVarType] ?? VariableType.Numeric;
+    return varTypeMap[question.spssVarType] ?? VariableType.Numeric;
   }
 
   // 자동 판단
@@ -60,17 +66,25 @@ function resolveVarType(col: SPSSExportColumn, question: Question | undefined): 
 }
 
 /**
- * 측정 수준 결정 (오버라이드 우선 → 기본 Nominal)
+ * 측정 수준 결정 (셀 단위 오버라이드 → 질문 단위 오버라이드 → 기본 Nominal)
  */
 function resolveMeasure(col: SPSSExportColumn, question: Question | undefined): VariableMeasure {
-  if (question?.spssMeasure) {
-    const map: Record<string, VariableMeasure> = {
-      Nominal: VariableMeasure.Nominal,
-      Ordinal: VariableMeasure.Ordinal,
-      Continuous: VariableMeasure.Continuous,
-    };
-    return map[question.spssMeasure] ?? VariableMeasure.Nominal;
+  const measureMap: Record<string, VariableMeasure> = {
+    Nominal: VariableMeasure.Nominal,
+    Ordinal: VariableMeasure.Ordinal,
+    Continuous: VariableMeasure.Continuous,
+  };
+
+  // 셀 단위 오버라이드
+  if (col.cellSpssMeasure) {
+    return measureMap[col.cellSpssMeasure] ?? VariableMeasure.Nominal;
   }
+
+  // 질문 단위 오버라이드
+  if (question?.spssMeasure) {
+    return measureMap[question.spssMeasure] ?? VariableMeasure.Nominal;
+  }
+
   return VariableMeasure.Nominal;
 }
 

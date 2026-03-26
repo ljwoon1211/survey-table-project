@@ -97,8 +97,13 @@ export interface QuestionOption {
 
 export interface TableCell {
   id: string;
-  cellCode?: string; // ✨ 엑셀 내보내기용 셀 코드 (예: "c1", "보유여부")
-  exportLabel?: string; // ✨ 엑셀 열 이름 (예: "TV보유여부")
+  cellCode?: string; // ✨ 셀 코드 (예: "Q4-1_r1_c1") — 자동생성 또는 수동 입력
+  isCustomCellCode?: boolean; // 사용자가 수동 편집한 셀코드인지 여부
+  exportLabel?: string; // ✨ 엑셀 열 이름 (예: "가구TV보유_TV종류_UHD")
+  isCustomExportLabel?: boolean; // 사용자가 수동 편집한 라벨인지 여부
+  // SPSS 변수 타입 / 측정 수준 (셀 단위)
+  spssVarType?: 'Numeric' | 'String' | 'Date' | 'DateTime';
+  spssMeasure?: 'Nominal' | 'Ordinal' | 'Continuous';
   content: string;
   imageUrl?: string;
   videoUrl?: string;
