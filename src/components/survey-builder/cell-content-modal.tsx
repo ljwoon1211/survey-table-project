@@ -44,6 +44,7 @@ import { generateId, isValidUUID } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { CheckboxOption, QuestionOption, RadioOption, TableCell } from '@/types/survey';
 import {
+  INTERACTIVE_CELL_TYPES,
   generateCellCode,
   generateExportLabel,
   inferSpssMeasure,
@@ -51,8 +52,6 @@ import {
 } from '@/utils/table-cell-code-generator';
 
 import { BranchRuleEditor } from './branch-rule-editor';
-
-const INTERACTIVE_CELL_TYPES = new Set(['checkbox', 'radio', 'select', 'input']);
 
 interface CellContentModalProps {
   isOpen: boolean;
@@ -741,21 +740,17 @@ export function CellContentModal({
               // 입력 타입으로 변경 → 변수 타입/측정 수준 자동 설정 (기존값 없을 때만)
               if (!spssVarType) setSpssVarType(inferSpssVarType(newType));
               if (!spssMeasure) setSpssMeasure(inferSpssMeasure(newType));
-              // 셀코드가 없고 커스텀이 아니면 자동생성
-              if (!cellCode && !isCustomCellCode && autoCellCode) {
-                setCellCode(autoCellCode);
-              }
-              if (!exportLabel && !isCustomExportLabel && autoExportLabel) {
-                setExportLabel(autoExportLabel);
-              }
             } else {
-              // 비입력 타입으로 변경 → 셀코드/라벨/변수타입/측정수준 삭제
-              setCellCode('');
-              setIsCustomCellCode(false);
-              setExportLabel('');
-              setIsCustomExportLabel(false);
+              // 비입력 타입 → SPSS만 삭제, 코드는 유지
               setSpssVarType(undefined);
               setSpssMeasure(undefined);
+            }
+            // 모든 타입: 코드가 없고 커스텀이 아니면 자동생성
+            if (!cellCode && !isCustomCellCode && autoCellCode) {
+              setCellCode(autoCellCode);
+            }
+            if (!exportLabel && !isCustomExportLabel && autoExportLabel) {
+              setExportLabel(autoExportLabel);
             }
           }}
         >

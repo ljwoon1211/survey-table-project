@@ -1,11 +1,11 @@
 import type { TableCell, TableColumn, TableRow } from '@/types/survey';
 
-/** 입력 가능한 셀 타입 */
-const INTERACTIVE_CELL_TYPES = new Set(['checkbox', 'radio', 'select', 'input']);
+/** 입력 가능한 셀 타입 (SPSS 변수 생성 대상) */
+export const INTERACTIVE_CELL_TYPES = new Set(['checkbox', 'radio', 'select', 'input']);
 
-/** 셀이 자동생성 대상인지 판별 */
+/** 셀이 자동생성 대상인지 판별 (모든 타입, hidden만 제외) */
 function isAutoGeneratable(cell: TableCell): boolean {
-  return INTERACTIVE_CELL_TYPES.has(cell.type) && !cell.isHidden;
+  return !cell.isHidden;
 }
 
 /** 기존 cellCode가 있고 isCustomCellCode가 undefined이면 커스텀으로 간주 (기존 데이터 보호) */
@@ -104,11 +104,11 @@ function applyAutoCodeToCell(
     updates.isCustomExportLabel = false;
   }
 
-  // 변수 타입/측정 수준이 아직 없으면 자동 설정
-  if (!cell.spssVarType) {
+  // 변수 타입/측정 수준이 아직 없으면 자동 설정 (interactive 셀만)
+  if (!cell.spssVarType && INTERACTIVE_CELL_TYPES.has(cell.type)) {
     updates.spssVarType = inferSpssVarType(cell.type);
   }
-  if (!cell.spssMeasure) {
+  if (!cell.spssMeasure && INTERACTIVE_CELL_TYPES.has(cell.type)) {
     updates.spssMeasure = inferSpssMeasure(cell.type);
   }
 
