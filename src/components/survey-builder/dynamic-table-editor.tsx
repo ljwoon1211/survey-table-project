@@ -48,6 +48,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
     copiedCell,
     copiedCellPosition,
     editingColumnWidth,
+    columnWidths,
     useMultiRowHeader,
     currentHeaderGrid,
     rowConditionModalOpen,
@@ -200,7 +201,8 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
                     key={row.id}
                     row={row}
                     rowIndex={rowIndex}
-                    columns={currentColumns}
+                    columnWidths={columnWidths}
+                    columnCount={currentColumns.length}
                     totalRowCount={currentRows.length}
                     hasQuestions={(allQuestions ?? []).length > 0}
                     hasCopiedCell={!!copiedCell}

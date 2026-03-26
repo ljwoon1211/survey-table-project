@@ -153,10 +153,31 @@ export function useTableEditor({
   const [rowConditionModalOpen, setRowConditionModalOpen] = useState(false);
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
 
-  // ── Refs (stale closure 방지) ──
+  // ── Refs (stale closure 방지 + useCallback 안정화) ──
+
+  const currentTitleRef = useRef(currentTitle);
+  currentTitleRef.current = currentTitle;
+
+  const currentColumnsRef = useRef(currentColumns);
+  currentColumnsRef.current = currentColumns;
+
+  const currentRowsRef = useRef(currentRows);
+  currentRowsRef.current = currentRows;
 
   const headerGridRef = useRef(currentHeaderGrid);
   headerGridRef.current = currentHeaderGrid;
+
+  const questionCodeRef = useRef(questionCode);
+  questionCodeRef.current = questionCode;
+
+  const questionTitleRef = useRef(questionTitle);
+  questionTitleRef.current = questionTitle;
+
+  const selectedCellRef = useRef(selectedCell);
+  selectedCellRef.current = selectedCell;
+
+  const copiedCellRef = useRef(copiedCell);
+  copiedCellRef.current = copiedCell;
 
   const onTableChangeRef = useRef(onTableChange);
   onTableChangeRef.current = onTableChange;
@@ -232,7 +253,7 @@ export function useTableEditor({
 
   const mergeColumnHeaders = useCallback(
     (columnIndex: number) => {
-      const cols = [...currentColumns];
+      const cols = [...currentColumnsRef.current];
       const currentCol = cols[columnIndex];
       const currentColspan = currentCol.colspan || 1;
       const nextVisibleIndex = columnIndex + currentColspan;
@@ -247,21 +268,21 @@ export function useTableEditor({
 
       const updatedCols = recalculateHiddenHeaders(cols);
       setCurrentColumns(updatedCols);
-      notifyChange(currentTitle, updatedCols, currentRows);
+      notifyChange(currentTitleRef.current, updatedCols, currentRowsRef.current);
     },
-    [currentColumns, currentTitle, currentRows, notifyChange],
+    [notifyChange],
   );
 
   const unmergeColumnHeader = useCallback(
     (columnIndex: number) => {
-      const cols = [...currentColumns];
+      const cols = [...currentColumnsRef.current];
       cols[columnIndex] = { ...cols[columnIndex], colspan: undefined };
 
       const updatedCols = recalculateHiddenHeaders(cols);
       setCurrentColumns(updatedCols);
-      notifyChange(currentTitle, updatedCols, currentRows);
+      notifyChange(currentTitleRef.current, updatedCols, currentRowsRef.current);
     },
-    [currentColumns, currentTitle, currentRows, notifyChange],
+    [notifyChange],
   );
 
   // ── 제목 ──
@@ -269,61 +290,65 @@ export function useTableEditor({
   const updateTitle = useCallback(
     (title: string) => {
       setCurrentTitle(title);
-      notifyChangeDebounced(title, currentColumns, currentRows);
+      notifyChangeDebounced(title, currentColumnsRef.current, currentRowsRef.current);
     },
-    [currentColumns, currentRows, notifyChangeDebounced],
+    [notifyChangeDebounced],
   );
 
   // ── 열 너비 ──
 
   const handleColumnWidthChange = useCallback(
     (columnIndex: number, width: number) => {
-      const updatedColumns = currentColumns.map((col, index) =>
+      const updatedColumns = currentColumnsRef.current.map((col, index) =>
         index === columnIndex ? { ...col, width: Math.max(0, width) } : col,
       );
       setCurrentColumns(updatedColumns);
-      notifyChange(currentTitle, updatedColumns, currentRows);
+      notifyChange(currentTitleRef.current, updatedColumns, currentRowsRef.current);
     },
-    [currentColumns, currentTitle, currentRows, notifyChange],
+    [notifyChange],
   );
 
-  // ── 열 코드 변경 (인라인 핸들러 → 추출) ──
+  // ── 열 코드 변경 ──
 
   const updateColumnCode = useCallback(
     (columnIndex: number, newColumnCode: string) => {
-      const column = currentColumns[columnIndex];
-      const updatedColumns = currentColumns.map((col, idx) =>
+      const columns = currentColumnsRef.current;
+      const column = columns[columnIndex];
+      const updatedColumns = columns.map((col, idx) =>
         idx === columnIndex ? { ...col, columnCode: newColumnCode } : col,
       );
       const updatedCol = { ...column, columnCode: newColumnCode };
       const updatedRows = generateCellCodesForColumn(
-        questionCode,
-        questionTitle,
+        questionCodeRef.current,
+        questionTitleRef.current,
         updatedCol,
         columnIndex,
-        currentRows,
+        currentRowsRef.current,
       );
       setCurrentColumns(updatedColumns);
       setCurrentRows(updatedRows);
-      notifyChangeDebounced(currentTitle, updatedColumns, updatedRows);
+      notifyChangeDebounced(currentTitleRef.current, updatedColumns, updatedRows);
     },
-    [currentColumns, currentRows, currentTitle, questionCode, questionTitle, notifyChangeDebounced],
+    [notifyChangeDebounced],
   );
 
   // ── 열 CRUD ──
 
   const addColumn = useCallback(() => {
+    const columns = currentColumnsRef.current;
+    const rows = currentRowsRef.current;
+
     const newColumn: TableColumn = {
       id: generateId(),
-      label: `열 ${currentColumns.length + 1}`,
-      columnCode: `c${currentColumns.length + 1}`,
+      label: `열 ${columns.length + 1}`,
+      columnCode: `c${columns.length + 1}`,
       width: 150,
     };
 
-    const updatedColumns = [...currentColumns, newColumn];
-    const newColIndex = currentColumns.length;
+    const updatedColumns = [...columns, newColumn];
+    const newColIndex = columns.length;
 
-    const updatedRows = currentRows.map((row) => {
+    const updatedRows = rows.map((row) => {
       let shouldBeHidden = false;
       for (let col = 0; col < row.cells.length; col++) {
         const cell = row.cells[col];
@@ -349,12 +374,15 @@ export function useTableEditor({
 
     setCurrentColumns(updatedColumns);
     setCurrentRows(updatedRows);
-    notifyChange(currentTitle, updatedColumns, updatedRows);
-  }, [currentColumns, currentRows, currentTitle, notifyChange]);
+    notifyChange(currentTitleRef.current, updatedColumns, updatedRows);
+  }, [notifyChange]);
 
   const deleteColumn = useCallback(
     (columnIndex: number) => {
-      if (currentColumns.length <= 1) return;
+      const columns = currentColumnsRef.current;
+      const rows = currentRowsRef.current;
+
+      if (columns.length <= 1) return;
 
       if (
         !window.confirm(
@@ -364,9 +392,9 @@ export function useTableEditor({
         return;
       }
 
-      const updatedColumns = currentColumns.filter((_, index) => index !== columnIndex);
+      const updatedColumns = columns.filter((_, index) => index !== columnIndex);
 
-      const updatedRows = currentRows.map((row) => ({
+      const updatedRows = rows.map((row) => ({
         ...row,
         cells: row.cells
           .map((cell, cIndex) => {
@@ -385,25 +413,28 @@ export function useTableEditor({
       const finalRows = recalculateHiddenCells(updatedRows);
       setCurrentColumns(updatedColumns);
       setCurrentRows(finalRows);
-      notifyChange(currentTitle, updatedColumns, finalRows);
+      notifyChange(currentTitleRef.current, updatedColumns, finalRows);
     },
-    [currentColumns, currentRows, currentTitle, notifyChange],
+    [notifyChange],
   );
 
   const moveColumn = useCallback(
     (columnIndex: number, direction: 'left' | 'right') => {
+      const columns = currentColumnsRef.current;
+      const rows = currentRowsRef.current;
+
       if (direction === 'left' && columnIndex === 0) return;
-      if (direction === 'right' && columnIndex === currentColumns.length - 1) return;
+      if (direction === 'right' && columnIndex === columns.length - 1) return;
 
       const targetIndex = direction === 'left' ? columnIndex - 1 : columnIndex + 1;
 
-      const updatedColumns = [...currentColumns];
+      const updatedColumns = [...columns];
       [updatedColumns[columnIndex], updatedColumns[targetIndex]] = [
         updatedColumns[targetIndex],
         updatedColumns[columnIndex],
       ];
 
-      const updatedRows = currentRows.map((row) => {
+      const updatedRows = rows.map((row) => {
         const newCells = [...row.cells];
         [newCells[columnIndex], newCells[targetIndex]] = [
           newCells[targetIndex],
@@ -415,26 +446,29 @@ export function useTableEditor({
       const finalRows = recalculateHiddenCells(updatedRows);
       setCurrentColumns(updatedColumns);
       setCurrentRows(finalRows);
-      notifyChange(currentTitle, updatedColumns, finalRows);
+      notifyChange(currentTitleRef.current, updatedColumns, finalRows);
     },
-    [currentColumns, currentRows, currentTitle, notifyChange],
+    [notifyChange],
   );
 
   const updateColumnLabel = useCallback(
     (columnIndex: number, label: string) => {
-      const updatedColumns = currentColumns.map((col, index) =>
+      const updatedColumns = currentColumnsRef.current.map((col, index) =>
         index === columnIndex ? { ...col, label } : col,
       );
       setCurrentColumns(updatedColumns);
-      notifyChangeDebounced(currentTitle, updatedColumns, currentRows);
+      notifyChangeDebounced(currentTitleRef.current, updatedColumns, currentRowsRef.current);
     },
-    [currentColumns, currentTitle, currentRows, notifyChangeDebounced],
+    [notifyChangeDebounced],
   );
 
   // ── 행 CRUD ──
 
   const addRow = useCallback(() => {
-    const existingNumbers = currentRows
+    const rows = currentRowsRef.current;
+    const columns = currentColumnsRef.current;
+
+    const existingNumbers = rows
       .map((row) => {
         const match = row.label.match(/행 (\d+)/);
         return match ? parseInt(match[1], 10) : 0;
@@ -446,18 +480,18 @@ export function useTableEditor({
 
     const newRowId = generateId();
 
-    const cells = currentColumns.map((col, colIndex) => {
+    const cells = columns.map((col, colIndex) => {
       let shouldBeHidden = false;
 
-      for (let r = 0; r < currentRows.length; r++) {
-        const cell = currentRows[r].cells[colIndex];
+      for (let r = 0; r < rows.length; r++) {
+        const cell = rows[r].cells[colIndex];
         if (!cell) continue;
 
         const rowspan = cell.rowspan || 1;
         const colspan = cell.colspan || 1;
 
-        if (r + rowspan > currentRows.length) {
-          const cellColIndex = currentRows[r].cells.findIndex((c) => c.id === cell.id);
+        if (r + rowspan > rows.length) {
+          const cellColIndex = rows[r].cells.findIndex((c) => c.id === cell.id);
           if (colIndex >= cellColIndex && colIndex < cellColIndex + colspan) {
             shouldBeHidden = true;
             break;
@@ -476,27 +510,29 @@ export function useTableEditor({
     const newRow: TableRow = {
       id: newRowId,
       label: `행 ${nextNumber}`,
-      rowCode: `r${currentRows.length + 1}`,
+      rowCode: `r${rows.length + 1}`,
       height: 60,
       minHeight: 40,
       cells,
     };
 
     const newRowWithCodes = generateCellCodesForRow(
-      questionCode,
-      questionTitle,
-      currentColumns,
+      questionCodeRef.current,
+      questionTitleRef.current,
+      columns,
       newRow,
     );
 
-    const updatedRows = [...currentRows, newRowWithCodes];
+    const updatedRows = [...rows, newRowWithCodes];
     setCurrentRows(updatedRows);
-    notifyChange(currentTitle, currentColumns, updatedRows);
-  }, [currentRows, currentColumns, currentTitle, questionCode, questionTitle, notifyChange]);
+    notifyChange(currentTitleRef.current, columns, updatedRows);
+  }, [notifyChange]);
 
   const deleteRow = useCallback(
     (rowIndex: number) => {
-      if (currentRows.length <= 1) return;
+      const rows = currentRowsRef.current;
+
+      if (rows.length <= 1) return;
 
       if (
         !window.confirm(
@@ -506,7 +542,7 @@ export function useTableEditor({
         return;
       }
 
-      const updatedRows = currentRows
+      const updatedRows = rows
         .map((row, rIndex) => {
           if (rIndex < rowIndex) {
             return {
@@ -527,33 +563,38 @@ export function useTableEditor({
 
       const finalRows = recalculateHiddenCells(updatedRows);
       setCurrentRows(finalRows);
-      notifyChange(currentTitle, currentColumns, finalRows);
+      notifyChange(currentTitleRef.current, currentColumnsRef.current, finalRows);
     },
-    [currentRows, currentTitle, currentColumns, notifyChange],
+    [notifyChange],
   );
 
   const updateRowLabel = useCallback(
     (rowIndex: number, label: string) => {
-      const updatedRows = currentRows.map((row, index) =>
+      const updatedRows = currentRowsRef.current.map((row, index) =>
         index === rowIndex ? { ...row, label } : row,
       );
       setCurrentRows(updatedRows);
-      notifyChangeDebounced(currentTitle, currentColumns, updatedRows);
+      notifyChangeDebounced(currentTitleRef.current, currentColumnsRef.current, updatedRows);
     },
-    [currentRows, currentTitle, currentColumns, notifyChangeDebounced],
+    [notifyChangeDebounced],
   );
 
   const updateRowCode = useCallback(
     (rowIndex: number, rowCode: string) => {
-      const updatedRows = currentRows.map((row, index) => {
+      const updatedRows = currentRowsRef.current.map((row, index) => {
         if (index !== rowIndex) return row;
         const updatedRow = { ...row, rowCode };
-        return generateCellCodesForRow(questionCode, questionTitle, currentColumns, updatedRow);
+        return generateCellCodesForRow(
+          questionCodeRef.current,
+          questionTitleRef.current,
+          currentColumnsRef.current,
+          updatedRow,
+        );
       });
       setCurrentRows(updatedRows);
-      notifyChangeDebounced(currentTitle, currentColumns, updatedRows);
+      notifyChangeDebounced(currentTitleRef.current, currentColumnsRef.current, updatedRows);
     },
-    [currentRows, currentTitle, currentColumns, questionCode, questionTitle, notifyChangeDebounced],
+    [notifyChangeDebounced],
   );
 
   // ── 행 조건부 표시 ──
@@ -565,13 +606,13 @@ export function useTableEditor({
 
   const updateRowCondition = useCallback(
     (rowIndex: number, conditionGroup: QuestionConditionGroup | undefined) => {
-      const updatedRows = currentRows.map((row, index) =>
+      const updatedRows = currentRowsRef.current.map((row, index) =>
         index === rowIndex ? { ...row, displayCondition: conditionGroup } : row,
       );
       setCurrentRows(updatedRows);
-      notifyChange(currentTitle, currentColumns, updatedRows);
+      notifyChange(currentTitleRef.current, currentColumnsRef.current, updatedRows);
     },
-    [currentRows, currentTitle, currentColumns, notifyChange],
+    [notifyChange],
   );
 
   const currentQuestionAsQuestion: Question = useMemo(
@@ -591,35 +632,38 @@ export function useTableEditor({
 
   const copyCell = useCallback(
     (rowIndex: number, cellIndex: number) => {
-      const cell = currentRows[rowIndex]?.cells[cellIndex];
+      const cell = currentRowsRef.current[rowIndex]?.cells[cellIndex];
       if (!cell) return;
       const cellToCopy: TableCell = { ...cell, id: '' };
       setCopiedCell(cellToCopy);
       setCopiedCellPosition({ rowIndex, cellIndex });
     },
-    [currentRows],
+    [],
   );
 
   const pasteCell = useCallback(
     (rowIndex: number, cellIndex: number) => {
-      if (!copiedCell) return;
+      const copied = copiedCellRef.current;
+      if (!copied) return;
 
-      const targetCell = currentRows[rowIndex]?.cells[cellIndex];
+      const rows = currentRowsRef.current;
+      const columns = currentColumnsRef.current;
+      const targetCell = rows[rowIndex]?.cells[cellIndex];
       if (!targetCell) return;
 
-      const targetRow = currentRows[rowIndex];
-      const targetColumn = currentColumns[cellIndex];
+      const targetRow = rows[rowIndex];
+      const targetColumn = columns[cellIndex];
       const pastedCell: TableCell = regenerateCellCodeForPaste(
-        { ...copiedCell, id: targetCell.id },
-        questionCode,
-        questionTitle,
+        { ...copied, id: targetCell.id },
+        questionCodeRef.current,
+        questionTitleRef.current,
         targetRow?.rowCode,
         targetRow?.label,
         targetColumn?.columnCode,
         targetColumn?.label,
       );
 
-      let updatedRows = currentRows.map((row, rIndex) =>
+      let updatedRows = rows.map((row, rIndex) =>
         rIndex === rowIndex
           ? { ...row, cells: row.cells.map((c, cIndex) => (cIndex === cellIndex ? pastedCell : c)) }
           : row,
@@ -644,16 +688,17 @@ export function useTableEditor({
 
       const finalRows = recalculateHiddenCells(updatedRows);
       setCurrentRows(finalRows);
-      notifyChange(currentTitle, currentColumns, finalRows);
+      notifyChange(currentTitleRef.current, columns, finalRows);
     },
-    [copiedCell, currentRows, currentColumns, currentTitle, questionCode, questionTitle, notifyChange],
+    [notifyChange],
   );
 
   // ── 셀 삭제/업데이트 ──
 
   const updateCell = useCallback(
     (rowIndex: number, cellIndex: number, cell: TableCell) => {
-      let updatedRows = currentRows.map((row, rIndex) =>
+      const rows = currentRowsRef.current;
+      let updatedRows = rows.map((row, rIndex) =>
         rIndex === rowIndex
           ? { ...row, cells: row.cells.map((c, cIndex) => (cIndex === cellIndex ? cell : c)) }
           : row,
@@ -678,15 +723,15 @@ export function useTableEditor({
 
       const finalRows = recalculateHiddenCells(updatedRows);
       setCurrentRows(finalRows);
-      notifyChange(currentTitle, currentColumns, finalRows);
+      notifyChange(currentTitleRef.current, currentColumnsRef.current, finalRows);
       setSelectedCell(null);
     },
-    [currentRows, currentTitle, currentColumns, notifyChange],
+    [notifyChange],
   );
 
   const deleteCell = useCallback(
     (rowIndex: number, cellIndex: number) => {
-      const cell = currentRows[rowIndex]?.cells[cellIndex];
+      const cell = currentRowsRef.current[rowIndex]?.cells[cellIndex];
       if (!cell) return;
 
       const emptyCell: TableCell = {
@@ -701,29 +746,43 @@ export function useTableEditor({
 
       updateCell(rowIndex, cellIndex, emptyCell);
     },
-    [currentRows, updateCell],
+    [updateCell],
   );
 
   // ── 셀 병합/해제 ──
 
   const canMerge = useCallback(
     (direction: 'up' | 'down' | 'left' | 'right'): boolean => {
-      if (!selectedCell) return false;
+      const selected = selectedCellRef.current;
+      if (!selected) return false;
 
-      const rowIndex = currentRows.findIndex((row) => row.id === selectedCell.rowId);
-      const cellIndex = currentRows[rowIndex]?.cells.findIndex(
-        (cell) => cell.id === selectedCell.cellId,
+      const rows = currentRowsRef.current;
+      const rowIndex = rows.findIndex((row) => row.id === selected.rowId);
+      const cellIndex = rows[rowIndex]?.cells.findIndex(
+        (cell) => cell.id === selected.cellId,
       );
       if (rowIndex === -1 || cellIndex === -1) return false;
 
-      return checkCanMerge(direction, rowIndex, cellIndex, currentRows, currentColumns);
+      return checkCanMerge(direction, rowIndex, cellIndex, rows, currentColumnsRef.current);
     },
-    [currentRows, currentColumns, selectedCell],
+    [],
   );
 
   const handleMerge = useCallback(
     (direction: 'up' | 'down' | 'left' | 'right') => {
-      if (!selectedCell || !canMerge(direction)) return;
+      const selected = selectedCellRef.current;
+      if (!selected) return;
+
+      const rows = currentRowsRef.current;
+      const columns = currentColumnsRef.current;
+
+      const rowIndex = rows.findIndex((row) => row.id === selected.rowId);
+      const cellIndex = rows[rowIndex]?.cells.findIndex(
+        (cell) => cell.id === selected.cellId,
+      );
+      if (rowIndex === -1 || cellIndex === -1) return;
+
+      if (!checkCanMerge(direction, rowIndex, cellIndex, rows, columns)) return;
 
       if (
         !window.confirm(
@@ -733,12 +792,7 @@ export function useTableEditor({
         return;
       }
 
-      const rowIndex = currentRows.findIndex((row) => row.id === selectedCell.rowId);
-      const cellIndex = currentRows[rowIndex]?.cells.findIndex(
-        (cell) => cell.id === selectedCell.cellId,
-      );
-
-      const { updatedRows, newSelectedCell } = executeMerge(direction, rowIndex, cellIndex, currentRows);
+      const { updatedRows, newSelectedCell } = executeMerge(direction, rowIndex, cellIndex, rows);
 
       if (newSelectedCell) {
         setSelectedCell(newSelectedCell);
@@ -746,28 +800,30 @@ export function useTableEditor({
 
       const finalRows = recalculateHiddenCells(updatedRows);
       setCurrentRows(finalRows);
-      notifyChange(currentTitle, currentColumns, finalRows);
+      notifyChange(currentTitleRef.current, columns, finalRows);
     },
-    [selectedCell, currentRows, currentColumns, canMerge, currentTitle, notifyChange],
+    [notifyChange],
   );
 
   const handleUnmerge = useCallback(() => {
-    if (!selectedCell) return;
+    const selected = selectedCellRef.current;
+    if (!selected) return;
 
-    const rowIndex = currentRows.findIndex((row) => row.id === selectedCell.rowId);
-    const cellIndex = currentRows[rowIndex]?.cells.findIndex(
-      (cell) => cell.id === selectedCell.cellId,
+    const rows = currentRowsRef.current;
+    const rowIndex = rows.findIndex((row) => row.id === selected.rowId);
+    const cellIndex = rows[rowIndex]?.cells.findIndex(
+      (cell) => cell.id === selected.cellId,
     );
 
     if (rowIndex === -1 || cellIndex === -1) return;
 
-    const newRows = executeUnmerge(rowIndex, cellIndex, currentRows);
-    if (newRows === currentRows) return; // 변경 없음
+    const newRows = executeUnmerge(rowIndex, cellIndex, rows);
+    if (newRows === rows) return;
 
     const finalRows = recalculateHiddenCells(newRows);
     setCurrentRows(finalRows);
-    notifyChange(currentTitle, currentColumns, finalRows);
-  }, [selectedCell, currentRows, currentTitle, currentColumns, notifyChange]);
+    notifyChange(currentTitleRef.current, currentColumnsRef.current, finalRows);
+  }, [notifyChange]);
 
   // ── 셀 선택 (안정된 콜백) ──
 
@@ -781,39 +837,48 @@ export function useTableEditor({
   const toggleMultiRowHeader = useCallback(
     (enabled: boolean) => {
       setUseMultiRowHeader(enabled);
-      if (enabled && !currentHeaderGrid) {
-        const defaultGrid = buildDefaultHeaderGrid(currentColumns);
+      if (enabled && !headerGridRef.current) {
+        const defaultGrid = buildDefaultHeaderGrid(currentColumnsRef.current);
         setCurrentHeaderGrid(defaultGrid);
         onTableChangeRef.current({
-          tableTitle: currentTitle,
-          tableColumns: currentColumns,
-          tableRowsData: currentRows,
+          tableTitle: currentTitleRef.current,
+          tableColumns: currentColumnsRef.current,
+          tableRowsData: currentRowsRef.current,
           tableHeaderGrid: defaultGrid,
         });
       } else if (!enabled) {
         setCurrentHeaderGrid(undefined);
         onTableChangeRef.current({
-          tableTitle: currentTitle,
-          tableColumns: currentColumns,
-          tableRowsData: currentRows,
+          tableTitle: currentTitleRef.current,
+          tableColumns: currentColumnsRef.current,
+          tableRowsData: currentRowsRef.current,
           tableHeaderGrid: undefined,
         });
       }
     },
-    [currentHeaderGrid, currentColumns, currentTitle, currentRows],
+    [],
   );
 
   const updateHeaderGrid = useCallback(
     (newGrid: HeaderCell[][]) => {
       setCurrentHeaderGrid(newGrid);
       onTableChangeRef.current({
-        tableTitle: currentTitle,
-        tableColumns: currentColumns,
-        tableRowsData: currentRows,
+        tableTitle: currentTitleRef.current,
+        tableColumns: currentColumnsRef.current,
+        tableRowsData: currentRowsRef.current,
         tableHeaderGrid: newGrid,
       });
     },
-    [currentTitle, currentColumns, currentRows],
+    [],
+  );
+
+  // ── columnWidths (EditorTableRow에 안정적 참조 전달용) ──
+
+  const columnWidths = useMemo(
+    () => currentColumns.map((col) => col.width || 150),
+    // 라벨/코드 변경 시 재생성 방지: 너비만 추적
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [currentColumns.map((col) => col.width).join(',')],
   );
 
   // ── selectedCellContext (CellContentModal용 useMemo) ──
@@ -850,6 +915,7 @@ export function useTableEditor({
       copiedCell,
       copiedCellPosition,
       editingColumnWidth,
+      columnWidths,
       useMultiRowHeader,
       currentHeaderGrid,
       rowConditionModalOpen,

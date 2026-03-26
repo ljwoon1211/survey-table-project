@@ -17,7 +17,7 @@ import {
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { TableCell, TableColumn, TableRow } from '@/types/survey';
+import { TableCell, TableRow } from '@/types/survey';
 
 /** 에디터 셀 내용 표시 컴포넌트 (매 렌더마다 함수 재생성 방지) */
 function EditorCellContent({ cell }: { cell: TableCell }) {
@@ -119,7 +119,8 @@ function EditorCellContent({ cell }: { cell: TableCell }) {
 export interface EditorTableRowProps {
   row: TableRow;
   rowIndex: number;
-  columns: TableColumn[];
+  columnWidths: number[];
+  columnCount: number;
   totalRowCount: number;
   hasQuestions: boolean;
   hasCopiedCell: boolean;
@@ -138,7 +139,8 @@ export interface EditorTableRowProps {
 export const EditorTableRow = React.memo(function EditorTableRow({
   row,
   rowIndex,
-  columns,
+  columnWidths,
+  columnCount,
   totalRowCount,
   hasQuestions,
   hasCopiedCell,
@@ -207,7 +209,7 @@ export const EditorTableRow = React.memo(function EditorTableRow({
       {row.cells.map((cell, cellIndex) => {
         if (cell.isHidden) return null;
 
-        const column = columns[cellIndex];
+        const columnWidth = columnWidths[cellIndex] ?? 150;
         const rowspan = cell.rowspan || 1;
         const colspan = cell.colspan || 1;
         const isMerged = rowspan > 1 || colspan > 1;
@@ -224,8 +226,8 @@ export const EditorTableRow = React.memo(function EditorTableRow({
             key={cell.id}
             className={`relative border border-gray-300 p-2 ${verticalAlignClass}`}
             style={{
-              width: column?.width ? `${column.width}px` : '150px',
-              maxWidth: column?.width ? `${column.width}px` : '150px',
+              width: `${columnWidth}px`,
+              maxWidth: `${columnWidth}px`,
               height: row.height ? `${row.height}px` : '60px',
             }}
             rowSpan={rowspan}
@@ -283,7 +285,7 @@ export const EditorTableRow = React.memo(function EditorTableRow({
                         e.stopPropagation();
                         onMoveColumn(cellIndex, 'right');
                       }}
-                      disabled={cellIndex === columns.length - 1}
+                      disabled={cellIndex === columnCount - 1}
                       title="열 오른쪽으로 이동"
                     >
                       <ArrowRight className="h-3 w-3" />
