@@ -17,7 +17,9 @@ interface CompactColumn {
   code: string;
   header: string;
   questionId: string;
-  type: 'meta' | 'question' | 'table-cell';
+  type: 'meta' | 'question' | 'table-cell' | 'multiselect-level';
+  /** 다단계 선택 레벨 ID (type이 'multiselect-level'일 때) */
+  levelId?: string;
   tableInfo?: {
     rowId: string;
     rowLabel: string;
@@ -65,13 +67,7 @@ function flattenQuestionsToCompactColumns(survey: Survey): CompactColumn[] {
           code,
           header: sanitizeHeader(header),
           questionId: question.id,
-          // 하지만 여기서는 column.code로 levelId를 직접 넘기기 위해 type을 확장하거나
-          // question.selectLevels를 참조하는 로직이 필요함.
-          // 간단하게 'multiselect-level' 타입을 추가하는 편이 나음.
-          // 편의상 questionId만 쓰고 내부에서 구분하거나, type을 확장.
-          // 여기서는 type='multiselect-level'로 확장하여 처리
-          type: 'multiselect-level' as any,
-          // @ts-ignore: Adding custom property for multiselect
+          type: 'multiselect-level',
           levelId: level.id,
         });
       });
@@ -160,11 +156,14 @@ function flattenResponsesToCompactRows(
   columns: CompactColumn[],
   survey: Survey,
 ): CompactRow[] {
+  // question lookup을 O(1)로 최적화
+  const questionMap = new Map(survey.questions.map((q) => [q.id, q]));
+
   return responses.map((response) => {
     const row: CompactRow = {};
 
     columns.forEach((col) => {
-      row[col.header] = getCompactValueForColumn(col, response, survey);
+      row[col.header] = getCompactValueForColumn(col, response, questionMap);
     });
 
     return row;
@@ -177,7 +176,7 @@ function flattenResponsesToCompactRows(
 function getCompactValueForColumn(
   column: CompactColumn,
   response: ResponseData,
-  survey: Survey,
+  questionMap: Map<string, Question>,
 ): string | number {
   const { questionResponses } = response;
 
@@ -188,17 +187,14 @@ function getCompactValueForColumn(
 
   const answer = questionResponses[column.questionId];
 
-  // [NEW] 다단계 선택 처리
-  // @ts-ignore
+  // 다단계 선택 처리
   if (column.type === 'multiselect-level' && column.levelId) {
     if (!answer || typeof answer !== 'object') return '';
-    // @ts-ignore
     const rawVal = (answer as Record<string, string>)[column.levelId];
     if (!rawVal) return '';
 
     // 라벨 변환
-    const question = survey.questions.find((q) => q.id === column.questionId);
-    // @ts-ignore
+    const question = questionMap.get(column.questionId);
     const level = question?.selectLevels?.find((l) => l.id === column.levelId);
     if (level) {
       const opt = level.options.find((o) => o.value === rawVal);
@@ -211,13 +207,13 @@ function getCompactValueForColumn(
 
   // 일반 질문
   if (column.type === 'question') {
-    return formatCompactValue(answer, column.questionId, survey);
+    return formatCompactValue(answer, column.questionId, questionMap);
   }
 
   // 테이블 셀
   if (column.type === 'table-cell' && column.tableInfo) {
     const cellValue = getTableCellValue(answer, column.tableInfo);
-    return formatCompactCellValue(cellValue, column.tableInfo, column.questionId, survey);
+    return formatCompactCellValue(cellValue, column.tableInfo, column.questionId, questionMap);
   }
 
   return '';
@@ -263,8 +259,8 @@ function getTableCellValue(answer: unknown, tableInfo: { rowId: string; cellId: 
 /**
  * 간결 값 포맷팅 (다중 선택은 콤마로 합침)
  */
-function formatCompactValue(value: unknown, questionId: string, survey: Survey): string {
-  const question = survey.questions.find((q) => q.id === questionId);
+function formatCompactValue(value: unknown, questionId: string, questionMap: Map<string, Question>): string {
+  const question = questionMap.get(questionId);
   if (!question) return String(value ?? '');
 
   // [NEW] 기타(Other) 응답 처리
@@ -325,11 +321,11 @@ function formatCompactCellValue(
   value: unknown,
   tableInfo: { rowId: string; cellId: string; cellType: string },
   questionId: string,
-  survey: Survey,
+  questionMap: Map<string, Question>,
 ): string {
   if (value === undefined || value === null) return '';
 
-  const question = survey.questions.find((q) => q.id === questionId);
+  const question = questionMap.get(questionId);
   if (!question) return String(value);
 
   // 셀 찾기

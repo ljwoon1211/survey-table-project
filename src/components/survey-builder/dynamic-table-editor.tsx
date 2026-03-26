@@ -595,41 +595,64 @@ export function DynamicTableEditor({
     initialHeaderGrid,
   );
 
+  // 최신 headerGrid를 ref로 유지 (closure stale 방지)
+  const headerGridRef = useRef(currentHeaderGrid);
+  headerGridRef.current = currentHeaderGrid;
+
+  // 최신 onTableChange를 ref로 유지
+  const onTableChangeRef = useRef(onTableChange);
+  onTableChangeRef.current = onTableChange;
+
   // 변경 사항을 부모에게 전달 (즉시 실행 - 구조 변경용)
   const notifyChangeImmediate = useCallback(
     (title: string, cols: TableColumn[], rowsData: TableRow[]) => {
-      onTableChange({
+      onTableChangeRef.current({
         tableTitle: title,
         tableColumns: cols,
         tableRowsData: rowsData,
-        tableHeaderGrid: currentHeaderGrid,
+        tableHeaderGrid: headerGridRef.current,
       });
     },
-    [onTableChange, currentHeaderGrid],
+    [],
   );
 
   // debounced 버전 (텍스트 입력용 - 300ms)
   const pendingChangeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingArgsRef = useRef<{ title: string; cols: TableColumn[]; rowsData: TableRow[] } | null>(null);
   const notifyChangeDebounced = useCallback(
     (title: string, cols: TableColumn[], rowsData: TableRow[]) => {
       if (pendingChangeRef.current) clearTimeout(pendingChangeRef.current);
+      pendingArgsRef.current = { title, cols, rowsData };
       pendingChangeRef.current = setTimeout(() => {
-        onTableChange({
+        onTableChangeRef.current({
           tableTitle: title,
           tableColumns: cols,
           tableRowsData: rowsData,
-          tableHeaderGrid: currentHeaderGrid,
+          tableHeaderGrid: headerGridRef.current,
         });
         pendingChangeRef.current = null;
+        pendingArgsRef.current = null;
       }, 300);
     },
-    [onTableChange, currentHeaderGrid],
+    [],
   );
 
-  // 언마운트 시 pending flush
+  // 언마운트 시 pending change flush (데이터 손실 방지)
   useEffect(() => {
     return () => {
-      if (pendingChangeRef.current) clearTimeout(pendingChangeRef.current);
+      if (pendingChangeRef.current) {
+        clearTimeout(pendingChangeRef.current);
+        // pending 변경이 있으면 flush
+        if (pendingArgsRef.current) {
+          const { title, cols, rowsData } = pendingArgsRef.current;
+          onTableChangeRef.current({
+            tableTitle: title,
+            tableColumns: cols,
+            tableRowsData: rowsData,
+            tableHeaderGrid: headerGridRef.current,
+          });
+        }
+      }
     };
   }, []);
 
@@ -846,15 +869,32 @@ export function DynamicTableEditor({
 
     const updatedColumns = currentColumns.filter((_, index) => index !== columnIndex);
 
-    // 모든 행에서 해당 셀 삭제
+    // 모든 행에서 해당 셀 삭제 + 왼쪽 셀의 colspan 조정
     const updatedRows = currentRows.map((row) => ({
       ...row,
-      cells: row.cells.filter((_, index) => index !== columnIndex),
+      cells: row.cells
+        .map((cell, cIndex) => {
+          // 삭제되는 열 왼쪽의 셀에서 colspan이 삭제되는 열까지 미치는 경우 조정
+          if (cIndex < columnIndex) {
+            const colspan = cell.colspan || 1;
+            if (cIndex + colspan > columnIndex) {
+              const newColspan = Math.max(1, colspan - 1);
+              return {
+                ...cell,
+                colspan: newColspan > 1 ? newColspan : undefined,
+              };
+            }
+          }
+          return cell;
+        })
+        .filter((_, index) => index !== columnIndex),
     }));
 
+    // 병합된 셀로 인해 숨겨져야 하는 셀들을 재계산
+    const finalRows = recalculateHiddenCells(updatedRows);
     setCurrentColumns(updatedColumns);
-    setCurrentRows(updatedRows);
-    notifyChange(currentTitle, updatedColumns, updatedRows);
+    setCurrentRows(finalRows);
+    notifyChange(currentTitle, updatedColumns, finalRows);
   };
 
   // 열 이동

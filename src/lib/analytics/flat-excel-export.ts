@@ -258,11 +258,14 @@ export function flattenResponsesToRows(
   columns: ExportColumn[],
   survey: Survey,
 ): FlatRow[] {
+  // question lookup을 O(1)로 최적화
+  const questionMap = new Map(survey.questions.map((q) => [q.id, q]));
+
   return responses.map((response) => {
     const row: FlatRow = {};
 
     columns.forEach((col) => {
-      row[col.header] = getValueForColumn(col, response, survey);
+      row[col.header] = getValueForColumn(col, response, questionMap);
     });
 
     return row;
@@ -275,7 +278,7 @@ export function flattenResponsesToRows(
 function getValueForColumn(
   column: ExportColumn,
   response: ResponseData,
-  survey: Survey,
+  questionMap: Map<string, Question>,
 ): string | number | boolean {
   const { questionResponses } = response;
 
@@ -289,8 +292,26 @@ function getValueForColumn(
 
   // 단일 값 열
   if (column.type === 'single') {
+    // "기타" 응답 객체 처리: { hasOther: true, selectedValue: "...", otherValue: "..." }
+    if (typeof answer === 'object' && answer !== null && !Array.isArray(answer)) {
+      const valObj = answer as Record<string, unknown>;
+      if (valObj.hasOther === true) {
+        const selected = String(valObj.selectedValue || '');
+        const input = String(valObj.otherValue || '').trim();
+        // 기타 입력값 열인 경우 입력값만 반환
+        if (column.code.endsWith('_other_text')) return input;
+        // 일반 열인 경우 라벨 변환
+        const question = questionMap.get(column.questionId);
+        let label = selected;
+        if (question?.options) {
+          const opt = question.options.find((o) => o.value === selected);
+          if (opt) label = opt.label;
+        }
+        return input ? `${label} (${input})` : label;
+      }
+    }
     if (typeof answer === 'string' || typeof answer === 'number') {
-      return formatValue(answer, column.questionId, survey);
+      return formatValue(answer, column.questionId, questionMap);
     }
     return '';
   }
@@ -298,7 +319,7 @@ function getValueForColumn(
   // 체크박스 옵션 열 (Y/N)
   if (column.type === 'checkbox-option' && column.optionInfo) {
     if (Array.isArray(answer)) {
-      return answer.includes(column.optionInfo.optionValue) ? 'Y' : 'N';
+      return checkArrayContainsOption(answer, column.optionInfo.optionValue) ? 'Y' : 'N';
     }
     return 'N';
   }
@@ -306,14 +327,14 @@ function getValueForColumn(
   // 테이블 셀 열
   if (column.type === 'table-cell' && column.tableInfo) {
     const cellValue = getTableCellValue(answer, column.tableInfo);
-    return formatTableCellValue(cellValue, column.tableInfo, column.questionId, survey);
+    return formatTableCellValue(cellValue, column.tableInfo, column.questionId, questionMap);
   }
 
   // 테이블 체크박스 옵션 열 (Y/N)
   if (column.type === 'table-checkbox-option' && column.tableInfo && column.optionInfo) {
     const cellValue = getTableCellValue(answer, column.tableInfo);
     if (Array.isArray(cellValue)) {
-      return cellValue.includes(column.optionInfo.optionValue) ? 'Y' : 'N';
+      return checkArrayContainsOption(cellValue, column.optionInfo.optionValue) ? 'Y' : 'N';
     }
     return 'N';
   }
@@ -366,8 +387,8 @@ function getTableCellValue(
 /**
  * 값 포맷팅 (옵션 라벨로 변환)
  */
-function formatValue(value: unknown, questionId: string, survey: Survey): string {
-  const question = survey.questions.find((q) => q.id === questionId);
+function formatValue(value: unknown, questionId: string, questionMap: Map<string, Question>): string {
+  const question = questionMap.get(questionId);
   if (!question) return String(value);
 
   // Radio/Select 옵션 라벨 변환
@@ -386,11 +407,11 @@ function formatTableCellValue(
   value: unknown,
   tableInfo: NonNullable<ExportColumn['tableInfo']>,
   questionId: string,
-  survey: Survey,
+  questionMap: Map<string, Question>,
 ): string {
   if (value === undefined || value === null) return '';
 
-  const question = survey.questions.find((q) => q.id === questionId);
+  const question = questionMap.get(questionId);
   if (!question) return String(value);
 
   // 셀 찾기
@@ -504,6 +525,21 @@ function sanitizeHeader(str: string): string {
     .replace(/[\/\\?*\[\]]/g, '_')
     .trim()
     .substring(0, 100);
+}
+
+/**
+ * 배열에 특정 옵션 값이 포함되어 있는지 확인 (기타 응답 객체 포함)
+ */
+function checkArrayContainsOption(arr: unknown[], optionValue: string): boolean {
+  return arr.some((item) => {
+    if (item === optionValue) return true;
+    // 기타(Other) 응답 객체: { hasOther: true, selectedValue: "other", otherValue: "..." }
+    if (typeof item === 'object' && item !== null) {
+      const obj = item as Record<string, unknown>;
+      if (obj.hasOther === true && obj.selectedValue === optionValue) return true;
+    }
+    return false;
+  });
 }
 
 /**

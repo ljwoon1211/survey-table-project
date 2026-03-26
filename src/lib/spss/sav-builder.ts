@@ -182,6 +182,30 @@ function findTableCellOptions(
   return undefined;
 }
 
+// ── SPSS 변수명 sanitize ──
+
+/**
+ * SPSS 변수명 규격에 맞게 정리
+ * - 영문/숫자/언더스코어만 허용
+ * - 영문자 또는 @로 시작해야 함
+ * - 최대 64자
+ */
+function sanitizeSpssVarName(name: string): string {
+  // 비 ASCII 문자(한국어 등)를 제거하고, 허용되지 않는 문자를 언더스코어로 대체
+  let sanitized = name.replace(/[^a-zA-Z0-9_@$.#]/g, '_');
+  // 연속 언더스코어 정리
+  sanitized = sanitized.replace(/_+/g, '_').replace(/^_|_$/g, '');
+  // 숫자로 시작하면 V 접두사 추가
+  if (/^[0-9]/.test(sanitized)) {
+    sanitized = `V${sanitized}`;
+  }
+  // 빈 문자열 방지
+  if (!sanitized) {
+    sanitized = 'VAR';
+  }
+  return sanitized.slice(0, 64);
+}
+
 // ── Short name 생성 ──
 
 /**
@@ -254,8 +278,8 @@ function toSavVariable(
     || varType === VariableType.DateTime;
 
   return {
-    name: col.spssVarName,
-    short: shortName,
+    name: sanitizeSpssVarName(col.spssVarName),
+    short: sanitizeSpssVarName(shortName),
     label: buildLabel(col),
     type: varType,
     width: isNumeric ? 0 : maxWidth,

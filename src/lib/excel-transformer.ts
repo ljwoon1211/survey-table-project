@@ -140,7 +140,7 @@ export function generateRawDataIndividualWorkbook(
   responses: SurveySubmission[],
 ): XLSX.WorkBook {
   const workbook = XLSX.utils.book_new();
-  const sortedQuestions = survey.questions.sort((a, b) => a.order - b.order);
+  const sortedQuestions = [...survey.questions].sort((a, b) => a.order - b.order);
 
   responses.forEach((res, index) => {
     // 시트 이름 생성 (최대 31자 제한, 특수문자 제거)
@@ -150,8 +150,10 @@ export function generateRawDataIndividualWorkbook(
 
     // 2-1. 메타데이터
     const startedAt = new Date(res.startedAt);
-    const completedAt = res.completedAt ? new Date(res.completedAt) : new Date();
-    const durationSeconds = Math.floor((completedAt.getTime() - startedAt.getTime()) / 1000);
+    const completedAt = res.completedAt ? new Date(res.completedAt) : null;
+    const durationSeconds = completedAt
+      ? Math.floor((completedAt.getTime() - startedAt.getTime()) / 1000)
+      : null;
 
     rows.push(['[응답자 정보]']);
     rows.push(['Response ID', res.id]);
@@ -159,9 +161,9 @@ export function generateRawDataIndividualWorkbook(
     rows.push(['Started At', startedAt.toLocaleString('ko-KR')]);
     rows.push([
       'Completed At',
-      res.completedAt ? new Date(res.completedAt).toLocaleString('ko-KR') : '미완료',
+      completedAt ? completedAt.toLocaleString('ko-KR') : '미완료',
     ]);
-    rows.push(['Duration', `${durationSeconds}초`]);
+    rows.push(['Duration', durationSeconds !== null ? `${durationSeconds}초` : '미완료']);
     rows.push(['Device', res.userAgent ? parseUserAgent(res.userAgent) : 'Unknown']);
     rows.push([]); // Spacer
     rows.push(['[응답 내용]']);
@@ -271,19 +273,21 @@ export function generateVariableMapWorkbook(survey: Survey): XLSX.WorkBook {
  */
 function generateRawDataCombinedData(survey: Survey, responses: SurveySubmission[]) {
   // 질문 목록 (순서대로)
-  const sortedQuestions = survey.questions.sort((a, b) => a.order - b.order);
+  const sortedQuestions = [...survey.questions].sort((a, b) => a.order - b.order);
 
   return responses.map((res) => {
     // 1-1. 메타데이터
     const startedAt = new Date(res.startedAt);
-    const completedAt = res.completedAt ? new Date(res.completedAt) : new Date();
-    const durationSeconds = Math.floor((completedAt.getTime() - startedAt.getTime()) / 1000);
+    const completedAt = res.completedAt ? new Date(res.completedAt) : null;
+    const durationSeconds = completedAt
+      ? Math.floor((completedAt.getTime() - startedAt.getTime()) / 1000)
+      : null;
 
     const row: Record<string, any> = {
       'Response ID': res.id,
       'Started At': startedAt.toLocaleString('ko-KR'),
-      'Completed At': res.completedAt ? new Date(res.completedAt).toLocaleString('ko-KR') : '미완료',
-      'Duration (sec)': durationSeconds,
+      'Completed At': completedAt ? completedAt.toLocaleString('ko-KR') : '미완료',
+      'Duration (sec)': durationSeconds ?? '',
       Status: res.isCompleted ? 'Completed' : 'Partial',
       Device: res.userAgent ? parseUserAgent(res.userAgent) : 'Unknown',
     };
@@ -368,7 +372,7 @@ function generateSummaryData(survey: Survey, responses: SurveySubmission[]) {
   const summary: any[] = [];
   const totalResponses = responses.length;
 
-  survey.questions
+  [...survey.questions]
     .sort((a, b) => a.order - b.order)
     .forEach((q) => {
       // [수정] Notice 타입 제외
@@ -404,7 +408,7 @@ function generateSummaryData(survey: Survey, responses: SurveySubmission[]) {
             summary.push({
               구분: `  - ${row.label} > ${col.label}`,
               '응답 수': count,
-              '비율(%)': ((count / totalResponses) * 100).toFixed(1) + '%',
+              '비율(%)': (totalResponses > 0 ? (count / totalResponses) * 100 : 0).toFixed(1) + '%',
             });
           });
         });
@@ -427,7 +431,7 @@ function generateSummaryData(survey: Survey, responses: SurveySubmission[]) {
             summary.push({
               구분: `    - ${opt.label}`,
               '응답 수': count,
-              '비율(%)': ((count / totalResponses) * 100).toFixed(1) + '%',
+              '비율(%)': (totalResponses > 0 ? (count / totalResponses) * 100 : 0).toFixed(1) + '%',
             });
           });
         });
@@ -443,7 +447,7 @@ function generateSummaryData(survey: Survey, responses: SurveySubmission[]) {
           summary.push({
             구분: `  - ${opt.label}`,
             '응답 수': count,
-            '비율(%)': ((count / totalResponses) * 100).toFixed(1) + '%',
+            '비율(%)': (totalResponses > 0 ? (count / totalResponses) * 100 : 0).toFixed(1) + '%',
           });
         });
       }

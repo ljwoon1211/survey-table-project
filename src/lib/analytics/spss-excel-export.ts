@@ -115,10 +115,10 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
           // 셀코드가 의도적으로 비어있으면 내보내기에서 제외 (표시용 셀)
           if (cell.isCustomCellCode === true && !cell.cellCode) continue;
 
-          // 변수명: cellCode > exportLabel > questionCode_rowCode_colCode (폴백)
+          // 변수명: cellCode > questionCode_rowCode_colCode (폴백)
+          // exportLabel은 한국어가 포함될 수 있어 SPSS 변수명으로 부적합
           const varName = cell.cellCode
-            || cell.exportLabel
-            || `${q.questionCode}_${tRow.rowCode || tRow.label}_${q.tableColumns[colIdx].columnCode || q.tableColumns[colIdx].label}`;
+            || `${q.questionCode || q.id.slice(0, 8)}_${tRow.rowCode || `r${tRow.id.slice(0, 4)}`}_${q.tableColumns[colIdx].columnCode || `c${colIdx + 1}`}`;
 
           // checkbox 셀: checkboxOptions가 있으면 옵션별 분리 변수 생성
           if (cell.type === 'checkbox' && cell.checkboxOptions && cell.checkboxOptions.length > 0) {
