@@ -123,7 +123,14 @@ export function useTableEditor({
               ],
             },
           ];
-    return recalculateHiddenCells(initialRows);
+    // 초기화 시 모든 셀에 코드 생성 (기존 데이터에 코드가 없는 셀 보완)
+    const rowsWithCodes = generateAllCellCodes(
+      questionCode,
+      questionTitle,
+      columns.length > 0 ? columns : [{ id: 'col-1', label: '열 1', width: 150 }, { id: 'col-2', label: '열 2', width: 150 }],
+      initialRows,
+    );
+    return recalculateHiddenCells(rowsWithCodes);
   });
 
   const [selectedCell, setSelectedCell] = useState<{
