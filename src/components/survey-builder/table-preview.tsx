@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import { FileText, Image, Video } from 'lucide-react';
 
@@ -8,11 +8,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getProxiedImageUrl } from '@/lib/image-utils';
 import { HeaderCell, TableColumn, TableRow } from '@/types/survey';
 
+// YouTube URL을 임베드 URL로 변환 (순수 함수 - 컴포넌트 외부)
+function getYouTubeEmbedUrl(url: string) {
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  if (match && match[2].length === 11) {
+    return `https://www.youtube.com/embed/${match[2]}`;
+  }
+  return url;
+}
+
 // 이미지 셀 컴포넌트 (에러 상태 관리)
 function ImageCell({ imageUrl, content }: { imageUrl: string; content?: string }) {
   const [error, setError] = useState(false);
 
-  // key가 바뀔 때 (= imageUrl이 바뀔 때) 에러 상태 리셋
   useEffect(() => {
     setError(false);
   }, [imageUrl]);
@@ -40,6 +49,180 @@ function ImageCell({ imageUrl, content }: { imageUrl: string; content?: string }
   );
 }
 
+// 셀 내용 렌더링 컴포넌트 (외부 분리)
+function CellContent({ cell }: { cell: TableRow['cells'][number] }) {
+  if (!cell) return <span className="text-sm text-gray-400">-</span>;
+
+  switch (cell.type) {
+    case 'checkbox':
+      return cell.checkboxOptions && cell.checkboxOptions.length > 0 ? (
+        <div className="w-full space-y-2">
+          {cell.content && cell.content.trim() && (
+            <div className="mb-3 text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
+              {cell.content}
+            </div>
+          )}
+          {cell.checkboxOptions.map((option) => (
+            <div key={option.id} className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={option.checked || false}
+                readOnly
+                className="rounded"
+              />
+              <span className="text-sm">{option.label}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 text-gray-500">
+          <span className="text-sm">체크박스 없음</span>
+        </div>
+      );
+
+    case 'radio':
+      return cell.radioOptions && cell.radioOptions.length > 0 ? (
+        <div className="w-full space-y-2">
+          {cell.content && cell.content.trim() && (
+            <div className="mb-3 text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
+              {cell.content}
+            </div>
+          )}
+          {cell.radioOptions.map((option) => (
+            <div key={option.id} className="flex items-center gap-2">
+              <input
+                type="radio"
+                name={`preview-${cell.id}`}
+                checked={option.selected || false}
+                readOnly
+              />
+              <span className="text-sm">{option.label}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 text-gray-500">
+          <span className="text-sm">라디오 버튼 없음</span>
+        </div>
+      );
+
+    case 'select':
+      return cell.selectOptions && cell.selectOptions.length > 0 ? (
+        <div className="flex h-full w-full flex-col space-y-2">
+          {cell.content && cell.content.trim() && (
+            <div className="text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
+              {cell.content}
+            </div>
+          )}
+          <select className="h-full w-full rounded border border-gray-300 p-2 text-sm" disabled>
+            <option value="">선택하세요...</option>
+            {cell.selectOptions.map((option) => (
+              <option key={option.id} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 text-gray-500">
+          <span className="text-sm">선택 옵션 없음</span>
+        </div>
+      );
+
+    case 'image':
+      return cell.imageUrl ? (
+        <ImageCell imageUrl={cell.imageUrl} content={cell.content} />
+      ) : (
+        <div className="flex items-center gap-2 text-gray-500">
+          <Image className="h-4 w-4" />
+          <span className="text-sm">이미지 없음</span>
+        </div>
+      );
+
+    case 'video':
+      return cell.videoUrl ? (
+        <div className="flex flex-col items-center gap-2">
+          {cell.videoUrl.includes('youtube.com') || cell.videoUrl.includes('youtu.be') ? (
+            <div className="w-full max-w-xs">
+              <div className="aspect-video">
+                <iframe
+                  src={getYouTubeEmbedUrl(cell.videoUrl)}
+                  className="h-full w-full rounded"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  title="테이블 동영상"
+                />
+              </div>
+            </div>
+          ) : cell.videoUrl.includes('vimeo.com') ? (
+            <div className="w-full max-w-xs">
+              <div className="aspect-video">
+                <iframe
+                  src={cell.videoUrl.replace('vimeo.com/', 'player.vimeo.com/video/')}
+                  className="h-full w-full rounded"
+                  frameBorder="0"
+                  allow="autoplay; fullscreen; picture-in-picture"
+                  allowFullScreen
+                  title="테이블 동영상"
+                />
+              </div>
+            </div>
+          ) : cell.videoUrl.match(/\.(mp4|webm|ogg)$/i) ? (
+            <video src={cell.videoUrl} controls className="max-h-32 w-full max-w-xs rounded">
+              동영상을 지원하지 않는 브라우저입니다.
+            </video>
+          ) : (
+            <div className="flex items-center gap-2 text-yellow-600">
+              <Video className="h-4 w-4" />
+              <span className="text-sm">동영상 링크 오류</span>
+            </div>
+          )}
+          {cell.content && (
+            <div className="mt-2 text-left text-sm text-gray-700">{cell.content}</div>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 text-gray-500">
+          <Video className="h-4 w-4" />
+          <span className="text-sm">동영상 없음</span>
+        </div>
+      );
+
+    case 'input':
+      return (
+        <div className="flex h-full w-full flex-col space-y-2">
+          {cell.content && cell.content.trim() && (
+            <div className="text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
+              {cell.content}
+            </div>
+          )}
+          <input
+            type="text"
+            placeholder={cell.placeholder || '답변을 입력하세요...'}
+            maxLength={cell.inputMaxLength}
+            disabled
+            className="h-full w-full rounded border border-gray-300 bg-gray-50 p-2 text-sm"
+          />
+          {cell.inputMaxLength && (
+            <div className="mt-1 text-right text-xs text-gray-500">
+              최대 {cell.inputMaxLength}자
+            </div>
+          )}
+        </div>
+      );
+
+    default:
+      return cell.content ? (
+        <div className="w-full text-sm leading-relaxed break-words whitespace-pre-wrap">
+          {cell.content}
+        </div>
+      ) : (
+        <span className="text-sm text-gray-400"></span>
+      );
+  }
+}
+
 interface TablePreviewProps {
   tableTitle?: string;
   columns?: TableColumn[];
@@ -48,7 +231,7 @@ interface TablePreviewProps {
   className?: string;
 }
 
-export function TablePreview({
+export const TablePreview = React.memo(function TablePreview({
   tableTitle,
   columns = [],
   rows = [],
@@ -69,194 +252,6 @@ export function TablePreview({
       </Card>
     );
   }
-
-  // 셀 내용 렌더링 함수
-  const renderCellContent = (cell: TableRow['cells'][number]) => {
-    if (!cell) return <span className="text-sm text-gray-400">-</span>;
-
-    switch (cell.type) {
-      case 'checkbox':
-        return cell.checkboxOptions && cell.checkboxOptions.length > 0 ? (
-          <div className="w-full space-y-2">
-            {/* 셀 텍스트 설명 (있는 경우) */}
-            {cell.content && cell.content.trim() && (
-              <div className="mb-3 text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
-                {cell.content}
-              </div>
-            )}
-            {cell.checkboxOptions.map((option) => (
-              <div key={option.id} className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={option.checked || false}
-                  readOnly
-                  className="rounded"
-                />
-                <span className="text-sm">{option.label}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 text-gray-500">
-            <span className="text-sm">체크박스 없음</span>
-          </div>
-        );
-
-      case 'radio':
-        return cell.radioOptions && cell.radioOptions.length > 0 ? (
-          <div className="w-full space-y-2">
-            {/* 셀 텍스트 설명 (있는 경우) */}
-            {cell.content && cell.content.trim() && (
-              <div className="mb-3 text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
-                {cell.content}
-              </div>
-            )}
-            {cell.radioOptions.map((option) => (
-              <div key={option.id} className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name={`preview-${cell.id}`}
-                  checked={option.selected || false}
-                  readOnly
-                />
-                <span className="text-sm">{option.label}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 text-gray-500">
-            <span className="text-sm">라디오 버튼 없음</span>
-          </div>
-        );
-
-      case 'select':
-        return cell.selectOptions && cell.selectOptions.length > 0 ? (
-          <div className="flex h-full w-full flex-col space-y-2">
-            {/* 셀 텍스트 설명 (있는 경우) */}
-            {cell.content && cell.content.trim() && (
-              <div className="text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
-                {cell.content}
-              </div>
-            )}
-            <select className="h-full w-full rounded border border-gray-300 p-2 text-sm" disabled>
-              <option value="">선택하세요...</option>
-              {cell.selectOptions.map((option) => (
-                <option key={option.id} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 text-gray-500">
-            <span className="text-sm">선택 옵션 없음</span>
-          </div>
-        );
-
-      case 'image':
-        return cell.imageUrl ? (
-          <ImageCell imageUrl={cell.imageUrl} content={cell.content} />
-        ) : (
-          <div className="flex items-center gap-2 text-gray-500">
-            <Image className="h-4 w-4" />
-            <span className="text-sm">이미지 없음</span>
-          </div>
-        );
-
-      case 'video':
-        return cell.videoUrl ? (
-          <div className="flex flex-col items-center gap-2">
-            {cell.videoUrl.includes('youtube.com') || cell.videoUrl.includes('youtu.be') ? (
-              <div className="w-full max-w-xs">
-                <div className="aspect-video">
-                  <iframe
-                    src={getYouTubeEmbedUrl(cell.videoUrl)}
-                    className="h-full w-full rounded"
-                    frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                    title="테이블 동영상"
-                  />
-                </div>
-              </div>
-            ) : cell.videoUrl.includes('vimeo.com') ? (
-              <div className="w-full max-w-xs">
-                <div className="aspect-video">
-                  <iframe
-                    src={cell.videoUrl.replace('vimeo.com/', 'player.vimeo.com/video/')}
-                    className="h-full w-full rounded"
-                    frameBorder="0"
-                    allow="autoplay; fullscreen; picture-in-picture"
-                    allowFullScreen
-                    title="테이블 동영상"
-                  />
-                </div>
-              </div>
-            ) : cell.videoUrl.match(/\.(mp4|webm|ogg)$/i) ? (
-              <video src={cell.videoUrl} controls className="max-h-32 w-full max-w-xs rounded">
-                동영상을 지원하지 않는 브라우저입니다.
-              </video>
-            ) : (
-              <div className="flex items-center gap-2 text-yellow-600">
-                <Video className="h-4 w-4" />
-                <span className="text-sm">동영상 링크 오류</span>
-              </div>
-            )}
-            {cell.content && (
-              <div className="mt-2 text-left text-sm text-gray-700">{cell.content}</div>
-            )}
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 text-gray-500">
-            <Video className="h-4 w-4" />
-            <span className="text-sm">동영상 없음</span>
-          </div>
-        );
-
-      case 'input':
-        return (
-          <div className="flex h-full w-full flex-col space-y-2">
-            {/* 셀 텍스트 설명 (있는 경우) */}
-            {cell.content && cell.content.trim() && (
-              <div className="text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
-                {cell.content}
-              </div>
-            )}
-            <input
-              type="text"
-              placeholder={cell.placeholder || '답변을 입력하세요...'}
-              maxLength={cell.inputMaxLength}
-              disabled
-              className="h-full w-full rounded border border-gray-300 bg-gray-50 p-2 text-sm"
-            />
-            {cell.inputMaxLength && (
-              <div className="mt-1 text-right text-xs text-gray-500">
-                최대 {cell.inputMaxLength}자
-              </div>
-            )}
-          </div>
-        );
-
-      default:
-        return cell.content ? (
-          <div className="w-full text-sm leading-relaxed break-words whitespace-pre-wrap">
-            {cell.content}
-          </div>
-        ) : (
-          <span className="text-sm text-gray-400"></span>
-        );
-    }
-  };
-
-  // YouTube URL을 임베드 URL로 변환
-  const getYouTubeEmbedUrl = (url: string) => {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    if (match && match[2].length === 11) {
-      return `https://www.youtube.com/embed/${match[2]}`;
-    }
-    return url;
-  };
 
   return (
     <Card className={className}>
@@ -322,12 +317,9 @@ export function TablePreview({
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50">
-                  {/* 셀들 */}
                   {row.cells.map((cell) => {
-                    // rowspan으로 숨겨진 셀은 렌더링하지 않음
                     if (cell.isHidden) return null;
 
-                    // 정렬 클래스 계산 (세로 정렬만 td에 적용)
                     const verticalAlignClass =
                       cell.verticalAlign === 'middle'
                         ? 'align-middle'
@@ -360,7 +352,7 @@ export function TablePreview({
                                   : 'flex items-end justify-end'
                             }`}
                           >
-                            {renderCellContent(cell)}
+                            <CellContent cell={cell} />
                           </div>
                         </div>
                       </td>
@@ -374,4 +366,4 @@ export function TablePreview({
       </CardContent>
     </Card>
   );
-}
+});

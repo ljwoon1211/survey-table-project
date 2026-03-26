@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   ArrowLeft,
@@ -45,6 +45,431 @@ import { CellContentModal } from './cell-content-modal';
 import { HeaderGridEditor } from './header-grid-editor';
 import { QuestionConditionEditor } from './question-condition-editor';
 
+// 테이블 요약 통계 컴포넌트 (useMemo로 불필요한 재계산 방지)
+const TableSummaryCard = React.memo(function TableSummaryCard({
+  rows,
+  columns,
+}: {
+  rows: TableRow[];
+  columns: TableColumn[];
+}) {
+  const stats = useMemo(() => {
+    let interactiveCount = 0;
+    let mediaCount = 0;
+    for (const row of rows) {
+      for (const cell of row.cells) {
+        if (
+          cell.type === 'checkbox' ||
+          cell.type === 'radio' ||
+          cell.type === 'select' ||
+          cell.type === 'input'
+        ) {
+          interactiveCount++;
+        }
+        if (cell.type === 'image' || cell.type === 'video') {
+          mediaCount++;
+        }
+      }
+    }
+    return {
+      totalCells: rows.length * columns.length,
+      interactiveCount,
+      mediaCount,
+    };
+  }, [rows, columns]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>테이블 요약</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
+          <div className="rounded-lg bg-blue-50 p-3">
+            <div className="font-medium text-blue-600">전체 크기</div>
+            <div className="text-lg font-bold text-blue-900">
+              {rows.length} × {columns.length}
+            </div>
+            <div className="text-xs text-blue-600">행 × 열</div>
+          </div>
+          <div className="rounded-lg bg-green-50 p-3">
+            <div className="font-medium text-green-600">총 셀 수</div>
+            <div className="text-lg font-bold text-green-900">{stats.totalCells}</div>
+            <div className="text-xs text-green-600">개</div>
+          </div>
+          <div className="rounded-lg bg-purple-50 p-3">
+            <div className="font-medium text-purple-600">인터랙티브 셀</div>
+            <div className="text-lg font-bold text-purple-900">{stats.interactiveCount}</div>
+            <div className="text-xs text-purple-600">개</div>
+          </div>
+          <div className="rounded-lg bg-orange-50 p-3">
+            <div className="font-medium text-orange-600">미디어 셀</div>
+            <div className="text-lg font-bold text-orange-900">{stats.mediaCount}</div>
+            <div className="text-xs text-orange-600">개</div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+});
+
+// 에디터 셀 내용 표시 컴포넌트 (외부 분리 - 매 렌더마다 함수 재생성 방지)
+function EditorCellContent({ cell }: { cell: TableCell }) {
+  const hasText = cell.content && cell.content.trim().length > 0;
+
+  const textContent = hasText ? (
+    <div
+      className={`mb-2 w-full text-sm break-words whitespace-pre-wrap ${cell.type === 'text' ? '' : 'font-medium text-gray-700'}`}
+    >
+      {cell.content}
+    </div>
+  ) : null;
+
+  let typeContent = null;
+
+  switch (cell.type) {
+    case 'checkbox':
+      typeContent =
+        cell.checkboxOptions && cell.checkboxOptions.length > 0 ? (
+          <div className="flex items-center gap-2">
+            <CheckSquare className="h-4 w-4 text-green-500" />
+            <span className="truncate text-sm text-gray-600">
+              체크박스 ({cell.checkboxOptions.length}개)
+            </span>
+          </div>
+        ) : (
+          <span className="text-sm text-gray-400">체크박스 없음</span>
+        );
+      break;
+    case 'radio':
+      typeContent =
+        cell.radioOptions && cell.radioOptions.length > 0 ? (
+          <div className="flex items-center justify-center gap-2">
+            <Circle className="h-4 w-4 text-purple-500" />
+            <span className="truncate text-sm text-gray-600">
+              라디오 ({cell.radioOptions.length}개)
+            </span>
+          </div>
+        ) : (
+          <span className="text-sm text-gray-400">라디오 없음</span>
+        );
+      break;
+    case 'image':
+      typeContent = cell.imageUrl ? (
+        <div className="flex items-center gap-2">
+          <Image className="h-4 w-4 text-blue-500" aria-label="이미지 아이콘" />
+          <span className="truncate text-sm text-gray-600">이미지</span>
+        </div>
+      ) : (
+        <span className="text-sm text-gray-400">이미지 없음</span>
+      );
+      break;
+    case 'video':
+      typeContent = cell.videoUrl ? (
+        <div className="flex items-center gap-2">
+          <Video className="h-4 w-4 text-red-500" />
+          <span className="truncate text-sm text-gray-600">동영상</span>
+        </div>
+      ) : (
+        <span className="text-sm text-gray-400">동영상 없음</span>
+      );
+      break;
+    case 'input':
+      typeContent = (
+        <div className="flex items-center gap-2">
+          <span className="truncate text-sm text-gray-600">
+            {cell.placeholder ? `입력 필드: ${cell.placeholder}` : '단답형 입력'}
+          </span>
+        </div>
+      );
+      break;
+    case 'select':
+      typeContent =
+        cell.selectOptions && cell.selectOptions.length > 0 ? (
+          <div className="flex items-center gap-2">
+            <span className="truncate text-sm text-gray-600">
+              선택 ({cell.selectOptions.length}개)
+            </span>
+          </div>
+        ) : (
+          <span className="text-sm text-gray-400">선택 옵션 없음</span>
+        );
+      break;
+    case 'text':
+      typeContent = null;
+      break;
+    default:
+      typeContent = <span className="text-sm text-gray-400"></span>;
+  }
+
+  return (
+    <div className="w-full">
+      {textContent}
+      {typeContent}
+    </div>
+  );
+}
+
+// 에디터 테이블 행 컴포넌트 (React.memo로 변경 안 된 행 리렌더 방지)
+interface EditorTableRowProps {
+  row: TableRow;
+  rowIndex: number;
+  columns: TableColumn[];
+  totalRowCount: number;
+  hasQuestions: boolean;
+  hasCopiedCell: boolean;
+  onUpdateRowLabel: (rowIndex: number, label: string) => void;
+  onUpdateRowCode: (rowIndex: number, rowCode: string) => void;
+  onOpenRowConditionModal: (rowIndex: number) => void;
+  onDeleteRow: (rowIndex: number) => void;
+  onSelectCell: (rowId: string, cellId: string) => void;
+  onMoveColumn: (cellIndex: number, direction: 'left' | 'right') => void;
+  onDeleteCell: (rowIndex: number, cellIndex: number) => void;
+  onCopyCell: (rowIndex: number, cellIndex: number) => void;
+  onPasteCell: (rowIndex: number, cellIndex: number) => void;
+}
+
+const EditorTableRow = React.memo(function EditorTableRow({
+  row,
+  rowIndex,
+  columns,
+  totalRowCount,
+  hasQuestions,
+  hasCopiedCell,
+  onUpdateRowLabel,
+  onUpdateRowCode,
+  onOpenRowConditionModal,
+  onDeleteRow,
+  onSelectCell,
+  onMoveColumn,
+  onDeleteCell,
+  onCopyCell,
+  onPasteCell,
+}: EditorTableRowProps) {
+  return (
+    <tr
+      style={{ height: row.height ? `${row.height}px` : '60px' }}
+      className="group/row"
+    >
+      {/* 행 이름(라벨) 입력칸 */}
+      <td className="group/label sticky left-0 z-10 w-[70px] min-w-[70px] border border-gray-300 bg-gray-50 p-1">
+        <div className="relative space-y-1">
+          <Input
+            value={row.label}
+            onChange={(e) => onUpdateRowLabel(rowIndex, e.target.value)}
+            className="h-6 bg-white px-1 text-center text-xs"
+            placeholder="행 라벨"
+            title={`행 라벨: ${row.label}`}
+          />
+          <Input
+            value={row.rowCode || ''}
+            onChange={(e) => onUpdateRowCode(rowIndex, e.target.value)}
+            className="h-6 bg-gray-100 px-1 text-center text-xs font-medium text-gray-700"
+            placeholder="행 코드"
+            title={`엑셀 코드: ${row.rowCode || '(자동)'}`}
+          />
+          {hasQuestions && (
+            <button
+              onClick={() => onOpenRowConditionModal(rowIndex)}
+              className={`mx-auto flex h-5 w-5 items-center justify-center rounded transition-colors ${
+                row.displayCondition && row.displayCondition.conditions.length > 0
+                  ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                  : 'text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+              }`}
+              title={
+                row.displayCondition && row.displayCondition.conditions.length > 0
+                  ? `조건부 표시 (${row.displayCondition.conditions.length}개 조건)`
+                  : '조건부 표시 설정'
+              }
+            >
+              <Eye className="h-3 w-3" />
+            </button>
+          )}
+          {totalRowCount > 1 && (
+            <button
+              onClick={() => onDeleteRow(rowIndex)}
+              className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white shadow-sm hover:bg-red-600 group-hover/label:flex"
+              title="행 삭제"
+            >
+              <Trash2 className="h-2.5 w-2.5" />
+            </button>
+          )}
+        </div>
+      </td>
+
+      {/* 셀들 */}
+      {row.cells.map((cell, cellIndex) => {
+        if (cell.isHidden) return null;
+
+        const column = columns[cellIndex];
+        const rowspan = cell.rowspan || 1;
+        const colspan = cell.colspan || 1;
+        const isMerged = rowspan > 1 || colspan > 1;
+
+        const verticalAlignClass =
+          cell.verticalAlign === 'middle'
+            ? 'align-middle'
+            : cell.verticalAlign === 'bottom'
+              ? 'align-bottom'
+              : 'align-top';
+
+        return (
+          <td
+            key={cell.id}
+            className={`relative border border-gray-300 p-2 ${verticalAlignClass}`}
+            style={{
+              width: column?.width ? `${column.width}px` : '150px',
+              maxWidth: column?.width ? `${column.width}px` : '150px',
+              height: row.height ? `${row.height}px` : '60px',
+            }}
+            rowSpan={rowspan}
+            colSpan={colspan}
+          >
+            <div
+              className={`group relative flex h-full cursor-pointer flex-col rounded p-2 transition-colors hover:bg-gray-50 ${
+                cell.verticalAlign === 'top'
+                  ? 'justify-start'
+                  : cell.verticalAlign === 'middle'
+                    ? 'justify-center'
+                    : 'justify-end'
+              }`}
+              onClick={() => onSelectCell(row.id, cell.id)}
+              style={{
+                minHeight: row.minHeight ? `${row.minHeight - 16}px` : '40px',
+              }}
+            >
+              <div
+                className={`mb-2 flex items-start justify-between ${
+                  cell.type === 'radio' ? 'w-full justify-center' : ''
+                }`}
+              >
+                <div
+                  className={`${cell.type === 'radio' ? '' : 'w-full flex-1'} ${
+                    cell.horizontalAlign === 'left'
+                      ? 'flex items-start justify-start'
+                      : cell.horizontalAlign === 'center'
+                        ? 'flex items-center justify-center'
+                        : 'flex items-end justify-end'
+                  }`}
+                >
+                  <EditorCellContent cell={cell} />
+                </div>
+                <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  <div className="mr-1 flex items-center border-r border-gray-200 pr-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-5 p-0 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMoveColumn(cellIndex, 'left');
+                      }}
+                      disabled={cellIndex === 0}
+                      title="열 왼쪽으로 이동"
+                    >
+                      <ArrowLeft className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-5 p-0 text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMoveColumn(cellIndex, 'right');
+                      }}
+                      disabled={cellIndex === columns.length - 1}
+                      title="열 오른쪽으로 이동"
+                    >
+                      <ArrowRight className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteCell(rowIndex, cellIndex);
+                    }}
+                    title="셀 삭제"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCopyCell(rowIndex, cellIndex);
+                    }}
+                    title="셀 복사"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                  {hasCopiedCell && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onPasteCell(rowIndex, cellIndex);
+                      }}
+                      title="셀 붙여넣기"
+                    >
+                      <Clipboard className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <div className="mt-1 border-t border-gray-100 pt-1 text-xs text-gray-400">
+                <div className="flex items-center justify-between">
+                  <span>
+                    셀 ({rowIndex + 1}, {cellIndex + 1})
+                  </span>
+                  <span className="font-medium capitalize">{cell.type}</span>
+                </div>
+                {isMerged && (
+                  <div className="mt-1 font-medium text-orange-600">
+                    🔗 병합: {rowspan}행 × {colspan}열
+                  </div>
+                )}
+                {cell.type === 'checkbox' && cell.checkboxOptions && (
+                  <div className="mt-1 text-green-600">
+                    체크박스 {cell.checkboxOptions.length}개
+                  </div>
+                )}
+                {cell.type === 'radio' && cell.radioOptions && (
+                  <div className="mt-1 text-purple-600">
+                    라디오 {cell.radioOptions.length}개
+                  </div>
+                )}
+                {cell.type === 'select' && cell.selectOptions && (
+                  <div className="mt-1 text-indigo-600">
+                    선택 {cell.selectOptions.length}개
+                  </div>
+                )}
+                {cell.type === 'input' && (
+                  <div className="mt-1 text-teal-600">
+                    {cell.placeholder || '단답형 입력'}
+                  </div>
+                )}
+                {cell.type === 'image' && cell.imageUrl && (
+                  <div className="mt-1 text-blue-600">이미지 설정됨</div>
+                )}
+                {cell.type === 'video' && cell.videoUrl && (
+                  <div className="mt-1 text-red-600">비디오 설정됨</div>
+                )}
+              </div>
+            </div>
+          </td>
+        );
+      })}
+    </tr>
+  );
+});
+
 interface DynamicTableEditorProps {
   tableTitle?: string;
   columns?: TableColumn[];
@@ -69,41 +494,32 @@ export function DynamicTableEditor({
   allQuestions = [],
   onTableChange,
 }: DynamicTableEditorProps) {
-  // isHidden 속성을 재계산하는 헬퍼 함수
+  // isHidden 속성을 재계산하는 헬퍼 함수 (O(nm) - 병합 셀 Set 기반)
   const recalculateHiddenCells = useCallback((tableRows: TableRow[]): TableRow[] => {
+    // 1패스: 병합 셀이 덮는 좌표를 Set에 수집
+    const hiddenCoords = new Set<string>();
+    for (let r = 0; r < tableRows.length; r++) {
+      const cells = tableRows[r].cells;
+      for (let c = 0; c < cells.length; c++) {
+        const rowspan = cells[c].rowspan || 1;
+        const colspan = cells[c].colspan || 1;
+        if (rowspan <= 1 && colspan <= 1) continue;
+        for (let dr = 0; dr < rowspan; dr++) {
+          for (let dc = 0; dc < colspan; dc++) {
+            if (dr === 0 && dc === 0) continue; // 시작 셀 제외
+            hiddenCoords.add(`${r + dr},${c + dc}`);
+          }
+        }
+      }
+    }
+
+    // 2패스: Set 조회로 isHidden 설정
     return tableRows.map((row, rIndex) => ({
       ...row,
-      cells: row.cells.map((c, cIndex) => {
-        // 현재 셀이 병합으로 인해 숨겨져야 하는지 확인
-        let shouldBeHidden = false;
-
-        // 모든 행과 열을 순회하면서 병합된 셀이 현재 셀을 덮는지 확인
-        for (let r = 0; r < tableRows.length; r++) {
-          for (let col = 0; col < tableRows[r].cells.length; col++) {
-            const checkCell = tableRows[r].cells[col];
-            const rowspan = checkCell.rowspan || 1;
-            const colspan = checkCell.colspan || 1;
-
-            // 병합된 셀이 있고, 병합 영역이 1보다 큰 경우만 처리
-            if (rowspan > 1 || colspan > 1) {
-              const isInRowRange = rIndex >= r && rIndex < r + rowspan;
-              const isInColRange = cIndex >= col && cIndex < col + colspan;
-
-              // 병합 영역 내에 있고, 시작 셀이 아닌 경우
-              if (isInRowRange && isInColRange && !(r === rIndex && col === cIndex)) {
-                shouldBeHidden = true;
-                break;
-              }
-            }
-          }
-          if (shouldBeHidden) break;
-        }
-
-        return {
-          ...c,
-          isHidden: shouldBeHidden,
-        };
-      }),
+      cells: row.cells.map((cell, cIndex) => ({
+        ...cell,
+        isHidden: hiddenCoords.has(`${rIndex},${cIndex}`),
+      })),
     }));
   }, []);
 
@@ -169,8 +585,8 @@ export function DynamicTableEditor({
     initialHeaderGrid,
   );
 
-  // 변경 사항을 부모에게 전달
-  const notifyChange = useCallback(
+  // 변경 사항을 부모에게 전달 (즉시 실행 - 구조 변경용)
+  const notifyChangeImmediate = useCallback(
     (title: string, cols: TableColumn[], rowsData: TableRow[]) => {
       onTableChange({
         tableTitle: title,
@@ -181,6 +597,34 @@ export function DynamicTableEditor({
     },
     [onTableChange, currentHeaderGrid],
   );
+
+  // debounced 버전 (텍스트 입력용 - 300ms)
+  const pendingChangeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notifyChangeDebounced = useCallback(
+    (title: string, cols: TableColumn[], rowsData: TableRow[]) => {
+      if (pendingChangeRef.current) clearTimeout(pendingChangeRef.current);
+      pendingChangeRef.current = setTimeout(() => {
+        onTableChange({
+          tableTitle: title,
+          tableColumns: cols,
+          tableRowsData: rowsData,
+          tableHeaderGrid: currentHeaderGrid,
+        });
+        pendingChangeRef.current = null;
+      }, 300);
+    },
+    [onTableChange, currentHeaderGrid],
+  );
+
+  // 언마운트 시 pending flush
+  useEffect(() => {
+    return () => {
+      if (pendingChangeRef.current) clearTimeout(pendingChangeRef.current);
+    };
+  }, []);
+
+  // 기본 notifyChange는 즉시 실행 (기존 호출부 호환)
+  const notifyChange = notifyChangeImmediate;
 
   // 컬럼 헤더의 isHeaderHidden 재계산
   const recalculateHiddenHeaders = useCallback((cols: TableColumn[]): TableColumn[] => {
@@ -245,9 +689,10 @@ export function DynamicTableEditor({
   );
 
   // 제목 업데이트
+  // 테이블 제목 업데이트 (텍스트 입력 → debounce)
   const updateTitle = (title: string) => {
     setCurrentTitle(title);
-    notifyChange(title, currentColumns, currentRows);
+    notifyChangeDebounced(title, currentColumns, currentRows);
   };
 
   // 열 너비 직접 입력 관련 함수들
@@ -420,14 +865,14 @@ export function DynamicTableEditor({
     notifyChange(currentTitle, updatedColumns, finalRows);
   };
 
-  // 열 제목 업데이트
+  // 열 제목 업데이트 (텍스트 입력 → debounce)
   const updateColumnLabel = (columnIndex: number, label: string) => {
     const updatedColumns = currentColumns.map((col, index) =>
       index === columnIndex ? { ...col, label } : col,
     );
 
     setCurrentColumns(updatedColumns);
-    notifyChange(currentTitle, updatedColumns, currentRows);
+    notifyChangeDebounced(currentTitle, updatedColumns, currentRows);
   };
 
   // 행 추가
@@ -570,24 +1015,24 @@ export function DynamicTableEditor({
     notifyChange(currentTitle, currentColumns, finalRows);
   };
 
-  // 행 제목 업데이트
+  // 행 제목 업데이트 (텍스트 입력 → debounce)
   const updateRowLabel = (rowIndex: number, label: string) => {
     const updatedRows = currentRows.map((row, index) =>
       index === rowIndex ? { ...row, label } : row,
     );
 
     setCurrentRows(updatedRows);
-    notifyChange(currentTitle, currentColumns, updatedRows);
+    notifyChangeDebounced(currentTitle, currentColumns, updatedRows);
   };
 
-  // 행 코드 업데이트 (엑셀 내보내기용)
+  // 행 코드 업데이트 (엑셀 내보내기용, 텍스트 입력 → debounce)
   const updateRowCode = (rowIndex: number, rowCode: string) => {
     const updatedRows = currentRows.map((row, index) =>
       index === rowIndex ? { ...row, rowCode } : row,
     );
 
     setCurrentRows(updatedRows);
-    notifyChange(currentTitle, currentColumns, updatedRows);
+    notifyChangeDebounced(currentTitle, currentColumns, updatedRows);
   };
 
   // 행 조건부 표시 설정
@@ -1083,105 +1528,11 @@ export function DynamicTableEditor({
     notifyChange,
   ]);
 
-  // 셀 렌더링 함수
-  const renderCellContent = (cell: TableCell) => {
-    const hasText = cell.content && cell.content.trim().length > 0;
-
-    // 텍스트 콘텐츠가 있으면 상단에 렌더링 (모든 타입 공통)
-    const textContent = hasText ? (
-      <div
-        className={`mb-2 w-full text-sm break-words whitespace-pre-wrap ${cell.type === 'text' ? '' : 'font-medium text-gray-700'}`}
-      >
-        {cell.content}
-      </div>
-    ) : null;
-
-    // 타입별 콘텐츠 렌더링
-    let typeContent = null;
-
-    switch (cell.type) {
-      case 'checkbox':
-        typeContent =
-          cell.checkboxOptions && cell.checkboxOptions.length > 0 ? (
-            <div className="flex items-center gap-2">
-              <CheckSquare className="h-4 w-4 text-green-500" />
-              <span className="truncate text-sm text-gray-600">
-                체크박스 ({cell.checkboxOptions.length}개)
-              </span>
-            </div>
-          ) : (
-            <span className="text-sm text-gray-400">체크박스 없음</span>
-          );
-        break;
-      case 'radio':
-        typeContent =
-          cell.radioOptions && cell.radioOptions.length > 0 ? (
-            <div className="flex items-center justify-center gap-2">
-              <Circle className="h-4 w-4 text-purple-500" />
-              <span className="truncate text-sm text-gray-600">
-                라디오 ({cell.radioOptions.length}개)
-              </span>
-            </div>
-          ) : (
-            <span className="text-sm text-gray-400">라디오 없음</span>
-          );
-        break;
-      case 'image':
-        typeContent = cell.imageUrl ? (
-          <div className="flex items-center gap-2">
-            <Image className="h-4 w-4 text-blue-500" aria-label="이미지 아이콘" />
-            <span className="truncate text-sm text-gray-600">이미지</span>
-          </div>
-        ) : (
-          <span className="text-sm text-gray-400">이미지 없음</span>
-        );
-        break;
-      case 'video':
-        typeContent = cell.videoUrl ? (
-          <div className="flex items-center gap-2">
-            <Video className="h-4 w-4 text-red-500" />
-            <span className="truncate text-sm text-gray-600">동영상</span>
-          </div>
-        ) : (
-          <span className="text-sm text-gray-400">동영상 없음</span>
-        );
-        break;
-      case 'input':
-        typeContent = (
-          <div className="flex items-center gap-2">
-            <span className="truncate text-sm text-gray-600">
-              {cell.placeholder ? `입력 필드: ${cell.placeholder}` : '단답형 입력'}
-            </span>
-          </div>
-        );
-        break;
-      case 'select':
-        typeContent =
-          cell.selectOptions && cell.selectOptions.length > 0 ? (
-            <div className="flex items-center gap-2">
-              <span className="truncate text-sm text-gray-600">
-                선택 ({cell.selectOptions.length}개)
-              </span>
-            </div>
-          ) : (
-            <span className="text-sm text-gray-400">선택 옵션 없음</span>
-          );
-        break;
-      case 'text':
-        // 텍스트 타입은 이미 위에서 처리했으므로 null 반환 (중복 방지)
-        typeContent = null;
-        break;
-      default:
-        typeContent = <span className="text-sm text-gray-400"></span>;
-    }
-
-    return (
-      <div className="w-full">
-        {textContent}
-        {typeContent}
-      </div>
-    );
-  };
+  // 행 컴포넌트에 전달할 안정된 콜백들
+  const handleSelectCell = useCallback(
+    (rowId: string, cellId: string) => setSelectedCell({ rowId, cellId }),
+    [],
+  );
 
   return (
     <div className="space-y-6">
@@ -1255,60 +1606,7 @@ export function DynamicTableEditor({
       </div>
 
       {/* 테이블 정보 요약 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>테이블 요약</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
-            <div className="rounded-lg bg-blue-50 p-3">
-              <div className="font-medium text-blue-600">전체 크기</div>
-              <div className="text-lg font-bold text-blue-900">
-                {currentRows.length} × {currentColumns.length}
-              </div>
-              <div className="text-xs text-blue-600">행 × 열</div>
-            </div>
-            <div className="rounded-lg bg-green-50 p-3">
-              <div className="font-medium text-green-600">총 셀 수</div>
-              <div className="text-lg font-bold text-green-900">
-                {currentRows.length * currentColumns.length}
-              </div>
-              <div className="text-xs text-green-600">개</div>
-            </div>
-            <div className="rounded-lg bg-purple-50 p-3">
-              <div className="font-medium text-purple-600">인터랙티브 셀</div>
-              <div className="text-lg font-bold text-purple-900">
-                {currentRows.reduce(
-                  (count, row) =>
-                    count +
-                    row.cells.filter(
-                      (cell) =>
-                        cell.type === 'checkbox' ||
-                        cell.type === 'radio' ||
-                        cell.type === 'select' ||
-                        cell.type === 'input',
-                    ).length,
-                  0,
-                )}
-              </div>
-              <div className="text-xs text-purple-600">개</div>
-            </div>
-            <div className="rounded-lg bg-orange-50 p-3">
-              <div className="font-medium text-orange-600">미디어 셀</div>
-              <div className="text-lg font-bold text-orange-900">
-                {currentRows.reduce(
-                  (count, row) =>
-                    count +
-                    row.cells.filter((cell) => cell.type === 'image' || cell.type === 'video')
-                      .length,
-                  0,
-                )}
-              </div>
-              <div className="text-xs text-orange-600">개</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <TableSummaryCard rows={currentRows} columns={currentColumns} />
 
       {/* 테이블 편집 영역 */}
       <Card>
@@ -1403,7 +1701,7 @@ export function DynamicTableEditor({
                                     idx === columnIndex ? { ...col, columnCode: e.target.value } : col
                                   );
                                   setCurrentColumns(updatedColumns);
-                                  notifyChange(currentTitle, updatedColumns, currentRows);
+                                  notifyChangeDebounced(currentTitle, updatedColumns, currentRows);
                                 }}
                                 className="h-5 border-none bg-gray-100 px-1 text-center text-[10px] text-gray-600 focus-visible:ring-0"
                                 placeholder="열 코드 (엑셀용)"
@@ -1536,233 +1834,24 @@ export function DynamicTableEditor({
               {/* 데이터 행들 */}
               <tbody>
                 {currentRows.map((row, rowIndex) => (
-                  <tr
+                  <EditorTableRow
                     key={row.id}
-                    style={{ height: row.height ? `${row.height}px` : '60px' }}
-                    className="group/row"
-                  >
-                    {/* 행 이름(라벨) 입력칸 */}
-                    <td className="group/label sticky left-0 z-10 w-[70px] min-w-[70px] border border-gray-300 bg-gray-50 p-1">
-                      <div className="relative space-y-1">
-                        <Input
-                          value={row.label}
-                          onChange={(e) => updateRowLabel(rowIndex, e.target.value)}
-                          className="h-6 bg-white px-1 text-center text-xs"
-                          placeholder="행 라벨"
-                          title={`행 라벨: ${row.label}`}
-                        />
-                        <Input
-                          value={row.rowCode || ''}
-                          onChange={(e) => updateRowCode(rowIndex, e.target.value)}
-                          className="h-6 bg-gray-100 px-1 text-center text-xs font-medium text-gray-700"
-                          placeholder="행 코드"
-                          title={`엑셀 코드: ${row.rowCode || '(자동)'}`}
-                        />
-                        {allQuestions.length > 0 && (
-                          <button
-                            onClick={() => openRowConditionModal(rowIndex)}
-                            className={`mx-auto flex h-5 w-5 items-center justify-center rounded transition-colors ${
-                              row.displayCondition && row.displayCondition.conditions.length > 0
-                                ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
-                                : 'text-gray-400 hover:bg-gray-200 hover:text-gray-600'
-                            }`}
-                            title={
-                              row.displayCondition && row.displayCondition.conditions.length > 0
-                                ? `조건부 표시 (${row.displayCondition.conditions.length}개 조건)`
-                                : '조건부 표시 설정'
-                            }
-                          >
-                            <Eye className="h-3 w-3" />
-                          </button>
-                        )}
-                        {currentRows.length > 1 && (
-                          <button
-                            onClick={() => deleteRow(rowIndex)}
-                            className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white shadow-sm hover:bg-red-600 group-hover/label:flex"
-                            title="행 삭제"
-                          >
-                            <Trash2 className="h-2.5 w-2.5" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-
-                    {/* 셀들 */}
-                    {row.cells.map((cell, cellIndex) => {
-                      // 숨겨진 셀은 렌더링하지 않음
-                      if (cell.isHidden) return null;
-
-                      const column = currentColumns[cellIndex];
-                      const rowspan = cell.rowspan || 1;
-                      const colspan = cell.colspan || 1;
-                      const isMerged = rowspan > 1 || colspan > 1;
-
-                      // 정렬 클래스 계산 (세로 정렬만 td에 적용)
-                      const verticalAlignClass =
-                        cell.verticalAlign === 'middle'
-                          ? 'align-middle'
-                          : cell.verticalAlign === 'bottom'
-                            ? 'align-bottom'
-                            : 'align-top';
-
-                      return (
-                        <td
-                          key={cell.id}
-                          className={`relative border border-gray-300 p-2 ${verticalAlignClass}`}
-                          style={{
-                            width: column?.width ? `${column.width}px` : '150px',
-                            maxWidth: column?.width ? `${column.width}px` : '150px',
-                            height: row.height ? `${row.height}px` : '60px',
-                          }}
-                          rowSpan={rowspan}
-                          colSpan={colspan}
-                        >
-                          <div
-                            className={`group relative flex h-full cursor-pointer flex-col rounded p-2 transition-colors hover:bg-gray-50 ${
-                              cell.verticalAlign === 'top'
-                                ? 'justify-start'
-                                : cell.verticalAlign === 'middle'
-                                  ? 'justify-center'
-                                  : 'justify-end'
-                            }`}
-                            onClick={() => setSelectedCell({ rowId: row.id, cellId: cell.id })}
-                            style={{
-                              minHeight: row.minHeight ? `${row.minHeight - 16}px` : '40px',
-                            }}
-                          >
-                            <div
-                              className={`mb-2 flex items-start justify-between ${
-                                cell.type === 'radio' ? 'w-full justify-center' : ''
-                              }`}
-                            >
-                              <div
-                                className={`${cell.type === 'radio' ? '' : 'w-full flex-1'} ${
-                                  cell.horizontalAlign === 'left'
-                                    ? 'flex items-start justify-start'
-                                    : cell.horizontalAlign === 'center'
-                                      ? 'flex items-center justify-center'
-                                      : 'flex items-end justify-end'
-                                }`}
-                              >
-                                {renderCellContent(cell)}
-                              </div>
-                              <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                                {/* 횡순서변경 (열 이동) */}
-                                <div className="mr-1 flex items-center border-r border-gray-200 pr-1">
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-6 w-5 p-0 text-gray-400 hover:text-gray-700 disabled:opacity-30"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      moveColumn(cellIndex, 'left');
-                                    }}
-                                    disabled={cellIndex === 0}
-                                    title="열 왼쪽으로 이동"
-                                  >
-                                    <ArrowLeft className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-6 w-5 p-0 text-gray-400 hover:text-gray-700 disabled:opacity-30"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      moveColumn(cellIndex, 'right');
-                                    }}
-                                    disabled={cellIndex === currentColumns.length - 1}
-                                    title="열 오른쪽으로 이동"
-                                  >
-                                    <ArrowRight className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                                {/* 삭제 */}
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    deleteCell(rowIndex, cellIndex);
-                                  }}
-                                  title="셀 삭제"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                                {/* 복사 */}
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-6 w-6 p-0"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    copyCell(rowIndex, cellIndex);
-                                  }}
-                                  title="셀 복사"
-                                >
-                                  <Copy className="h-3 w-3" />
-                                </Button>
-                                {/* 붙여넣기 */}
-                                {copiedCell && (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      pasteCell(rowIndex, cellIndex);
-                                    }}
-                                    title="셀 붙여넣기"
-                                  >
-                                    <Clipboard className="h-3 w-3" />
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                            <div className="mt-1 border-t border-gray-100 pt-1 text-xs text-gray-400">
-                              <div className="flex items-center justify-between">
-                                <span>
-                                  셀 ({rowIndex + 1}, {cellIndex + 1})
-                                </span>
-                                <span className="font-medium capitalize">{cell.type}</span>
-                              </div>
-                              {isMerged && (
-                                <div className="mt-1 font-medium text-orange-600">
-                                  🔗 병합: {rowspan}행 × {colspan}열
-                                </div>
-                              )}
-                              {cell.type === 'checkbox' && cell.checkboxOptions && (
-                                <div className="mt-1 text-green-600">
-                                  체크박스 {cell.checkboxOptions.length}개
-                                </div>
-                              )}
-                              {cell.type === 'radio' && cell.radioOptions && (
-                                <div className="mt-1 text-purple-600">
-                                  라디오 {cell.radioOptions.length}개
-                                </div>
-                              )}
-                              {cell.type === 'select' && cell.selectOptions && (
-                                <div className="mt-1 text-indigo-600">
-                                  선택 {cell.selectOptions.length}개
-                                </div>
-                              )}
-                              {cell.type === 'input' && (
-                                <div className="mt-1 text-teal-600">
-                                  {cell.placeholder || '단답형 입력'}
-                                </div>
-                              )}
-                              {cell.type === 'image' && cell.imageUrl && (
-                                <div className="mt-1 text-blue-600">이미지 설정됨</div>
-                              )}
-                              {cell.type === 'video' && cell.videoUrl && (
-                                <div className="mt-1 text-red-600">비디오 설정됨</div>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                      );
-                    })}
-                  </tr>
+                    row={row}
+                    rowIndex={rowIndex}
+                    columns={currentColumns}
+                    totalRowCount={currentRows.length}
+                    hasQuestions={allQuestions.length > 0}
+                    hasCopiedCell={!!copiedCell}
+                    onUpdateRowLabel={updateRowLabel}
+                    onUpdateRowCode={updateRowCode}
+                    onOpenRowConditionModal={openRowConditionModal}
+                    onDeleteRow={deleteRow}
+                    onSelectCell={handleSelectCell}
+                    onMoveColumn={moveColumn}
+                    onDeleteCell={deleteCell}
+                    onCopyCell={copyCell}
+                    onPasteCell={pasteCell}
+                  />
                 ))}
               </tbody>
             </table>
