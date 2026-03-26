@@ -178,8 +178,8 @@ export function executeUnmerge(
   const newRows = structuredClone(rows);
   const targetCell = newRows[rowIndex].cells[cellIndex];
 
-  targetCell.rowspan = 1;
-  targetCell.colspan = 1;
+  targetCell.rowspan = undefined;
+  targetCell.colspan = undefined;
 
   return newRows;
 }

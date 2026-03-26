@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { generateId } from '@/lib/utils';
 import {
@@ -137,11 +137,6 @@ export function useTableEditor({
     cellIndex: number;
   } | null>(null);
 
-  const [resizingRow, setResizingRow] = useState<{
-    rowIndex: number;
-    startY: number;
-    startHeight: number;
-  } | null>(null);
   const tableRef = useRef<HTMLTableElement>(null);
 
   const [editingColumnWidth, setEditingColumnWidth] = useState<{
@@ -168,7 +163,7 @@ export function useTableEditor({
 
   // ── 변경 알림 ──
 
-  const notifyChangeImmediate = useCallback(
+  const notifyChange = useCallback(
     (title: string, cols: TableColumn[], rowsData: TableRow[]) => {
       onTableChangeRef.current({
         tableTitle: title,
@@ -219,8 +214,6 @@ export function useTableEditor({
     };
   }, []);
 
-  const notifyChange = notifyChangeImmediate;
-
   // ── questionCode/questionTitle 변경 감지 ──
 
   const prevQuestionInfoRef = useRef({ questionCode, questionTitle });
@@ -231,7 +224,7 @@ export function useTableEditor({
 
     const updatedRows = generateAllCellCodes(questionCode, questionTitle, currentColumns, currentRows);
     setCurrentRows(updatedRows);
-    notifyChangeImmediate(currentTitle, currentColumns, updatedRows);
+    notifyChange(currentTitle, currentColumns, updatedRows);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questionCode, questionTitle]);
 
@@ -316,53 +309,6 @@ export function useTableEditor({
     },
     [currentColumns, currentRows, currentTitle, questionCode, questionTitle, notifyChangeDebounced],
   );
-
-  // ── 행 높이 리사이즈 ──
-
-  const handleRowResizeStart = useCallback(
-    (e: React.MouseEvent, rowIndex: number) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const currentHeight = currentRows[rowIndex].height || 60;
-      setResizingRow({ rowIndex, startY: e.clientY, startHeight: currentHeight });
-    },
-    [currentRows],
-  );
-
-  const handleRowResizeMove = useCallback(
-    (e: MouseEvent) => {
-      if (!resizingRow) return;
-      const deltaY = e.clientY - resizingRow.startY;
-      const newHeight = Math.max(40, resizingRow.startHeight + deltaY);
-      const updatedRows = currentRows.map((row, index) =>
-        index === resizingRow.rowIndex ? { ...row, height: newHeight } : row,
-      );
-      setCurrentRows(updatedRows);
-    },
-    [resizingRow, currentRows],
-  );
-
-  const handleRowResizeEnd = useCallback(() => {
-    if (!resizingRow) return;
-    notifyChange(currentTitle, currentColumns, currentRows);
-    setResizingRow(null);
-  }, [resizingRow, currentTitle, currentColumns, currentRows, notifyChange]);
-
-  React.useEffect(() => {
-    if (resizingRow) {
-      document.addEventListener('mousemove', handleRowResizeMove);
-      document.addEventListener('mouseup', handleRowResizeEnd);
-      document.body.style.cursor = 'row-resize';
-      document.body.style.userSelect = 'none';
-
-      return () => {
-        document.removeEventListener('mousemove', handleRowResizeMove);
-        document.removeEventListener('mouseup', handleRowResizeEnd);
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-      };
-    }
-  }, [resizingRow, handleRowResizeMove, handleRowResizeEnd]);
 
   // ── 열 CRUD ──
 
@@ -578,25 +524,6 @@ export function useTableEditor({
           return row;
         })
         .filter((_, index) => index !== rowIndex);
-
-      const finalRows = recalculateHiddenCells(updatedRows);
-      setCurrentRows(finalRows);
-      notifyChange(currentTitle, currentColumns, finalRows);
-    },
-    [currentRows, currentTitle, currentColumns, notifyChange],
-  );
-
-  const moveRow = useCallback(
-    (rowIndex: number, direction: 'up' | 'down') => {
-      if (direction === 'up' && rowIndex === 0) return;
-      if (direction === 'down' && rowIndex === currentRows.length - 1) return;
-
-      const targetIndex = direction === 'up' ? rowIndex - 1 : rowIndex + 1;
-      const updatedRows = [...currentRows];
-      [updatedRows[rowIndex], updatedRows[targetIndex]] = [
-        updatedRows[targetIndex],
-        updatedRows[rowIndex],
-      ];
 
       const finalRows = recalculateHiddenCells(updatedRows);
       setCurrentRows(finalRows);
@@ -894,11 +821,11 @@ export function useTableEditor({
   const selectedCellContext = useMemo(() => {
     if (!selectedCell) return null;
 
-    const selectedRow = currentRows.find((row) => row.id === selectedCell.rowId);
     const rowIndex = currentRows.findIndex((row) => row.id === selectedCell.rowId);
+    const selectedRow = rowIndex >= 0 ? currentRows[rowIndex] : undefined;
     const cellIndex = selectedRow?.cells.findIndex((c) => c.id === selectedCell.cellId) ?? -1;
     const selectedColumn = cellIndex >= 0 ? currentColumns[cellIndex] : undefined;
-    const cell = selectedRow?.cells.find((c) => c.id === selectedCell.cellId);
+    const cell = cellIndex >= 0 ? selectedRow?.cells[cellIndex] : undefined;
 
     return {
       rowIndex,
@@ -952,10 +879,8 @@ export function useTableEditor({
       // 행
       addRow,
       deleteRow,
-      moveRow,
       updateRowLabel,
       updateRowCode,
-      handleRowResizeStart,
       // 셀
       handleSelectCell,
       setSelectedCell,
