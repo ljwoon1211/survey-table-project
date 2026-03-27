@@ -1,6 +1,8 @@
 'use client';
 
-import { Clipboard, Plus } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+import { Clipboard, Plus, Undo2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -47,6 +49,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
     selectedCell,
     copiedCell,
     copiedCellPosition,
+    copiedRegion,
     editingColumnWidth,
     columnWidths,
     useMultiRowHeader,
@@ -91,7 +94,152 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
     setRowConditionModalOpen,
     toggleMultiRowHeader,
     updateHeaderGrid,
+    // 드래그 복사
+    dragCopyState,
+    undoInfo,
+    startDragCopy,
+    updateDragCopyRange,
+    storeSelectedRegion,
+    cancelDragCopy,
+    undoPaste,
+    clearCopiedRegion,
   } = actions;
+
+  // ── 드래그 복사: 토스트 상태 ──
+
+  const [dragCopyToast, setDragCopyToast] = useState<{
+    count: number;
+    visible: boolean;
+  } | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showDragCopyToast = useCallback((count: number) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setDragCopyToast({ count, visible: true });
+    toastTimerRef.current = setTimeout(() => {
+      setDragCopyToast(null);
+    }, 4000);
+  }, []);
+
+  const handleUndoPaste = useCallback(() => {
+    undoPaste();
+    setDragCopyToast(null);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+  }, [undoPaste]);
+
+  // 토스트 타이머 언마운트 시 정리
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  // ── 드래그 복사: 행별 대상 셀 매핑 ──
+
+  const dragCopyTargetsByRow = useMemo(() => {
+    if (!dragCopyState) return null;
+    const map = new Map<number, string>();
+    for (const t of dragCopyState.selectedCells) {
+      const existing = map.get(t.rowIndex);
+      map.set(t.rowIndex, existing ? `${existing},${t.cellIndex}` : `${t.cellIndex}`);
+    }
+    return map;
+  }, [dragCopyState]);
+
+  // ── 드래그 복사: document 이벤트 리스너 ──
+
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const scrollAnimRef = useRef<number | null>(null);
+  const scrollSpeedRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    if (!dragCopyState?.isDragging) {
+      if (scrollAnimRef.current) {
+        cancelAnimationFrame(scrollAnimRef.current);
+        scrollAnimRef.current = null;
+      }
+      scrollSpeedRef.current = { x: 0, y: 0 };
+      return;
+    }
+
+    // rAF 기반 스크롤 루프 (ref에서 속도를 읽어 항상 최신 값 사용)
+    const doScroll = () => {
+      const { x, y } = scrollSpeedRef.current;
+      if (x !== 0 || y !== 0) {
+        tableContainerRef.current?.scrollBy(x, y);
+      }
+      scrollAnimRef.current = requestAnimationFrame(doScroll);
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const td = el?.closest('td[data-row-index]') as HTMLElement | null;
+      if (td) {
+        const rowIndex = parseInt(td.getAttribute('data-row-index')!, 10);
+        const cellIndex = parseInt(td.getAttribute('data-cell-index')!, 10);
+        if (!isNaN(rowIndex) && !isNaN(cellIndex)) {
+          updateDragCopyRange(rowIndex, cellIndex);
+        }
+      }
+
+      // 자동 스크롤 속도 계산 (ref 업데이트 — rAF 루프가 최신 속도 사용)
+      const container = tableContainerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const EDGE = 40;
+      const MAX_SPEED = 8;
+      let scrollX = 0;
+      let scrollY = 0;
+
+      if (e.clientY < rect.top + EDGE) {
+        scrollY = -MAX_SPEED * (1 - (e.clientY - rect.top) / EDGE);
+      } else if (e.clientY > rect.bottom - EDGE) {
+        scrollY = MAX_SPEED * (1 - (rect.bottom - e.clientY) / EDGE);
+      }
+      if (e.clientX < rect.left + EDGE) {
+        scrollX = -MAX_SPEED * (1 - (e.clientX - rect.left) / EDGE);
+      } else if (e.clientX > rect.right - EDGE) {
+        scrollX = MAX_SPEED * (1 - (rect.right - e.clientX) / EDGE);
+      }
+
+      scrollSpeedRef.current = { x: scrollX, y: scrollY };
+    };
+
+    const stopScroll = () => {
+      if (scrollAnimRef.current) {
+        cancelAnimationFrame(scrollAnimRef.current);
+        scrollAnimRef.current = null;
+      }
+      scrollSpeedRef.current = { x: 0, y: 0 };
+    };
+
+    const handleMouseUp = () => {
+      stopScroll();
+      const result = storeSelectedRegion();
+      if (result) showDragCopyToast(result.width * result.height);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        stopScroll();
+        cancelDragCopy();
+      }
+    };
+
+    // 스크롤 루프 시작
+    scrollAnimRef.current = requestAnimationFrame(doScroll);
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('keydown', handleKeyDown);
+      stopScroll();
+    };
+  }, [dragCopyState?.isDragging, updateDragCopyRange, storeSelectedRegion, cancelDragCopy, showDragCopyToast]);
 
   return (
     <div className="space-y-6">
@@ -144,7 +292,22 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
           <CardTitle className="flex items-center justify-between">
             <span>테이블 구조 편집</span>
             <div className="flex gap-2">
-              {copiedCell && (
+              {copiedRegion && (
+                <div className="flex items-center gap-2 rounded-md border border-purple-200 bg-purple-50 px-3 py-1 text-sm text-purple-700">
+                  <Clipboard className="h-4 w-4" />
+                  <span>
+                    영역 복사됨 ({copiedRegion.height}행 × {copiedRegion.width}열)
+                  </span>
+                  <button
+                    onClick={clearCopiedRegion}
+                    className="ml-1 text-purple-500 hover:text-purple-700"
+                    title="복사 취소"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+              {copiedCell && !copiedRegion && (
                 <div className="flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-1 text-sm text-blue-700">
                   <Clipboard className="h-4 w-4" />
                   <span>
@@ -166,7 +329,11 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          <div
+            ref={tableContainerRef}
+            className="overflow-x-auto"
+            style={dragCopyState?.isDragging ? { cursor: 'crosshair', userSelect: 'none' } : undefined}
+          >
             <table
               ref={tableRef}
               className="w-full border-collapse border border-gray-300"
@@ -206,6 +373,10 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
                     totalRowCount={currentRows.length}
                     hasQuestions={(allQuestions ?? []).length > 0}
                     hasCopiedCell={!!copiedCell}
+                    hasCopiedRegion={!!copiedRegion}
+                    isDragCopyActive={!!dragCopyState}
+                    dragSelectionCellsKey={dragCopyTargetsByRow?.get(rowIndex) ?? ''}
+                    onStartDragCopy={startDragCopy}
                     onUpdateRowLabel={updateRowLabel}
                     onUpdateRowCode={updateRowCode}
                     onOpenRowConditionModal={openRowConditionModal}
@@ -283,6 +454,33 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
         allQuestions={allQuestions ?? []}
         onUpdateCondition={updateRowCondition}
       />
+
+      {/* 영역 복사 알림 토스트 (화면 하단 고정) */}
+      {dragCopyToast?.visible && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center gap-3 rounded-lg border border-purple-200 bg-purple-50 px-4 py-2.5 text-sm text-purple-700 shadow-lg">
+            <span className="font-medium">{dragCopyToast.count}개 셀 영역 복사됨</span>
+          </div>
+        </div>
+      )}
+
+      {/* 붙여넣기 Undo 토스트 (화면 하단 고정) */}
+      {!dragCopyToast?.visible && undoInfo && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-700 shadow-lg">
+            <span className="font-medium">영역 붙여넣기 완료</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 gap-1 px-2 text-green-700 hover:bg-green-100 hover:text-green-900"
+              onClick={handleUndoPaste}
+            >
+              <Undo2 className="h-3.5 w-3.5" />
+              실행 취소
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

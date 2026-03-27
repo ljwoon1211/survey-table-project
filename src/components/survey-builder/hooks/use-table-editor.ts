@@ -18,6 +18,7 @@ import {
 import { buildDefaultHeaderGrid } from '@/utils/table-merge-helpers';
 
 import { checkCanMerge, executeMerge, executeUnmerge } from '../utils/table-cell-merge';
+import { useDragCopy } from './use-drag-copy';
 
 // ── 타입 ──
 
@@ -635,6 +636,23 @@ export function useTableEditor({
     [currentQuestionId, currentTitle, currentColumns, currentRows],
   );
 
+  // ── 드래그 복사 ──
+
+  const dragCopy = useDragCopy({
+    currentRowsRef,
+    currentColumnsRef,
+    questionCodeRef,
+    questionTitleRef,
+    setCurrentRows,
+    notifyChange,
+    currentTitleRef,
+    recalculateHiddenCells,
+    clearCopiedCell: () => {
+      setCopiedCell(null);
+      setCopiedCellPosition(null);
+    },
+  });
+
   // ── 셀 복사/붙여넣기 ──
 
   const copyCell = useCallback(
@@ -644,12 +662,22 @@ export function useTableEditor({
       const cellToCopy: TableCell = { ...cell, id: '' };
       setCopiedCell(cellToCopy);
       setCopiedCellPosition({ rowIndex, cellIndex });
+      dragCopy.clearCopiedRegion(); // 상호 배타
     },
-    [],
+    [dragCopy.clearCopiedRegion],
   );
 
   const pasteCell = useCallback(
     (rowIndex: number, cellIndex: number) => {
+      // 영역 복사가 있으면 영역 붙여넣기 우선
+      if (dragCopy.copiedRegion) {
+        const result = dragCopy.pasteRegion(rowIndex, cellIndex);
+        if ('blocked' in result) {
+          alert(result.message);
+        }
+        return;
+      }
+
       const copied = copiedCellRef.current;
       if (!copied) return;
 
@@ -697,7 +725,7 @@ export function useTableEditor({
       setCurrentRows(finalRows);
       notifyChange(currentTitleRef.current, columns, finalRows);
     },
-    [notifyChange],
+    [notifyChange, dragCopy.copiedRegion, dragCopy.pasteRegion],
   );
 
   // ── 셀 삭제/업데이트 ──
@@ -835,8 +863,12 @@ export function useTableEditor({
   // ── 셀 선택 (안정된 콜백) ──
 
   const handleSelectCell = useCallback(
-    (rowId: string, cellId: string) => setSelectedCell({ rowId, cellId }),
-    [],
+    (rowId: string, cellId: string) => {
+      // 드래그 복사 중에는 셀 선택(모달 열림) 방지
+      if (dragCopy.dragCopyState?.isDragging) return;
+      setSelectedCell({ rowId, cellId });
+    },
+    [dragCopy.dragCopyState?.isDragging],
   );
 
   // ── 다단계 헤더 토글 ──
@@ -921,6 +953,7 @@ export function useTableEditor({
       selectedCell,
       copiedCell,
       copiedCellPosition,
+      copiedRegion: dragCopy.copiedRegion,
       editingColumnWidth,
       columnWidths,
       useMultiRowHeader,
@@ -972,6 +1005,8 @@ export function useTableEditor({
       // 다단계 헤더
       toggleMultiRowHeader,
       updateHeaderGrid,
+      // 드래그 복사
+      ...dragCopy,
     },
   };
 }

@@ -124,6 +124,12 @@ export interface EditorTableRowProps {
   totalRowCount: number;
   hasQuestions: boolean;
   hasCopiedCell: boolean;
+  hasCopiedRegion: boolean;
+  // 드래그 복사
+  isDragCopyActive: boolean;
+  dragSelectionCellsKey: string; // 선택 영역 셀 indices ("2,3,5" 형태, 빈 문자열이면 없음)
+  onStartDragCopy: (rowIndex: number, cellIndex: number) => void;
+  // 기존 핸들러
   onUpdateRowLabel: (rowIndex: number, label: string) => void;
   onUpdateRowCode: (rowIndex: number, rowCode: string) => void;
   onOpenRowConditionModal: (rowIndex: number) => void;
@@ -144,6 +150,10 @@ export const EditorTableRow = React.memo(function EditorTableRow({
   totalRowCount,
   hasQuestions,
   hasCopiedCell,
+  hasCopiedRegion,
+  isDragCopyActive,
+  dragSelectionCellsKey,
+  onStartDragCopy,
   onUpdateRowLabel,
   onUpdateRowCode,
   onOpenRowConditionModal,
@@ -154,6 +164,11 @@ export const EditorTableRow = React.memo(function EditorTableRow({
   onCopyCell,
   onPasteCell,
 }: EditorTableRowProps) {
+  // 드래그 선택 영역 셀 Set (문자열 → Set<number>)
+  const dragSelectionCells = React.useMemo(() => {
+    if (!dragSelectionCellsKey) return null;
+    return new Set(dragSelectionCellsKey.split(',').map(Number));
+  }, [dragSelectionCellsKey]);
   return (
     <tr
       style={{ height: row.height ? `${row.height}px` : '60px' }}
@@ -221,10 +236,16 @@ export const EditorTableRow = React.memo(function EditorTableRow({
               ? 'align-bottom'
               : 'align-top';
 
+        const isSelected = dragSelectionCells?.has(cellIndex) ?? false;
+
         return (
           <td
             key={cell.id}
-            className={`relative border border-gray-300 p-2 ${verticalAlignClass}`}
+            data-row-index={rowIndex}
+            data-cell-index={cellIndex}
+            className={`relative border border-gray-300 p-2 ${verticalAlignClass} ${
+              isSelected ? 'ring-2 ring-inset ring-blue-500 bg-blue-50' : ''
+            }`}
             style={{
               width: `${columnWidth}px`,
               maxWidth: `${columnWidth}px`,
@@ -315,7 +336,7 @@ export const EditorTableRow = React.memo(function EditorTableRow({
                   >
                     <Copy className="h-3 w-3" />
                   </Button>
-                  {hasCopiedCell && (
+                  {(hasCopiedCell || hasCopiedRegion) && (
                     <Button
                       size="sm"
                       variant="ghost"
@@ -331,6 +352,20 @@ export const EditorTableRow = React.memo(function EditorTableRow({
                   )}
                 </div>
               </div>
+              {/* Fill Handle — 드래그 복사 시작점 */}
+              {!isDragCopyActive && (
+                <div
+                  className="absolute bottom-0 right-0 z-10 flex h-3 w-3 cursor-crosshair items-center justify-center opacity-0 group-hover:opacity-100"
+                  style={{ padding: '3px', margin: '-3px' }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onStartDragCopy(rowIndex, cellIndex);
+                  }}
+                >
+                  <div className="h-1.5 w-1.5 rounded-sm bg-blue-500" />
+                </div>
+              )}
               <div className="mt-1 border-t border-gray-100 pt-1 text-xs text-gray-400">
                 <div className="flex items-center justify-between">
                   <span>
