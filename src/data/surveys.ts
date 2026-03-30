@@ -3,6 +3,7 @@ import { and, desc, eq, gte, ilike, lte } from 'drizzle-orm';
 import { db } from '@/db';
 import { questionGroups, questions, surveys, surveyVersions } from '@/db/schema';
 import type { QuestionGroup, Question as QuestionType, Survey as SurveyType } from '@/types/survey';
+import { generateAllCellCodes } from '@/utils/table-cell-code-generator';
 
 // ========================
 // 설문 조회 함수
@@ -124,34 +125,44 @@ export async function getSurveyWithDetails(surveyId: string): Promise<SurveyType
       collapsed: g.collapsed ?? undefined,
       displayCondition: g.displayCondition as QuestionGroup['displayCondition'],
     })),
-    questions: questionList.map((q) => ({
-      id: q.id,
-      type: q.type as QuestionType['type'],
-      title: q.title,
-      description: q.description ?? undefined,
-      required: q.required,
-      groupId: q.groupId ?? undefined,
-      options: q.options as QuestionType['options'],
-      selectLevels: q.selectLevels as QuestionType['selectLevels'],
-      tableTitle: q.tableTitle ?? undefined,
-      tableColumns: q.tableColumns as QuestionType['tableColumns'],
-      tableRowsData: q.tableRowsData as QuestionType['tableRowsData'],
-      tableHeaderGrid: q.tableHeaderGrid as QuestionType['tableHeaderGrid'],
-      imageUrl: q.imageUrl ?? undefined,
-      videoUrl: q.videoUrl ?? undefined,
-      order: q.order,
-      allowOtherOption: q.allowOtherOption ?? undefined,
-      minSelections: q.minSelections ?? undefined,
-      maxSelections: q.maxSelections ?? undefined,
-      noticeContent: q.noticeContent ?? undefined,
-      requiresAcknowledgment: q.requiresAcknowledgment ?? undefined,
-      placeholder: q.placeholder ?? undefined,
-      tableValidationRules: q.tableValidationRules as QuestionType['tableValidationRules'],
-      displayCondition: q.displayCondition as QuestionType['displayCondition'],
-      questionCode: q.questionCode ?? undefined,
-      isCustomSpssVarName: q.isCustomSpssVarName ?? undefined,
-      exportLabel: q.exportLabel ?? undefined,
-    })),
+    questions: questionList.map((q) => {
+      const mapped: QuestionType = {
+        id: q.id,
+        type: q.type as QuestionType['type'],
+        title: q.title,
+        description: q.description ?? undefined,
+        required: q.required,
+        groupId: q.groupId ?? undefined,
+        options: q.options as QuestionType['options'],
+        selectLevels: q.selectLevels as QuestionType['selectLevels'],
+        tableTitle: q.tableTitle ?? undefined,
+        tableColumns: q.tableColumns as QuestionType['tableColumns'],
+        tableRowsData: q.tableRowsData as QuestionType['tableRowsData'],
+        tableHeaderGrid: q.tableHeaderGrid as QuestionType['tableHeaderGrid'],
+        imageUrl: q.imageUrl ?? undefined,
+        videoUrl: q.videoUrl ?? undefined,
+        order: q.order,
+        allowOtherOption: q.allowOtherOption ?? undefined,
+        minSelections: q.minSelections ?? undefined,
+        maxSelections: q.maxSelections ?? undefined,
+        noticeContent: q.noticeContent ?? undefined,
+        requiresAcknowledgment: q.requiresAcknowledgment ?? undefined,
+        placeholder: q.placeholder ?? undefined,
+        tableValidationRules: q.tableValidationRules as QuestionType['tableValidationRules'],
+        dynamicRowConfigs: q.dynamicRowConfigs as QuestionType['dynamicRowConfigs'],
+        displayCondition: q.displayCondition as QuestionType['displayCondition'],
+        questionCode: q.questionCode ?? undefined,
+        isCustomSpssVarName: q.isCustomSpssVarName ?? undefined,
+        exportLabel: q.exportLabel ?? undefined,
+      };
+      // strip된 셀 데이터를 hydrate (cellCode, exportLabel, spssVarType 등 복원)
+      if (mapped.type === 'table' && mapped.tableRowsData && mapped.tableColumns) {
+        mapped.tableRowsData = generateAllCellCodes(
+          mapped.questionCode, mapped.title, mapped.tableColumns, mapped.tableRowsData,
+        );
+      }
+      return mapped;
+    }),
     settings: {
       isPublic: survey.isPublic,
       allowMultipleResponses: survey.allowMultipleResponses,
@@ -217,7 +228,17 @@ export async function getSurveyForResponse(
         slug: survey.slug ?? undefined,
         privateToken: survey.privateToken ?? undefined,
         groups: snapshot.groups,
-        questions: snapshot.questions,
+        questions: snapshot.questions.map((q) => {
+          if (q.type === 'table' && q.tableRowsData && q.tableColumns) {
+            return {
+              ...q,
+              tableRowsData: generateAllCellCodes(
+                q.questionCode, q.title, q.tableColumns, q.tableRowsData,
+              ),
+            };
+          }
+          return q;
+        }),
         settings: {
           ...snapshot.settings,
           endDate: snapshot.settings.endDate

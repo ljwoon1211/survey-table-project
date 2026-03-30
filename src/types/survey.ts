@@ -162,6 +162,17 @@ export interface TableRow {
   height?: number; // 행 높이 (픽셀 단위)
   minHeight?: number; // 최소 높이
   displayCondition?: QuestionConditionGroup; // 행 표시 조건
+  dynamicGroupId?: string; // 소속 동적 그룹 ID (undefined = 항상 표시)
+  showWhenDynamicGroupId?: string; // 이 그룹에 선택 있으면 함께 표시 (소계 행용)
+}
+
+// 동적 행 그룹 설정
+export interface DynamicRowGroupConfig {
+  groupId: string; // 그룹 고유 ID
+  enabled: boolean;
+  label?: string; // 선택 버튼 텍스트 (기본: "항목 선택")
+  insertAfterRowId?: string; // 이 행 다음에 선택 버튼 배치
+  buttonAlign?: 'left' | 'center' | 'right'; // 버튼 정렬 (기본: 'left')
 }
 
 export interface TableColumn {
@@ -173,6 +184,7 @@ export interface TableColumn {
   // 컬럼 헤더 병합 관련 속성
   colspan?: number; // 헤더 가로 병합
   isHeaderHidden?: boolean; // 다른 컬럼의 colspan에 의해 숨겨진 헤더
+  displayCondition?: QuestionConditionGroup; // 열 표시 조건
 }
 
 // 다단계 헤더 셀 (headerGrid용)
@@ -240,6 +252,8 @@ export interface Question {
   placeholder?: string; // 입력 필드 placeholder
   // 테이블 검증 규칙 (테이블 타입 전용)
   tableValidationRules?: TableValidationRule[];
+  // 동적 행 그룹 설정 (테이블 타입 전용)
+  dynamicRowConfigs?: DynamicRowGroupConfig[];
   // 질문 표시 조건 (이 질문을 표시하기 위한 조건)
   displayCondition?: QuestionConditionGroup;
   // SPSS .sav 내보내기 오버라이드 (없으면 질문 타입 기반 자동 판단)

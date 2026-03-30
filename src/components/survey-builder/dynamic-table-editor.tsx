@@ -2,18 +2,20 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Clipboard, Plus, Undo2 } from 'lucide-react';
+import { Clipboard, ListChecks, Plus, Undo2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { HeaderCell, Question, TableColumn, TableRow } from '@/types/survey';
+import { generateId } from '@/lib/utils';
+import { DynamicRowGroupConfig, HeaderCell, Question, TableColumn, TableRow } from '@/types/survey';
 
 import { CellContentModal } from './cell-content-modal';
 import { EditorTableRow } from './editor-table-row';
 import { HeaderGridEditor } from './header-grid-editor';
 import { useTableEditor } from './hooks/use-table-editor';
+import { ColumnConditionModal } from './column-condition-modal';
 import { RowConditionModal } from './row-condition-modal';
 import { TableHeaderSection } from './table-header-section';
 import { TableSummaryCard } from './table-summary-card';
@@ -29,17 +31,22 @@ interface DynamicTableEditorProps {
   allQuestions?: Question[];
   questionCode?: string;
   questionTitle?: string;
+  dynamicRowConfigs?: DynamicRowGroupConfig[];
   onTableChange: (data: {
     tableTitle: string;
     tableColumns: TableColumn[];
     tableRowsData: TableRow[];
     tableHeaderGrid?: HeaderCell[][];
   }) => void;
+  onDynamicRowConfigsChange?: (configs: DynamicRowGroupConfig[] | undefined) => void;
 }
 
 // ── 컴포넌트 ──
 
 export function DynamicTableEditor(props: DynamicTableEditorProps) {
+  const { dynamicRowConfigs: rawConfigs, onDynamicRowConfigsChange } = props;
+  // 기존 단일 객체 → 배열 마이그레이션 호환
+  const dynamicRowConfigs = Array.isArray(rawConfigs) ? rawConfigs : [];
   const { state, actions } = useTableEditor(props);
 
   const {
@@ -56,6 +63,8 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
     currentHeaderGrid,
     rowConditionModalOpen,
     editingRowIndex,
+    columnConditionModalOpen,
+    editingColumnIndex,
     tableRef,
     selectedCellContext,
     currentQuestionAsQuestion,
@@ -92,6 +101,11 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
     openRowConditionModal,
     updateRowCondition,
     setRowConditionModalOpen,
+    setDynamicGroupId,
+    setShowWhenDynamicGroupId,
+    openColumnConditionModal,
+    updateColumnCondition,
+    setColumnConditionModalOpen,
     toggleMultiRowHeader,
     updateHeaderGrid,
     // 드래그 복사
@@ -104,6 +118,10 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
     undoPaste,
     clearCopiedRegion,
   } = actions;
+
+  // ── 동적 행 감지 ──
+  const hasDynamicRows = currentRows.some((r) => r.dynamicGroupId);
+  const nonDynamicRows = currentRows.filter((r) => !r.dynamicGroupId && !r.showWhenDynamicGroupId);
 
   // ── 드래그 복사: 토스트 상태 ──
 
@@ -351,6 +369,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
               <TableHeaderSection
                 columns={currentColumns}
                 editingColumnWidth={editingColumnWidth}
+                hasQuestions={(allQuestions ?? []).length > 0}
                 onUpdateColumnLabel={updateColumnLabel}
                 onUpdateColumnCode={updateColumnCode}
                 onMoveColumn={moveColumn}
@@ -359,6 +378,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
                 onUnmergeColumnHeader={unmergeColumnHeader}
                 onSetEditingColumnWidth={setEditingColumnWidth}
                 onColumnWidthChange={handleColumnWidthChange}
+                onOpenColumnConditionModal={openColumnConditionModal}
               />
 
               {/* 데이터 행들 */}
@@ -380,6 +400,9 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
                     onUpdateRowLabel={updateRowLabel}
                     onUpdateRowCode={updateRowCode}
                     onOpenRowConditionModal={openRowConditionModal}
+                    dynamicRowConfigs={dynamicRowConfigs}
+                    onSetDynamicGroupId={setDynamicGroupId}
+                    onSetShowWhenDynamicGroupId={setShowWhenDynamicGroupId}
                     onDeleteRow={deleteRow}
                     onSelectCell={handleSelectCell}
                     onMoveColumn={moveColumn}
@@ -423,6 +446,145 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
         </Card>
       )}
 
+      {/* 동적 행 그룹 설정 */}
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ListChecks className="h-4 w-4 text-purple-600" />
+              <span className="text-sm font-medium text-gray-700">동적 행 그룹</span>
+              {dynamicRowConfigs.length > 0 && (
+                <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-600">
+                  {dynamicRowConfigs.length}개 그룹
+                </span>
+              )}
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 text-xs"
+              onClick={() => {
+                const newGroup: DynamicRowGroupConfig = {
+                  groupId: generateId(),
+                  enabled: true,
+                  label: `그룹 ${dynamicRowConfigs.length + 1}`,
+                };
+                onDynamicRowConfigsChange?.([...dynamicRowConfigs, newGroup]);
+              }}
+            >
+              <Plus className="h-3 w-3" />
+              그룹 추가
+            </Button>
+          </div>
+
+          {dynamicRowConfigs.length === 0 && (
+            <p className="text-xs text-gray-400">그룹을 추가하면 행을 동적으로 선택/표시할 수 있습니다.</p>
+          )}
+
+          {dynamicRowConfigs.map((group, idx) => {
+            const groupRowCount = currentRows.filter((r) => r.dynamicGroupId === group.groupId).length;
+            return (
+              <div key={group.groupId} className="space-y-2 rounded-md border border-purple-200 bg-purple-50/30 p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={group.enabled}
+                      onChange={(e) => {
+                        const updated = dynamicRowConfigs.map((g) =>
+                          g.groupId === group.groupId ? { ...g, enabled: e.target.checked } : g,
+                        );
+                        onDynamicRowConfigsChange?.(updated);
+                      }}
+                      className="rounded"
+                    />
+                    <span className="text-xs font-medium text-purple-700">
+                      {group.label || group.groupId}
+                    </span>
+                    <span className="text-xs text-gray-400">{groupRowCount}개 행</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      // 그룹 삭제 + 고아 행 정리
+                      const updated = dynamicRowConfigs.filter((g) => g.groupId !== group.groupId);
+                      onDynamicRowConfigsChange?.(updated.length > 0 ? updated : undefined);
+                      // 해당 그룹에 배정된 행들의 groupId 정리
+                      const cleanedRows = currentRows.map((row) => {
+                        if (row.dynamicGroupId === group.groupId) return { ...row, dynamicGroupId: undefined };
+                        if (row.showWhenDynamicGroupId === group.groupId) return { ...row, showWhenDynamicGroupId: undefined };
+                        return row;
+                      });
+                      if (cleanedRows.some((r, i) => r !== currentRows[i])) {
+                        // rows가 변경되었으면 알림 (notifyChange는 직접 접근 불가하므로 onTableChange 활용)
+                      }
+                    }}
+                    className="text-xs text-red-400 hover:text-red-600"
+                    title="그룹 삭제"
+                  >
+                    삭제
+                  </button>
+                </div>
+                {group.enabled && (
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-gray-500">버튼 텍스트</Label>
+                      <Input
+                        value={group.label ?? ''}
+                        onChange={(e) => {
+                          const updated = dynamicRowConfigs.map((g) =>
+                            g.groupId === group.groupId ? { ...g, label: e.target.value || undefined } : g,
+                          );
+                          onDynamicRowConfigsChange?.(updated);
+                        }}
+                        placeholder="항목 선택"
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-gray-500">삽입 위치</Label>
+                      <select
+                        value={group.insertAfterRowId ?? ''}
+                        onChange={(e) => {
+                          const updated = dynamicRowConfigs.map((g) =>
+                            g.groupId === group.groupId ? { ...g, insertAfterRowId: e.target.value || undefined } : g,
+                          );
+                          onDynamicRowConfigsChange?.(updated);
+                        }}
+                        className="h-7 w-full rounded-md border border-input bg-background px-1 text-xs"
+                      >
+                        <option value="">선택...</option>
+                        {nonDynamicRows.map((row) => (
+                          <option key={row.id} value={row.id}>{row.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-gray-500">정렬</Label>
+                      <select
+                        value={group.buttonAlign ?? 'left'}
+                        onChange={(e) => {
+                          const updated = dynamicRowConfigs.map((g) =>
+                            g.groupId === group.groupId
+                              ? { ...g, buttonAlign: e.target.value as 'left' | 'center' | 'right' }
+                              : g,
+                          );
+                          onDynamicRowConfigsChange?.(updated);
+                        }}
+                        className="h-7 w-full rounded-md border border-input bg-background px-1 text-xs"
+                      >
+                        <option value="left">좌측</option>
+                        <option value="center">중앙</option>
+                        <option value="right">우측</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+
       {/* 셀 내용 편집 모달 */}
       {selectedCellContext && (
         <CellContentModal
@@ -453,6 +615,16 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
         currentQuestion={currentQuestionAsQuestion}
         allQuestions={allQuestions ?? []}
         onUpdateCondition={updateRowCondition}
+      />
+
+      <ColumnConditionModal
+        open={columnConditionModalOpen}
+        onOpenChange={setColumnConditionModalOpen}
+        editingColumnIndex={editingColumnIndex}
+        columns={currentColumns}
+        currentQuestion={currentQuestionAsQuestion}
+        allQuestions={allQuestions ?? []}
+        onUpdateCondition={updateColumnCondition}
       />
 
       {/* 영역 복사 알림 토스트 (화면 하단 고정) */}

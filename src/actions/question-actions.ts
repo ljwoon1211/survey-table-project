@@ -103,6 +103,7 @@ export async function updateQuestion(
     requiresAcknowledgment: boolean;
     placeholder: string;
     tableValidationRules: QuestionType['tableValidationRules'];
+    dynamicRowConfigs: QuestionType['dynamicRowConfigs'];
     displayCondition: QuestionType['displayCondition'];
   }>,
 ) {

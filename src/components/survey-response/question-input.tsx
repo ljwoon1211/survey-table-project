@@ -140,6 +140,7 @@ export function QuestionInput({
           className="border-0 shadow-none"
           allResponses={allResponses}
           allQuestions={allQuestions}
+          dynamicRowConfigs={question.dynamicRowConfigs}
         />
       ) : (
         <div className="py-4 text-center text-gray-500">테이블이 구성되지 않았습니다.</div>

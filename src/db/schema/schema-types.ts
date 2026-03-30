@@ -171,6 +171,14 @@ export interface QuestionCondition {
   enabled?: boolean;
 }
 
+export interface DynamicRowGroupConfig {
+  groupId: string;
+  enabled: boolean;
+  label?: string;
+  insertAfterRowId?: string;
+  buttonAlign?: 'left' | 'center' | 'right';
+}
+
 export interface QuestionConditionGroup {
   conditions: QuestionCondition[];
   logicType: 'AND' | 'OR' | 'NOT';

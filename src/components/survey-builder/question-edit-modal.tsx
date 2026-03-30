@@ -98,6 +98,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         requiresAcknowledgment: (question as any).requiresAcknowledgment || false,
         placeholder: question.placeholder || '',
         tableValidationRules: (question as any).tableValidationRules || [],
+        dynamicRowConfigs: (question as any).dynamicRowConfigs || undefined,
         displayCondition: question.displayCondition,
         spssVarType: (question as any).spssVarType,
         spssMeasure: (question as any).spssMeasure,
@@ -1264,6 +1265,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                     allQuestions={currentSurvey.questions}
                     questionCode={formData.questionCode}
                     questionTitle={formData.title}
+                    dynamicRowConfigs={formData.dynamicRowConfigs}
                     onTableChange={(data) => {
                       setFormData((prev) => ({
                         ...prev,
@@ -1271,6 +1273,12 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                         tableColumns: data.tableColumns,
                         tableRowsData: data.tableRowsData,
                         tableHeaderGrid: data.tableHeaderGrid,
+                      }));
+                    }}
+                    onDynamicRowConfigsChange={(configs) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        dynamicRowConfigs: configs,
                       }));
                     }}
                   />

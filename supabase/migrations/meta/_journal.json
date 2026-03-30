@@ -43,6 +43,13 @@
       "when": 1774340797390,
       "tag": "0005_furry_rockslide",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1774862477672,
+      "tag": "0006_broken_robbie_robertson",
+      "breakpoints": true
     }
   ]
 }

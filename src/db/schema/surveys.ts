@@ -2,6 +2,7 @@ import { relations } from 'drizzle-orm';
 import { boolean, integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 import type {
+  DynamicRowGroupConfig,
   HeaderCell,
   QuestionConditionGroup,
   QuestionData,
@@ -111,6 +112,7 @@ export const questions = pgTable('questions', {
 
   // 검증 규칙 및 조건부 표시
   tableValidationRules: jsonb('table_validation_rules').$type<TableValidationRule[]>(),
+  dynamicRowConfigs: jsonb('dynamic_row_config').$type<DynamicRowGroupConfig[]>(),
   displayCondition: jsonb('display_condition').$type<QuestionConditionGroup>(),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

@@ -2,14 +2,20 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { CheckCircle2, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, FileText, ListChecks } from 'lucide-react';
 
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTestResponseStore } from '@/stores/test-response-store';
-import { HeaderCell, Question, TableColumn, TableRow } from '@/types/survey';
-import { shouldDisplayRow } from '@/utils/branch-logic';
-import { recalculateRowspansForVisibleRows } from '@/utils/table-merge-helpers';
+import { DynamicRowGroupConfig, HeaderCell, Question, TableColumn, TableRow } from '@/types/survey';
+import { shouldDisplayColumn, shouldDisplayRow } from '@/utils/branch-logic';
+import {
+  recalculateColspansForVisibleColumns,
+  recalculateRowspansForVisibleRows,
+} from '@/utils/table-merge-helpers';
 
+import { DynamicRowSelectorModal } from './dynamic-row-selector-modal';
 import { InteractiveTableCell } from './interactive-table-cell';
 
 interface InteractiveTableResponseProps {
@@ -24,6 +30,7 @@ interface InteractiveTableResponseProps {
   isTestMode?: boolean;
   allResponses?: Record<string, unknown>;
   allQuestions?: Question[];
+  dynamicRowConfigs?: DynamicRowGroupConfig[];
 }
 
 export function InteractiveTableResponse({
@@ -38,6 +45,7 @@ export function InteractiveTableResponse({
   isTestMode = false,
   allResponses,
   allQuestions,
+  dynamicRowConfigs,
 }: InteractiveTableResponseProps) {
   // Zustand 선택적 구독으로 변경
   // testResponses 전체를 구독하여 testResponses[questionId] 내부의 속성 변경도 감지
@@ -46,6 +54,7 @@ export function InteractiveTableResponse({
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [showLeftShadow, setShowLeftShadow] = useState(false);
   const [showRightShadow, setShowRightShadow] = useState(false);
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
 
   // 현재 질문의 응답 데이터 가져오기
   // 테스트 모드일 때는 testResponses 전체를 의존성으로 사용하여 testResponses[questionId] 내부 변경도 감지
@@ -59,23 +68,93 @@ export function InteractiveTableResponse({
     return (value || {}) as Record<string, any>;
   }, [isTestMode, questionId, testResponses, value]);
 
-  // displayCondition 기반 가시 행 필터링 + rowspan 재계산
-  const visibleRows = useMemo(() => {
-    if (!allResponses || !allQuestions || rows.length === 0) return rows;
+  // displayCondition 기반 가시 열 필터링 + colspan 재계산 (열 → 행 순서)
+  const { visibleColumns, columnFilteredRows, visibleHeaderGrid } = useMemo(() => {
+    if (!allResponses || !allQuestions || columns.length === 0) {
+      return { visibleColumns: columns, columnFilteredRows: rows, visibleHeaderGrid: tableHeaderGrid };
+    }
 
-    // displayCondition이 있는 행이 하나도 없으면 원본 반환
-    const hasConditions = rows.some((row) => row.displayCondition);
-    if (!hasConditions) return rows;
+    const hasColumnConditions = columns.some((col) => col.displayCondition);
+    if (!hasColumnConditions) {
+      return { visibleColumns: columns, columnFilteredRows: rows, visibleHeaderGrid: tableHeaderGrid };
+    }
 
-    const visibleRowIds = new Set<string>();
-    for (const row of rows) {
-      if (shouldDisplayRow(row, allResponses, allQuestions)) {
-        visibleRowIds.add(row.id);
+    const visibleColumnIds = new Set<string>();
+    for (const col of columns) {
+      if (shouldDisplayColumn(col, allResponses, allQuestions)) {
+        visibleColumnIds.add(col.id);
       }
     }
 
-    return recalculateRowspansForVisibleRows(rows, visibleRowIds);
-  }, [rows, allResponses, allQuestions]);
+    const result = recalculateColspansForVisibleColumns(columns, rows, visibleColumnIds, tableHeaderGrid);
+    return {
+      visibleColumns: result.columns,
+      columnFilteredRows: result.rows,
+      visibleHeaderGrid: result.headerGrid,
+    };
+  }, [columns, rows, tableHeaderGrid, allResponses, allQuestions]);
+
+  // 동적 행 관련 데이터 추출 (다중 그룹)
+  const groupConfigMap = useMemo(() => {
+    if (!dynamicRowConfigs || !Array.isArray(dynamicRowConfigs)) return new Map<string, DynamicRowGroupConfig>();
+    return new Map(dynamicRowConfigs.filter((g) => g.enabled).map((g) => [g.groupId, g]));
+  }, [dynamicRowConfigs]);
+
+  const dynamicRows = useMemo(
+    () => rows.filter((r) => r.dynamicGroupId && groupConfigMap.has(r.dynamicGroupId)),
+    [rows, groupConfigMap],
+  );
+  const hasDynamicRows = dynamicRows.length > 0;
+  const selectedRowIds = useMemo(
+    () => (currentResponse?.__selectedRowIds as string[]) || [],
+    [currentResponse],
+  );
+
+  // displayCondition 기반 가시 행 필터링 + 동적 행 필터링 + rowspan 재계산
+  const visibleRows = useMemo(() => {
+    if (columnFilteredRows.length === 0) return columnFilteredRows;
+
+    let filtered = columnFilteredRows;
+
+    // 1. displayCondition 필터링
+    if (allResponses && allQuestions) {
+      const hasConditions = filtered.some((row) => row.displayCondition);
+      if (hasConditions) {
+        const conditionVisibleIds = new Set<string>();
+        for (const row of filtered) {
+          if (shouldDisplayRow(row, allResponses, allQuestions)) {
+            conditionVisibleIds.add(row.id);
+          }
+        }
+        filtered = filtered.filter((row) => conditionVisibleIds.has(row.id));
+      }
+    }
+
+    // 2. 동적 행 필터링 (다중 그룹)
+    if (hasDynamicRows) {
+      const selectedSet = new Set(selectedRowIds);
+      // 각 그룹별 선택 여부
+      const groupsWithSelections = new Set<string>();
+      for (const row of filtered) {
+        if (row.dynamicGroupId && selectedSet.has(row.id)) {
+          groupsWithSelections.add(row.dynamicGroupId);
+        }
+      }
+
+      filtered = filtered.filter((row) => {
+        if (row.dynamicGroupId && groupConfigMap.has(row.dynamicGroupId)) {
+          return selectedSet.has(row.id);
+        }
+        if (row.showWhenDynamicGroupId && groupConfigMap.has(row.showWhenDynamicGroupId)) {
+          return groupsWithSelections.has(row.showWhenDynamicGroupId);
+        }
+        return true;
+      });
+    }
+
+    const visibleRowIds = new Set(filtered.map((r) => r.id));
+    return recalculateRowspansForVisibleRows(columnFilteredRows, visibleRowIds);
+  }, [columnFilteredRows, allResponses, allQuestions, hasDynamicRows, selectedRowIds, groupConfigMap]);
 
   // 스크롤 인디케이터 업데이트
   useEffect(() => {
@@ -107,7 +186,7 @@ export function InteractiveTableResponse({
         clearTimeout(timeoutId);
       };
     }
-  }, [columns, rows]);
+  }, [visibleColumns, visibleRows]);
 
   // 행이 완료되었는지 확인
   const isRowCompleted = (row: TableRow) => {
@@ -158,6 +237,144 @@ export function InteractiveTableResponse({
     [isTestMode, questionId, updateTestResponse, onChange, value],
   );
 
+  // 동적 행 선택 확인 핸들러 (그룹별 머지)
+  const handleDynamicRowSelect = useCallback(
+    (rowIdsFromModal: string[]) => {
+      // 현재 그룹의 행 ID만 교체, 다른 그룹 유지
+      const thisGroupRowIds = new Set(
+        dynamicRows.filter((r) => r.dynamicGroupId === activeGroupId).map((r) => r.id),
+      );
+      const otherSelections = selectedRowIds.filter((id) => !thisGroupRowIds.has(id));
+      const merged = [...otherSelections, ...rowIdsFromModal];
+
+      if (isTestMode) {
+        const currentState = useTestResponseStore.getState();
+        const latestResponse =
+          typeof currentState.testResponses[questionId] === 'object'
+            ? currentState.testResponses[questionId]
+            : {};
+        updateTestResponse(questionId, {
+          ...(latestResponse as Record<string, any>),
+          __selectedRowIds: merged,
+        });
+      } else if (onChange) {
+        onChange({
+          ...((value || {}) as Record<string, any>),
+          __selectedRowIds: merged,
+        });
+      }
+    },
+    [isTestMode, questionId, updateTestResponse, onChange, value, dynamicRows, activeGroupId, selectedRowIds],
+  );
+
+  // 그룹별 셀렉터 앵커 위치 (Map<groupId, anchorRowId>)
+  const selectorAnchors = useMemo(() => {
+    if (!hasDynamicRows) return new Map<string, string>();
+    const anchors = new Map<string, string>();
+
+    for (const [groupId, config] of groupConfigMap) {
+      // 1. 설정된 앵커가 visibleRows에 있으면 사용
+      if (config.insertAfterRowId && visibleRows.some((r) => r.id === config.insertAfterRowId)) {
+        anchors.set(groupId, config.insertAfterRowId);
+        continue;
+      }
+      // 2. 이 그룹의 동적 행 직전의 visible 행
+      const groupRows = visibleRows.filter((r) => r.dynamicGroupId === groupId);
+      if (groupRows.length > 0) {
+        const firstIdx = visibleRows.indexOf(groupRows[0]);
+        if (firstIdx > 0) { anchors.set(groupId, visibleRows[firstIdx - 1].id); continue; }
+      }
+      // 3. 폴백: 원본 rows에서 insertAfterRowId의 위치를 기반으로 가장 가까운 visible 행 찾기
+      if (config.insertAfterRowId) {
+        const origIdx = rows.findIndex((r) => r.id === config.insertAfterRowId);
+        if (origIdx !== -1) {
+          // origIdx 이하의 행 중 visibleRows에 있는 마지막 행
+          for (let i = origIdx; i >= 0; i--) {
+            const found = visibleRows.find((vr) => vr.id === rows[i].id);
+            if (found) { anchors.set(groupId, found.id); break; }
+          }
+        }
+      }
+      // 4. 최종 폴백: visibleRows의 마지막 비동적 행
+      if (!anchors.has(groupId) && visibleRows.length > 0) {
+        const lastNonDynamic = [...visibleRows].reverse().find(
+          (r) => !r.dynamicGroupId && !r.showWhenDynamicGroupId,
+        );
+        if (lastNonDynamic) anchors.set(groupId, lastNonDynamic.id);
+      }
+    }
+    return anchors;
+  }, [hasDynamicRows, groupConfigMap, visibleRows, rows]);
+
+  // 여러 셀렉터 행 삽입 시 rowspan 보정
+  const displayRows = useMemo(() => {
+    if (selectorAnchors.size === 0) return visibleRows;
+
+    // 앵커 인덱스 수집 (중복 제거, 정렬)
+    const anchorIndices: number[] = [];
+    for (const [, anchorId] of selectorAnchors) {
+      const idx = visibleRows.findIndex((r) => r.id === anchorId);
+      if (idx !== -1) anchorIndices.push(idx);
+    }
+    const uniqueAnchors = [...new Set(anchorIndices)].sort((a, b) => a - b);
+    if (uniqueAnchors.length === 0) return visibleRows;
+
+    return visibleRows.map((row, rowIdx) => {
+      const needsAdjust = row.cells.some((cell) => {
+        if (cell.isHidden) return false;
+        const span = cell.rowspan || 1;
+        if (span <= 1) return false;
+        return uniqueAnchors.some((ai) => ai >= rowIdx && ai < rowIdx + span - 1);
+      });
+      if (!needsAdjust) return row;
+      return {
+        ...row,
+        cells: row.cells.map((cell) => {
+          if (cell.isHidden) return cell;
+          const span = cell.rowspan || 1;
+          if (span <= 1) return cell;
+          const spanEnd = rowIdx + span;
+          const insertedCount = uniqueAnchors.filter((ai) => ai >= rowIdx && ai < spanEnd - 1).length;
+          if (insertedCount === 0) return cell;
+          return { ...cell, rowspan: span + insertedCount };
+        }),
+      };
+    });
+  }, [visibleRows, selectorAnchors]);
+
+  // 그룹별 셀렉터 행 렌더링
+  const renderSelectorRow = (groupId: string) => {
+    const config = groupConfigMap.get(groupId);
+    if (!config) return null;
+    const groupSelectedCount = selectedRowIds.filter((id) =>
+      rows.find((r) => r.id === id)?.dynamicGroupId === groupId,
+    ).length;
+    return (
+      <tr key={`selector-${groupId}`} className="bg-muted/30 border-b border-gray-300">
+        <td colSpan={visibleColumns.length} className={`border-r border-gray-300 p-2 ${
+          config.buttonAlign === 'center' ? 'text-center'
+            : config.buttonAlign === 'right' ? 'text-right'
+            : 'text-left'
+        }`}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => setActiveGroupId(groupId)}
+          >
+            <ListChecks className="h-4 w-4" />
+            {config.label || '항목 선택'}
+            {groupSelectedCount > 0 && (
+              <Badge variant="secondary" className="ml-1">
+                {groupSelectedCount}개 선택
+              </Badge>
+            )}
+          </Button>
+        </td>
+      </tr>
+    );
+  };
+
   // 테이블이 비어있는 경우
   if (columns.length === 0 || rows.length === 0) {
     return (
@@ -176,7 +393,7 @@ export function InteractiveTableResponse({
   const renderMobileCardView = () => {
     return (
       <div className="space-y-6">
-        {visibleRows.map((row, rowIndex) => {
+        {displayRows.map((row, rowIndex) => {
           const completed = isRowCompleted(row);
           // 첫 번째 셀은 보통 행의 제목(Row Header) 역할을 합니다.
           const firstCell = row.cells[0];
@@ -211,7 +428,7 @@ export function InteractiveTableResponse({
                 {row.cells.map((cell, index) => {
                   if (cell.isHidden) return null;
                   // 인덱스를 사용하여 컬럼 라벨 가져옴
-                  const columnLabel = columns[index]?.label || `질문 ${index + 1}`;
+                  const columnLabel = visibleColumns[index]?.label || `질문 ${index + 1}`;
 
                   return (
                     <div
@@ -274,7 +491,7 @@ export function InteractiveTableResponse({
   // 데스크톱 테이블 뷰 렌더링 (모바일에서도 사용)
   const renderTableView = () => {
     // 전체 테이블 너비 계산 (각 열의 너비 합계)
-    const totalWidth = columns.reduce((acc, col) => acc + (col.width || 150), 0);
+    const totalWidth = visibleColumns.reduce((acc, col) => acc + (col.width || 150), 0);
 
     return (
       <div className="group relative">
@@ -331,16 +548,16 @@ export function InteractiveTableResponse({
           >
             {/* 열 너비 정의 */}
             <colgroup>
-              {columns.map((column, index) => (
+              {visibleColumns.map((column, index) => (
                 <col key={`col-${index}`} style={{ width: `${column.width || 150}px` }} />
               ))}
             </colgroup>
 
             {/* 헤더 */}
             <thead>
-              {tableHeaderGrid && tableHeaderGrid.length > 0 ? (
+              {visibleHeaderGrid && visibleHeaderGrid.length > 0 ? (
                 // 다단계 헤더
-                tableHeaderGrid.map((headerRow, rowIdx) => (
+                visibleHeaderGrid.map((headerRow, rowIdx) => (
                   <tr key={`header-row-${rowIdx}`} className="bg-gray-50">
                     {headerRow.map((cell) => (
                       <th
@@ -357,11 +574,11 @@ export function InteractiveTableResponse({
               ) : (
                 // 기존 단일 행 헤더 (폴백)
                 <tr className="bg-gray-50">
-                  {columns.map((column, colIndex) => {
+                  {visibleColumns.map((column, colIndex) => {
                     if (column.isHeaderHidden) return null;
                     const headerColspan = column.colspan || 1;
                     const mergedWidth = headerColspan > 1
-                      ? columns.slice(colIndex, colIndex + headerColspan).reduce((sum, col) => sum + (col.width || 150), 0)
+                      ? visibleColumns.slice(colIndex, colIndex + headerColspan).reduce((sum, col) => sum + (col.width || 150), 0)
                       : (column.width || 150);
                     return (
                       <th
@@ -380,11 +597,11 @@ export function InteractiveTableResponse({
 
             {/* 본문 */}
             <tbody>
-              {visibleRows.map((row, rowIndex) => {
+              {displayRows.map((row, rowIndex) => {
                 const completed = isRowCompleted(row);
                 return (
+                  <React.Fragment key={row.id}>
                   <tr
-                    key={row.id}
                     className={`transition-colors hover:bg-blue-50/30 ${
                       completed ? 'bg-green-50/30' : 'bg-white'
                     }`}
@@ -443,6 +660,10 @@ export function InteractiveTableResponse({
                       );
                     })}
                   </tr>
+                  {Array.from(selectorAnchors.entries())
+                    .filter(([, anchorId]) => anchorId === row.id)
+                    .map(([groupId]) => renderSelectorRow(groupId))}
+                  </React.Fragment>
                 );
               })}
             </tbody>
@@ -453,25 +674,38 @@ export function InteractiveTableResponse({
   };
 
   return (
-    <Card className={className}>
-      {tableTitle && (
-        <CardHeader>
-          <CardTitle className="text-lg font-medium">{tableTitle}</CardTitle>
-        </CardHeader>
-      )}
-      <CardContent className="overflow-hidden p-0 sm:p-6">
-        {/* CSS 기반 반응형 처리 -> 모든 화면에서 테이블 뷰 사용 */}
-        <div className="w-full">{renderTableView()}</div>
-
-        {isTestMode && (
-          <div className="mx-4 mt-4 mb-4 rounded-lg bg-blue-50 p-3 sm:mx-0 sm:mb-0">
-            <div className="text-sm text-blue-700">
-              <span className="font-medium">테스트 모드:</span> 위 테이블에서 실제로 응답해보세요.
-              응답 데이터는 저장되지 않습니다.
-            </div>
-          </div>
+    <>
+      <Card className={className}>
+        {tableTitle && (
+          <CardHeader>
+            <CardTitle className="text-lg font-medium">{tableTitle}</CardTitle>
+          </CardHeader>
         )}
-      </CardContent>
-    </Card>
+        <CardContent className="overflow-hidden p-0 sm:p-6">
+          {/* CSS 기반 반응형 처리 -> 모든 화면에서 테이블 뷰 사용 */}
+          <div className="w-full">{renderTableView()}</div>
+
+          {isTestMode && (
+            <div className="mx-4 mt-4 mb-4 rounded-lg bg-blue-50 p-3 sm:mx-0 sm:mb-0">
+              <div className="text-sm text-blue-700">
+                <span className="font-medium">테스트 모드:</span> 위 테이블에서 실제로 응답해보세요.
+                응답 데이터는 저장되지 않습니다.
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {activeGroupId && (
+        <DynamicRowSelectorModal
+          open={!!activeGroupId}
+          onOpenChange={(open) => { if (!open) setActiveGroupId(null); }}
+          dynamicRows={dynamicRows.filter((r) => r.dynamicGroupId === activeGroupId)}
+          selectedRowIds={selectedRowIds}
+          label={groupConfigMap.get(activeGroupId)?.label}
+          onConfirm={handleDynamicRowSelect}
+        />
+      )}
+    </>
   );
 }

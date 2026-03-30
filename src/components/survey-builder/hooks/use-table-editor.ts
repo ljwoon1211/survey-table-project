@@ -161,6 +161,10 @@ export function useTableEditor({
   const [rowConditionModalOpen, setRowConditionModalOpen] = useState(false);
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
 
+  // 열 조건부 표시 모달
+  const [columnConditionModalOpen, setColumnConditionModalOpen] = useState(false);
+  const [editingColumnIndex, setEditingColumnIndex] = useState<number | null>(null);
+
   // ── Refs (stale closure 방지 + useCallback 안정화) ──
 
   const currentTitleRef = useRef(currentTitle);
@@ -623,6 +627,52 @@ export function useTableEditor({
     [notifyChange],
   );
 
+  // ── 동적 행 설정 ──
+
+  const setDynamicGroupId = useCallback(
+    (rowId: string, groupId: string | undefined) => {
+      const updatedRows = currentRowsRef.current.map((row) =>
+        row.id === rowId
+          ? { ...row, dynamicGroupId: groupId, showWhenDynamicGroupId: undefined }
+          : row,
+      );
+      setCurrentRows(updatedRows);
+      notifyChange(currentTitleRef.current, currentColumnsRef.current, updatedRows);
+    },
+    [notifyChange],
+  );
+
+  const setShowWhenDynamicGroupId = useCallback(
+    (rowId: string, groupId: string | undefined) => {
+      const updatedRows = currentRowsRef.current.map((row) =>
+        row.id === rowId
+          ? { ...row, showWhenDynamicGroupId: groupId, dynamicGroupId: undefined }
+          : row,
+      );
+      setCurrentRows(updatedRows);
+      notifyChange(currentTitleRef.current, currentColumnsRef.current, updatedRows);
+    },
+    [notifyChange],
+  );
+
+  // ── 열 조건부 표시 ──
+
+  const openColumnConditionModal = useCallback((columnIndex: number) => {
+    setEditingColumnIndex(columnIndex);
+    setColumnConditionModalOpen(true);
+  }, []);
+
+  const updateColumnCondition = useCallback(
+    (columnIndex: number, conditionGroup: QuestionConditionGroup | undefined) => {
+      const updatedColumns = currentColumnsRef.current.map((col, index) =>
+        index === columnIndex ? { ...col, displayCondition: conditionGroup } : col,
+      );
+      setCurrentColumns(updatedColumns);
+      notifyChange(currentTitleRef.current, updatedColumns, currentRowsRef.current);
+    },
+    [notifyChange],
+  );
+
   const currentQuestionAsQuestion: Question = useMemo(
     () => ({
       id: currentQuestionId,
@@ -960,6 +1010,8 @@ export function useTableEditor({
       currentHeaderGrid,
       rowConditionModalOpen,
       editingRowIndex,
+      columnConditionModalOpen,
+      editingColumnIndex,
       tableRef,
       selectedCellContext,
       currentQuestionAsQuestion,
@@ -1002,6 +1054,13 @@ export function useTableEditor({
       openRowConditionModal,
       updateRowCondition,
       setRowConditionModalOpen,
+      // 동적 행 설정
+      setDynamicGroupId,
+      setShowWhenDynamicGroupId,
+      // 열 조건부 표시
+      openColumnConditionModal,
+      updateColumnCondition,
+      setColumnConditionModalOpen,
       // 다단계 헤더
       toggleMultiRowHeader,
       updateHeaderGrid,

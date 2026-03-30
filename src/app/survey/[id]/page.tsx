@@ -344,16 +344,44 @@ export default function SurveyResponsePage() {
         // 1. 노출된 질문 ID 수집
         const exposedQuestionIds = visibleQuestions.map((q) => q.id);
 
-        // 2. 노출된 테이블 행 ID 수집
+        // 2. 노출된 테이블 행 ID 수집 (displayCondition + 동적 행 선택 반영)
         const exposedRowIds = visibleQuestions
           .filter((q) => q.type === 'table' && q.tableRowsData)
-          .flatMap((q) =>
-            q
-              .tableRowsData!.filter((row) =>
-                shouldDisplayRow(row, responses as Record<string, unknown>, questions),
-              )
-              .map((row) => row.id),
-          );
+          .flatMap((q) => {
+            const qResponse = (responses as Record<string, any>)?.[q.id];
+            const selectedDynamicIds = new Set<string>(
+              (qResponse?.__selectedRowIds as string[]) ?? [],
+            );
+            const enabledGroupIds = new Set(
+              (q.dynamicRowConfigs ?? []).filter((g) => g.enabled).map((g) => g.groupId),
+            );
+            const hasDynamic = enabledGroupIds.size > 0 && q.tableRowsData!.some((r) => r.dynamicGroupId);
+
+            // 그룹별 선택 여부
+            const groupsWithSelections = new Set<string>();
+            if (hasDynamic) {
+              for (const row of q.tableRowsData!) {
+                if (row.dynamicGroupId && selectedDynamicIds.has(row.id)) {
+                  groupsWithSelections.add(row.dynamicGroupId);
+                }
+              }
+            }
+
+            return q.tableRowsData!
+              .filter((row) => {
+                if (!shouldDisplayRow(row, responses as Record<string, unknown>, questions)) return false;
+                if (hasDynamic) {
+                  if (row.dynamicGroupId && enabledGroupIds.has(row.dynamicGroupId)) {
+                    return selectedDynamicIds.has(row.id);
+                  }
+                  if (row.showWhenDynamicGroupId && enabledGroupIds.has(row.showWhenDynamicGroupId)) {
+                    return groupsWithSelections.has(row.showWhenDynamicGroupId);
+                  }
+                }
+                return true;
+              })
+              .map((row) => row.id);
+          });
 
         console.log('Impression Logging:', { exposedQuestionIds, exposedRowIds });
 
