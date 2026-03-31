@@ -26,7 +26,9 @@ import { generateId } from '@/lib/utils';
 import { buildSurveySnapshot } from '@/lib/versioning/snapshot-builder';
 import type {
   Question,
+  QuestionGroup,
   Survey as SurveyType,
+  SurveySettings,
 } from '@/types/survey';
 import { stripTableRowsData } from '@/utils/table-cell-optimizer';
 
@@ -245,7 +247,236 @@ export async function duplicateSurvey(surveyId: string) {
 }
 
 // ========================
-// 전체 설문 저장 (설문 + 그룹 + 질문 일괄)
+// Diff 기반 설문 저장 (변경분만 전송)
+// ========================
+
+export interface SurveyDiffPayload {
+  surveyId: string;
+  metadata?: {
+    title: string;
+    description?: string;
+    slug?: string;
+    privateToken?: string;
+    settings: SurveySettings;
+    thankYouMessage?: string;
+  };
+  groups?: QuestionGroup[];
+  questionChanges?: {
+    upserted: Question[];     // 추가 + 수정된 질문 (전체 객체)
+    deleted: string[];        // 삭제된 질문 ID
+    reorderedIds?: string[];  // 전체 질문 ID 순서 (순서 변경 시에만)
+  };
+}
+
+export async function saveSurveyDiff(payload: SurveyDiffPayload) {
+  await requireAuth();
+
+  const { surveyId, metadata, groups: incomingGroups, questionChanges } = payload;
+
+  return await db.transaction(async (tx) => {
+    // 1. 메타데이터 업데이트
+    if (metadata) {
+      await tx
+        .update(surveys)
+        .set({
+          title: metadata.title,
+          description: metadata.description,
+          slug: metadata.slug,
+          isPublic: metadata.settings.isPublic,
+          allowMultipleResponses: metadata.settings.allowMultipleResponses,
+          showProgressBar: metadata.settings.showProgressBar,
+          shuffleQuestions: metadata.settings.shuffleQuestions,
+          requireLogin: metadata.settings.requireLogin,
+          endDate: metadata.settings.endDate ? new Date(metadata.settings.endDate) : null,
+          maxResponses: metadata.settings.maxResponses ?? null,
+          thankYouMessage: metadata.settings.thankYouMessage,
+          updatedAt: new Date(),
+        })
+        .where(eq(surveys.id, surveyId));
+    }
+
+    // 2. 그룹 처리 (displayCondition 보존 포함)
+    if (incomingGroups) {
+      // displayCondition 보존 로직
+      const existingGroups = await tx.query.questionGroups.findMany({
+        where: eq(questionGroups.surveyId, surveyId),
+      });
+
+      const preservedGroups = incomingGroups.map((group) => {
+        if (group.displayCondition) return group;
+        const existing = existingGroups.find((g) => g.id === group.id);
+        if (existing?.displayCondition) {
+          return {
+            ...group,
+            displayCondition: existing.displayCondition as NonNullable<
+              SurveyType['groups']
+            >[0]['displayCondition'],
+          };
+        }
+        return group;
+      });
+
+      // 삭제된 그룹 처리
+      const newGroupIds = new Set(preservedGroups.map((g) => g.id));
+      const groupIdsToRemove = existingGroups
+        .filter((g) => !newGroupIds.has(g.id))
+        .map((g) => g.id);
+
+      if (groupIdsToRemove.length > 0) {
+        await tx.delete(questionGroups).where(inArray(questionGroups.id, groupIdsToRemove));
+      }
+
+      if (preservedGroups.length > 0) {
+        const groupValues = preservedGroups.map((group) => ({
+          id: group.id,
+          surveyId,
+          name: group.name,
+          description: group.description,
+          order: group.order,
+          parentGroupId: group.parentGroupId || null,
+          color: group.color,
+          collapsed: group.collapsed,
+          displayCondition: group.displayCondition as NewQuestionGroup['displayCondition'],
+          updatedAt: new Date(),
+        }));
+
+        await tx
+          .insert(questionGroups)
+          .values(groupValues)
+          .onConflictDoUpdate({
+            target: questionGroups.id,
+            set: {
+              name: sql`excluded.name`,
+              description: sql`excluded.description`,
+              order: sql`excluded.order`,
+              parentGroupId: sql`excluded.parent_group_id`,
+              color: sql`excluded.color`,
+              collapsed: sql`excluded.collapsed`,
+              displayCondition: sql`excluded.display_condition`,
+              updatedAt: sql`excluded.updated_at`,
+            },
+          });
+      }
+    }
+
+    // 3. 질문 변경분 처리
+    if (questionChanges) {
+      // 3a. 삭제
+      if (questionChanges.deleted.length > 0) {
+        const questionsToRemove = await tx.query.questions.findMany({
+          where: inArray(questions.id, questionChanges.deleted),
+        });
+        const imagesToDelete = extractImageUrlsFromQuestions(questionsToRemove as Question[]);
+        if (imagesToDelete.length > 0) {
+          deleteImagesFromR2Server(imagesToDelete).catch(console.error);
+        }
+        await tx.delete(questions).where(inArray(questions.id, questionChanges.deleted));
+      }
+
+      // 3b. Upsert (추가 + 수정)
+      if (questionChanges.upserted.length > 0) {
+        const questionValues = questionChanges.upserted.map((question) => ({
+          id: question.id,
+          surveyId,
+          groupId: question.groupId || null,
+          type: question.type,
+          title: question.title,
+          description: question.description,
+          required: question.required,
+          order: question.order,
+          options: question.options as NewQuestion['options'],
+          selectLevels: question.selectLevels as NewQuestion['selectLevels'],
+          tableTitle: question.tableTitle,
+          tableColumns: question.tableColumns as NewQuestion['tableColumns'],
+          tableRowsData: (question.type === 'table' && question.tableRowsData
+            ? stripTableRowsData(question.tableRowsData)
+            : question.tableRowsData) as NewQuestion['tableRowsData'],
+          tableHeaderGrid: question.tableHeaderGrid as NewQuestion['tableHeaderGrid'],
+          imageUrl: question.imageUrl,
+          videoUrl: question.videoUrl,
+          allowOtherOption: question.allowOtherOption,
+          minSelections: question.minSelections,
+          maxSelections: question.maxSelections,
+          noticeContent: question.noticeContent,
+          requiresAcknowledgment: question.requiresAcknowledgment,
+          placeholder: question.placeholder,
+          tableValidationRules:
+            question.tableValidationRules as NewQuestion['tableValidationRules'],
+          dynamicRowConfigs:
+            question.dynamicRowConfigs as NewQuestion['dynamicRowConfigs'],
+          displayCondition: question.displayCondition as NewQuestion['displayCondition'],
+          questionCode: question.questionCode,
+          isCustomSpssVarName: question.isCustomSpssVarName,
+          exportLabel: question.exportLabel,
+          spssVarType: question.spssVarType,
+          spssMeasure: question.spssMeasure,
+          updatedAt: new Date(),
+        }));
+
+        await tx
+          .insert(questions)
+          .values(questionValues)
+          .onConflictDoUpdate({
+            target: questions.id,
+            set: {
+              groupId: sql`excluded.group_id`,
+              type: sql`excluded.type`,
+              title: sql`excluded.title`,
+              description: sql`excluded.description`,
+              required: sql`excluded.required`,
+              order: sql`excluded.order`,
+              options: sql`excluded.options`,
+              selectLevels: sql`excluded.select_levels`,
+              tableTitle: sql`excluded.table_title`,
+              tableColumns: sql`excluded.table_columns`,
+              tableRowsData: sql`excluded.table_rows_data`,
+              tableHeaderGrid: sql`excluded.table_header_grid`,
+              imageUrl: sql`excluded.image_url`,
+              videoUrl: sql`excluded.video_url`,
+              allowOtherOption: sql`excluded.allow_other_option`,
+              minSelections: sql`excluded.min_selections`,
+              maxSelections: sql`excluded.max_selections`,
+              noticeContent: sql`excluded.notice_content`,
+              requiresAcknowledgment: sql`excluded.requires_acknowledgment`,
+              placeholder: sql`excluded.placeholder`,
+              tableValidationRules: sql`excluded.table_validation_rules`,
+              dynamicRowConfigs: sql`excluded.dynamic_row_config`,
+              displayCondition: sql`excluded.display_condition`,
+              questionCode: sql`excluded.question_code`,
+              isCustomSpssVarName: sql`excluded.is_custom_spss_var_name`,
+              exportLabel: sql`excluded.export_label`,
+              spssVarType: sql`excluded.spss_var_type`,
+              spssMeasure: sql`excluded.spss_measure`,
+              updatedAt: sql`excluded.updated_at`,
+            },
+          });
+      }
+
+      // 3c. 순서 변경 (reorderedIds에 있지만 upserted에 없는 질문들의 order 업데이트)
+      if (questionChanges.reorderedIds) {
+        const upsertedIds = new Set(questionChanges.upserted.map((q) => q.id));
+        const orderUpdates = questionChanges.reorderedIds
+          .map((id, index) => ({ id, order: index + 1 }))
+          .filter(({ id }) => !upsertedIds.has(id)); // upsert된 질문은 이미 order 포함
+
+        for (const { id, order } of orderUpdates) {
+          await tx
+            .update(questions)
+            .set({ order, updatedAt: new Date() })
+            .where(eq(questions.id, id));
+        }
+      }
+    }
+
+    revalidatePath('/admin/surveys');
+    revalidatePath(`/admin/surveys/${surveyId}`);
+
+    return { surveyId };
+  });
+}
+
+// ========================
+// 전체 설문 저장 (설문 + 그룹 + 질문 일괄) — 신규 생성 전용
 // ========================
 
 export async function saveSurveyWithDetails(surveyData: SurveyType) {
@@ -426,6 +657,8 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
           questionCode: question.questionCode,
           isCustomSpssVarName: question.isCustomSpssVarName,
           exportLabel: question.exportLabel,
+          spssVarType: question.spssVarType,
+          spssMeasure: question.spssMeasure,
           updatedAt: new Date(),
         }));
 
@@ -461,6 +694,8 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
               questionCode: sql`excluded.question_code`,
               isCustomSpssVarName: sql`excluded.is_custom_spss_var_name`,
               exportLabel: sql`excluded.export_label`,
+              spssVarType: sql`excluded.spss_var_type`,
+              spssMeasure: sql`excluded.spss_measure`,
               updatedAt: sql`excluded.updated_at`,
             },
           });

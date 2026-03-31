@@ -154,6 +154,8 @@ export async function getSurveyWithDetails(surveyId: string): Promise<SurveyType
         questionCode: q.questionCode ?? undefined,
         isCustomSpssVarName: q.isCustomSpssVarName ?? undefined,
         exportLabel: q.exportLabel ?? undefined,
+        spssVarType: (q as any).spssVarType ?? undefined,
+        spssMeasure: (q as any).spssMeasure ?? undefined,
       };
       // strip된 셀 데이터를 hydrate (cellCode, exportLabel, spssVarType 등 복원)
       if (mapped.type === 'table' && mapped.tableRowsData && mapped.tableColumns) {

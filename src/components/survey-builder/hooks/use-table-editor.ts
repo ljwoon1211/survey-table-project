@@ -11,7 +11,6 @@ import {
 } from '@/types/survey';
 import {
   generateAllCellCodes,
-  generateCellCodesForColumn,
   generateCellCodesForRow,
   regenerateCellCodeForPaste,
 } from '@/utils/table-cell-code-generator';
@@ -211,6 +210,11 @@ export function useTableEditor({
   const pendingChangeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingArgsRef = useRef<{ title: string; cols: TableColumn[]; rowsData: TableRow[] } | null>(null);
 
+  // 셀 코드 재계산 전용 debounce (updateColumnCode / updateRowCode 용)
+  const pendingCellCodeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // questionCode/questionTitle 변경 시 전체 재계산 debounce
+  const pendingQuestionInfoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const notifyChangeDebounced = useCallback(
     (title: string, cols: TableColumn[], rowsData: TableRow[]) => {
       if (pendingChangeRef.current) clearTimeout(pendingChangeRef.current);
@@ -232,6 +236,17 @@ export function useTableEditor({
   // 언마운트 시 pending change flush (데이터 손실 방지)
   useEffect(() => {
     return () => {
+      // 셀 코드 재계산 flush
+      if (pendingCellCodeRef.current) {
+        clearTimeout(pendingCellCodeRef.current);
+        pendingCellCodeRef.current = null;
+      }
+      // questionCode/questionTitle 재계산 flush
+      if (pendingQuestionInfoRef.current) {
+        clearTimeout(pendingQuestionInfoRef.current);
+        pendingQuestionInfoRef.current = null;
+      }
+      // 부모 알림 flush
       if (pendingChangeRef.current) {
         clearTimeout(pendingChangeRef.current);
         if (pendingArgsRef.current) {
@@ -247,7 +262,7 @@ export function useTableEditor({
     };
   }, []);
 
-  // ── questionCode/questionTitle 변경 감지 ──
+  // ── questionCode/questionTitle 변경 감지 (debounced) ──
 
   const prevQuestionInfoRef = useRef({ questionCode, questionTitle });
   useEffect(() => {
@@ -255,9 +270,23 @@ export function useTableEditor({
     if (prev.questionCode === questionCode && prev.questionTitle === questionTitle) return;
     prevQuestionInfoRef.current = { questionCode, questionTitle };
 
-    const updatedRows = generateAllCellCodes(questionCode, questionTitle, currentColumns, currentRows);
-    setCurrentRows(updatedRows);
-    notifyChange(currentTitle, currentColumns, updatedRows);
+    // 300ms debounce: 타이핑 중에는 재계산하지 않고, 멈추면 실행
+    if (pendingQuestionInfoRef.current) clearTimeout(pendingQuestionInfoRef.current);
+    pendingQuestionInfoRef.current = setTimeout(() => {
+      const updatedRows = generateAllCellCodes(
+        questionCodeRef.current,
+        questionTitleRef.current,
+        currentColumnsRef.current,
+        currentRowsRef.current,
+      );
+      setCurrentRows(updatedRows);
+      notifyChangeDebounced(
+        currentTitleRef.current,
+        currentColumnsRef.current,
+        updatedRows,
+      );
+      pendingQuestionInfoRef.current = null;
+    }, 300);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questionCode, questionTitle]);
 
@@ -322,26 +351,34 @@ export function useTableEditor({
 
   // ── 열 코드 변경 ──
 
-  const updateColumnCode = useCallback(
-    (columnIndex: number, newColumnCode: string) => {
-      const columns = currentColumnsRef.current;
-      const column = columns[columnIndex];
-      const updatedColumns = columns.map((col, idx) =>
-        idx === columnIndex ? { ...col, columnCode: newColumnCode } : col,
-      );
-      const updatedCol = { ...column, columnCode: newColumnCode };
-      const updatedRows = generateCellCodesForColumn(
+  /** 셀 코드 전체 재계산 debounce (열 코드/행 코드 변경 공통) */
+  const scheduleCellCodeRecalc = useCallback(() => {
+    if (pendingCellCodeRef.current) clearTimeout(pendingCellCodeRef.current);
+    pendingCellCodeRef.current = setTimeout(() => {
+      const updatedRows = generateAllCellCodes(
         questionCodeRef.current,
         questionTitleRef.current,
-        updatedCol,
-        columnIndex,
+        currentColumnsRef.current,
         currentRowsRef.current,
       );
-      setCurrentColumns(updatedColumns);
       setCurrentRows(updatedRows);
-      notifyChangeDebounced(currentTitleRef.current, updatedColumns, updatedRows);
+      notifyChangeDebounced(currentTitleRef.current, currentColumnsRef.current, updatedRows);
+      pendingCellCodeRef.current = null;
+    }, 300);
+  }, [notifyChangeDebounced]);
+
+  const updateColumnCode = useCallback(
+    (columnIndex: number, newColumnCode: string) => {
+      // 즉시: 컬럼 코드 문자열만 업데이트
+      const updatedColumns = currentColumnsRef.current.map((col, idx) =>
+        idx === columnIndex ? { ...col, columnCode: newColumnCode } : col,
+      );
+      setCurrentColumns(updatedColumns);
+      notifyChangeDebounced(currentTitleRef.current, updatedColumns, currentRowsRef.current);
+      // 지연: 셀 코드 전체 재계산
+      scheduleCellCodeRecalc();
     },
-    [notifyChangeDebounced],
+    [notifyChangeDebounced, scheduleCellCodeRecalc],
   );
 
   // ── 열 CRUD ──
@@ -593,20 +630,16 @@ export function useTableEditor({
 
   const updateRowCode = useCallback(
     (rowIndex: number, rowCode: string) => {
-      const updatedRows = currentRowsRef.current.map((row, index) => {
-        if (index !== rowIndex) return row;
-        const updatedRow = { ...row, rowCode };
-        return generateCellCodesForRow(
-          questionCodeRef.current,
-          questionTitleRef.current,
-          currentColumnsRef.current,
-          updatedRow,
-        );
-      });
+      // 즉시: 행 코드 문자열만 업데이트
+      const updatedRows = currentRowsRef.current.map((row, index) =>
+        index === rowIndex ? { ...row, rowCode } : row,
+      );
       setCurrentRows(updatedRows);
       notifyChangeDebounced(currentTitleRef.current, currentColumnsRef.current, updatedRows);
+      // 지연: 셀 코드 전체 재계산
+      scheduleCellCodeRecalc();
     },
-    [notifyChangeDebounced],
+    [notifyChangeDebounced, scheduleCellCodeRecalc],
   );
 
   // ── 행 조건부 표시 ──

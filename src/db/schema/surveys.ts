@@ -109,6 +109,8 @@ export const questions = pgTable('questions', {
   questionCode: text('question_code'), // SPSS 변수명 (예: "Q1", "Q2M1")
   isCustomSpssVarName: boolean('is_custom_spss_var_name').default(false), // 수동 편집 여부
   exportLabel: text('export_label'), // 엑셀 헤더 라벨
+  spssVarType: text('spss_var_type'), // SPSS 변수 타입 오버라이드 ('Numeric' | 'String' | 'Date' | 'DateTime')
+  spssMeasure: text('spss_measure'), // SPSS 측정 수준 오버라이드 ('Nominal' | 'Ordinal' | 'Continuous')
 
   // 검증 규칙 및 조건부 표시
   tableValidationRules: jsonb('table_validation_rules').$type<TableValidationRule[]>(),

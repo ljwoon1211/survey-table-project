@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   AlertTriangle,
@@ -65,6 +65,28 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [showBranchSettings, setShowBranchSettings] = useState(false);
 
+  // ── 로컬 state: 타이핑 성능을 위해 formData와 분리 ──
+  const [localTitle, setLocalTitle] = useState('');
+  const [localExportLabel, setLocalExportLabel] = useState('');
+  const debouncedTitleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedExportLabelRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const localTitleRef = useRef(localTitle);
+  localTitleRef.current = localTitle;
+  const localExportLabelRef = useRef(localExportLabel);
+  localExportLabelRef.current = localExportLabel;
+
+  // handleSave에서 formData를 ref로 읽기 (이벤트 리스너 체인 안정화)
+  const formDataRef = useRef(formData);
+  formDataRef.current = formData;
+
+  // 모달 닫힐 때 debounce 타이머 cleanup
+  useEffect(() => {
+    return () => {
+      if (debouncedTitleRef.current) clearTimeout(debouncedTitleRef.current);
+      if (debouncedExportLabelRef.current) clearTimeout(debouncedExportLabelRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     if (question) {
       // options의 각 항목과 branchRule을 깊은 복사
@@ -108,54 +130,78 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         spssMeasure: (question as any).spssMeasure,
       });
 
+      // 로컬 state 동기화 (이전 질문의 pending debounce 취소)
+      if (debouncedTitleRef.current) {
+        clearTimeout(debouncedTitleRef.current);
+        debouncedTitleRef.current = null;
+      }
+      if (debouncedExportLabelRef.current) {
+        clearTimeout(debouncedExportLabelRef.current);
+        debouncedExportLabelRef.current = null;
+      }
+      setLocalTitle(question.title || '');
+      setLocalExportLabel((question as any).exportLabel || '');
+
       // 옵션들 중 하나라도 branchRule이 있으면 조건부 분기 설정 표시
       const hasBranchRule = question.options?.some((option) => option.branchRule) || false;
       setShowBranchSettings(hasBranchRule);
     }
   }, [question]);
 
-  // 검증 로직
+  // 검증 로직 (formDataRef로 최신 값 참조 — deps에서 formData 제거)
   const validateForm = useCallback(() => {
     if (!question) return false;
 
+    const currentFormData = formDataRef.current;
     const needsOptions = ['radio', 'checkbox', 'select'].includes(question.type);
     const needsSelectLevels = question.type === 'multiselect';
     const errors: Record<string, string> = {};
 
-    if (!formData.title?.trim()) {
+    if (!currentFormData.title?.trim()) {
       errors.title = '질문 제목은 필수입니다.';
     }
 
-    if (needsOptions && (!formData.options || formData.options.length === 0)) {
+    if (needsOptions && (!currentFormData.options || currentFormData.options.length === 0)) {
       errors.options = '최소 하나의 선택 옵션이 필요합니다.';
     }
 
-    if (needsSelectLevels && (!formData.selectLevels || formData.selectLevels.length === 0)) {
+    if (needsSelectLevels && (!currentFormData.selectLevels || currentFormData.selectLevels.length === 0)) {
       errors.selectLevels = '최소 하나의 선택 레벨이 필요합니다.';
     }
 
-    // 테이블 타입은 title만 있으면 저장 가능 (테이블 데이터는 선택적)
-    // 공지사항 타입은 title만 있으면 저장 가능 (내용은 선택적)
-    // text, textarea 타입은 title만 있으면 저장 가능
-
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
-  }, [question, formData]);
+  }, [question]);
 
-  // 저장 핸들러
+  // 저장 핸들러 (formDataRef로 최신 값 참조 — deps에서 formData 제거)
   const handleSave = useCallback(async () => {
+    // debounce 중인 로컬 state를 formData에 flush
+    if (debouncedTitleRef.current) {
+      clearTimeout(debouncedTitleRef.current);
+      debouncedTitleRef.current = null;
+    }
+    if (debouncedExportLabelRef.current) {
+      clearTimeout(debouncedExportLabelRef.current);
+      debouncedExportLabelRef.current = null;
+    }
+    // 로컬 state의 최신 값을 formData에 즉시 반영 (ref로 읽어 deps 분리)
+    const currentTitle = localTitleRef.current;
+    const currentExportLabel = localExportLabelRef.current;
+    setFormData((prev) => ({ ...prev, title: currentTitle, exportLabel: currentExportLabel }));
+    // formDataRef를 직접 업데이트하여 아래 로직에서 최신 값 사용
+    formDataRef.current = { ...formDataRef.current, title: currentTitle, exportLabel: currentExportLabel };
+
     if (!questionId || !validateForm()) return;
 
+    const currentFormData = formDataRef.current;
     setIsSaving(true);
     try {
-      // 저장 전: 현재 질문에서 사용 중인 이미지 추출
       const updatedQuestion = {
         ...question,
-        ...formData,
+        ...currentFormData,
       } as Question;
       const usedImages = extractImageUrlsFromQuestion(updatedQuestion);
 
-      // 저장된 질문의 이미지와 비교하여 사용되지 않은 이미지 삭제
       if (question) {
         const previousImages = extractImageUrlsFromQuestion(question);
         const unusedImages = previousImages.filter((url) => !usedImages.includes(url));
@@ -165,51 +211,70 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         }
       }
 
-      // 로컬 스토어 업데이트
-      updateQuestion(questionId, formData);
+      updateQuestion(questionId, currentFormData);
 
-      // 서버에 질문 저장/업데이트 API 호출
-      if (useSurveyBuilderStore.getState().currentSurvey.id && questionId) {
+      const store = useSurveyBuilderStore.getState();
+      if (store.currentSurvey.id && questionId) {
+        // 새 질문 판별: questionChanges.added에 있으면 아직 DB에 없는 질문
+        const isNewQuestion = !!store.questionChanges.added[questionId];
+
         try {
-          if (isValidUUID(questionId)) {
-            // 이미 DB에 저장된 질문: 업데이트
-            // placeholder는 빈 문자열도 저장할 수 있도록 명시적으로 전달
+          if (!isNewQuestion) {
+            // 기존 질문: UPDATE 경로
             const updateData = {
-              ...formData,
+              ...currentFormData,
               placeholder:
-                formData.placeholder !== undefined ? formData.placeholder : question?.placeholder,
+                currentFormData.placeholder !== undefined ? currentFormData.placeholder : question?.placeholder,
             };
             await updateQuestionAction(questionId, updateData);
           } else {
-            // 임시 질문: 생성하고 반환된 UUID로 로컬 스토어의 질문 ID 업데이트
+            // 새 질문: CREATE 경로
             const createdQuestion = await createQuestionAction({
-              surveyId: useSurveyBuilderStore.getState().currentSurvey.id,
+              id: questionId,
+              surveyId: store.currentSurvey.id,
               groupId: question?.groupId,
-              type: formData.type || question?.type || 'text',
-              title: formData.title || question?.title || '',
-              description: formData.description || question?.description,
-              required: formData.required ?? question?.required ?? false,
+              type: currentFormData.type || question?.type || 'text',
+              title: currentFormData.title || question?.title || '',
+              description: currentFormData.description || question?.description,
+              required: currentFormData.required ?? question?.required ?? false,
               order: question?.order ?? 0,
-              options: formData.options || question?.options,
-              selectLevels: formData.selectLevels || question?.selectLevels,
-              tableTitle: formData.tableTitle || question?.tableTitle,
-              tableColumns: formData.tableColumns || question?.tableColumns,
-              tableRowsData: formData.tableRowsData || question?.tableRowsData,
-              tableHeaderGrid: formData.tableHeaderGrid ?? question?.tableHeaderGrid,
-              imageUrl: formData.imageUrl || question?.imageUrl,
-              videoUrl: formData.videoUrl || question?.videoUrl,
-              allowOtherOption: formData.allowOtherOption ?? question?.allowOtherOption,
-              noticeContent: formData.noticeContent || question?.noticeContent,
+              options: currentFormData.options || question?.options,
+              selectLevels: currentFormData.selectLevels || question?.selectLevels,
+              tableTitle: currentFormData.tableTitle || question?.tableTitle,
+              tableColumns: currentFormData.tableColumns || question?.tableColumns,
+              tableRowsData: currentFormData.tableRowsData || question?.tableRowsData,
+              tableHeaderGrid: currentFormData.tableHeaderGrid ?? question?.tableHeaderGrid,
+              imageUrl: currentFormData.imageUrl || question?.imageUrl,
+              videoUrl: currentFormData.videoUrl || question?.videoUrl,
+              allowOtherOption: currentFormData.allowOtherOption ?? question?.allowOtherOption,
+              minSelections: currentFormData.minSelections ?? question?.minSelections,
+              maxSelections: currentFormData.maxSelections ?? question?.maxSelections,
+              noticeContent: currentFormData.noticeContent || question?.noticeContent,
               requiresAcknowledgment:
-                formData.requiresAcknowledgment ?? question?.requiresAcknowledgment,
+                currentFormData.requiresAcknowledgment ?? question?.requiresAcknowledgment,
               placeholder:
-                formData.placeholder !== undefined ? formData.placeholder : question?.placeholder,
-              tableValidationRules: formData.tableValidationRules || question?.tableValidationRules,
-              displayCondition: formData.displayCondition || question?.displayCondition,
+                currentFormData.placeholder !== undefined ? currentFormData.placeholder : question?.placeholder,
+              tableValidationRules: currentFormData.tableValidationRules || question?.tableValidationRules,
+              displayCondition: currentFormData.displayCondition || question?.displayCondition,
+              dynamicRowConfigs: currentFormData.dynamicRowConfigs || question?.dynamicRowConfigs,
+              questionCode: currentFormData.questionCode || question?.questionCode,
+              isCustomSpssVarName: currentFormData.isCustomSpssVarName ?? question?.isCustomSpssVarName,
+              exportLabel: currentFormData.exportLabel || question?.exportLabel,
+              spssVarType: currentFormData.spssVarType ?? question?.spssVarType,
+              spssMeasure: currentFormData.spssMeasure ?? question?.spssMeasure,
             });
 
-            // 반환된 UUID로 로컬 스토어의 질문 ID 업데이트
             if (createdQuestion?.id) {
+              // DB에 생성 완료 → added에서 제거 (다음 모달 저장 시 UPDATE 경로 사용)
+              const { [questionId]: _, ...remainingAdded } = useSurveyBuilderStore.getState().questionChanges.added;
+              useSurveyBuilderStore.setState((state) => ({
+                questionChanges: {
+                  ...state.questionChanges,
+                  added: remainingAdded,
+                },
+              }));
+            }
+            if (createdQuestion?.id && createdQuestion.id !== questionId) {
               useSurveyBuilderStore.setState((state) => ({
                 currentSurvey: {
                   ...state.currentSurvey,
@@ -222,7 +287,6 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
           }
         } catch (error) {
           console.error('질문 저장/업데이트 실패:', error);
-          // 저장 실패해도 모달은 닫음 (로컬 상태는 이미 업데이트됨)
         }
       }
 
@@ -232,7 +296,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
     } finally {
       setIsSaving(false);
     }
-  }, [questionId, validateForm, updateQuestion, formData, onClose, question]);
+  }, [questionId, validateForm, updateQuestion, onClose, question]);
 
   // 키보드 이벤트 핸들러
   const handleKeyDown = useCallback(
@@ -512,12 +576,19 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                   </Label>
                   <Input
                     id="title"
-                    value={formData.title || ''}
+                    value={localTitle}
                     onChange={(e) => {
-                      setFormData((prev) => ({ ...prev, title: e.target.value }));
+                      const value = e.target.value;
+                      setLocalTitle(value);
                       if (validationErrors.title) {
                         setValidationErrors((prev) => ({ ...prev, title: '' }));
                       }
+                      // 300ms debounce 후 formData에 반영
+                      if (debouncedTitleRef.current) clearTimeout(debouncedTitleRef.current);
+                      debouncedTitleRef.current = setTimeout(() => {
+                        setFormData((prev) => ({ ...prev, title: value }));
+                        debouncedTitleRef.current = null;
+                      }, 300);
                     }}
                     placeholder="질문을 입력하세요"
                     className={`mt-2 ${
@@ -594,10 +665,16 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                         <Label htmlFor="exportLabel">엑셀 라벨 (선택사항)</Label>
                         <Input
                           id="exportLabel"
-                          value={formData.exportLabel || ''}
-                          onChange={(e) =>
-                            setFormData((prev) => ({ ...prev, exportLabel: e.target.value }))
-                          }
+                          value={localExportLabel}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setLocalExportLabel(value);
+                            if (debouncedExportLabelRef.current) clearTimeout(debouncedExportLabelRef.current);
+                            debouncedExportLabelRef.current = setTimeout(() => {
+                              setFormData((prev) => ({ ...prev, exportLabel: value }));
+                              debouncedExportLabelRef.current = null;
+                            }, 300);
+                          }}
                           placeholder="예: 성별, TV보유현황"
                           className="mt-2"
                         />
@@ -617,7 +694,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                           onChange={(e) =>
                             setFormData((prev) => ({
                               ...prev,
-                              spssVarType: (e.target.value || undefined) as any,
+                              spssVarType: (e.target.value || null) as any,
                             }))
                           }
                           className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
@@ -647,7 +724,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                           onChange={(e) =>
                             setFormData((prev) => ({
                               ...prev,
-                              spssMeasure: (e.target.value || undefined) as any,
+                              spssMeasure: (e.target.value || null) as any,
                             }))
                           }
                           className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"

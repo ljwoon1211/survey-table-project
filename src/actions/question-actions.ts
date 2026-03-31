@@ -36,11 +36,19 @@ export async function createQuestion(data: {
   imageUrl?: string;
   videoUrl?: string;
   allowOtherOption?: boolean;
+  minSelections?: number;
+  maxSelections?: number;
   noticeContent?: string;
   requiresAcknowledgment?: boolean;
   placeholder?: string;
   tableValidationRules?: QuestionType['tableValidationRules'];
   displayCondition?: QuestionType['displayCondition'];
+  dynamicRowConfigs?: QuestionType['dynamicRowConfigs'];
+  questionCode?: string;
+  isCustomSpssVarName?: boolean;
+  exportLabel?: string;
+  spssVarType?: string;
+  spssMeasure?: string;
 }) {
   await requireAuth();
 
@@ -67,11 +75,19 @@ export async function createQuestion(data: {
     imageUrl: data.imageUrl,
     videoUrl: data.videoUrl,
     allowOtherOption: data.allowOtherOption,
+    minSelections: data.minSelections,
+    maxSelections: data.maxSelections,
     noticeContent: data.noticeContent,
     requiresAcknowledgment: data.requiresAcknowledgment,
     placeholder: data.placeholder,
     tableValidationRules: data.tableValidationRules as NewQuestion['tableValidationRules'],
     displayCondition: data.displayCondition as NewQuestion['displayCondition'],
+    dynamicRowConfigs: data.dynamicRowConfigs as NewQuestion['dynamicRowConfigs'],
+    questionCode: data.questionCode,
+    isCustomSpssVarName: data.isCustomSpssVarName,
+    exportLabel: data.exportLabel,
+    spssVarType: data.spssVarType,
+    spssMeasure: data.spssMeasure,
   };
 
   const [question] = await db.insert(questions).values(newQuestion).returning();
@@ -80,7 +96,7 @@ export async function createQuestion(data: {
   return question;
 }
 
-// 질문 업데이트
+// 질문 업데이트 (허용 필드만 화이트리스트로 추출)
 export async function updateQuestion(
   questionId: string,
   data: Partial<{
@@ -99,22 +115,57 @@ export async function updateQuestion(
     imageUrl: string;
     videoUrl: string;
     allowOtherOption: boolean;
+    minSelections: number;
+    maxSelections: number;
     noticeContent: string;
     requiresAcknowledgment: boolean;
     placeholder: string;
     tableValidationRules: QuestionType['tableValidationRules'];
     dynamicRowConfigs: QuestionType['dynamicRowConfigs'];
     displayCondition: QuestionType['displayCondition'];
+    questionCode: string;
+    isCustomSpssVarName: boolean;
+    exportLabel: string;
+    spssVarType: string;
+    spssMeasure: string;
   }>,
 ) {
   await requireAuth();
 
+  // 허용 필드만 추출 (id, surveyId, createdAt 등 변경 방지)
+  const allowed: Partial<NewQuestion> = { updatedAt: new Date() };
+  if (data.groupId !== undefined) allowed.groupId = data.groupId;
+  if (data.type !== undefined) allowed.type = data.type;
+  if (data.title !== undefined) allowed.title = data.title;
+  if (data.description !== undefined) allowed.description = data.description;
+  if (data.required !== undefined) allowed.required = data.required;
+  if (data.order !== undefined) allowed.order = data.order;
+  if (data.options !== undefined) allowed.options = data.options as NewQuestion['options'];
+  if (data.selectLevels !== undefined) allowed.selectLevels = data.selectLevels as NewQuestion['selectLevels'];
+  if (data.tableTitle !== undefined) allowed.tableTitle = data.tableTitle;
+  if (data.tableColumns !== undefined) allowed.tableColumns = data.tableColumns as NewQuestion['tableColumns'];
+  if (data.tableRowsData !== undefined) allowed.tableRowsData = data.tableRowsData as NewQuestion['tableRowsData'];
+  if (data.tableHeaderGrid !== undefined) allowed.tableHeaderGrid = data.tableHeaderGrid as NewQuestion['tableHeaderGrid'];
+  if (data.imageUrl !== undefined) allowed.imageUrl = data.imageUrl;
+  if (data.videoUrl !== undefined) allowed.videoUrl = data.videoUrl;
+  if (data.allowOtherOption !== undefined) allowed.allowOtherOption = data.allowOtherOption;
+  if (data.minSelections !== undefined) allowed.minSelections = data.minSelections;
+  if (data.maxSelections !== undefined) allowed.maxSelections = data.maxSelections;
+  if (data.noticeContent !== undefined) allowed.noticeContent = data.noticeContent;
+  if (data.requiresAcknowledgment !== undefined) allowed.requiresAcknowledgment = data.requiresAcknowledgment;
+  if (data.placeholder !== undefined) allowed.placeholder = data.placeholder;
+  if (data.tableValidationRules !== undefined) allowed.tableValidationRules = data.tableValidationRules as NewQuestion['tableValidationRules'];
+  if (data.dynamicRowConfigs !== undefined) allowed.dynamicRowConfigs = data.dynamicRowConfigs as NewQuestion['dynamicRowConfigs'];
+  if (data.displayCondition !== undefined) allowed.displayCondition = data.displayCondition as NewQuestion['displayCondition'];
+  if (data.questionCode !== undefined) allowed.questionCode = data.questionCode;
+  if (data.isCustomSpssVarName !== undefined) allowed.isCustomSpssVarName = data.isCustomSpssVarName;
+  if (data.exportLabel !== undefined) allowed.exportLabel = data.exportLabel;
+  if (data.spssVarType !== undefined) allowed.spssVarType = data.spssVarType;
+  if (data.spssMeasure !== undefined) allowed.spssMeasure = data.spssMeasure;
+
   const [updated] = await db
     .update(questions)
-    .set({
-      ...data,
-      updatedAt: new Date(),
-    } as Partial<NewQuestion>)
+    .set(allowed)
     .where(eq(questions.id, questionId))
     .returning();
 

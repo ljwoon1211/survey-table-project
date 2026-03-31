@@ -50,6 +50,13 @@
       "when": 1774862477672,
       "tag": "0006_broken_robbie_robertson",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1774943317692,
+      "tag": "0007_colorful_agent_brand",
+      "breakpoints": true
     }
   ]
 }

@@ -79,7 +79,7 @@ export function inferSpssMeasure(
 
 // ── 일괄 생성 함수들 ──
 
-/** 단일 셀에 자동생성값 적용 */
+/** 단일 셀에 자동생성값 적용 (변경 없으면 원본 참조 반환) */
 function applyAutoCodeToCell(
   cell: TableCell,
   questionCode: string | undefined,
@@ -92,39 +92,50 @@ function applyAutoCodeToCell(
   if (!isAutoGeneratable(cell)) return cell;
   if (isEffectivelyCustom(cell) && isEffectivelyCustomLabel(cell)) return cell;
 
+  let hasChanges = false;
   const updates: Partial<TableCell> = {};
 
   if (!isEffectivelyCustom(cell)) {
-    updates.cellCode = generateCellCode(questionCode, rowCode, columnCode);
-    updates.isCustomCellCode = false;
+    const newCellCode = generateCellCode(questionCode, rowCode, columnCode);
+    if (cell.cellCode !== newCellCode || cell.isCustomCellCode !== false) {
+      updates.cellCode = newCellCode;
+      updates.isCustomCellCode = false;
+      hasChanges = true;
+    }
   }
 
   if (!isEffectivelyCustomLabel(cell)) {
-    updates.exportLabel = generateExportLabel(questionTitle, columnLabel, rowLabel);
-    updates.isCustomExportLabel = false;
+    const newExportLabel = generateExportLabel(questionTitle, columnLabel, rowLabel);
+    if (cell.exportLabel !== newExportLabel || cell.isCustomExportLabel !== false) {
+      updates.exportLabel = newExportLabel;
+      updates.isCustomExportLabel = false;
+      hasChanges = true;
+    }
   }
 
   // 변수 타입/측정 수준이 아직 없으면 자동 설정 (interactive 셀만)
   if (!cell.spssVarType && INTERACTIVE_CELL_TYPES.has(cell.type)) {
     updates.spssVarType = inferSpssVarType(cell.type);
+    hasChanges = true;
   }
   if (!cell.spssMeasure && INTERACTIVE_CELL_TYPES.has(cell.type)) {
     updates.spssMeasure = inferSpssMeasure(cell.type);
+    hasChanges = true;
   }
 
+  if (!hasChanges) return cell;
   return { ...cell, ...updates };
 }
 
-/** 전체 테이블의 셀코드/라벨 일괄 자동생성 */
+/** 전체 테이블의 셀코드/라벨 일괄 자동생성 (변경된 행/셀만 새 객체) */
 export function generateAllCellCodes(
   questionCode: string | undefined,
   questionTitle: string | undefined,
   columns: TableColumn[],
   rows: TableRow[],
 ): TableRow[] {
-  return rows.map((row) => ({
-    ...row,
-    cells: row.cells.map((cell, colIdx) => {
+  return rows.map((row) => {
+    const newCells = row.cells.map((cell, colIdx) => {
       const col = columns[colIdx];
       return applyAutoCodeToCell(
         cell,
@@ -135,35 +146,37 @@ export function generateAllCellCodes(
         col?.columnCode,
         col?.label,
       );
-    }),
-  }));
+    });
+    // 모든 셀이 동일 참조면 행도 원본 유지
+    if (newCells.every((c, i) => c === row.cells[i])) return row;
+    return { ...row, cells: newCells };
+  });
 }
 
-/** 특정 행의 셀코드 재계산 (rowCode 변경 시) */
+/** 특정 행의 셀코드 재계산 (rowCode 변경 시, 변경 없으면 원본 반환) */
 export function generateCellCodesForRow(
   questionCode: string | undefined,
   questionTitle: string | undefined,
   columns: TableColumn[],
   row: TableRow,
 ): TableRow {
-  return {
-    ...row,
-    cells: row.cells.map((cell, colIdx) => {
-      const col = columns[colIdx];
-      return applyAutoCodeToCell(
-        cell,
-        questionCode,
-        questionTitle,
-        row.rowCode,
-        row.label,
-        col?.columnCode,
-        col?.label,
-      );
-    }),
-  };
+  const newCells = row.cells.map((cell, colIdx) => {
+    const col = columns[colIdx];
+    return applyAutoCodeToCell(
+      cell,
+      questionCode,
+      questionTitle,
+      row.rowCode,
+      row.label,
+      col?.columnCode,
+      col?.label,
+    );
+  });
+  if (newCells.every((c, i) => c === row.cells[i])) return row;
+  return { ...row, cells: newCells };
 }
 
-/** 특정 열의 셀코드 재계산 (columnCode 변경 시) */
+/** 특정 열의 셀코드 재계산 (columnCode 변경 시, 변경된 행만 새 객체) */
 export function generateCellCodesForColumn(
   questionCode: string | undefined,
   questionTitle: string | undefined,
@@ -171,21 +184,23 @@ export function generateCellCodesForColumn(
   colIdx: number,
   rows: TableRow[],
 ): TableRow[] {
-  return rows.map((row) => ({
-    ...row,
-    cells: row.cells.map((cell, cIdx) => {
-      if (cIdx !== colIdx) return cell;
-      return applyAutoCodeToCell(
-        cell,
-        questionCode,
-        questionTitle,
-        row.rowCode,
-        row.label,
-        column.columnCode,
-        column.label,
-      );
-    }),
-  }));
+  return rows.map((row) => {
+    const cell = row.cells[colIdx];
+    if (!cell) return row;
+    const updated = applyAutoCodeToCell(
+      cell,
+      questionCode,
+      questionTitle,
+      row.rowCode,
+      row.label,
+      column.columnCode,
+      column.label,
+    );
+    if (updated === cell) return row;
+    const newCells = [...row.cells];
+    newCells[colIdx] = updated;
+    return { ...row, cells: newCells };
+  });
 }
 
 /** 셀 복사/붙여넣기 시 새 위치 기준으로 셀코드 재생성 */
