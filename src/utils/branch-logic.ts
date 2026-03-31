@@ -5,6 +5,7 @@ import {
   QuestionConditionGroup,
   QuestionGroup,
   SurveyResponse,
+  TableColumn,
   TableRow,
   TableValidationRule,
 } from '@/types/survey';
@@ -851,6 +852,36 @@ export function shouldDisplayRow(
     .map((condition) => evaluateQuestionCondition(condition, allResponses, allQuestions));
 
   // 논리 타입에 따라 결과 결합
+  switch (logicType) {
+    case 'AND':
+      return results.every((result) => result);
+    case 'OR':
+      return results.some((result) => result);
+    case 'NOT':
+      return !results.some((result) => result);
+    default:
+      return true;
+  }
+}
+
+/**
+ * 테이블 열 표시 조건 확인
+ */
+export function shouldDisplayColumn(
+  column: TableColumn,
+  allResponses: Record<string, unknown>,
+  allQuestions: Question[],
+): boolean {
+  if (!column.displayCondition) {
+    return true;
+  }
+
+  const { conditions, logicType } = column.displayCondition;
+
+  const results = conditions
+    .filter((condition) => condition.enabled !== false)
+    .map((condition) => evaluateQuestionCondition(condition, allResponses, allQuestions));
+
   switch (logicType) {
     case 'AND':
       return results.every((result) => result);

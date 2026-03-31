@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Combine,
+  Eye,
   Trash2,
   Unlink,
 } from 'lucide-react';
@@ -15,6 +16,7 @@ import { TableColumn } from '@/types/survey';
 export interface TableHeaderSectionProps {
   columns: TableColumn[];
   editingColumnWidth: { columnIndex: number; value: string } | null;
+  hasQuestions?: boolean;
   onUpdateColumnLabel: (columnIndex: number, label: string) => void;
   onUpdateColumnCode: (columnIndex: number, code: string) => void;
   onMoveColumn: (columnIndex: number, direction: 'left' | 'right') => void;
@@ -23,11 +25,13 @@ export interface TableHeaderSectionProps {
   onUnmergeColumnHeader: (columnIndex: number) => void;
   onSetEditingColumnWidth: (value: { columnIndex: number; value: string } | null) => void;
   onColumnWidthChange: (columnIndex: number, width: number) => void;
+  onOpenColumnConditionModal?: (columnIndex: number) => void;
 }
 
 export function TableHeaderSection({
   columns,
   editingColumnWidth,
+  hasQuestions,
   onUpdateColumnLabel,
   onUpdateColumnCode,
   onMoveColumn,
@@ -36,6 +40,7 @@ export function TableHeaderSection({
   onUnmergeColumnHeader,
   onSetEditingColumnWidth,
   onColumnWidthChange,
+  onOpenColumnConditionModal,
 }: TableHeaderSectionProps) {
   return (
     <thead>
@@ -125,6 +130,23 @@ export function TableHeaderSection({
                       <span className="font-medium text-orange-600">
                         🔗 {headerColspan}열 병합
                       </span>
+                    )}
+                    {hasQuestions && onOpenColumnConditionModal && !isHeaderMerged && (
+                      <button
+                        onClick={() => onOpenColumnConditionModal(columnIndex)}
+                        className={`flex h-5 w-5 items-center justify-center rounded transition-colors ${
+                          column.displayCondition && column.displayCondition.conditions.length > 0
+                            ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                            : 'text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+                        }`}
+                        title={
+                          column.displayCondition && column.displayCondition.conditions.length > 0
+                            ? `조건부 표시 (${column.displayCondition.conditions.length}개 조건)`
+                            : '조건부 표시 설정'
+                        }
+                      >
+                        <Eye className="h-3 w-3" />
+                      </button>
                     )}
                   </div>
                   <div className="flex items-center gap-1">
