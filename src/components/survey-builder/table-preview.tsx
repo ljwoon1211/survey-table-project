@@ -223,8 +223,11 @@ export const TablePreview = React.memo(function TablePreview({
       <CardContent>
         <div className="overflow-x-auto">
           <table
-            className="w-full border-collapse border border-gray-300 text-sm"
-            style={{ tableLayout: 'fixed' }}
+            className="mx-auto border-collapse border border-gray-300 text-sm"
+            style={{
+              tableLayout: 'fixed',
+              width: `${columns.reduce((sum, col) => sum + (col.width || 150), 0)}px`,
+            }}
           >
             {/* 열 너비 정의 */}
             <colgroup>

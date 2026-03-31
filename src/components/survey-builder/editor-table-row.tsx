@@ -11,12 +11,12 @@ import {
   Copy,
   Eye,
   Image,
+  Settings2,
   Trash2,
   Video,
   Zap,
 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DynamicRowGroupConfig, TableCell, TableRow } from '@/types/survey';
@@ -191,8 +191,8 @@ export const EditorTableRow = React.memo(function EditorTableRow({
       className="group/row"
     >
       {/* 행 이름(라벨) 입력칸 */}
-      <td className="group/label sticky left-0 z-10 w-[70px] min-w-[70px] border border-gray-300 bg-gray-50 p-1">
-        <div className="relative space-y-1">
+      <td className="sticky left-0 z-10 w-[120px] min-w-[120px] border border-gray-300 bg-gray-50 p-1">
+        <div className="space-y-1">
           <Input
             value={row.label}
             onChange={(e) => onUpdateRowLabel(rowIndex, e.target.value)}
@@ -200,106 +200,120 @@ export const EditorTableRow = React.memo(function EditorTableRow({
             placeholder="행 라벨"
             title={`행 라벨: ${row.label}`}
           />
-          <Input
-            value={row.rowCode || ''}
-            onChange={(e) => onUpdateRowCode(rowIndex, e.target.value)}
-            className="h-6 bg-gray-100 px-1 text-center text-xs font-medium text-gray-700"
-            placeholder="행 코드"
-            title={`엑셀 코드: ${row.rowCode || '(자동)'}`}
-          />
+          {/* 요약 아이콘 + 설정 Popover */}
           <div className="flex items-center justify-center gap-0.5">
-            {hasQuestions && (
-              <button
-                onClick={() => onOpenRowConditionModal(rowIndex)}
-                className={`flex h-5 w-5 items-center justify-center rounded transition-colors ${
-                  row.displayCondition && row.displayCondition.conditions.length > 0
-                    ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
-                    : 'text-gray-400 hover:bg-gray-200 hover:text-gray-600'
-                }`}
-                title={
-                  row.displayCondition && row.displayCondition.conditions.length > 0
-                    ? `조건부 표시 (${row.displayCondition.conditions.length}개 조건)`
-                    : '조건부 표시 설정'
-                }
-              >
-                <Eye className="h-3 w-3" />
-              </button>
+            <span className="truncate text-[10px] text-gray-400">{row.rowCode || `r${rowIndex + 1}`}</span>
+            {row.displayCondition && row.displayCondition.conditions.length > 0 && (
+              <Eye className="h-2.5 w-2.5 shrink-0 text-blue-500" />
             )}
-          </div>
-          {dynamicRowConfigs.length > 0 && (
+            {row.dynamicGroupId && (
+              <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${
+                GROUP_COLORS[dynamicRowConfigs.findIndex((g) => g.groupId === row.dynamicGroupId) % GROUP_COLORS.length] || 'bg-purple-500'
+              }`} />
+            )}
+            {row.showWhenDynamicGroupId && (
+              <Zap className={`h-2.5 w-2.5 shrink-0 ${GROUP_COLORS[dynamicRowConfigs.findIndex((g) => g.groupId === row.showWhenDynamicGroupId) % GROUP_COLORS.length]?.replace('bg-', 'text-') || 'text-amber-500'}`} />
+            )}
             <Popover>
               <PopoverTrigger asChild>
                 <button
-                  className="mx-auto flex h-5 w-5 items-center justify-center rounded transition-colors hover:bg-gray-200"
-                  title={
-                    row.dynamicGroupId
-                      ? `동적 그룹: ${dynamicRowConfigs.find((g) => g.groupId === row.dynamicGroupId)?.label || row.dynamicGroupId}`
-                      : row.showWhenDynamicGroupId
-                        ? `소계 연동: ${dynamicRowConfigs.find((g) => g.groupId === row.showWhenDynamicGroupId)?.label || row.showWhenDynamicGroupId}`
-                        : '그룹 배정'
-                  }
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-700"
+                  title="행 설정"
                 >
-                  {row.showWhenDynamicGroupId ? (
-                    <Zap className={`h-3 w-3 ${GROUP_COLORS[dynamicRowConfigs.findIndex((g) => g.groupId === row.showWhenDynamicGroupId) % GROUP_COLORS.length]?.replace('bg-', 'text-') || 'text-amber-500'}`} />
-                  ) : (
-                    <span className={`inline-block h-2.5 w-2.5 rounded-full ${
-                      row.dynamicGroupId
-                        ? GROUP_COLORS[dynamicRowConfigs.findIndex((g) => g.groupId === row.dynamicGroupId) % GROUP_COLORS.length] || 'bg-purple-500'
-                        : 'bg-gray-300'
-                    }`} />
-                  )}
+                  <Settings2 className="h-3 w-3" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-40 p-1" side="right" align="start">
+              <PopoverContent className="w-48 p-1" side="right" align="start">
                 <div className="space-y-0.5">
-                  <button
-                    onClick={() => { onSetDynamicGroupId(row.id, undefined); onSetShowWhenDynamicGroupId(row.id, undefined); }}
-                    className={`flex w-full items-center gap-2 rounded px-2 py-1 text-xs hover:bg-gray-100 ${
-                      !row.dynamicGroupId && !row.showWhenDynamicGroupId ? 'bg-gray-100 font-medium' : ''
-                    }`}
-                  >
-                    <span className="inline-block h-2 w-2 rounded-full bg-gray-300" />
-                    그룹없음
-                  </button>
-                  <div className="my-1 border-t" />
-                  {dynamicRowConfigs.map((g, idx) => (
-                    <button
-                      key={g.groupId}
-                      onClick={() => onSetDynamicGroupId(row.id, g.groupId)}
-                      className={`flex w-full items-center gap-2 rounded px-2 py-1 text-xs hover:bg-gray-100 ${
-                        row.dynamicGroupId === g.groupId ? 'bg-gray-100 font-medium' : ''
-                      }`}
-                    >
-                      <span className={`inline-block h-2 w-2 rounded-full ${GROUP_COLORS[idx % GROUP_COLORS.length]}`} />
-                      {g.label || g.groupId}
-                    </button>
-                  ))}
-                  <div className="my-1 border-t" />
-                  {dynamicRowConfigs.map((g, idx) => (
-                    <button
-                      key={`link-${g.groupId}`}
-                      onClick={() => onSetShowWhenDynamicGroupId(row.id, g.groupId)}
-                      className={`flex w-full items-center gap-2 rounded px-2 py-1 text-xs hover:bg-gray-100 ${
-                        row.showWhenDynamicGroupId === g.groupId ? 'bg-gray-100 font-medium' : ''
-                      }`}
-                    >
-                      <Zap className={`h-3 w-3 ${GROUP_COLORS[idx % GROUP_COLORS.length]?.replace('bg-', 'text-') || 'text-gray-400'}`} />
-                      {g.label || g.groupId} (소계)
-                    </button>
-                  ))}
+                  {/* 행 코드 */}
+                  <div className="px-2 py-1.5">
+                    <label className="mb-1 block text-[10px] font-medium text-gray-500">행 코드 (엑셀용)</label>
+                    <Input
+                      value={row.rowCode || ''}
+                      onChange={(e) => onUpdateRowCode(rowIndex, e.target.value)}
+                      className="h-6 bg-gray-50 px-1.5 text-xs"
+                      placeholder="행 코드"
+                    />
+                  </div>
+
+                  {/* 조건부 표시 */}
+                  {hasQuestions && (
+                    <>
+                      <div className="my-1 border-t" />
+                      <button
+                        onClick={() => onOpenRowConditionModal(rowIndex)}
+                        className={`flex w-full items-center gap-2 rounded px-2 py-1 text-xs ${
+                          row.displayCondition && row.displayCondition.conditions.length > 0
+                            ? 'text-blue-600 hover:bg-blue-50'
+                            : 'text-gray-600 hover:bg-gray-100'
+                        }`}
+                      >
+                        <Eye className="h-3 w-3" />
+                        {row.displayCondition && row.displayCondition.conditions.length > 0
+                          ? `조건부 표시 (${row.displayCondition.conditions.length}개)`
+                          : '조건부 표시'}
+                      </button>
+                    </>
+                  )}
+
+                  {/* 동적 그룹 */}
+                  {dynamicRowConfigs.length > 0 && (
+                    <>
+                      <div className="my-1 border-t" />
+                      <div className="px-2 py-0.5 text-[10px] font-medium text-gray-500">동적 그룹</div>
+                      <button
+                        onClick={() => { onSetDynamicGroupId(row.id, undefined); onSetShowWhenDynamicGroupId(row.id, undefined); }}
+                        className={`flex w-full items-center gap-2 rounded px-2 py-1 text-xs hover:bg-gray-100 ${
+                          !row.dynamicGroupId && !row.showWhenDynamicGroupId ? 'bg-gray-100 font-medium' : ''
+                        }`}
+                      >
+                        <span className="inline-block h-2 w-2 rounded-full bg-gray-300" />
+                        그룹없음
+                      </button>
+                      {dynamicRowConfigs.map((g, idx) => (
+                        <button
+                          key={g.groupId}
+                          onClick={() => onSetDynamicGroupId(row.id, g.groupId)}
+                          className={`flex w-full items-center gap-2 rounded px-2 py-1 text-xs hover:bg-gray-100 ${
+                            row.dynamicGroupId === g.groupId ? 'bg-gray-100 font-medium' : ''
+                          }`}
+                        >
+                          <span className={`inline-block h-2 w-2 rounded-full ${GROUP_COLORS[idx % GROUP_COLORS.length]}`} />
+                          {g.label || g.groupId}
+                        </button>
+                      ))}
+                      <div className="my-1 border-t" />
+                      {dynamicRowConfigs.map((g, idx) => (
+                        <button
+                          key={`link-${g.groupId}`}
+                          onClick={() => onSetShowWhenDynamicGroupId(row.id, g.groupId)}
+                          className={`flex w-full items-center gap-2 rounded px-2 py-1 text-xs hover:bg-gray-100 ${
+                            row.showWhenDynamicGroupId === g.groupId ? 'bg-gray-100 font-medium' : ''
+                          }`}
+                        >
+                          <Zap className={`h-3 w-3 ${GROUP_COLORS[idx % GROUP_COLORS.length]?.replace('bg-', 'text-') || 'text-gray-400'}`} />
+                          {g.label || g.groupId} (소계)
+                        </button>
+                      ))}
+                    </>
+                  )}
+
+                  {/* 행 삭제 */}
+                  {totalRowCount > 1 && (
+                    <>
+                      <div className="my-1 border-t" />
+                      <button
+                        onClick={() => onDeleteRow(rowIndex)}
+                        className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-3 w-3" /> 행 삭제
+                      </button>
+                    </>
+                  )}
                 </div>
               </PopoverContent>
             </Popover>
-          )}
-          {totalRowCount > 1 && (
-            <button
-              onClick={() => onDeleteRow(rowIndex)}
-              className="absolute -right-1 -top-1 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white shadow-sm hover:bg-red-600 group-hover/label:flex"
-              title="행 삭제"
-            >
-              <Trash2 className="h-2.5 w-2.5" />
-            </button>
-          )}
+          </div>
         </div>
       </td>
 
@@ -366,74 +380,58 @@ export const EditorTableRow = React.memo(function EditorTableRow({
                 >
                   <EditorCellContent cell={cell} />
                 </div>
-                <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                  <div className="mr-1 flex items-center border-r border-gray-200 pr-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-6 w-5 p-0 text-gray-400 hover:text-gray-700 disabled:opacity-30"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onMoveColumn(cellIndex, 'left');
-                      }}
-                      disabled={cellIndex === 0}
-                      title="열 왼쪽으로 이동"
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-gray-400 opacity-0 transition-opacity hover:bg-gray-200 hover:text-gray-700 group-hover:opacity-100 data-[state=open]:opacity-100"
+                      onClick={(e) => e.stopPropagation()}
+                      title="셀 설정"
                     >
-                      <ArrowLeft className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-6 w-5 p-0 text-gray-400 hover:text-gray-700 disabled:opacity-30"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onMoveColumn(cellIndex, 'right');
-                      }}
-                      disabled={cellIndex === columnCount - 1}
-                      title="열 오른쪽으로 이동"
-                    >
-                      <ArrowRight className="h-3 w-3" />
-                    </Button>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteCell(rowIndex, cellIndex);
-                    }}
-                    title="셀 삭제"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 w-6 p-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onCopyCell(rowIndex, cellIndex);
-                    }}
-                    title="셀 복사"
-                  >
-                    <Copy className="h-3 w-3" />
-                  </Button>
-                  {(hasCopiedCell || hasCopiedRegion) && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-6 w-6 p-0 text-blue-600 hover:text-blue-800"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onPasteCell(rowIndex, cellIndex);
-                      }}
-                      title="셀 붙여넣기"
-                    >
-                      <Clipboard className="h-3 w-3" />
-                    </Button>
-                  )}
-                </div>
+                      <Settings2 className="h-3 w-3" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-40 p-1" side="bottom" align="end" onClick={(e) => e.stopPropagation()}>
+                    <div className="space-y-0.5">
+                      <button
+                        onClick={() => onCopyCell(rowIndex, cellIndex)}
+                        className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
+                      >
+                        <Copy className="h-3 w-3" /> 셀 복사
+                      </button>
+                      {(hasCopiedCell || hasCopiedRegion) && (
+                        <button
+                          onClick={() => onPasteCell(rowIndex, cellIndex)}
+                          className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-blue-600 hover:bg-blue-50"
+                        >
+                          <Clipboard className="h-3 w-3" /> 셀 붙여넣기
+                        </button>
+                      )}
+                      <button
+                        onClick={() => onDeleteCell(rowIndex, cellIndex)}
+                        className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-3 w-3" /> 셀 삭제
+                      </button>
+                      <div className="my-1 border-t" />
+                      <div className="flex gap-0.5 px-1">
+                        <button
+                          onClick={() => onMoveColumn(cellIndex, 'left')}
+                          disabled={cellIndex === 0}
+                          className="flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-30"
+                        >
+                          <ArrowLeft className="h-3 w-3" /> 왼쪽
+                        </button>
+                        <button
+                          onClick={() => onMoveColumn(cellIndex, 'right')}
+                          disabled={cellIndex === columnCount - 1}
+                          className="flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-30"
+                        >
+                          오른쪽 <ArrowRight className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
               {/* Fill Handle — 드래그 복사 시작점 */}
               {!isDragCopyActive && (

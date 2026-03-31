@@ -354,12 +354,15 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
           >
             <table
               ref={tableRef}
-              className="w-full border-collapse border border-gray-300"
-              style={{ tableLayout: 'fixed' }}
+              className="mx-auto border-collapse border border-gray-300"
+              style={{
+                tableLayout: 'fixed',
+                width: `${120 + currentColumns.reduce((sum, col) => sum + (col.width || 150), 0)}px`,
+              }}
             >
               {/* 열 너비 정의 */}
               <colgroup>
-                <col style={{ width: '70px' }} />
+                <col style={{ width: '120px' }} />
                 {currentColumns.map((column, index) => (
                   <col key={`col-${index}`} style={{ width: `${column.width || 150}px` }} />
                 ))}
