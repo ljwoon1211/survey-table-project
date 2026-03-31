@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
   // saveSurveyWithDetails에서 설문 전체 데이터를 전송하므로 제한 확대 필요
   experimental: {
     serverActions: {
-      bodySizeLimit: '10mb',
+      bodySizeLimit: '30mb',
     },
   },
 
