@@ -1029,6 +1029,60 @@ export function SortableQuestionList({
           }))
         : undefined;
 
+      // 행 ID 매핑 생성 (dynamicRowConfigs의 insertAfterRowId 업데이트용)
+      const rowIdMap = new Map<string, string>();
+
+      // tableRowsData 복사 (새 ID 부여 및 셀 ID 규칙 적용)
+      const newTableRowsData = questionToDuplicate.tableRowsData
+        ? questionToDuplicate.tableRowsData.map((row) => {
+            const newRowId = generateId();
+            rowIdMap.set(row.id, newRowId);
+            return {
+              ...row,
+              id: newRowId,
+              cells: row.cells.map((cell, cellIndex) => {
+                // 해당 셀의 새 컬럼 ID 찾기
+                const newColId = newTableColumns?.[cellIndex]?.id;
+                const newCellId = newColId ? `cell-${newRowId}-${newColId}` : generateId();
+
+                return {
+                  ...cell,
+                  id: newCellId,
+                  // 셀 내부의 옵션들도 복사
+                  checkboxOptions: cell.checkboxOptions
+                    ? cell.checkboxOptions.map((opt) => ({
+                        ...opt,
+                        id: generateId(),
+                      }))
+                    : undefined,
+                  radioOptions: cell.radioOptions
+                    ? cell.radioOptions.map((opt) => ({
+                        ...opt,
+                        id: generateId(),
+                      }))
+                    : undefined,
+                  selectOptions: cell.selectOptions
+                    ? cell.selectOptions.map((opt) => ({
+                        ...opt,
+                        id: generateId(),
+                      }))
+                    : undefined,
+                };
+              }),
+            };
+          })
+        : undefined;
+
+      // dynamicRowConfigs 복사 (insertAfterRowId를 새 행 ID로 매핑)
+      const newDynamicRowConfigs = questionToDuplicate.dynamicRowConfigs
+        ? questionToDuplicate.dynamicRowConfigs.map((config) => ({
+            ...config,
+            insertAfterRowId: config.insertAfterRowId
+              ? rowIdMap.get(config.insertAfterRowId) ?? config.insertAfterRowId
+              : undefined,
+          }))
+        : undefined;
+
       // 기존 질문들의 최대 order를 찾아서 +1 (없으면 1부터 시작)
       const maxOrder = questions.length > 0 ? Math.max(...questions.map((q) => q.order), 0) : 0;
 
@@ -1058,45 +1112,8 @@ export function SortableQuestionList({
           : undefined,
         // tableColumns 복사 (위에서 생성한 새 컬럼 사용)
         tableColumns: newTableColumns,
-        // tableRowsData 복사 (새 ID 부여 및 셀 ID 규칙 적용)
-        tableRowsData: questionToDuplicate.tableRowsData
-          ? questionToDuplicate.tableRowsData.map((row) => {
-              const newRowId = generateId();
-              return {
-                ...row,
-                id: newRowId,
-                cells: row.cells.map((cell, cellIndex) => {
-                  // 해당 셀의 새 컬럼 ID 찾기
-                  const newColId = newTableColumns?.[cellIndex]?.id;
-                  const newCellId = newColId ? `cell-${newRowId}-${newColId}` : generateId();
-
-                  return {
-                    ...cell,
-                    id: newCellId,
-                    // 셀 내부의 옵션들도 복사
-                    checkboxOptions: cell.checkboxOptions
-                      ? cell.checkboxOptions.map((opt) => ({
-                          ...opt,
-                          id: generateId(),
-                        }))
-                      : undefined,
-                    radioOptions: cell.radioOptions
-                      ? cell.radioOptions.map((opt) => ({
-                          ...opt,
-                          id: generateId(),
-                        }))
-                      : undefined,
-                    selectOptions: cell.selectOptions
-                      ? cell.selectOptions.map((opt) => ({
-                          ...opt,
-                          id: generateId(),
-                        }))
-                      : undefined,
-                  };
-                }),
-              };
-            })
-          : undefined,
+        tableRowsData: newTableRowsData,
+        dynamicRowConfigs: newDynamicRowConfigs,
       };
 
       // 로컬 스토어에 추가
@@ -1125,6 +1142,7 @@ export function SortableQuestionList({
             requiresAcknowledgment: newQuestion.requiresAcknowledgment,
             tableValidationRules: newQuestion.tableValidationRules,
             displayCondition: newQuestion.displayCondition,
+            dynamicRowConfigs: newQuestion.dynamicRowConfigs,
           });
         } catch (error) {
           console.error('질문 복제 실패:', error);
