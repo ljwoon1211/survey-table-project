@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 
 import {
   DndContext,
@@ -36,8 +37,18 @@ interface GroupManagerProps {
 }
 
 export function GroupManager({ className }: GroupManagerProps) {
-  const { currentSurvey, addGroup, updateGroup, deleteGroup, reorderGroups } =
-    useSurveyBuilderStore();
+  const { addGroup, updateGroup, deleteGroup, reorderGroups } =
+    useSurveyBuilderStore(
+      useShallow((s) => ({
+        addGroup: s.addGroup,
+        updateGroup: s.updateGroup,
+        deleteGroup: s.deleteGroup,
+        reorderGroups: s.reorderGroups,
+      })),
+    );
+  const groups = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.groups));
+  const questions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
+  const surveyId = useSurveyBuilderStore((s) => s.currentSurvey.id);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<QuestionGroup | null>(null);
@@ -49,12 +60,12 @@ export function GroupManager({ className }: GroupManagerProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
 
-  const groups = useMemo(() => currentSurvey.groups || [], [currentSurvey.groups]);
+  const groupsOrEmpty = useMemo(() => groups || [], [groups]);
 
-  // 모달이 열려있는 동안 currentSurvey.groups가 업데이트되면 editingGroup도 업데이트
+  // 모달이 열려있는 동안 groups가 업데이트되면 editingGroup도 업데이트
   useEffect(() => {
     if (isEditModalOpen && editingGroup?.id) {
-      const latestGroup = groups.find((g) => g.id === editingGroup.id);
+      const latestGroup = groupsOrEmpty.find((g) => g.id === editingGroup.id);
       if (latestGroup) {
         // displayCondition이 다르거나 다른 필드가 업데이트된 경우
         const hasChanges =
@@ -69,20 +80,20 @@ export function GroupManager({ className }: GroupManagerProps) {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditModalOpen, editingGroup?.id, groups]);
+  }, [isEditModalOpen, editingGroup?.id, groupsOrEmpty]);
 
   // 최상위 그룹만 필터링 (parentGroupId가 없는 것들)
   const topLevelGroups = useMemo(
-    () => groups.filter((g) => !g.parentGroupId).sort((a, b) => a.order - b.order),
-    [groups],
+    () => groupsOrEmpty.filter((g) => !g.parentGroupId).sort((a, b) => a.order - b.order),
+    [groupsOrEmpty],
   );
 
   // 특정 그룹의 하위 그룹들 가져오기
   const getSubGroups = useCallback(
     (parentId: string) => {
-      return groups.filter((g) => g.parentGroupId === parentId).sort((a, b) => a.order - b.order);
+      return groupsOrEmpty.filter((g) => g.parentGroupId === parentId).sort((a, b) => a.order - b.order);
     },
-    [groups],
+    [groupsOrEmpty],
   );
 
   const sensors = useSensors(
@@ -95,12 +106,12 @@ export function GroupManager({ className }: GroupManagerProps) {
   // 각 그룹에 직접 속한 질문 개수 계산 (메모이제이션)
   const questionCountMap = useMemo(() => {
     const map = new Map<string, number>();
-    groups.forEach((group) => {
-      const count = currentSurvey.questions.filter((q) => q.groupId === group.id).length;
+    groupsOrEmpty.forEach((group) => {
+      const count = questions.filter((q) => q.groupId === group.id).length;
       map.set(group.id, count);
     });
     return map;
-  }, [groups, currentSurvey.questions]);
+  }, [groupsOrEmpty, questions]);
 
   // 재귀적으로 그룹과 모든 하위 그룹의 질문 개수 합계 계산 (메모이제이션)
   const getTotalQuestionCount = useCallback(
@@ -134,14 +145,14 @@ export function GroupManager({ className }: GroupManagerProps) {
     };
 
     // 모든 그룹에 대해 계산
-    groups.forEach((group) => {
+    groupsOrEmpty.forEach((group) => {
       if (!map.has(group.id)) {
         calculateCount(group.id);
       }
     });
 
     return map;
-  }, [groups, getSubGroups]);
+  }, [groupsOrEmpty, getSubGroups]);
 
   const getTotalSubGroupCount = useCallback(
     (groupId: string): number => {
@@ -155,11 +166,11 @@ export function GroupManager({ className }: GroupManagerProps) {
       let createdGroupId: string | undefined;
 
       // DB에 그룹 저장
-      if (currentSurvey.id && isUUID(currentSurvey.id)) {
+      if (surveyId && isUUID(surveyId)) {
         try {
           const { createQuestionGroup } = await import('@/actions/question-group-actions');
           const createdGroup = await createQuestionGroup({
-            surveyId: currentSurvey.id,
+            surveyId: surveyId,
             name: groupName.trim(),
             description: groupDescription.trim() || undefined,
             parentGroupId: parentGroupIdForNew,
@@ -175,14 +186,14 @@ export function GroupManager({ className }: GroupManagerProps) {
       // 로컬 스토어 업데이트
       if (createdGroupId && isUUID(createdGroupId)) {
         // DB에서 생성된 그룹의 UUID를 사용하여 직접 추가
-        const groups = currentSurvey.groups || [];
-        const siblingGroups = groups.filter((g) => g.parentGroupId === parentGroupIdForNew);
+        const currentGroups = groupsOrEmpty;
+        const siblingGroups = currentGroups.filter((g) => g.parentGroupId === parentGroupIdForNew);
         const maxOrder =
           siblingGroups.length > 0 ? Math.max(...siblingGroups.map((g) => g.order)) : -1;
 
         const newGroup: QuestionGroup = {
           id: createdGroupId,
-          surveyId: currentSurvey.id!,
+          surveyId: surveyId!,
           name: groupName.trim(),
           description: groupDescription.trim() || undefined,
           order: maxOrder + 1,
@@ -233,8 +244,8 @@ export function GroupManager({ className }: GroupManagerProps) {
   };
 
   const handleEditGroup = (group: QuestionGroup) => {
-    // currentSurvey.groups에서 최신 그룹 정보 가져오기 (displayCondition 포함)
-    const latestGroup = groups.find((g) => g.id === group.id) || group;
+    // groups에서 최신 그룹 정보 가져오기 (displayCondition 포함)
+    const latestGroup = groupsOrEmpty.find((g) => g.id === group.id) || group;
     setEditingGroup(latestGroup);
     setGroupName(latestGroup.name);
     setGroupDescription(latestGroup.description || '');
@@ -247,7 +258,7 @@ export function GroupManager({ className }: GroupManagerProps) {
       updateGroup(editingGroup.id, { displayCondition: conditionGroup });
 
       // DB에 저장 (그룹 ID가 UUID인 경우에만)
-      if (currentSurvey.id && isUUID(currentSurvey.id) && isUUID(editingGroup.id)) {
+      if (surveyId && isUUID(surveyId) && isUUID(editingGroup.id)) {
         import('@/actions/question-group-actions').then(({ updateQuestionGroup }) => {
           updateQuestionGroup(editingGroup.id, {
             displayCondition: conditionGroup,
@@ -264,14 +275,14 @@ export function GroupManager({ className }: GroupManagerProps) {
       const oldParentGroupId = editingGroup.parentGroupId;
       const newParentGroupId = parentGroupIdForEdit;
 
-      // currentSurvey.groups에서 최신 그룹 정보 확인
-      const latestGroup = groups.find((g) => g.id === editingGroup.id);
+      // groups에서 최신 그룹 정보 확인
+      const latestGroup = groupsOrEmpty.find((g) => g.id === editingGroup.id);
       const finalDisplayCondition = latestGroup?.displayCondition;
 
       // 상위 그룹이 변경된 경우
       if (oldParentGroupId !== newParentGroupId) {
         // 순환 참조 체크: newParentGroupId가 editingGroup의 하위 그룹이 될 수 있는지 확인
-        if (newParentGroupId && !canBeParentOf(newParentGroupId, editingGroup.id, groups)) {
+        if (newParentGroupId && !canBeParentOf(newParentGroupId, editingGroup.id, groupsOrEmpty)) {
           alert('순환 참조 방지: 선택한 그룹을 상위 그룹으로 설정할 수 없습니다.');
           return;
         }
@@ -279,13 +290,13 @@ export function GroupManager({ className }: GroupManagerProps) {
         // 새로운 상위 그룹의 하위 그룹들 중 마지막 순서 계산
         let newOrder = 0;
         if (newParentGroupId) {
-          const newSiblings = groups.filter(
+          const newSiblings = groupsOrEmpty.filter(
             (g) => g.parentGroupId === newParentGroupId && g.id !== editingGroup.id,
           );
           newOrder = newSiblings.length > 0 ? Math.max(...newSiblings.map((g) => g.order)) + 1 : 0;
         } else {
           // 최상위로 이동하는 경우
-          const topLevelSiblings = groups.filter(
+          const topLevelSiblings = groupsOrEmpty.filter(
             (g) => !g.parentGroupId && g.id !== editingGroup.id,
           );
           newOrder =
@@ -301,8 +312,8 @@ export function GroupManager({ className }: GroupManagerProps) {
 
         // DB에 저장 (그룹 ID가 UUID인 경우에만)
         if (
-          currentSurvey.id &&
-          isUUID(currentSurvey.id) &&
+          surveyId &&
+          isUUID(surveyId) &&
           isUUID(editingGroup.id) &&
           (!newParentGroupId || isUUID(newParentGroupId))
         ) {
@@ -332,7 +343,7 @@ export function GroupManager({ className }: GroupManagerProps) {
         });
 
         // DB에 저장 (그룹 ID가 UUID인 경우에만)
-        if (currentSurvey.id && isUUID(currentSurvey.id) && isUUID(editingGroup.id)) {
+        if (surveyId && isUUID(surveyId) && isUUID(editingGroup.id)) {
           try {
             const { updateQuestionGroup } = await import('@/actions/question-group-actions');
             await updateQuestionGroup(editingGroup.id, {
@@ -364,7 +375,7 @@ export function GroupManager({ className }: GroupManagerProps) {
 
     if (confirm(message)) {
       // DB에서 그룹 삭제 (deleteQuestionGroup이 재귀적으로 하위 그룹도 함께 처리)
-      if (currentSurvey.id && isUUID(currentSurvey.id)) {
+      if (surveyId && isUUID(surveyId)) {
         try {
           const { deleteQuestionGroup } = await import('@/actions/question-group-actions');
           // 최상위 그룹만 삭제하면, 서버 액션에서 하위 그룹도 함께 처리됨
@@ -399,8 +410,8 @@ export function GroupManager({ className }: GroupManagerProps) {
 
     if (!over || active.id === over.id) return;
 
-    const draggedGroup = groups.find((g) => g.id === active.id);
-    const targetGroup = groups.find((g) => g.id === over.id);
+    const draggedGroup = groupsOrEmpty.find((g) => g.id === active.id);
+    const targetGroup = groupsOrEmpty.find((g) => g.id === over.id);
 
     if (!draggedGroup || !targetGroup) return;
 
@@ -409,7 +420,7 @@ export function GroupManager({ className }: GroupManagerProps) {
 
     // 대분류는 대분류끼리만 순서 변경 가능
     if (!draggedGroup.parentGroupId && !targetGroup.parentGroupId) {
-      const sameLevelGroups = groups
+      const sameLevelGroups = groupsOrEmpty
         .filter((g) => !g.parentGroupId)
         .sort((a, b) => a.order - b.order);
 
@@ -422,12 +433,12 @@ export function GroupManager({ className }: GroupManagerProps) {
         reorderGroups(newGroupIds);
 
         // DB에 저장 (UUID인 그룹 ID만 필터링)
-        if (currentSurvey.id && isUUID(currentSurvey.id)) {
+        if (surveyId && isUUID(surveyId)) {
           try {
             const { reorderGroups: reorderGroupsAction } = await import('@/actions/question-group-actions');
             const uuidGroupIds = newGroupIds.filter((id) => isUUID(id));
             if (uuidGroupIds.length > 0) {
-              await reorderGroupsAction(currentSurvey.id, uuidGroupIds);
+              await reorderGroupsAction(surveyId, uuidGroupIds);
             }
           } catch (error) {
             console.error('그룹 순서 저장 실패:', error);
@@ -443,7 +454,7 @@ export function GroupManager({ className }: GroupManagerProps) {
       // 같은 대분류 내의 소분류인지 확인
       if (draggedGroup.parentGroupId === targetGroup.parentGroupId) {
         // 같은 대분류 내의 소분류끼리 순서만 변경
-        const sameLevelGroups = groups
+        const sameLevelGroups = groupsOrEmpty
           .filter((g) => g.parentGroupId === draggedGroup.parentGroupId)
           .sort((a, b) => a.order - b.order);
 
@@ -461,7 +472,7 @@ export function GroupManager({ className }: GroupManagerProps) {
           });
 
           // DB에 저장 (그룹 ID가 UUID인 경우에만)
-          if (currentSurvey.id && isUUID(currentSurvey.id)) {
+          if (surveyId && isUUID(surveyId)) {
             try {
               const { updateQuestionGroup } = await import('@/actions/question-group-actions');
               await Promise.all(
@@ -591,7 +602,7 @@ export function GroupManager({ className }: GroupManagerProps) {
         groupDescription={groupDescription}
         setGroupDescription={setGroupDescription}
         parentGroupId={parentGroupIdForNew}
-        groups={groups}
+        groups={groupsOrEmpty}
       />
 
       {/* 그룹 편집 모달 */}
@@ -613,8 +624,8 @@ export function GroupManager({ className }: GroupManagerProps) {
         parentGroupId={parentGroupIdForEdit}
         setParentGroupId={setParentGroupIdForEdit}
         topLevelGroups={topLevelGroups}
-        allGroups={groups}
-        allQuestions={currentSurvey.questions}
+        allGroups={groupsOrEmpty}
+        allQuestions={questions}
         onConditionUpdate={handleGroupConditionUpdate}
       />
     </div>

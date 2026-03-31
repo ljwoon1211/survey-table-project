@@ -43,6 +43,7 @@ import { getProxiedImageUrl, optimizeImage, validateImageFile } from '@/lib/imag
 import { generateId, isValidUUID } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { CheckboxOption, QuestionOption, RadioOption, TableCell } from '@/types/survey';
+import { useShallow } from 'zustand/react/shallow';
 import {
   INTERACTIVE_CELL_TYPES,
   generateCellCode,
@@ -80,7 +81,7 @@ export function CellContentModal({
   columnCode,
   columnLabel,
 }: CellContentModalProps) {
-  const { currentSurvey } = useSurveyBuilderStore();
+  const questions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
   const [isSaving, setIsSaving] = useState(false);
   const [contentType, setContentType] = useState<
     'text' | 'image' | 'video' | 'checkbox' | 'radio' | 'select' | 'input'
@@ -311,8 +312,8 @@ export function CellContentModal({
       onSave(updatedCell);
 
       // 서버에 질문 저장/업데이트
-      if (currentQuestionId && currentSurvey.id) {
-        const question = currentSurvey.questions.find((q) => q.id === currentQuestionId);
+      if (currentQuestionId && useSurveyBuilderStore.getState().currentSurvey.id) {
+        const question = questions.find((q) => q.id === currentQuestionId);
         if (question && question.tableRowsData) {
           // tableRowsData에서 해당 셀을 찾아 업데이트
           const updatedRowsData = question.tableRowsData.map((row) => ({
@@ -329,7 +330,7 @@ export function CellContentModal({
             } else {
               // 임시 질문: 생성하고 반환된 UUID로 로컬 스토어의 질문 ID 업데이트
               const createdQuestion = await createQuestionAction({
-                surveyId: currentSurvey.id,
+                surveyId: useSurveyBuilderStore.getState().currentSurvey.id,
                 groupId: question.groupId,
                 type: question.type,
                 title: question.title || '',
@@ -1227,7 +1228,7 @@ export function CellContentModal({
                       <div className="px-3 pb-3">
                         <BranchRuleEditor
                           branchRule={option.branchRule}
-                          allQuestions={currentSurvey.questions}
+                          allQuestions={questions}
                           currentQuestionId={currentQuestionId}
                           onChange={(branchRule) => {
                             const updated = [...checkboxOptions];
@@ -1495,7 +1496,7 @@ export function CellContentModal({
                       <div className="px-3 pb-3">
                         <BranchRuleEditor
                           branchRule={option.branchRule}
-                          allQuestions={currentSurvey.questions}
+                          allQuestions={questions}
                           currentQuestionId={currentQuestionId}
                           onChange={(branchRule) => {
                             const updated = [...radioOptions];
@@ -1653,7 +1654,7 @@ export function CellContentModal({
                       <div className="px-3 pb-3">
                         <BranchRuleEditor
                           branchRule={option.branchRule}
-                          allQuestions={currentSurvey.questions}
+                          allQuestions={questions}
                           currentQuestionId={currentQuestionId}
                           onChange={(branchRule) => {
                             const updated = [...selectOptions];

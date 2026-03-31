@@ -183,26 +183,31 @@ export function recalculateRowspansForVisibleRows(
   originalRows: TableRow[],
   visibleRowIds: Set<string>,
 ): TableRow[] {
-  // 가시 행만 deep copy
-  const visibleRows = originalRows
-    .filter((row) => visibleRowIds.has(row.id))
-    .map((row) => ({
-      ...row,
-      cells: row.cells.map((cell) => ({ ...cell })),
-    }));
+  const visibleRows = originalRows.filter((row) => visibleRowIds.has(row.id));
 
   if (visibleRows.length === 0) return visibleRows;
 
-  // 열 개수 (첫 번째 행 기준)
   const colCount = visibleRows[0].cells.length;
+
+  // 변경이 필요한 셀만 추적: Map<visibleRowIndex, Map<colIdx, cellOverrides>>
+  const modifications = new Map<number, Map<number, Partial<TableRow['cells'][0]>>>();
+
+  const setMod = (rowIdx: number, colIdx: number, overrides: Partial<TableRow['cells'][0]>) => {
+    let rowMods = modifications.get(rowIdx);
+    if (!rowMods) {
+      rowMods = new Map();
+      modifications.set(rowIdx, rowMods);
+    }
+    rowMods.set(colIdx, { ...rowMods.get(colIdx), ...overrides });
+  };
 
   // 각 열에 대해 병합 재계산
   for (let colIdx = 0; colIdx < colCount; colIdx++) {
     // 1. 원본에서 병합 그룹 식별 (rowspan > 1인 셀 기준)
     interface MergeGroup {
       startOrigIdx: number;
-      endOrigIdx: number; // exclusive
-      cellContent: typeof originalRows[0]['cells'][0]; // 병합 시작 셀의 내용 참조
+      endOrigIdx: number;
+      cellContent: typeof originalRows[0]['cells'][0];
     }
     const mergeGroups: MergeGroup[] = [];
 
@@ -219,13 +224,11 @@ export function recalculateRowspansForVisibleRows(
 
     // 2. 각 병합 그룹에 대해, 가시 행 중 해당 범위에 속하는 행들을 찾아 재계산
     for (const group of mergeGroups) {
-      // 이 그룹 범위에 속하는 원본 행 ID들
       const groupOrigRowIds = new Set<string>();
       for (let r = group.startOrigIdx; r < group.endOrigIdx && r < originalRows.length; r++) {
         groupOrigRowIds.add(originalRows[r].id);
       }
 
-      // 가시 행 중 이 그룹에 속하는 행들의 인덱스 (visibleRows 기준)
       const visibleInGroup: number[] = [];
       for (let v = 0; v < visibleRows.length; v++) {
         if (groupOrigRowIds.has(visibleRows[v].id)) {
@@ -236,23 +239,136 @@ export function recalculateRowspansForVisibleRows(
       if (visibleInGroup.length === 0) continue;
 
       // 첫 번째 가시 행에 병합 시작 셀 배치
-      const firstVisibleIdx = visibleInGroup[0];
-      const firstCell = visibleRows[firstVisibleIdx].cells[colIdx];
-      firstCell.isHidden = false;
-      firstCell.content = group.cellContent.content;
-      firstCell.type = group.cellContent.type;
-      firstCell.rowspan = visibleInGroup.length > 1 ? visibleInGroup.length : undefined;
+      setMod(visibleInGroup[0], colIdx, {
+        isHidden: false,
+        content: group.cellContent.content,
+        type: group.cellContent.type,
+        rowspan: visibleInGroup.length > 1 ? visibleInGroup.length : undefined,
+      });
 
       // 나머지 가시 행의 해당 열 셀은 isHidden
       for (let i = 1; i < visibleInGroup.length; i++) {
-        const hiddenCell = visibleRows[visibleInGroup[i]].cells[colIdx];
-        hiddenCell.isHidden = true;
-        hiddenCell.rowspan = undefined;
+        setMod(visibleInGroup[i], colIdx, {
+          isHidden: true,
+          rowspan: undefined,
+        });
       }
     }
   }
 
-  return visibleRows;
+  // 변경 필요한 행만 복사, 나머지는 원본 참조 유지
+  return visibleRows.map((row, rowIdx) => {
+    const rowMods = modifications.get(rowIdx);
+    if (!rowMods) return row;
+
+    return {
+      ...row,
+      cells: row.cells.map((cell, colIdx) => {
+        const cellMod = rowMods.get(colIdx);
+        if (!cellMod) return cell;
+        return { ...cell, ...cellMod };
+      }),
+    };
+  });
+}
+
+/**
+ * 가시 열 기준으로 columns, rows의 cells, headerGrid를 필터링하고 colspan을 재계산
+ *
+ * @param originalColumns 원본 전체 열 배열
+ * @param originalRows 원본 전체 행 배열
+ * @param visibleColumnIds 표시할 열 ID Set
+ * @param headerGrid 다단계 헤더 (선택사항)
+ * @returns 필터링된 columns, rows, headerGrid (deep copy)
+ */
+export function recalculateColspansForVisibleColumns(
+  originalColumns: TableColumn[],
+  originalRows: TableRow[],
+  visibleColumnIds: Set<string>,
+  headerGrid?: HeaderCell[][],
+): { columns: TableColumn[]; rows: TableRow[]; headerGrid?: HeaderCell[][] } {
+  // 가시 열 인덱스 Set 생성
+  const visibleColIndices = new Set<number>();
+  originalColumns.forEach((col, idx) => {
+    if (visibleColumnIds.has(col.id)) visibleColIndices.add(idx);
+  });
+
+  // 열 필터링 + 헤더 colspan 재계산
+  const filteredColumns: TableColumn[] = [];
+  for (let i = 0; i < originalColumns.length; i++) {
+    if (!visibleColIndices.has(i)) continue;
+    const col = { ...originalColumns[i] };
+
+    // 이 열이 헤더 병합 시작이면 colspan 재계산
+    if (col.colspan && col.colspan > 1) {
+      let newColspan = 0;
+      for (let j = i; j < i + col.colspan && j < originalColumns.length; j++) {
+        if (visibleColIndices.has(j)) newColspan++;
+      }
+      col.colspan = newColspan > 1 ? newColspan : undefined;
+    }
+    col.isHeaderHidden = false; // 필터링 후에는 모두 표시
+    filteredColumns.push(col);
+  }
+
+  // 행의 cells 필터링 + colspan 재계산
+  const filteredRows = originalRows.map((row) => {
+    const newCells = [];
+    for (let i = 0; i < row.cells.length; i++) {
+      if (!visibleColIndices.has(i)) continue;
+      const cell = { ...row.cells[i] };
+
+      // colspan 재계산
+      if (cell.colspan && cell.colspan > 1) {
+        let newColspan = 0;
+        for (let j = i; j < i + cell.colspan && j < row.cells.length; j++) {
+          if (visibleColIndices.has(j)) newColspan++;
+        }
+        cell.colspan = newColspan > 1 ? newColspan : undefined;
+        cell.isHidden = false;
+      }
+
+      // colspan에 의해 숨겨진 셀이면 건너뜀 (원본 기준 isHidden이고 해당 병합 시작 셀이 숨겨진 열에 있는 경우)
+      // → 필터링 후에는 보이는 열만 남으므로, 여전히 다른 가시 셀의 colspan에 포함되는지 확인
+      newCells.push(cell);
+    }
+    return { ...row, cells: newCells };
+  });
+
+  // 다단계 헤더 재계산
+  let filteredHeaderGrid: HeaderCell[][] | undefined;
+  if (headerGrid && headerGrid.length > 0) {
+    filteredHeaderGrid = headerGrid.map((headerRow) => {
+      const newRow: HeaderCell[] = [];
+      let origColIdx = 0;
+
+      for (const cell of headerRow) {
+        const cellColspan = cell.colspan || 1;
+        // 이 헤더 셀이 커버하는 원본 열 범위에서 가시 열 수 카운트
+        let visibleCount = 0;
+        for (let j = 0; j < cellColspan && origColIdx + j < originalColumns.length; j++) {
+          if (visibleColIndices.has(origColIdx + j)) visibleCount++;
+        }
+
+        if (visibleCount > 0) {
+          newRow.push({
+            ...cell,
+            colspan: visibleCount,
+          });
+        }
+
+        origColIdx += cellColspan;
+      }
+
+      return newRow;
+    });
+
+    // 빈 행 제거
+    filteredHeaderGrid = filteredHeaderGrid.filter((row) => row.length > 0);
+    if (filteredHeaderGrid.length === 0) filteredHeaderGrid = undefined;
+  }
+
+  return { columns: filteredColumns, rows: filteredRows, headerGrid: filteredHeaderGrid };
 }
 
 /**

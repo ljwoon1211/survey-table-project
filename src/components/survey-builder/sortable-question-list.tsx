@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+
+import { useShallow } from 'zustand/react/shallow';
 
 import {
   DndContext,
@@ -69,7 +71,7 @@ interface SortableQuestionProps {
   onSaveToLibrary?: (question: Question) => void;
 }
 
-function SortableQuestion({
+const SortableQuestion = React.memo(function SortableQuestion({
   question,
   index,
   isSelected,
@@ -213,7 +215,7 @@ function SortableQuestion({
       </div>
     </Card>
   );
-}
+});
 
 function QuestionPreview({ question }: { question: Question }) {
   switch (question.type) {
@@ -299,7 +301,8 @@ function QuestionPreview({ question }: { question: Question }) {
 
 // 테스트 모드용 인터랙티브 질문 카드 컴포넌트
 function QuestionTestCard({ question, index }: { question: Question; index: number }) {
-  const { testResponses, updateTestResponse } = useTestResponseStore();
+  const testResponse = useTestResponseStore((s) => s.testResponses[question.id]);
+  const updateTestResponse = useTestResponseStore((s) => s.updateTestResponse);
 
   const handleResponse = (value: unknown) => {
     updateTestResponse(
@@ -332,7 +335,7 @@ function QuestionTestCard({ question, index }: { question: Question; index: numb
       <div className="space-y-3">
         <QuestionTestInput
           question={question}
-          value={testResponses[question.id]}
+          value={testResponse}
           onChange={handleResponse}
         />
       </div>
@@ -843,15 +846,24 @@ export function SortableQuestionList({
   isTestMode = false,
   onSaveToLibrary,
 }: SortableQuestionListProps) {
-  const { currentSurvey, reorderQuestions, deleteQuestion, updateQuestion, addQuestion } =
-    useSurveyBuilderStore();
-  const { selectQuestion } = useSurveyUIStore();
+  const { reorderQuestions, deleteQuestion, updateQuestion, addQuestion } =
+    useSurveyBuilderStore(
+      useShallow((s) => ({
+        reorderQuestions: s.reorderQuestions,
+        deleteQuestion: s.deleteQuestion,
+        updateQuestion: s.updateQuestion,
+        addQuestion: s.addQuestion,
+      })),
+    );
+  const { surveyId } = useSurveyBuilderStore(
+    useShallow((s) => ({ surveyId: s.currentSurvey.id })),
+  );
+  const groups = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.groups || []));
+  const selectQuestion = useSurveyUIStore((s) => s.selectQuestion);
 
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
-
-  const groups = currentSurvey.groups || [];
 
   // 중복 제거: 같은 ID를 가진 그룹이 있으면 첫 번째 것만 사용
   const uniqueGroups = Array.from(new Map(groups.map((g) => [g.id, g])).values());
@@ -960,7 +972,7 @@ export function SortableQuestionList({
         reorderQuestions(questionIds);
 
         // 서버에 질문 순서 변경 API 호출
-        if (currentSurvey.id) {
+        if (surveyId) {
           reorderQuestionsAction(questionIds).catch((error) => {
             console.error('질문 순서 변경 실패:', error);
           });
@@ -1091,10 +1103,10 @@ export function SortableQuestionList({
       useSurveyBuilderStore.getState().addPreparedQuestion(newQuestion);
 
       // 서버에 질문 생성 API 호출
-      if (currentSurvey.id) {
+      if (surveyId) {
         try {
           await createQuestionAction({
-            surveyId: currentSurvey.id,
+            surveyId: surveyId,
             groupId: newQuestion.groupId,
             type: newQuestion.type,
             title: newQuestion.title,
