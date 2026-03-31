@@ -16,11 +16,30 @@ import {
   TableRow,
 } from '@/types/survey';
 
+// 질문 변경 추적을 위한 changeset
+export interface QuestionChangeset {
+  updated: Record<string, boolean>;  // 수정된 질문 ID
+  added: Record<string, boolean>;    // 새로 추가된 질문 ID
+  deleted: Record<string, boolean>;  // 삭제된 질문 ID
+  reordered: boolean;                // 순서 변경 여부
+}
+
+const emptyChangeset = (): QuestionChangeset => ({
+  updated: {},
+  added: {},
+  deleted: {},
+  reordered: false,
+});
+
 export interface SurveyBuilderState {
   // 현재 편집 중인 설문 (메모리에만 유지, TanStack Query로 서버와 동기화)
   currentSurvey: Survey;
   isDirty: boolean; // 변경사항 있음 표시
   isModifiedSincePublish: boolean; // 배포 후 수정되었는지
+
+  // Diff 기반 저장을 위한 changeset
+  questionChanges: QuestionChangeset;
+  isMetadataDirty: boolean; // 설문 메타데이터/그룹 변경 여부
 
   // 서버에서 불러온 데이터 설정
   setSurvey: (survey: Survey) => void;
@@ -53,6 +72,10 @@ export interface SurveyBuilderState {
   // 초기화
   resetSurvey: () => void;
   markClean: () => void; // 저장 후 dirty 플래그 초기화
+
+  // Diff 저장용 changeset 관리
+  snapshotChanges: () => { questionChanges: QuestionChangeset; isMetadataDirty: boolean };
+  mergeChangesBack: (snapshot: { questionChanges: QuestionChangeset; isMetadataDirty: boolean }) => void;
 }
 
 const defaultSurveySettings: SurveySettings = {
@@ -82,6 +105,8 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
       currentSurvey: createDefaultSurvey(),
       isDirty: false,
       isModifiedSincePublish: false,
+      questionChanges: emptyChangeset(),
+      isMetadataDirty: false,
 
       // 서버에서 불러온 설문 데이터 설정
       setSurvey: (survey: Survey) =>
@@ -89,6 +114,8 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           state.currentSurvey = survey;
           state.isDirty = false;
           state.isModifiedSincePublish = false;
+          state.questionChanges = emptyChangeset();
+          state.isMetadataDirty = false;
         }),
 
       markPublished: () =>
@@ -106,6 +133,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
             state.currentSurvey.slug = generateSlugFromTitle(title);
           }
           state.isDirty = true;
+          state.isMetadataDirty = true;
           if (state.currentSurvey.status === 'published') {
             state.isModifiedSincePublish = true;
           }
@@ -116,6 +144,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           state.currentSurvey.description = description;
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
+          state.isMetadataDirty = true;
           if (state.currentSurvey.status === 'published') {
             state.isModifiedSincePublish = true;
           }
@@ -126,6 +155,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           state.currentSurvey.slug = slug;
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
+          state.isMetadataDirty = true;
           if (state.currentSurvey.status === 'published') {
             state.isModifiedSincePublish = true;
           }
@@ -136,6 +166,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           state.currentSurvey.privateToken = token;
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
+          state.isMetadataDirty = true;
           if (state.currentSurvey.status === 'published') {
             state.isModifiedSincePublish = true;
           }
@@ -147,6 +178,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           state.currentSurvey.privateToken = newToken;
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
+          state.isMetadataDirty = true;
           if (state.currentSurvey.status === 'published') {
             state.isModifiedSincePublish = true;
           }
@@ -178,6 +210,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           state.currentSurvey.groups.push(newGroup);
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
+          state.isMetadataDirty = true;
           if (state.currentSurvey.status === 'published') {
             state.isModifiedSincePublish = true;
           }
@@ -191,9 +224,10 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
             Object.assign(group, updates);
             state.currentSurvey.updatedAt = new Date();
             state.isDirty = true;
-          if (state.currentSurvey.status === 'published') {
-            state.isModifiedSincePublish = true;
-          }
+            state.isMetadataDirty = true;
+            if (state.currentSurvey.status === 'published') {
+              state.isModifiedSincePublish = true;
+            }
           }
         }),
 
@@ -214,14 +248,19 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
 
           state.currentSurvey.groups = groups.filter((g) => !groupsToDelete.has(g.id));
 
+          // 그룹 삭제 시 소속 질문들의 groupId도 변경됨 → updated 추가
           state.currentSurvey.questions.forEach((q) => {
             if (q.groupId && groupsToDelete.has(q.groupId)) {
               q.groupId = undefined;
+              if (!state.questionChanges.added[q.id]) {
+                state.questionChanges.updated[q.id] = true;
+              }
             }
           });
 
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
+          state.isMetadataDirty = true;
           if (state.currentSurvey.status === 'published') {
             state.isModifiedSincePublish = true;
           }
@@ -253,6 +292,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           state.currentSurvey.groups = [...topLevelGroups, ...remainingGroups];
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
+          state.isMetadataDirty = true;
           if (state.currentSurvey.status === 'published') {
             state.isModifiedSincePublish = true;
           }
@@ -275,7 +315,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           type,
           title: getDefaultQuestionTitle(type),
           required: false,
-          order: maxOrder + 1, // 1부터 시작하는 실제 질문 번호
+          order: maxOrder + 1,
           groupId,
           ...(needsOptions(type) && {
             options: [
@@ -292,10 +332,19 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
         };
 
         set((state) => {
+          // SPSS 재생성 전 코드 스냅샷
+          const oldCodes = new Map(state.currentSurvey.questions.map((q) => [q.id, q.questionCode]));
+
           state.currentSurvey.questions.push(newQuestion);
           state.currentSurvey.questions = regenerateAfterReorder(
             state.currentSurvey.questions,
           );
+
+          // changeset: 새 질문 추가
+          state.questionChanges.added[newQuestion.id] = true;
+          // SPSS 코드가 바뀐 기존 질문들도 updated에 추가
+          markSpssChangedQuestions(state, oldCodes);
+
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
           if (state.currentSurvey.status === 'published') {
@@ -314,10 +363,16 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
         };
 
         set((state) => {
+          const oldCodes = new Map(state.currentSurvey.questions.map((q) => [q.id, q.questionCode]));
+
           state.currentSurvey.questions.push(questionWithOrder);
           state.currentSurvey.questions = regenerateAfterReorder(
             state.currentSurvey.questions,
           );
+
+          state.questionChanges.added[questionWithOrder.id] = true;
+          markSpssChangedQuestions(state, oldCodes);
+
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
           if (state.currentSurvey.status === 'published') {
@@ -333,20 +388,39 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
             Object.assign(question, updates);
             state.currentSurvey.updatedAt = new Date();
             state.isDirty = true;
-          if (state.currentSurvey.status === 'published') {
-            state.isModifiedSincePublish = true;
-          }
+            // added에 없는 질문만 updated에 추가 (added면 이미 전체 전송 대상)
+            if (!state.questionChanges.added[questionId]) {
+              state.questionChanges.updated[questionId] = true;
+            }
+            if (state.currentSurvey.status === 'published') {
+              state.isModifiedSincePublish = true;
+            }
           }
         }),
 
       deleteQuestion: (questionId: string) =>
         set((state) => {
+          const oldCodes = new Map(state.currentSurvey.questions.map((q) => [q.id, q.questionCode]));
+
           state.currentSurvey.questions = state.currentSurvey.questions.filter(
             (q) => q.id !== questionId,
           );
           state.currentSurvey.questions = regenerateAfterDelete(
             state.currentSurvey.questions,
           );
+
+          // changeset: 삭제 처리
+          if (state.questionChanges.added[questionId]) {
+            // 추가 후 삭제 → 서버에 보낼 필요 없음
+            delete state.questionChanges.added[questionId];
+          } else {
+            state.questionChanges.deleted[questionId] = true;
+          }
+          delete state.questionChanges.updated[questionId];
+
+          // SPSS 코드가 바뀐 기존 질문들도 updated에 추가
+          markSpssChangedQuestions(state, oldCodes);
+
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
           if (state.currentSurvey.status === 'published') {
@@ -356,6 +430,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
 
       reorderQuestions: (questionIds: string[]) =>
         set((state) => {
+          const oldCodes = new Map(state.currentSurvey.questions.map((q) => [q.id, q.questionCode]));
           const questions = state.currentSurvey.questions;
           const questionMap = new Map<string, Question>(questions.map((q) => [q.id, q]));
 
@@ -374,6 +449,11 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           Array.from(questionMap.values()).forEach((q) => reorderedQuestions.push(q));
 
           state.currentSurvey.questions = regenerateAfterReorder(reorderedQuestions);
+
+          // changeset: 순서 변경 + SPSS 코드 변경된 질문 추적
+          state.questionChanges.reordered = true;
+          markSpssChangedQuestions(state, oldCodes);
+
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
           if (state.currentSurvey.status === 'published') {
@@ -386,6 +466,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           Object.assign(state.currentSurvey.settings, settings);
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
+          state.isMetadataDirty = true;
           if (state.currentSurvey.status === 'published') {
             state.isModifiedSincePublish = true;
           }
@@ -396,18 +477,93 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           state.currentSurvey = createDefaultSurvey();
           state.isDirty = false;
           state.isModifiedSincePublish = false;
+          state.questionChanges = emptyChangeset();
+          state.isMetadataDirty = false;
         }),
 
       markClean: () =>
         set((state) => {
           state.isDirty = false;
+          state.questionChanges = emptyChangeset();
+          state.isMetadataDirty = false;
         }),
+
+      // 저장 시작 시 changeset 스냅샷 후 초기화 (저장 중 새 변경은 새 changeset에 쌓임)
+      snapshotChanges: () => {
+        const state = get();
+        const snapshot = {
+          questionChanges: { ...state.questionChanges },
+          isMetadataDirty: state.isMetadataDirty,
+        };
+        set((s) => {
+          s.questionChanges = emptyChangeset();
+          s.isMetadataDirty = false;
+        });
+        return snapshot;
+      },
+
+      // 저장 실패 시 스냅샷을 현재 changeset에 merge back
+      mergeChangesBack: (snapshot: { questionChanges: QuestionChangeset; isMetadataDirty: boolean }) => {
+        set((state) => {
+          const pending = snapshot.questionChanges;
+          const current = state.questionChanges;
+
+          // pending.added → current에 merge (단, current에서 삭제된 건 제외)
+          for (const id in pending.added) {
+            if (!current.deleted[id]) {
+              current.added[id] = true;
+            }
+          }
+          // pending.updated → current에 merge (삭제/추가 대상 제외)
+          for (const id in pending.updated) {
+            if (!current.deleted[id] && !current.added[id]) {
+              current.updated[id] = true;
+            }
+          }
+          // pending.deleted → current에 merge
+          for (const id in pending.deleted) {
+            if (current.added[id]) {
+              // 저장 중 다시 추가된 경우 → 상쇄
+              delete current.added[id];
+            } else {
+              current.deleted[id] = true;
+            }
+            delete current.updated[id];
+          }
+
+          if (pending.reordered) {
+            current.reordered = true;
+          }
+          if (snapshot.isMetadataDirty) {
+            state.isMetadataDirty = true;
+          }
+
+          // isDirty도 복원
+          state.isDirty = true;
+        });
+      },
     })) as any,
     {
       name: 'survey-builder-store',
     },
   ),
 );
+
+/**
+ * SPSS 코드 재생성 후 코드가 바뀐 기존 질문들을 updated changeset에 추가.
+ * added 상태인 질문은 이미 전체 전송 대상이므로 제외.
+ */
+function markSpssChangedQuestions(
+  state: SurveyBuilderState,
+  oldCodes: Map<string, string | undefined>,
+) {
+  for (const q of state.currentSurvey.questions) {
+    if (state.questionChanges.added[q.id]) continue;
+    if (oldCodes.get(q.id) !== q.questionCode) {
+      state.questionChanges.updated[q.id] = true;
+    }
+  }
+}
 
 function getDefaultQuestionTitle(type: QuestionType): string {
   const titles: Record<QuestionType, string> = {

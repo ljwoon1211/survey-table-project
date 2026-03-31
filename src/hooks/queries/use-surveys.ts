@@ -12,9 +12,11 @@ import {
   createSurvey,
   deleteSurvey as deleteSurveyAction,
   duplicateSurvey as duplicateSurveyAction,
+  saveSurveyDiff,
   saveSurveyWithDetails,
   updateSurvey,
 } from '@/actions/survey-crud-actions';
+import type { SurveyDiffPayload } from '@/actions/survey-crud-actions';
 import type { Survey } from '@/types/survey';
 
 // ========================
@@ -100,13 +102,28 @@ export function useCreateSurvey() {
 }
 
 /**
- * 설문 전체 저장 (설문 + 그룹 + 질문)
+ * 설문 전체 저장 (설문 + 그룹 + 질문) — 신규 생성 전용
  */
 export function useSaveSurvey() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (survey: Survey) => saveSurveyWithDetails(survey),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: surveyKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: surveyKeys.detail(data.surveyId) });
+    },
+  });
+}
+
+/**
+ * Diff 기반 설문 저장 (변경분만 전송)
+ */
+export function useSaveSurveyDiff() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: SurveyDiffPayload) => saveSurveyDiff(payload),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: surveyKeys.lists() });
       queryClient.invalidateQueries({ queryKey: surveyKeys.detail(data.surveyId) });

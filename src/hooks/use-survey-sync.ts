@@ -16,8 +16,10 @@ import {
 import {
   deleteSurvey as deleteSurveyAction,
   duplicateSurvey as duplicateSurveyAction,
+  saveSurveyDiff,
   saveSurveyWithDetails,
 } from '@/actions/survey-crud-actions';
+import type { SurveyDiffPayload } from '@/actions/survey-crud-actions';
 import {
   useSurveyBuilderStore,
   useSurveyListStore,
@@ -25,47 +27,95 @@ import {
   useSurveyUIStore,
   useTestResponseStore,
 } from '@/stores';
-import type { Survey } from '@/types/survey';
 
 /**
  * 설문 빌더와 DB를 동기화하는 훅
  */
 export function useSurveySync() {
   const [isPending, startTransition] = useTransition();
-  const { currentSurvey, resetSurvey, markClean } = useSurveyBuilderStore();
+  const { resetSurvey, markClean } = useSurveyBuilderStore();
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<Error | null>(null);
 
-  // 현재 설문을 DB에 저장 (중복 저장 방지 포함)
+  // Diff 기반 저장: 변경분만 서버에 전송
   const saveSurvey = useCallback(
-    async (surveyData?: Survey) => {
-      // surveyData가 제공되면 그것을 사용, 아니면 currentSurvey 사용
-      const surveyToSave = surveyData || currentSurvey;
+    async () => {
+      const store = useSurveyBuilderStore.getState();
 
-      if (!surveyToSave.id) {
+      if (!store.currentSurvey.id) {
         console.error('설문 ID가 없습니다.');
         return null;
       }
 
-      // 이미 저장 중이면 중복 저장 방지
       if (isSaving) {
         console.log('이미 저장 중입니다. 중복 저장을 방지합니다.');
         return null;
       }
 
+      // 변경 없으면 저장 스킵
+      if (!store.isDirty) {
+        return { surveyId: store.currentSurvey.id };
+      }
+
       setIsSaving(true);
       setSaveError(null);
 
-      try {
-        // 저장 전에 최신 currentSurvey 상태 가져오기 (그룹의 displayCondition 포함)
-        const latestSurvey = useSurveyBuilderStore.getState().currentSurvey;
-        const finalSurvey = surveyData || latestSurvey;
+      // 스냅샷: 현재 changeset을 캡처하고 초기화 (저장 중 새 변경은 새 changeset에 쌓임)
+      const snapshot = store.snapshotChanges();
 
-        const result = await saveSurveyWithDetails(finalSurvey);
-        // 저장 성공 시 dirty 플래그 초기화
+      try {
+        const survey = useSurveyBuilderStore.getState().currentSurvey;
+        const { questionChanges: qc, isMetadataDirty } = snapshot;
+
+        const hasQuestionChanges =
+          Object.keys(qc.added).length > 0 ||
+          Object.keys(qc.updated).length > 0 ||
+          Object.keys(qc.deleted).length > 0 ||
+          qc.reordered;
+
+        // 변경분이 전혀 없으면 스킵
+        if (!isMetadataDirty && !hasQuestionChanges) {
+          markClean();
+          return { surveyId: survey.id };
+        }
+
+        // diff payload 구성
+        const payload: SurveyDiffPayload = { surveyId: survey.id };
+
+        if (isMetadataDirty) {
+          payload.metadata = {
+            title: survey.title,
+            description: survey.description,
+            slug: survey.slug,
+            privateToken: survey.privateToken,
+            settings: survey.settings,
+            thankYouMessage: survey.settings.thankYouMessage,
+          };
+          payload.groups = survey.groups;
+        }
+
+        if (hasQuestionChanges) {
+          const dirtyIds = new Set([
+            ...Object.keys(qc.added),
+            ...Object.keys(qc.updated),
+          ]);
+          const upserted = survey.questions.filter((q) => dirtyIds.has(q.id));
+
+          payload.questionChanges = {
+            upserted,
+            deleted: Object.keys(qc.deleted),
+            reorderedIds: qc.reordered
+              ? survey.questions.map((q) => q.id)
+              : undefined,
+          };
+        }
+
+        const result = await saveSurveyDiff(payload);
         markClean();
         return result;
       } catch (error) {
+        // 실패 시 스냅샷을 현재 changeset에 merge back
+        useSurveyBuilderStore.getState().mergeChangesBack(snapshot);
         const err = error instanceof Error ? error : new Error('설문 저장 실패');
         console.error('설문 저장 실패:', err);
         setSaveError(err);
@@ -74,7 +124,7 @@ export function useSurveySync() {
         setIsSaving(false);
       }
     },
-    [currentSurvey, isSaving, markClean],
+    [isSaving, markClean],
   );
 
   // DB에서 설문 불러오기

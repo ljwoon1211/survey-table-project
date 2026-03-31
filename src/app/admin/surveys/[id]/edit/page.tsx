@@ -42,7 +42,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useSaveSurvey, useSurvey } from '@/hooks/queries/use-surveys';
+import { useSurvey } from '@/hooks/queries/use-surveys';
+import { useSurveySync } from '@/hooks/use-survey-sync';
 import { generateSlugFromTitle, validateSlug } from '@/lib/survey-url';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { useSurveyUIStore } from '@/stores/ui-store';
@@ -148,7 +149,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   );
   // TanStack Query 훅 사용
   const { data: survey, isLoading: isSurveyLoading, isError } = useSurvey(id);
-  const saveSurveyMutation = useSaveSurvey();
+  const { saveSurvey, isSaving: isSavingSurvey } = useSurveySync();
 
   const [titleInput, setTitleInput] = useState('');
   const [questionNumberInput, setQuestionNumberInput] = useState('');
@@ -278,7 +279,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
     addPreparedQuestion(ottQuestion);
   };
 
-  // 설문 저장
+  // 설문 저장 (diff 기반)
   const handleSaveSurvey = async () => {
     const latestSurvey = useSurveyBuilderStore.getState().currentSurvey;
     // 공개 설문인데 슬러그가 없으면 자동 생성
@@ -286,12 +287,12 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
       await handleAutoGenerateSlug();
     }
 
-    // TanStack Query 뮤테이션으로 저장
-    saveSurveyMutation.mutate(useSurveyBuilderStore.getState().currentSurvey, {
-      onSuccess: () => {
-        setShowSaveModal(true);
-      },
-    });
+    try {
+      await saveSurvey();
+      setShowSaveModal(true);
+    } catch (error) {
+      console.error('설문 저장 실패:', error);
+    }
   };
 
   // 설문 배포
@@ -306,12 +307,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
     setIsPublishing(true);
     try {
       // 배포 전 저장
-      await new Promise<void>((resolve, reject) => {
-        saveSurveyMutation.mutate(useSurveyBuilderStore.getState().currentSurvey, {
-          onSuccess: () => resolve(),
-          onError: (err) => reject(err),
-        });
-      });
+      await saveSurvey();
 
       const version = await publishSurvey(surveyId);
       markPublished();
