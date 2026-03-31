@@ -5,6 +5,14 @@ const nextConfig: NextConfig = {
 
   reactCompiler: true,
 
+  // Server Actions body 크기 제한 (기본값 1MB → 5MB)
+  // saveSurveyWithDetails에서 설문 전체 데이터를 전송하므로 제한 확대 필요
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
+  },
+
   // 2. 타입스크립트 에러 확인 (빌드 시 타입 검증)
   typescript: {
     ignoreBuildErrors: false,

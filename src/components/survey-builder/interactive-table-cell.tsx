@@ -11,7 +11,7 @@ import { useTestResponseStore } from '@/stores/test-response-store';
 import { TableCell } from '@/types/survey';
 
 // 이미지 셀 컴포넌트 (에러 상태 관리)
-function ImageCell({ imageUrl, content }: { imageUrl: string; content?: string }) {
+const ImageCell = React.memo(function ImageCell({ imageUrl, content }: { imageUrl: string; content?: string }) {
   const [error, setError] = React.useState(false);
 
   React.useEffect(() => {
@@ -39,7 +39,7 @@ function ImageCell({ imageUrl, content }: { imageUrl: string; content?: string }
       {content && <div className="mt-2 text-left text-sm text-gray-700">{content}</div>}
     </div>
   );
-}
+});
 
 interface InteractiveTableCellProps {
   cell: TableCell;
@@ -60,7 +60,7 @@ function getYouTubeEmbedUrl(url: string) {
   return url;
 }
 
-export function InteractiveTableCell({
+export const InteractiveTableCell = React.memo(function InteractiveTableCell({
   cell,
   questionId,
   isTestMode,
@@ -597,4 +597,4 @@ export function InteractiveTableCell({
         <span className="text-sm text-gray-400"></span>
       );
   }
-}
+});
