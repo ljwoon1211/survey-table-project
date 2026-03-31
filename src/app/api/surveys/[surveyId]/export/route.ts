@@ -13,6 +13,7 @@ import {
   generateVariableMapWorkbook,
 } from '@/lib/excel-transformer';
 import { Question, Survey, SurveySubmission } from '@/types/survey';
+import { generateAllCellCodes } from '@/utils/table-cell-code-generator';
 
 // Vercel serverless 최대 실행시간 30초 (기본 10초)
 export const maxDuration = 30;
@@ -45,6 +46,15 @@ export async function GET(
 
     if (!surveyData) {
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
+    }
+
+    // strip된 셀 데이터 hydrate (cellCode, exportLabel 등 복원)
+    for (const q of surveyData.questions) {
+      if (q.type === 'table' && q.tableRowsData && q.tableColumns) {
+        (q as any).tableRowsData = generateAllCellCodes(
+          q.questionCode ?? undefined, q.title, q.tableColumns as any, q.tableRowsData as any,
+        );
+      }
     }
 
     // 2. 응답 데이터 조회 (Variable Map은 응답 불필요 → 스킵)

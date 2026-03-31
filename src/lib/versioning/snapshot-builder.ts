@@ -5,6 +5,7 @@
  */
 
 import type { Question, QuestionGroup, Survey } from '@/types/survey';
+import { stripTableRowsData } from '@/utils/table-cell-optimizer';
 
 export interface SurveySnapshot {
   title: string;
@@ -47,6 +48,7 @@ interface SnapshotQuestion {
   placeholder?: string;
   tableValidationRules?: Question['tableValidationRules'];
   displayCondition?: Question['displayCondition'];
+  questionCode?: string;
 }
 
 interface SnapshotGroup {
@@ -86,7 +88,9 @@ export function buildSurveySnapshot(survey: Survey): SurveySnapshot {
       selectLevels: q.selectLevels,
       tableTitle: q.tableTitle,
       tableColumns: q.tableColumns,
-      tableRowsData: q.tableRowsData,
+      tableRowsData: q.type === 'table' && q.tableRowsData
+        ? stripTableRowsData(q.tableRowsData)
+        : q.tableRowsData,
       tableHeaderGrid: q.tableHeaderGrid,
       imageUrl: q.imageUrl,
       videoUrl: q.videoUrl,
@@ -99,6 +103,7 @@ export function buildSurveySnapshot(survey: Survey): SurveySnapshot {
       placeholder: q.placeholder,
       tableValidationRules: q.tableValidationRules,
       displayCondition: q.displayCondition,
+      questionCode: q.questionCode,
     })),
     groups: sortedGroups.map((g) => ({
       id: g.id,
