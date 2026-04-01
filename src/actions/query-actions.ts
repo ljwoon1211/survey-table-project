@@ -6,6 +6,7 @@
  * 주의: 이 파일의 함수들은 TanStack Query에서 사용하기 위한 것입니다.
  * Server Component에서는 @/data/* 함수들을 직접 사용하세요.
  */
+import * as cellLibraryData from '@/data/cell-library';
 import * as libraryData from '@/data/library';
 import * as responseData from '@/data/responses';
 import * as surveyData from '@/data/surveys';
@@ -144,4 +145,16 @@ export async function getQuestionsByTag(tag: string) {
 
 export async function getAllCategories() {
   return libraryData.getAllCategories();
+}
+
+// ========================
+// Cell Library 조회
+// ========================
+
+export async function getAllSavedCells() {
+  return cellLibraryData.getAllSavedCells();
+}
+
+export async function searchSavedCells(query: string) {
+  return cellLibraryData.searchSavedCells(query);
 }

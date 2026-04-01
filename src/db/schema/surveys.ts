@@ -9,6 +9,7 @@ import type {
   QuestionOption,
   SelectLevel,
   SurveyVersionSnapshot,
+  TableCell,
   TableColumn,
   TableRow,
   TableValidationRule,
@@ -212,6 +213,22 @@ export const savedQuestions = pgTable('saved_questions', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// 셀 보관함 테이블
+export const savedCells = pgTable('saved_cells', {
+  id: uuid('id').primaryKey().defaultRandom(),
+
+  // 셀 데이터 (위치/이미지 정보 제거됨)
+  cell: jsonb('cell').notNull().$type<TableCell>(),
+
+  // 메타데이터
+  name: text('name').notNull(),
+  cellType: text('cell_type').notNull(), // 'text'|'checkbox'|'radio'|'select'|'input'|'video'
+  usageCount: integer('usage_count').default(0).notNull(),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // 질문 카테고리 테이블
 export const questionCategories = pgTable('question_categories', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -305,6 +322,9 @@ export type NewSurveyResponse = typeof surveyResponses.$inferInsert;
 
 export type SavedQuestion = typeof savedQuestions.$inferSelect;
 export type NewSavedQuestion = typeof savedQuestions.$inferInsert;
+
+export type SavedCellRow = typeof savedCells.$inferSelect;
+export type NewSavedCell = typeof savedCells.$inferInsert;
 
 export type QuestionCategory = typeof questionCategories.$inferSelect;
 export type NewQuestionCategory = typeof questionCategories.$inferInsert;

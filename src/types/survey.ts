@@ -337,6 +337,17 @@ export interface SavedQuestion {
   updatedAt: Date;
 }
 
+// 셀 보관함
+export interface SavedCell {
+  id: string;
+  cell: TableCell;
+  name: string;
+  cellType: TableCell['type'];
+  usageCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // 질문 카테고리
 export interface QuestionCategory {
   id: string;

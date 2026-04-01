@@ -9,14 +9,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { generateId } from '@/lib/utils';
-import { DynamicRowGroupConfig, HeaderCell, Question, TableColumn, TableRow } from '@/types/survey';
+import { DynamicRowGroupConfig, HeaderCell, Question, TableCell, TableColumn, TableRow } from '@/types/survey';
 
 import { CellContentModal } from './cell-content-modal';
 import { EditorTableRow } from './editor-table-row';
 import { HeaderGridEditor } from './header-grid-editor';
 import { useTableEditor } from './hooks/use-table-editor';
 import { ColumnConditionModal } from './column-condition-modal';
+import { LoadCellModal } from './load-cell-modal';
 import { RowConditionModal } from './row-condition-modal';
+import { SaveCellModal } from './save-cell-modal';
 import { TableHeaderSection } from './table-header-section';
 import { TableSummaryCard } from './table-summary-card';
 
@@ -122,6 +124,45 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
   // ── 동적 행 감지 ──
   const hasDynamicRows = currentRows.some((r) => r.dynamicGroupId);
   const nonDynamicRows = currentRows.filter((r) => !r.dynamicGroupId && !r.showWhenDynamicGroupId);
+
+  // ── 셀 보관함 상태 ──
+  const [saveCellTarget, setSaveCellTarget] = useState<{
+    rowIndex: number;
+    cellIndex: number;
+    cell: TableCell;
+  } | null>(null);
+  const [loadCellTarget, setLoadCellTarget] = useState<{
+    rowIndex: number;
+    cellIndex: number;
+    targetCell: TableCell;
+  } | null>(null);
+
+  const handleSaveCell = useCallback(
+    (rowIndex: number, cellIndex: number) => {
+      const cell = currentRows[rowIndex]?.cells[cellIndex];
+      if (!cell) return;
+      setSaveCellTarget({ rowIndex, cellIndex, cell });
+    },
+    [currentRows],
+  );
+
+  const handleLoadCell = useCallback(
+    (rowIndex: number, cellIndex: number) => {
+      const cell = currentRows[rowIndex]?.cells[cellIndex];
+      if (!cell) return;
+      setLoadCellTarget({ rowIndex, cellIndex, targetCell: cell });
+    },
+    [currentRows],
+  );
+
+  const handleCellApplied = useCallback(
+    (restoredCell: TableCell) => {
+      if (!loadCellTarget) return;
+      updateCell(loadCellTarget.rowIndex, loadCellTarget.cellIndex, restoredCell);
+      setLoadCellTarget(null);
+    },
+    [loadCellTarget, updateCell],
+  );
 
   // ── 드래그 복사: 토스트 상태 ──
 
@@ -412,6 +453,8 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
                     onDeleteCell={deleteCell}
                     onCopyCell={copyCell}
                     onPasteCell={pasteCell}
+                    onSaveCell={handleSaveCell}
+                    onLoadCell={handleLoadCell}
                   />
                 ))}
               </tbody>
@@ -628,6 +671,19 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
         currentQuestion={currentQuestionAsQuestion}
         allQuestions={allQuestions ?? []}
         onUpdateCondition={updateColumnCondition}
+      />
+
+      {/* 셀 보관함 모달 */}
+      <SaveCellModal
+        open={!!saveCellTarget}
+        onOpenChange={(open) => { if (!open) setSaveCellTarget(null); }}
+        cell={saveCellTarget?.cell ?? null}
+      />
+      <LoadCellModal
+        open={!!loadCellTarget}
+        onOpenChange={(open) => { if (!open) setLoadCellTarget(null); }}
+        targetCell={loadCellTarget?.targetCell ?? null}
+        onApply={handleCellApplied}
       />
 
       {/* 영역 복사 알림 토스트 (화면 하단 고정) */}

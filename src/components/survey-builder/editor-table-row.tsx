@@ -3,12 +3,14 @@
 import React from 'react';
 
 import {
+  Archive,
   ArrowLeft,
   ArrowRight,
   CheckSquare,
   Circle,
   Clipboard,
   Copy,
+  Download,
   Eye,
   Image,
   Settings2,
@@ -20,6 +22,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DynamicRowGroupConfig, TableCell, TableRow } from '@/types/survey';
+import { isCellSaveable } from '@/utils/cell-library-helpers';
 
 const GROUP_COLORS = [
   'bg-purple-500', 'bg-green-500', 'bg-yellow-500', 'bg-blue-500',
@@ -152,6 +155,8 @@ export interface EditorTableRowProps {
   onDeleteCell: (rowIndex: number, cellIndex: number) => void;
   onCopyCell: (rowIndex: number, cellIndex: number) => void;
   onPasteCell: (rowIndex: number, cellIndex: number) => void;
+  onSaveCell: (rowIndex: number, cellIndex: number) => void;
+  onLoadCell: (rowIndex: number, cellIndex: number) => void;
 }
 
 /** 에디터 테이블 행 컴포넌트 (React.memo로 변경 안 된 행 리렌더 방지) */
@@ -179,6 +184,8 @@ export const EditorTableRow = React.memo(function EditorTableRow({
   onDeleteCell,
   onCopyCell,
   onPasteCell,
+  onSaveCell,
+  onLoadCell,
 }: EditorTableRowProps) {
   // 드래그 선택 영역 셀 Set (문자열 → Set<number>)
   const dragSelectionCells = React.useMemo(() => {
@@ -411,6 +418,20 @@ export const EditorTableRow = React.memo(function EditorTableRow({
                         className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50"
                       >
                         <Trash2 className="h-3 w-3" /> 셀 삭제
+                      </button>
+                      <div className="my-1 border-t" />
+                      <button
+                        onClick={() => onSaveCell(rowIndex, cellIndex)}
+                        disabled={!isCellSaveable(cell)}
+                        className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-purple-600 hover:bg-purple-50 disabled:opacity-30"
+                      >
+                        <Archive className="h-3 w-3" /> 셀 보관
+                      </button>
+                      <button
+                        onClick={() => onLoadCell(rowIndex, cellIndex)}
+                        className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-green-600 hover:bg-green-50"
+                      >
+                        <Download className="h-3 w-3" /> 셀 불러오기
                       </button>
                       <div className="my-1 border-t" />
                       <div className="flex gap-0.5 px-1">
