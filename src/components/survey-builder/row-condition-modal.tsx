@@ -1,5 +1,7 @@
 'use client';
 
+import { useShallow } from 'zustand/react/shallow';
+
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -9,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { Question, QuestionConditionGroup, TableRow } from '@/types/survey';
 
 import { QuestionConditionEditor } from './question-condition-editor';
@@ -19,7 +22,6 @@ export interface RowConditionModalProps {
   editingRowIndex: number | null;
   rows: TableRow[];
   currentQuestion: Question;
-  allQuestions: Question[];
   onUpdateCondition: (rowIndex: number, condition: QuestionConditionGroup | undefined) => void;
 }
 
@@ -29,9 +31,9 @@ export function RowConditionModal({
   editingRowIndex,
   rows,
   currentQuestion,
-  allQuestions,
   onUpdateCondition,
 }: RowConditionModalProps) {
+  const allQuestions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">

@@ -27,7 +27,6 @@ interface UseTableEditorParams {
   rows?: TableRow[];
   tableHeaderGrid?: HeaderCell[][];
   currentQuestionId?: string;
-  allQuestions?: Question[];
   questionCode?: string;
   questionTitle?: string;
   onTableChange: (data: {
@@ -91,7 +90,6 @@ export function useTableEditor({
   rows = [],
   tableHeaderGrid: initialHeaderGrid,
   currentQuestionId = '',
-  allQuestions = [],
   questionCode,
   questionTitle,
   onTableChange,
@@ -577,6 +575,96 @@ export function useTableEditor({
     notifyChange(currentTitleRef.current, columns, updatedRows);
   }, [notifyChange]);
 
+  const addBulkRows = useCallback(
+    (
+      rowDefs: Array<{
+        label: string;
+        rowCode: string;
+        displayCondition?: QuestionConditionGroup;
+        dynamicGroupId?: string;
+      }>,
+    ) => {
+      const columns = currentColumnsRef.current;
+      const existingRows = currentRowsRef.current;
+
+      const newRows: TableRow[] = rowDefs.map((def) => {
+        const newRowId = generateId();
+        const cells = columns.map((col) => ({
+          id: `cell-${newRowId}-${col.id}`,
+          content: '',
+          type: 'text' as const,
+        }));
+
+        const row: TableRow = {
+          id: newRowId,
+          label: def.label,
+          rowCode: def.rowCode,
+          height: 60,
+          minHeight: 40,
+          cells,
+          displayCondition: def.displayCondition,
+          dynamicGroupId: def.dynamicGroupId,
+        };
+
+        return generateCellCodesForRow(
+          questionCodeRef.current,
+          questionTitleRef.current,
+          columns,
+          row,
+        );
+      });
+
+      const updatedRows = [...existingRows, ...newRows];
+      const finalRows = recalculateHiddenCells(updatedRows);
+      setCurrentRows(finalRows);
+      notifyChange(currentTitleRef.current, columns, finalRows);
+    },
+    [notifyChange],
+  );
+
+  const duplicateRow = useCallback(
+    (rowIndex: number) => {
+      const rows = currentRowsRef.current;
+      const columns = currentColumnsRef.current;
+      const sourceRow = rows[rowIndex];
+      if (!sourceRow) return;
+
+      const newRowId = generateId();
+      const newRow: TableRow = {
+        ...sourceRow,
+        id: newRowId,
+        label: `${sourceRow.label} (복사)`,
+        rowCode: sourceRow.rowCode ? `${sourceRow.rowCode}_copy` : undefined,
+        cells: sourceRow.cells.map((cell, colIndex) => {
+          const cloned = JSON.parse(JSON.stringify(cell));
+          cloned.id = `cell-${newRowId}-${columns[colIndex]?.id ?? colIndex}`;
+          cloned.rowspan = undefined;
+          return cloned;
+        }),
+        displayCondition: sourceRow.displayCondition
+          ? JSON.parse(JSON.stringify(sourceRow.displayCondition))
+          : undefined,
+      };
+
+      const newRowWithCodes = generateCellCodesForRow(
+        questionCodeRef.current,
+        questionTitleRef.current,
+        columns,
+        newRow,
+      );
+
+      const updatedRows = [
+        ...rows.slice(0, rowIndex + 1),
+        newRowWithCodes,
+        ...rows.slice(rowIndex + 1),
+      ];
+      const finalRows = recalculateHiddenCells(updatedRows);
+      setCurrentRows(finalRows);
+      notifyChange(currentTitleRef.current, columns, finalRows);
+    },
+    [notifyChange],
+  );
+
   const deleteRow = useCallback(
     (rowIndex: number) => {
       const rows = currentRowsRef.current;
@@ -1048,7 +1136,6 @@ export function useTableEditor({
       tableRef,
       selectedCellContext,
       currentQuestionAsQuestion,
-      allQuestions,
       currentQuestionId,
       questionCode,
       questionTitle,
@@ -1069,6 +1156,8 @@ export function useTableEditor({
       unmergeColumnHeader,
       // 행
       addRow,
+      addBulkRows,
+      duplicateRow,
       deleteRow,
       updateRowLabel,
       updateRowCode,

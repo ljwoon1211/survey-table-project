@@ -68,6 +68,19 @@ export function TableOptionSelector({
   }
 
   if (rowsWithOptions.length === 0) {
+    const hasInputCell = rowIds.some((rowId) => {
+      const row = question.tableRowsData?.find((r) => r.id === rowId);
+      return row?.cells[colIndex]?.type === 'input';
+    });
+
+    if (hasInputCell) {
+      return (
+        <p className="text-sm text-blue-600">
+          입력 필드는 값이 입력되어 있으면 조건이 충족됩니다
+        </p>
+      );
+    }
+
     return <p className="text-sm text-gray-500">선택한 행의 셀에 옵션이 없습니다</p>;
   }
 

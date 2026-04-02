@@ -149,6 +149,7 @@ export interface EditorTableRowProps {
   dynamicRowConfigs: DynamicRowGroupConfig[];
   onSetDynamicGroupId: (rowId: string, groupId: string | undefined) => void;
   onSetShowWhenDynamicGroupId: (rowId: string, groupId: string | undefined) => void;
+  onDuplicateRow: (rowIndex: number) => void;
   onDeleteRow: (rowIndex: number) => void;
   onSelectCell: (rowId: string, cellId: string) => void;
   onMoveColumn: (cellIndex: number, direction: 'left' | 'right') => void;
@@ -178,6 +179,7 @@ export const EditorTableRow = React.memo(function EditorTableRow({
   dynamicRowConfigs,
   onSetDynamicGroupId,
   onSetShowWhenDynamicGroupId,
+  onDuplicateRow,
   onDeleteRow,
   onSelectCell,
   onMoveColumn,
@@ -305,17 +307,21 @@ export const EditorTableRow = React.memo(function EditorTableRow({
                     </>
                   )}
 
-                  {/* 행 삭제 */}
+                  {/* 행 복제 / 삭제 */}
+                  <div className="my-1 border-t" />
+                  <button
+                    onClick={() => onDuplicateRow(rowIndex)}
+                    className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
+                  >
+                    <Copy className="h-3 w-3" /> 행 복제
+                  </button>
                   {totalRowCount > 1 && (
-                    <>
-                      <div className="my-1 border-t" />
-                      <button
-                        onClick={() => onDeleteRow(rowIndex)}
-                        className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-3 w-3" /> 행 삭제
-                      </button>
-                    </>
+                    <button
+                      onClick={() => onDeleteRow(rowIndex)}
+                      className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-3 w-3" /> 행 삭제
+                    </button>
                   )}
                 </div>
               </PopoverContent>

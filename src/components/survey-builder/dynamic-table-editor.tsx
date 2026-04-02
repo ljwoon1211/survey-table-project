@@ -3,14 +3,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Clipboard, ListChecks, Plus, Undo2 } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { generateId } from '@/lib/utils';
-import { DynamicRowGroupConfig, HeaderCell, Question, TableCell, TableColumn, TableRow } from '@/types/survey';
+import { useSurveyBuilderStore } from '@/stores/survey-store';
+import { DynamicRowGroupConfig, HeaderCell, TableCell, TableColumn, TableRow } from '@/types/survey';
 
+import { BulkRowGeneratorModal } from './bulk-row-generator-modal';
 import { CellContentModal } from './cell-content-modal';
 import { EditorTableRow } from './editor-table-row';
 import { HeaderGridEditor } from './header-grid-editor';
@@ -30,7 +33,6 @@ interface DynamicTableEditorProps {
   rows?: TableRow[];
   tableHeaderGrid?: HeaderCell[][];
   currentQuestionId?: string;
-  allQuestions?: Question[];
   questionCode?: string;
   questionTitle?: string;
   dynamicRowConfigs?: DynamicRowGroupConfig[];
@@ -49,6 +51,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
   const { dynamicRowConfigs: rawConfigs, onDynamicRowConfigsChange } = props;
   // 기존 단일 객체 → 배열 마이그레이션 호환
   const dynamicRowConfigs = Array.isArray(rawConfigs) ? rawConfigs : [];
+  const allQuestions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
   const { state, actions } = useTableEditor(props);
 
   const {
@@ -70,7 +73,6 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
     tableRef,
     selectedCellContext,
     currentQuestionAsQuestion,
-    allQuestions,
     currentQuestionId,
     questionCode,
     questionTitle,
@@ -88,6 +90,8 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
     mergeColumnHeaders,
     unmergeColumnHeader,
     addRow,
+    addBulkRows,
+    duplicateRow,
     deleteRow,
     updateRowLabel,
     updateRowCode,
@@ -124,6 +128,19 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
   // ── 동적 행 감지 ──
   const hasDynamicRows = currentRows.some((r) => r.dynamicGroupId);
   const nonDynamicRows = currentRows.filter((r) => !r.dynamicGroupId && !r.showWhenDynamicGroupId);
+
+  // ── 행 일괄 생성 상태 ──
+  const [bulkRowModalOpen, setBulkRowModalOpen] = useState(false);
+  const [bulkRowToast, setBulkRowToast] = useState<{ count: number; visible: boolean } | null>(null);
+
+  const handleBulkGenerate = useCallback(
+    (rows: Parameters<typeof addBulkRows>[0]) => {
+      addBulkRows(rows);
+      setBulkRowToast({ count: rows.length, visible: true });
+      setTimeout(() => setBulkRowToast(null), 2500);
+    },
+    [addBulkRows],
+  );
 
   // ── 셀 보관함 상태 ──
   const [saveCellTarget, setSaveCellTarget] = useState<{
@@ -384,6 +401,9 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
               <Button onClick={addRow} size="sm" variant="outline">
                 <Plus className="mr-1 h-4 w-4" />행 추가
               </Button>
+              <Button onClick={() => setBulkRowModalOpen(true)} size="sm" variant="outline">
+                <Plus className="mr-1 h-4 w-4" />행 일괄 생성
+              </Button>
             </div>
           </CardTitle>
         </CardHeader>
@@ -413,7 +433,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
               <TableHeaderSection
                 columns={currentColumns}
                 editingColumnWidth={editingColumnWidth}
-                hasQuestions={(allQuestions ?? []).length > 0}
+                hasQuestions={allQuestions.length > 0}
                 onUpdateColumnLabel={updateColumnLabel}
                 onUpdateColumnCode={updateColumnCode}
                 onMoveColumn={moveColumn}
@@ -435,7 +455,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
                     columnWidths={columnWidths}
                     columnCount={currentColumns.length}
                     totalRowCount={currentRows.length}
-                    hasQuestions={(allQuestions ?? []).length > 0}
+                    hasQuestions={allQuestions.length > 0}
                     hasCopiedCell={!!copiedCell}
                     hasCopiedRegion={!!copiedRegion}
                     isDragCopyActive={!!dragCopyState}
@@ -447,6 +467,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
                     dynamicRowConfigs={dynamicRowConfigs}
                     onSetDynamicGroupId={setDynamicGroupId}
                     onSetShowWhenDynamicGroupId={setShowWhenDynamicGroupId}
+                    onDuplicateRow={duplicateRow}
                     onDeleteRow={deleteRow}
                     onSelectCell={handleSelectCell}
                     onMoveColumn={moveColumn}
@@ -659,7 +680,6 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
         editingRowIndex={editingRowIndex}
         rows={currentRows}
         currentQuestion={currentQuestionAsQuestion}
-        allQuestions={allQuestions ?? []}
         onUpdateCondition={updateRowCondition}
       />
 
@@ -669,7 +689,6 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
         editingColumnIndex={editingColumnIndex}
         columns={currentColumns}
         currentQuestion={currentQuestionAsQuestion}
-        allQuestions={allQuestions ?? []}
         onUpdateCondition={updateColumnCondition}
       />
 
@@ -685,6 +704,25 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
         targetCell={loadCellTarget?.targetCell ?? null}
         onApply={handleCellApplied}
       />
+
+      {/* 행 일괄 생성 모달 */}
+      <BulkRowGeneratorModal
+        open={bulkRowModalOpen}
+        onOpenChange={setBulkRowModalOpen}
+        currentQuestionId={currentQuestionId}
+        existingRowCodes={currentRows.map((r) => r.rowCode).filter(Boolean) as string[]}
+        dynamicRowGroups={dynamicRowConfigs}
+        onGenerate={handleBulkGenerate}
+      />
+
+      {/* 행 일괄 생성 토스트 */}
+      {bulkRowToast?.visible && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-700 shadow-lg">
+            <span className="font-medium">{bulkRowToast.count}개 행 추가됨</span>
+          </div>
+        </div>
+      )}
 
       {/* 영역 복사 알림 토스트 (화면 하단 고정) */}
       {dragCopyToast?.visible && (

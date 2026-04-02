@@ -1343,7 +1343,6 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                     rows={formData.tableRowsData}
                     tableHeaderGrid={formData.tableHeaderGrid}
                     currentQuestionId={questionId || ''}
-                    allQuestions={questions}
                     questionCode={formData.questionCode}
                     questionTitle={formData.title}
                     dynamicRowConfigs={formData.dynamicRowConfigs}
