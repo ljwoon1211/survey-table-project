@@ -606,13 +606,15 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
             return (
               <React.Fragment key={row.id}>
                 {row.cells.map((cell, cellIndex) => {
-                  // hidden 셀: border-only placeholder (rowspan/colspan으로 가려진 영역)
+                  const col = cellIndex + 1; // 1-based grid column
+
+                  // hidden 셀: border-only placeholder
                   if (cell.isHidden) {
                     return (
                       <div
                         key={cell.id}
                         className="border-r border-b border-gray-300"
-                        style={{ gridRow, gridColumn: cellIndex + 1 }}
+                        style={{ gridRow, gridColumn: col }}
                         aria-hidden
                       />
                     );
@@ -631,7 +633,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
                       )}
                       style={{
                         gridRow: rs > 1 ? `${gridRow} / span ${rs}` : gridRow,
-                        ...(cs > 1 ? { gridColumn: `span ${cs}` } : undefined),
+                        gridColumn: cs > 1 ? `${col} / span ${cs}` : col,
                       }}
                       data-row-id={row.id}
                       {...getGridCellAria('gridcell', cs, rs)}
