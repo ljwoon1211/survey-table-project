@@ -32,6 +32,7 @@ interface SelectorRowProps {
   buttonAlign?: 'left' | 'center' | 'right';
   selectedCount: number;
   onSelect: (groupId: string) => void;
+  gridRow?: number;
 }
 
 const SelectorRow = React.memo(function SelectorRow({
@@ -40,6 +41,7 @@ const SelectorRow = React.memo(function SelectorRow({
   buttonAlign,
   selectedCount,
   onSelect,
+  gridRow,
 }: SelectorRowProps) {
   return (
     <div
@@ -49,7 +51,7 @@ const SelectorRow = React.memo(function SelectorRow({
           : buttonAlign === 'right' ? 'justify-end'
           : 'justify-start',
       )}
-      style={{ gridColumn: '1 / -1' }}
+      style={{ gridColumn: '1 / -1', gridRow }}
     >
       <button
         className="group flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-4 py-1.5 text-sm text-gray-700 transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 active:scale-[0.98]"
@@ -371,6 +373,34 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
   const totalWidth = useMemo(() => calcTotalWidth(visibleColumns), [visibleColumns]);
   const gridTemplateCols = useMemo(() => buildGridTemplateCols(visibleColumns), [visibleColumns]);
 
+  // 헤더 행 수 계산
+  const headerRowCount = useMemo(() => {
+    if (hideColumnLabels) return 0;
+    if (visibleHeaderGrid && visibleHeaderGrid.length > 0) return visibleHeaderGrid.length;
+    return 1;
+  }, [hideColumnLabels, visibleHeaderGrid]);
+
+  // 명시적 grid-row 위치 계산 (셀렉터 행 포함)
+  const { rowGridMap, selectorGridMap } = useMemo(() => {
+    const rowMap = new Map<string, number>(); // rowId → grid row (1-based)
+    const selMap = new Map<string, number>(); // groupId → grid row
+
+    let gridRow = headerRowCount + 1;
+    for (const row of displayRows) {
+      rowMap.set(row.id, gridRow);
+      gridRow++;
+
+      // 이 행 뒤에 삽입되는 셀렉터 행들
+      for (const [groupId, anchorId] of selectorAnchors) {
+        if (anchorId === row.id) {
+          selMap.set(groupId, gridRow);
+          gridRow++;
+        }
+      }
+    }
+    return { rowGridMap: rowMap, selectorGridMap: selMap };
+  }, [displayRows, selectorAnchors, headerRowCount]);
+
   // ── 빈 테이블 ──
   if (columns.length === 0 || rows.length === 0) {
     return (
@@ -558,15 +588,17 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
           {/* 헤더 */}
           {renderHeaderCells()}
 
-          {/* 바디 — flat 렌더링 + 셀렉터 행 삽입 */}
+          {/* 바디 — 명시적 grid-row 배치 */}
           {displayRows.map((row) => {
             const completed = rowCompletionMap.get(row.id) ?? false;
+            const gridRow = rowGridMap.get(row.id);
 
             return (
               <React.Fragment key={row.id}>
-                {/* 행의 셀들 */}
                 {row.cells.map((cell) => {
                   if (cell.isHidden) return null;
+                  const rs = cell.rowspan || 1;
+                  const cs = cell.colspan || 1;
 
                   return (
                     <div
@@ -576,9 +608,12 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
                         completed ? 'bg-green-50/40' : 'bg-white',
                         getAlignmentClasses(cell.horizontalAlign, cell.verticalAlign),
                       )}
-                      style={getGridSpanStyle(cell.colspan, cell.rowspan)}
+                      style={{
+                        gridRow: rs > 1 ? `${gridRow} / span ${rs}` : gridRow,
+                        ...(cs > 1 ? { gridColumn: `span ${cs}` } : undefined),
+                      }}
                       data-row-id={row.id}
-                      {...getGridCellAria('gridcell', cell.colspan, cell.rowspan)}
+                      {...getGridCellAria('gridcell', cs, rs)}
                     >
                       <InteractiveCell
                         cell={cell}
@@ -590,25 +625,24 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
                     </div>
                   );
                 })}
-
-                {/* 이 행 뒤에 삽입되는 셀렉터 행들 */}
-                {Array.from(selectorAnchors.entries())
-                  .filter(([, anchorId]) => anchorId === row.id)
-                  .map(([groupId]) => {
-                    const config = groupConfigMap.get(groupId);
-                    if (!config) return null;
-                    return (
-                      <SelectorRow
-                        key={`selector-${groupId}`}
-                        groupId={groupId}
-                        label={config.label}
-                        buttonAlign={config.buttonAlign}
-                        selectedCount={groupSelectedCountMap.get(groupId) ?? 0}
-                        onSelect={handleSelectGroup}
-                      />
-                    );
-                  })}
               </React.Fragment>
+            );
+          })}
+
+          {/* 셀렉터 행들 — 명시적 grid-row 배치 */}
+          {Array.from(selectorGridMap.entries()).map(([groupId, gridRow]) => {
+            const config = groupConfigMap.get(groupId);
+            if (!config) return null;
+            return (
+              <SelectorRow
+                key={`selector-${groupId}`}
+                groupId={groupId}
+                label={config.label}
+                buttonAlign={config.buttonAlign}
+                selectedCount={groupSelectedCountMap.get(groupId) ?? 0}
+                onSelect={handleSelectGroup}
+                gridRow={gridRow}
+              />
             );
           })}
         </div>
