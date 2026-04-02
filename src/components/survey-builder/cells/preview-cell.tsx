@@ -6,7 +6,8 @@ import { Image, Video } from 'lucide-react';
 
 import type { TableCell } from '@/types/survey';
 
-import { getYouTubeEmbedUrl, ImageCell as SharedImageCell } from '../table-cell-renderers';
+import { getYouTubeEmbedUrl } from '../table-cell-renderers';
+import { ImageCell } from './image-cell';
 
 /** 미리보기용 셀 컨텐츠 (읽기 전용) */
 export const PreviewCell = React.memo(function PreviewCell({ cell }: { cell: TableCell }) {
@@ -85,7 +86,7 @@ export const PreviewCell = React.memo(function PreviewCell({ cell }: { cell: Tab
 
     case 'image':
       return cell.imageUrl ? (
-        <SharedImageCell imageUrl={cell.imageUrl} content={cell.content} />
+        <ImageCell cell={cell} cellResponse={undefined} onUpdateValue={() => {}} />
       ) : (
         <div className="flex items-center gap-2 text-gray-500">
           <Image className="h-4 w-4" />

@@ -55,7 +55,7 @@ export function TableHeaderSection({
   return (
     <>
       {/* 행 라벨 헤더 (첫 번째 열) */}
-      <div className="sticky left-0 z-10 border-r border-b border-gray-300 bg-gray-100 p-2">
+      <div className="sticky left-0 z-10 bg-gray-100 p-2">
         <div className="truncate text-center text-xs font-semibold text-gray-600" title="행 라벨/코드">
           행
         </div>
@@ -73,7 +73,7 @@ export function TableHeaderSection({
         return (
           <div
             key={column.id}
-            className="relative border-r border-b border-gray-300 bg-gray-50 p-2"
+            className="relative min-w-0 bg-gray-50 p-2"
             style={getGridSpanStyle(headerColspan)}
           >
             <div className="space-y-1">
