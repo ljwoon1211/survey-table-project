@@ -33,6 +33,7 @@ interface SelectorRowProps {
   selectedCount: number;
   onSelect: (groupId: string) => void;
   gridRow?: number;
+  hasMergedAbove?: boolean;
 }
 
 const SelectorRow = React.memo(function SelectorRow({
@@ -42,11 +43,13 @@ const SelectorRow = React.memo(function SelectorRow({
   selectedCount,
   onSelect,
   gridRow,
+  hasMergedAbove,
 }: SelectorRowProps) {
   return (
     <div
       className={cn(
-        'flex items-center gap-3 border-t border-r border-b border-gray-300 bg-white px-4 py-2.5',
+        'flex items-center gap-3 border-r border-b border-gray-300 bg-white px-4 py-2.5',
+        hasMergedAbove && 'border-t',
         buttonAlign === 'center' ? 'justify-center'
           : buttonAlign === 'right' ? 'justify-end'
           : 'justify-start',
@@ -645,6 +648,10 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
           {Array.from(selectorGridMap.entries()).map(([groupId, gridRow]) => {
             const config = groupConfigMap.get(groupId);
             if (!config) return null;
+            // 앵커 행에 rowspan > 1 셀이 있으면 병합 영역과 겹침 → border-t 필요
+            const anchorId = selectorAnchors.get(groupId);
+            const anchorRow = anchorId ? displayRows.find((r) => r.id === anchorId) : undefined;
+            const hasMergedAbove = anchorRow?.cells.some((c) => !c.isHidden && (c.rowspan || 1) > 1) ?? false;
             return (
               <SelectorRow
                 key={`selector-${groupId}`}
@@ -654,6 +661,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
                 selectedCount={groupSelectedCountMap.get(groupId) ?? 0}
                 onSelect={handleSelectGroup}
                 gridRow={gridRow}
+                hasMergedAbove={hasMergedAbove}
               />
             );
           })}
