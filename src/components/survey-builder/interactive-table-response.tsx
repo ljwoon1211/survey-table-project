@@ -477,7 +477,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
         headerRow.map((cell) => (
           <div
             key={cell.id}
-            className="bg-gray-50 px-4 py-3 text-center align-middle font-semibold text-gray-800"
+            className="flex items-center justify-center bg-gray-50 px-4 py-3 text-center font-semibold text-gray-800"
             style={getGridSpanStyle(cell.colspan, cell.rowspan)}
             {...getGridCellAria('columnheader', cell.colspan, cell.rowspan)}
           >
