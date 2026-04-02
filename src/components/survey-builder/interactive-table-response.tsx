@@ -46,7 +46,7 @@ const SelectorRow = React.memo(function SelectorRow({
   return (
     <div
       className={cn(
-        'bg-muted/30 border-b border-gray-300 p-2',
+        'bg-muted/30 p-2',
         buttonAlign === 'center' ? 'text-center'
           : buttonAlign === 'right' ? 'text-right'
           : 'text-left',
