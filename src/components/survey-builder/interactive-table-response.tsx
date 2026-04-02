@@ -532,7 +532,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
       return (
         <div
           key={column.id}
-          className="bg-gray-50 px-4 py-3 text-center align-middle font-semibold text-gray-800"
+          className="flex items-center justify-center border-r border-b border-gray-300 bg-gray-50 px-4 py-3 text-center font-semibold text-gray-800"
           style={getGridSpanStyle(headerColspan)}
           {...getGridCellAria('columnheader', headerColspan)}
         >
@@ -613,8 +613,8 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
                     return (
                       <div
                         key={cell.id}
-                        className="pointer-events-none border-r border-b border-gray-300"
-                        style={{ gridRow, gridColumn: col, zIndex: 1 }}
+                        className="border-r border-b border-gray-300"
+                        style={{ gridRow, gridColumn: col }}
                         aria-hidden
                       />
                     );
