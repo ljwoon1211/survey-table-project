@@ -549,7 +549,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
         {/* CSS Grid 테이블 */}
         <div
           role="grid"
-          className="mx-auto overflow-hidden rounded-lg bg-gray-300 text-base shadow-sm"
+          className="mx-auto overflow-hidden rounded-lg border border-gray-300 bg-gray-300 text-base shadow-sm"
           style={{
             display: 'grid',
             gridTemplateColumns: gridTemplateCols,

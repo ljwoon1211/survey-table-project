@@ -98,7 +98,7 @@ export const TablePreview = React.memo(function TablePreview({
         <div className="overflow-x-auto">
           <div
             role="grid"
-            className="overflow-hidden rounded-lg bg-gray-300"
+            className="overflow-hidden rounded-lg border border-gray-300 bg-gray-300"
             style={{
               display: 'grid',
               gridTemplateColumns: gridTemplateCols,

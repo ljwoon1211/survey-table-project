@@ -38,17 +38,18 @@ export function getGridSpanStyle(
 }
 
 // ── 셀 정렬 Tailwind 클래스 ──
+// flex-col로 세로 정렬하고, text-align으로 가로 정렬 (블록 자식에도 작동)
 
-const H_ALIGN_MAP = {
-  left: 'justify-start',
-  center: 'justify-center',
-  right: 'justify-end',
+const H_ALIGN_TEXT_MAP = {
+  left: 'text-left',
+  center: 'text-center',
+  right: 'text-right',
 } as const;
 
 const V_ALIGN_MAP = {
-  top: 'items-start',
-  middle: 'items-center',
-  bottom: 'items-end',
+  top: 'justify-start',
+  middle: 'justify-center',
+  bottom: 'justify-end',
 } as const;
 
 export function getAlignmentClasses(
@@ -56,9 +57,9 @@ export function getAlignmentClasses(
   verticalAlign?: 'top' | 'middle' | 'bottom',
 ): string {
   return cn(
-    'flex',
-    H_ALIGN_MAP[horizontalAlign || 'left'],
+    'flex flex-col',
     V_ALIGN_MAP[verticalAlign || 'top'],
+    H_ALIGN_TEXT_MAP[horizontalAlign || 'left'],
   );
 }
 

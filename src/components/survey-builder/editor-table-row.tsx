@@ -304,21 +304,12 @@ export const EditorTableRow = React.memo(function EditorTableRow({
               className={cn(
                 'group relative flex h-full cursor-pointer flex-col rounded p-2 transition-colors hover:bg-gray-50',
                 getAlignmentClasses(cell.horizontalAlign, cell.verticalAlign),
-                // flex-col 유지하면서 세로 정렬
-                cell.verticalAlign === 'middle' ? 'justify-center'
-                  : cell.verticalAlign === 'bottom' ? 'justify-end'
-                  : 'justify-start',
               )}
               onClick={() => onSelectCell(row.id, cell.id)}
               style={{ minHeight: row.minHeight ? `${row.minHeight - 16}px` : '40px' }}
             >
               <div className="mb-2 flex items-start justify-between">
-                <div className={cn(
-                  'flex-1',
-                  cell.horizontalAlign === 'center' ? 'flex justify-center'
-                    : cell.horizontalAlign === 'right' ? 'flex justify-end'
-                    : '',
-                )}>
+                <div className="flex-1">
                   <EditorCellContent cell={cell} />
                 </div>
                 <Popover>
