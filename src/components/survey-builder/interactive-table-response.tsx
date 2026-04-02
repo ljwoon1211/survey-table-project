@@ -606,20 +606,9 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
             return (
               <React.Fragment key={row.id}>
                 {row.cells.map((cell, cellIndex) => {
-                  const col = cellIndex + 1; // 1-based grid column
+                  if (cell.isHidden) return null;
 
-                  // hidden 셀: border-only placeholder (병합 셀 위에 grid line 표시)
-                  if (cell.isHidden) {
-                    return (
-                      <div
-                        key={cell.id}
-                        className="border-r border-b border-gray-300"
-                        style={{ gridRow, gridColumn: col }}
-                        aria-hidden
-                      />
-                    );
-                  }
-
+                  const col = cellIndex + 1;
                   const rs = cell.rowspan || 1;
                   const cs = cell.colspan || 1;
 
