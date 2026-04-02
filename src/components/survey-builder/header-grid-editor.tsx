@@ -455,80 +455,76 @@ export function HeaderGridEditor({ headerGrid, columnCount, onChange }: HeaderGr
         </div>
       </div>
 
-      {/* 헤더 그리드 테이블 */}
+      {/* 헤더 그리드 — CSS Grid */}
       <div
-        className="select-none overflow-auto rounded border border-gray-300"
+        className="select-none overflow-auto rounded-lg bg-gray-300"
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
-        <table className="w-full border-collapse">
-          <tbody>
-            {headerGrid.map((_row, rowIdx) => (
-              <tr key={rowIdx}>
-                {cellPositions
-                  .filter((p) => p.rowIdx === rowIdx)
-                  .map(({ cellIdx, cell, gridCol }) => {
-                    let isSelected = false;
-                    for (let r = 0; r < cell.rowspan; r++) {
-                      for (let c = 0; c < cell.colspan; c++) {
-                        if (selectedCells.has(`${rowIdx + r}-${gridCol + c}`)) {
-                          isSelected = true;
-                        }
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${columnCount}, minmax(80px, 1fr))`,
+            gap: '1px',
+          }}
+        >
+          {cellPositions.map(({ rowIdx, cellIdx, cell, gridCol }) => {
+            let isSelected = false;
+            for (let r = 0; r < cell.rowspan; r++) {
+              for (let c = 0; c < cell.colspan; c++) {
+                if (selectedCells.has(`${rowIdx + r}-${gridCol + c}`)) {
+                  isSelected = true;
+                }
+              }
+            }
+
+            const isEditing =
+              editingCell?.rowIdx === rowIdx && editingCell?.cellIdx === cellIdx;
+            const isMerged = cell.colspan > 1 || cell.rowspan > 1;
+
+            return (
+              <div
+                key={cell.id}
+                className={`p-1 text-center text-sm transition-colors ${
+                  isSelected
+                    ? 'bg-blue-100 ring-2 ring-inset ring-blue-400'
+                    : isMerged
+                      ? 'bg-amber-50 hover:bg-amber-100'
+                      : 'bg-white hover:bg-gray-50'
+                }`}
+                style={{
+                  gridColumn: cell.colspan > 1 ? `span ${cell.colspan}` : undefined,
+                  gridRow: cell.rowspan > 1 ? `span ${cell.rowspan}` : undefined,
+                  cursor: isEditing ? 'text' : 'cell',
+                }}
+                onMouseDown={(e) => handleMouseDown(rowIdx, gridCol, e)}
+                onMouseEnter={() => handleMouseEnter(rowIdx, gridCol)}
+              >
+                {isEditing ? (
+                  <Input
+                    autoFocus
+                    value={cell.label}
+                    onChange={(e) => updateLabel(rowIdx, cellIdx, e.target.value)}
+                    onBlur={() => setEditingCell(null)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === 'Escape') {
+                        setEditingCell(null);
                       }
-                    }
-
-                    const isEditing =
-                      editingCell?.rowIdx === rowIdx && editingCell?.cellIdx === cellIdx;
-                    const isMerged = cell.colspan > 1 || cell.rowspan > 1;
-
-                    return (
-                      <td
-                        key={cell.id}
-                        colSpan={cell.colspan}
-                        rowSpan={cell.rowspan}
-                        className={`border border-gray-300 p-1 text-center text-sm transition-colors ${
-                          isSelected
-                            ? 'bg-blue-100 ring-2 ring-inset ring-blue-400'
-                            : isMerged
-                              ? 'bg-amber-50 hover:bg-amber-100'
-                              : 'bg-white hover:bg-gray-50'
-                        }`}
-                        style={{
-                          width: `${colWidth * cell.colspan}%`,
-                          minWidth: `${80 * cell.colspan}px`,
-                          cursor: isEditing ? 'text' : 'cell',
-                        }}
-                        onMouseDown={(e) => handleMouseDown(rowIdx, gridCol, e)}
-                        onMouseEnter={() => handleMouseEnter(rowIdx, gridCol)}
-                      >
-                        {isEditing ? (
-                          <Input
-                            autoFocus
-                            value={cell.label}
-                            onChange={(e) => updateLabel(rowIdx, cellIdx, e.target.value)}
-                            onBlur={() => setEditingCell(null)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === 'Escape') {
-                                setEditingCell(null);
-                              }
-                            }}
-                            className="h-7 text-center text-sm"
-                          />
-                        ) : (
-                          <span
-                            className={cell.label ? 'text-gray-800' : 'text-gray-400 italic'}
-                            title={isMerged ? `${cell.colspan}×${cell.rowspan} 병합` : undefined}
-                          >
-                            {cell.label || '(빈 셀)'}
-                          </span>
-                        )}
-                      </td>
-                    );
-                  })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    }}
+                    className="h-7 text-center text-sm"
+                  />
+                ) : (
+                  <span
+                    className={cell.label ? 'text-gray-800' : 'text-gray-400 italic'}
+                    title={isMerged ? `${cell.colspan}×${cell.rowspan} 병합` : undefined}
+                  >
+                    {cell.label || '(빈 셀)'}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <p className="text-xs text-gray-500">
