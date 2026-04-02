@@ -605,8 +605,19 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
 
             return (
               <React.Fragment key={row.id}>
-                {row.cells.map((cell) => {
-                  if (cell.isHidden) return null;
+                {row.cells.map((cell, cellIndex) => {
+                  // hidden 셀: border-only placeholder (rowspan/colspan으로 가려진 영역)
+                  if (cell.isHidden) {
+                    return (
+                      <div
+                        key={cell.id}
+                        className="border-r border-b border-gray-300"
+                        style={{ gridRow, gridColumn: cellIndex + 1 }}
+                        aria-hidden
+                      />
+                    );
+                  }
+
                   const rs = cell.rowspan || 1;
                   const cs = cell.colspan || 1;
 

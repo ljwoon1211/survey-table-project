@@ -110,8 +110,16 @@ export const TablePreview = React.memo(function TablePreview({
 
             {/* 바디 */}
             {rows.map((row) =>
-              row.cells.map((cell) => {
-                if (cell.isHidden) return null;
+              row.cells.map((cell, cellIndex) => {
+                if (cell.isHidden) {
+                  return (
+                    <div
+                      key={cell.id}
+                      className="border-r border-b border-gray-300"
+                      aria-hidden
+                    />
+                  );
+                }
 
                 return (
                   <div
