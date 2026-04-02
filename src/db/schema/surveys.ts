@@ -113,6 +113,9 @@ export const questions = pgTable('questions', {
   spssVarType: text('spss_var_type'), // SPSS 변수 타입 오버라이드 ('Numeric' | 'String' | 'Date' | 'DateTime')
   spssMeasure: text('spss_measure'), // SPSS 측정 수준 오버라이드 ('Nominal' | 'Ordinal' | 'Continuous')
 
+  // 행 라벨 열 숨기기 (테이블 타입 전용)
+  hideRowLabels: boolean('hide_row_labels').default(false),
+
   // 검증 규칙 및 조건부 표시
   tableValidationRules: jsonb('table_validation_rules').$type<TableValidationRule[]>(),
   dynamicRowConfigs: jsonb('dynamic_row_config').$type<DynamicRowGroupConfig[]>(),

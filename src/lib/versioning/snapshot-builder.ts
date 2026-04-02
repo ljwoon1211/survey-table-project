@@ -47,6 +47,7 @@ interface SnapshotQuestion {
   requiresAcknowledgment?: boolean;
   placeholder?: string;
   tableValidationRules?: Question['tableValidationRules'];
+  hideRowLabels?: boolean;
   displayCondition?: Question['displayCondition'];
   questionCode?: string;
 }
@@ -102,6 +103,7 @@ export function buildSurveySnapshot(survey: Survey): SurveySnapshot {
       requiresAcknowledgment: q.requiresAcknowledgment,
       placeholder: q.placeholder,
       tableValidationRules: q.tableValidationRules,
+      hideRowLabels: q.hideRowLabels,
       displayCondition: q.displayCondition,
       questionCode: q.questionCode,
     })),

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
+import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { TableColumn } from '@/types/survey';
 
@@ -45,16 +46,20 @@ export function TableHeaderSection({
   onColumnWidthChange,
   onOpenColumnConditionModal,
 }: TableHeaderSectionProps) {
+  const hideRowLabels = useSurveyBuilderStore(
+    (s) => s.currentSurvey.questions.find((q) => q.id === s.editingQuestionId)?.hideRowLabels ?? false,
+  );
+
   return (
     <thead>
       <tr>
         {/* 행 이름(라벨) 헤더 */}
-        <th className="sticky left-0 z-10 w-[120px] min-w-[120px] border border-gray-300 bg-gray-100 p-2">
+        <th className={`sticky left-0 z-10 border border-gray-300 bg-gray-100 p-2 ${hideRowLabels ? 'w-[40px] min-w-[40px]' : 'w-[120px] min-w-[120px]'}`}>
           <div
             className="truncate text-center text-xs font-semibold text-gray-600"
-            title="행 라벨/코드"
+            title={hideRowLabels ? '행 설정' : '행 라벨/코드'}
           >
-            행
+            {hideRowLabels ? <Settings2 className="mx-auto h-3 w-3" /> : '행'}
           </div>
         </th>
 

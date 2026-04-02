@@ -54,8 +54,12 @@ interface QuestionEditModalProps {
 }
 
 export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditModalProps) {
-  const { updateQuestion } = useSurveyBuilderStore(
-    useShallow((s) => ({ updateQuestion: s.updateQuestion })),
+  const { updateQuestion, setEditingQuestionId, silentUpdateQuestion } = useSurveyBuilderStore(
+    useShallow((s) => ({
+      updateQuestion: s.updateQuestion,
+      setEditingQuestionId: s.setEditingQuestionId,
+      silentUpdateQuestion: s.silentUpdateQuestion,
+    })),
   );
   const questions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
   const question = questions.find((q) => q.id === questionId);
@@ -64,6 +68,10 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
   const [isSaving, setIsSaving] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [showBranchSettings, setShowBranchSettings] = useState(false);
+
+  // hideRowLabels 롤백용 refs
+  const originalHideRowLabelsRef = useRef(false);
+  const didSaveRef = useRef(false);
 
   // ── 로컬 state: 타이핑 성능을 위해 formData와 분리 ──
   const [localTitle, setLocalTitle] = useState('');
@@ -86,6 +94,28 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
       if (debouncedExportLabelRef.current) clearTimeout(debouncedExportLabelRef.current);
     };
   }, []);
+
+  // editingQuestionId 라이프사이클 + hideRowLabels 롤백
+  const questionIdRef = useRef(questionId);
+  questionIdRef.current = questionId;
+  useEffect(() => {
+    if (isOpen && questionId) {
+      setEditingQuestionId(questionId);
+      const q = useSurveyBuilderStore.getState().currentSurvey.questions.find((q) => q.id === questionId);
+      originalHideRowLabelsRef.current = q?.hideRowLabels ?? false;
+      didSaveRef.current = false;
+    }
+    return () => {
+      const qId = questionIdRef.current;
+      if (qId) {
+        if (!didSaveRef.current) {
+          useSurveyBuilderStore.getState().silentUpdateQuestion(qId, { hideRowLabels: originalHideRowLabelsRef.current });
+        }
+        useSurveyBuilderStore.getState().setEditingQuestionId(null);
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, questionId]);
 
   useEffect(() => {
     if (question) {
@@ -193,7 +223,11 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
 
     if (!questionId || !validateForm()) return;
 
-    const currentFormData = formDataRef.current;
+    // store에서 hideRowLabels 최신값 머지 (silentUpdateQuestion으로 토글한 값)
+    const storeQuestion = useSurveyBuilderStore.getState()
+      .currentSurvey.questions.find((q) => q.id === questionId);
+    const currentFormData = { ...formDataRef.current, hideRowLabels: storeQuestion?.hideRowLabels };
+    didSaveRef.current = true;
     setIsSaving(true);
     try {
       const updatedQuestion = {

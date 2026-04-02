@@ -208,5 +208,6 @@ export interface QuestionData {
   requiresAcknowledgment?: boolean;
   placeholder?: string;
   tableValidationRules?: TableValidationRule[];
+  hideRowLabels?: boolean;
   displayCondition?: QuestionConditionGroup;
 }

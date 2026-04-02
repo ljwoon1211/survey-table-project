@@ -141,6 +141,7 @@ export function QuestionInput({
           allResponses={allResponses}
           allQuestions={allQuestions}
           dynamicRowConfigs={question.dynamicRowConfigs}
+          hideRowLabels={question.hideRowLabels}
         />
       ) : (
         <div className="py-4 text-center text-gray-500">테이블이 구성되지 않았습니다.</div>

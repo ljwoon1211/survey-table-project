@@ -76,6 +76,12 @@ export interface SurveyBuilderState {
   // Diff 저장용 changeset 관리
   snapshotChanges: () => { questionChanges: QuestionChangeset; isMetadataDirty: boolean };
   mergeChangesBack: (snapshot: { questionChanges: QuestionChangeset; isMetadataDirty: boolean }) => void;
+
+  // 현재 편집 중인 질문 ID (모달 open/close 시 설정)
+  editingQuestionId: string | null;
+  setEditingQuestionId: (id: string | null) => void;
+  // dirty/questionChanges를 건드리지 않는 질문 업데이트 (UI 전용 토글 등)
+  silentUpdateQuestion: (questionId: string, updates: Partial<Question>) => void;
 }
 
 const defaultSurveySettings: SurveySettings = {
@@ -107,6 +113,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
       isModifiedSincePublish: false,
       questionChanges: emptyChangeset(),
       isMetadataDirty: false,
+      editingQuestionId: null,
 
       // 서버에서 불러온 설문 데이터 설정
       setSurvey: (survey: Survey) =>
@@ -540,6 +547,21 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
 
           // isDirty도 복원
           state.isDirty = true;
+        });
+      },
+
+      // 현재 편집 중인 질문 ID
+      setEditingQuestionId: (id: string | null) => {
+        set((state) => {
+          state.editingQuestionId = id;
+        });
+      },
+
+      // dirty/questionChanges를 건드리지 않는 질문 업데이트 (UI 전용 토글 등)
+      silentUpdateQuestion: (questionId: string, updates: Partial<Question>) => {
+        set((state) => {
+          const question = state.currentSurvey.questions.find((q) => q.id === questionId);
+          if (question) Object.assign(question, updates);
         });
       },
     })) as any,

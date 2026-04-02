@@ -81,6 +81,7 @@ interface InteractiveTableResponseProps {
   allResponses?: Record<string, unknown>;
   allQuestions?: Question[];
   dynamicRowConfigs?: DynamicRowGroupConfig[];
+  hideRowLabels?: boolean;
 }
 
 export const InteractiveTableResponse = React.memo(function InteractiveTableResponse({
@@ -96,6 +97,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
   allResponses,
   allQuestions,
   dynamicRowConfigs,
+  hideRowLabels = false,
 }: InteractiveTableResponseProps) {
   // Zustand: 현재 질문만 구독 (다른 질문 변경 시 리렌더 방지)
   const updateTestResponse = useTestResponseStore((state) => state.updateTestResponse);
@@ -459,8 +461,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
               <div className={`border-b p-4 ${completed ? 'bg-green-100/50' : 'bg-gray-50/80'}`}>
                 <div className="flex items-center justify-between">
                   <div className="text-lg font-semibold text-gray-900">
-                    {/* 행 라벨을 타이틀로 표시 */}
-                    {row.label || `항목 ${rowIndex + 1}`}
+                    {hideRowLabels ? `항목 ${rowIndex + 1}` : (row.label || `항목 ${rowIndex + 1}`)}
                   </div>
                   {completed && (
                     <div className="flex items-center gap-1.5 rounded-full bg-green-100 px-2 py-1 text-sm font-medium text-green-600">

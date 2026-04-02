@@ -21,6 +21,7 @@ import {
 
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { DynamicRowGroupConfig, TableCell, TableRow } from '@/types/survey';
 import { isCellSaveable } from '@/utils/cell-library-helpers';
 
@@ -189,6 +190,10 @@ export const EditorTableRow = React.memo(function EditorTableRow({
   onSaveCell,
   onLoadCell,
 }: EditorTableRowProps) {
+  const hideRowLabels = useSurveyBuilderStore(
+    (s) => s.currentSurvey.questions.find((q) => q.id === s.editingQuestionId)?.hideRowLabels ?? false,
+  );
+
   // 드래그 선택 영역 셀 Set (문자열 → Set<number>)
   const dragSelectionCells = React.useMemo(() => {
     if (!dragSelectionCellsKey) return null;
@@ -200,28 +205,34 @@ export const EditorTableRow = React.memo(function EditorTableRow({
       className="group/row"
     >
       {/* 행 이름(라벨) 입력칸 */}
-      <td className="sticky left-0 z-10 w-[120px] min-w-[120px] border border-gray-300 bg-gray-50 p-1">
-        <div className="space-y-1">
-          <Input
-            value={row.label}
-            onChange={(e) => onUpdateRowLabel(rowIndex, e.target.value)}
-            className="h-6 bg-white px-1 text-center text-xs"
-            placeholder="행 라벨"
-            title={`행 라벨: ${row.label}`}
-          />
+      <td className={`sticky left-0 z-10 border border-gray-300 bg-gray-50 p-1 ${hideRowLabels ? 'w-[40px] min-w-[40px]' : 'w-[120px] min-w-[120px]'}`}>
+        <div className={hideRowLabels ? 'flex items-center justify-center' : 'space-y-1'}>
+          {!hideRowLabels && (
+            <Input
+              value={row.label}
+              onChange={(e) => onUpdateRowLabel(rowIndex, e.target.value)}
+              className="h-6 bg-white px-1 text-center text-xs"
+              placeholder="행 라벨"
+              title={`행 라벨: ${row.label}`}
+            />
+          )}
           {/* 요약 아이콘 + 설정 Popover */}
           <div className="flex items-center justify-center gap-0.5">
-            <span className="truncate text-[10px] text-gray-400">{row.rowCode || `r${rowIndex + 1}`}</span>
-            {row.displayCondition && row.displayCondition.conditions.length > 0 && (
-              <Eye className="h-2.5 w-2.5 shrink-0 text-blue-500" />
-            )}
-            {row.dynamicGroupId && (
-              <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${
-                GROUP_COLORS[dynamicRowConfigs.findIndex((g) => g.groupId === row.dynamicGroupId) % GROUP_COLORS.length] || 'bg-purple-500'
-              }`} />
-            )}
-            {row.showWhenDynamicGroupId && (
-              <Zap className={`h-2.5 w-2.5 shrink-0 ${GROUP_COLORS[dynamicRowConfigs.findIndex((g) => g.groupId === row.showWhenDynamicGroupId) % GROUP_COLORS.length]?.replace('bg-', 'text-') || 'text-amber-500'}`} />
+            {!hideRowLabels && (
+              <>
+                <span className="truncate text-[10px] text-gray-400">{row.rowCode || `r${rowIndex + 1}`}</span>
+                {row.displayCondition && row.displayCondition.conditions.length > 0 && (
+                  <Eye className="h-2.5 w-2.5 shrink-0 text-blue-500" />
+                )}
+                {row.dynamicGroupId && (
+                  <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${
+                    GROUP_COLORS[dynamicRowConfigs.findIndex((g) => g.groupId === row.dynamicGroupId) % GROUP_COLORS.length] || 'bg-purple-500'
+                  }`} />
+                )}
+                {row.showWhenDynamicGroupId && (
+                  <Zap className={`h-2.5 w-2.5 shrink-0 ${GROUP_COLORS[dynamicRowConfigs.findIndex((g) => g.groupId === row.showWhenDynamicGroupId) % GROUP_COLORS.length]?.replace('bg-', 'text-') || 'text-amber-500'}`} />
+                )}
+              </>
             )}
             <Popover>
               <PopoverTrigger asChild>

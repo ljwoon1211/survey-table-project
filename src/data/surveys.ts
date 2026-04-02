@@ -150,6 +150,7 @@ export async function getSurveyWithDetails(surveyId: string): Promise<SurveyType
         placeholder: q.placeholder ?? undefined,
         tableValidationRules: q.tableValidationRules as QuestionType['tableValidationRules'],
         dynamicRowConfigs: q.dynamicRowConfigs as QuestionType['dynamicRowConfigs'],
+        hideRowLabels: q.hideRowLabels ?? undefined,
         displayCondition: q.displayCondition as QuestionType['displayCondition'],
         questionCode: q.questionCode ?? undefined,
         isCustomSpssVarName: q.isCustomSpssVarName ?? undefined,

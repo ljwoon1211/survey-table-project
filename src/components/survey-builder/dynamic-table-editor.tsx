@@ -52,6 +52,11 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
   // 기존 단일 객체 → 배열 마이그레이션 호환
   const dynamicRowConfigs = Array.isArray(rawConfigs) ? rawConfigs : [];
   const allQuestions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
+  const editingQuestionId = useSurveyBuilderStore((s) => s.editingQuestionId);
+  const hideRowLabels = useSurveyBuilderStore(
+    (s) => s.currentSurvey.questions.find((q) => q.id === s.editingQuestionId)?.hideRowLabels ?? false,
+  );
+  const silentUpdateQuestion = useSurveyBuilderStore((s) => s.silentUpdateQuestion);
   const { state, actions } = useTableEditor(props);
 
   const {
@@ -359,6 +364,31 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
         )}
       </div>
 
+      {/* 행 라벨 숨기기 설정 */}
+      <div className="space-y-3 rounded-lg border border-gray-200 p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <Label className="text-sm font-medium">행 라벨 숨기기</Label>
+            <p className="text-xs text-gray-500">
+              행 라벨 열을 숨기고 설정 아이콘만 표시합니다. 내보내기에는 영향 없음.
+            </p>
+          </div>
+          <label className="relative inline-flex cursor-pointer items-center">
+            <input
+              type="checkbox"
+              checked={hideRowLabels}
+              onChange={(e) => {
+                if (editingQuestionId) {
+                  silentUpdateQuestion(editingQuestionId, { hideRowLabels: e.target.checked });
+                }
+              }}
+              className="peer sr-only"
+            />
+            <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none" />
+          </label>
+        </div>
+      </div>
+
       {/* 테이블 정보 요약 */}
       <TableSummaryCard rows={currentRows} columns={currentColumns} />
 
@@ -418,12 +448,12 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
               className="mx-auto border-collapse border border-gray-300"
               style={{
                 tableLayout: 'fixed',
-                width: `${120 + currentColumns.reduce((sum, col) => sum + (col.width || 150), 0)}px`,
+                width: `${(hideRowLabels ? 40 : 120) + currentColumns.reduce((sum, col) => sum + (col.width || 150), 0)}px`,
               }}
             >
               {/* 열 너비 정의 */}
               <colgroup>
-                <col style={{ width: '120px' }} />
+                <col style={{ width: hideRowLabels ? '40px' : '120px' }} />
                 {currentColumns.map((column, index) => (
                   <col key={`col-${index}`} style={{ width: `${column.width || 150}px` }} />
                 ))}
