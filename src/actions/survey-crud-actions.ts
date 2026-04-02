@@ -233,7 +233,7 @@ export async function duplicateSurvey(surveyId: string) {
         placeholder: question.placeholder,
         tableValidationRules: question.tableValidationRules as NewQuestion['tableValidationRules'],
         dynamicRowConfigs: question.dynamicRowConfigs as NewQuestion['dynamicRowConfigs'],
-        hideRowLabels: question.hideRowLabels,
+        hideColumnLabels: question.hideColumnLabels,
         displayCondition: question.displayCondition as NewQuestion['displayCondition'],
       };
     });
@@ -405,7 +405,7 @@ export async function saveSurveyDiff(payload: SurveyDiffPayload) {
             question.tableValidationRules as NewQuestion['tableValidationRules'],
           dynamicRowConfigs:
             question.dynamicRowConfigs as NewQuestion['dynamicRowConfigs'],
-          hideRowLabels: question.hideRowLabels,
+          hideColumnLabels: question.hideColumnLabels,
           displayCondition: question.displayCondition as NewQuestion['displayCondition'],
           questionCode: question.questionCode,
           isCustomSpssVarName: question.isCustomSpssVarName,
@@ -443,7 +443,7 @@ export async function saveSurveyDiff(payload: SurveyDiffPayload) {
               placeholder: sql`excluded.placeholder`,
               tableValidationRules: sql`excluded.table_validation_rules`,
               dynamicRowConfigs: sql`excluded.dynamic_row_config`,
-              hideRowLabels: sql`excluded.hide_row_labels`,
+              hideColumnLabels: sql`excluded.hide_column_labels`,
               displayCondition: sql`excluded.display_condition`,
               questionCode: sql`excluded.question_code`,
               isCustomSpssVarName: sql`excluded.is_custom_spss_var_name`,
@@ -656,7 +656,7 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
             question.tableValidationRules as NewQuestion['tableValidationRules'],
           dynamicRowConfigs:
             question.dynamicRowConfigs as NewQuestion['dynamicRowConfigs'],
-          hideRowLabels: question.hideRowLabels,
+          hideColumnLabels: question.hideColumnLabels,
           displayCondition: question.displayCondition as NewQuestion['displayCondition'],
           questionCode: question.questionCode,
           isCustomSpssVarName: question.isCustomSpssVarName,
@@ -694,7 +694,7 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
               placeholder: sql`excluded.placeholder`,
               tableValidationRules: sql`excluded.table_validation_rules`,
               dynamicRowConfigs: sql`excluded.dynamic_row_config`,
-              hideRowLabels: sql`excluded.hide_row_labels`,
+              hideColumnLabels: sql`excluded.hide_column_labels`,
               displayCondition: sql`excluded.display_condition`,
               questionCode: sql`excluded.question_code`,
               isCustomSpssVarName: sql`excluded.is_custom_spss_var_name`,

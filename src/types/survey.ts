@@ -254,8 +254,8 @@ export interface Question {
   tableValidationRules?: TableValidationRule[];
   // 동적 행 그룹 설정 (테이블 타입 전용)
   dynamicRowConfigs?: DynamicRowGroupConfig[];
-  // 행 라벨 열 숨기기 (테이블 타입 전용, UI에서만 숨기고 데이터는 보존)
-  hideRowLabels?: boolean;
+  // 열 라벨 숨기기 (테이블 타입 전용, UI에서만 숨기고 데이터는 보존)
+  hideColumnLabels?: boolean;
   // 질문 표시 조건 (이 질문을 표시하기 위한 조건)
   displayCondition?: QuestionConditionGroup;
   // SPSS .sav 내보내기 오버라이드 (없으면 질문 타입 기반 자동 판단)

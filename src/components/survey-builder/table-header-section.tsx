@@ -13,8 +13,8 @@ import {
 } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
-import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { TableColumn } from '@/types/survey';
 
 export interface TableHeaderSectionProps {
@@ -46,20 +46,20 @@ export function TableHeaderSection({
   onColumnWidthChange,
   onOpenColumnConditionModal,
 }: TableHeaderSectionProps) {
-  const hideRowLabels = useSurveyBuilderStore(
-    (s) => s.currentSurvey.questions.find((q) => q.id === s.editingQuestionId)?.hideRowLabels ?? false,
+  const hideColumnLabels = useSurveyBuilderStore(
+    (s) => s.currentSurvey.questions.find((q) => q.id === s.editingQuestionId)?.hideColumnLabels ?? false,
   );
 
   return (
     <thead>
       <tr>
         {/* 행 이름(라벨) 헤더 */}
-        <th className={`sticky left-0 z-10 border border-gray-300 bg-gray-100 p-2 ${hideRowLabels ? 'w-[40px] min-w-[40px]' : 'w-[120px] min-w-[120px]'}`}>
+        <th className="sticky left-0 z-10 w-[120px] min-w-[120px] border border-gray-300 bg-gray-100 p-2">
           <div
             className="truncate text-center text-xs font-semibold text-gray-600"
-            title={hideRowLabels ? '행 설정' : '행 라벨/코드'}
+            title="행 라벨/코드"
           >
-            {hideRowLabels ? <Settings2 className="mx-auto h-3 w-3" /> : '행'}
+            행
           </div>
         </th>
 
@@ -85,13 +85,15 @@ export function TableHeaderSection({
             >
               <div className="space-y-1">
                 {/* 라벨 + 메뉴 버튼 */}
-                <div className="flex items-center gap-1">
-                  <Input
-                    value={column.label}
-                    onChange={(e) => onUpdateColumnLabel(columnIndex, e.target.value)}
-                    className="h-7 flex-1 border border-gray-200 bg-white text-center text-sm"
-                    placeholder="열 제목"
-                  />
+                <div className={`flex items-center ${hideColumnLabels ? 'justify-center' : 'gap-1'}`}>
+                  {!hideColumnLabels && (
+                    <Input
+                      value={column.label}
+                      onChange={(e) => onUpdateColumnLabel(columnIndex, e.target.value)}
+                      className="h-7 flex-1 border border-gray-200 bg-white text-center text-sm"
+                      placeholder="열 제목"
+                    />
+                  )}
                   <Popover>
                     <PopoverTrigger asChild>
                       <button
@@ -234,11 +236,13 @@ export function TableHeaderSection({
                 </div>
 
                 {/* 요약 정보 (한 줄) */}
-                <div className="flex items-center justify-center gap-1 text-[10px] text-gray-400">
-                  <span>{column.columnCode || `c${columnIndex + 1}`}</span>
-                  {isHeaderMerged && <span className="text-orange-500">🔗{headerColspan}</span>}
-                  {hasCondition && <Eye className="h-2.5 w-2.5 text-blue-500" />}
-                </div>
+                {!hideColumnLabels && (
+                  <div className="flex items-center justify-center gap-1 text-[10px] text-gray-400">
+                    <span>{column.columnCode || `c${columnIndex + 1}`}</span>
+                    {isHeaderMerged && <span className="text-orange-500">🔗{headerColspan}</span>}
+                    {hasCondition && <Eye className="h-2.5 w-2.5 text-blue-500" />}
+                  </div>
+                )}
               </div>
             </th>
           );

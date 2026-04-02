@@ -69,8 +69,9 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [showBranchSettings, setShowBranchSettings] = useState(false);
 
-  // hideRowLabels 롤백용 refs
-  const originalHideRowLabelsRef = useRef(false);
+  // hideColumnLabels 롤백용 refs
+  const originalHideColumnLabelsRef = useRef(false);
+
   const didSaveRef = useRef(false);
 
   // ── 로컬 state: 타이핑 성능을 위해 formData와 분리 ──
@@ -95,21 +96,21 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
     };
   }, []);
 
-  // editingQuestionId 라이프사이클 + hideRowLabels 롤백
+  // editingQuestionId 라이프사이클 + hideColumnLabels 롤백
   const questionIdRef = useRef(questionId);
   questionIdRef.current = questionId;
   useEffect(() => {
     if (isOpen && questionId) {
       setEditingQuestionId(questionId);
       const q = useSurveyBuilderStore.getState().currentSurvey.questions.find((q) => q.id === questionId);
-      originalHideRowLabelsRef.current = q?.hideRowLabels ?? false;
+      originalHideColumnLabelsRef.current = q?.hideColumnLabels ?? false;
       didSaveRef.current = false;
     }
     return () => {
       const qId = questionIdRef.current;
       if (qId) {
         if (!didSaveRef.current) {
-          useSurveyBuilderStore.getState().silentUpdateQuestion(qId, { hideRowLabels: originalHideRowLabelsRef.current });
+          useSurveyBuilderStore.getState().silentUpdateQuestion(qId, { hideColumnLabels: originalHideColumnLabelsRef.current });
         }
         useSurveyBuilderStore.getState().setEditingQuestionId(null);
       }
@@ -223,10 +224,10 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
 
     if (!questionId || !validateForm()) return;
 
-    // store에서 hideRowLabels 최신값 머지 (silentUpdateQuestion으로 토글한 값)
+    // store에서 hideColumnLabels 최신값 머지 (silentUpdateQuestion으로 토글한 값)
     const storeQuestion = useSurveyBuilderStore.getState()
       .currentSurvey.questions.find((q) => q.id === questionId);
-    const currentFormData = { ...formDataRef.current, hideRowLabels: storeQuestion?.hideRowLabels };
+    const currentFormData = { ...formDataRef.current, hideColumnLabels: storeQuestion?.hideColumnLabels };
     didSaveRef.current = true;
     setIsSaving(true);
     try {
@@ -1407,6 +1408,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                         rows={formData.tableRowsData}
                         tableHeaderGrid={formData.tableHeaderGrid}
                         className="border-2 border-dashed border-gray-300"
+                        hideColumnLabels={questions.find((q) => q.id === questionId)?.hideColumnLabels}
                       />
                     </div>
                   )}

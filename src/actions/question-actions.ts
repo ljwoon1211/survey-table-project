@@ -44,7 +44,7 @@ export async function createQuestion(data: {
   tableValidationRules?: QuestionType['tableValidationRules'];
   displayCondition?: QuestionType['displayCondition'];
   dynamicRowConfigs?: QuestionType['dynamicRowConfigs'];
-  hideRowLabels?: boolean;
+  hideColumnLabels?: boolean;
   questionCode?: string;
   isCustomSpssVarName?: boolean;
   exportLabel?: string;
@@ -84,7 +84,7 @@ export async function createQuestion(data: {
     tableValidationRules: data.tableValidationRules as NewQuestion['tableValidationRules'],
     displayCondition: data.displayCondition as NewQuestion['displayCondition'],
     dynamicRowConfigs: data.dynamicRowConfigs as NewQuestion['dynamicRowConfigs'],
-    hideRowLabels: data.hideRowLabels,
+    hideColumnLabels: data.hideColumnLabels,
     questionCode: data.questionCode,
     isCustomSpssVarName: data.isCustomSpssVarName,
     exportLabel: data.exportLabel,
@@ -124,7 +124,7 @@ export async function updateQuestion(
     placeholder: string;
     tableValidationRules: QuestionType['tableValidationRules'];
     dynamicRowConfigs: QuestionType['dynamicRowConfigs'];
-    hideRowLabels: boolean;
+    hideColumnLabels: boolean;
     displayCondition: QuestionType['displayCondition'];
     questionCode: string;
     isCustomSpssVarName: boolean;
@@ -159,7 +159,7 @@ export async function updateQuestion(
   if (data.placeholder !== undefined) allowed.placeholder = data.placeholder;
   if (data.tableValidationRules !== undefined) allowed.tableValidationRules = data.tableValidationRules as NewQuestion['tableValidationRules'];
   if (data.dynamicRowConfigs !== undefined) allowed.dynamicRowConfigs = data.dynamicRowConfigs as NewQuestion['dynamicRowConfigs'];
-  if (data.hideRowLabels !== undefined) allowed.hideRowLabels = data.hideRowLabels;
+  if (data.hideColumnLabels !== undefined) allowed.hideColumnLabels = data.hideColumnLabels;
   if (data.displayCondition !== undefined) allowed.displayCondition = data.displayCondition as NewQuestion['displayCondition'];
   if (data.questionCode !== undefined) allowed.questionCode = data.questionCode;
   if (data.isCustomSpssVarName !== undefined) allowed.isCustomSpssVarName = data.isCustomSpssVarName;

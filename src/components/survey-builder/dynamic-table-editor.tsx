@@ -53,8 +53,8 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
   const dynamicRowConfigs = Array.isArray(rawConfigs) ? rawConfigs : [];
   const allQuestions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
   const editingQuestionId = useSurveyBuilderStore((s) => s.editingQuestionId);
-  const hideRowLabels = useSurveyBuilderStore(
-    (s) => s.currentSurvey.questions.find((q) => q.id === s.editingQuestionId)?.hideRowLabels ?? false,
+  const hideColumnLabels = useSurveyBuilderStore(
+    (s) => s.currentSurvey.questions.find((q) => q.id === s.editingQuestionId)?.hideColumnLabels ?? false,
   );
   const silentUpdateQuestion = useSurveyBuilderStore((s) => s.silentUpdateQuestion);
   const { state, actions } = useTableEditor(props);
@@ -364,22 +364,22 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
         )}
       </div>
 
-      {/* 행 라벨 숨기기 설정 */}
+      {/* 열 라벨 숨기기 설정 */}
       <div className="space-y-3 rounded-lg border border-gray-200 p-4">
         <div className="flex items-center justify-between">
           <div>
-            <Label className="text-sm font-medium">행 라벨 숨기기</Label>
+            <Label className="text-sm font-medium">열 라벨 숨기기</Label>
             <p className="text-xs text-gray-500">
-              행 라벨 열을 숨기고 설정 아이콘만 표시합니다. 내보내기에는 영향 없음.
+              응답자가 직접 열 항목을 기입하는 테이블에 사용합니다. 열 헤더를 숨기고 데이터만 표시합니다.
             </p>
           </div>
           <label className="relative inline-flex cursor-pointer items-center">
             <input
               type="checkbox"
-              checked={hideRowLabels}
+              checked={hideColumnLabels}
               onChange={(e) => {
                 if (editingQuestionId) {
-                  silentUpdateQuestion(editingQuestionId, { hideRowLabels: e.target.checked });
+                  silentUpdateQuestion(editingQuestionId, { hideColumnLabels: e.target.checked });
                 }
               }}
               className="peer sr-only"
@@ -448,12 +448,12 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
               className="mx-auto border-collapse border border-gray-300"
               style={{
                 tableLayout: 'fixed',
-                width: `${(hideRowLabels ? 40 : 120) + currentColumns.reduce((sum, col) => sum + (col.width || 150), 0)}px`,
+                width: `${120 + currentColumns.reduce((sum, col) => sum + (col.width || 150), 0)}px`,
               }}
             >
               {/* 열 너비 정의 */}
               <colgroup>
-                <col style={{ width: hideRowLabels ? '40px' : '120px' }} />
+                <col style={{ width: '120px' }} />
                 {currentColumns.map((column, index) => (
                   <col key={`col-${index}`} style={{ width: `${column.width || 150}px` }} />
                 ))}

@@ -189,6 +189,7 @@ interface TablePreviewProps {
   rows?: TableRow[];
   tableHeaderGrid?: HeaderCell[][];
   className?: string;
+  hideColumnLabels?: boolean;
 }
 
 export const TablePreview = React.memo(function TablePreview({
@@ -197,6 +198,7 @@ export const TablePreview = React.memo(function TablePreview({
   rows = [],
   tableHeaderGrid,
   className,
+  hideColumnLabels = false,
 }: TablePreviewProps) {
   // 테이블이 비어있는 경우
   if (columns.length === 0 || rows.length === 0) {
@@ -237,44 +239,46 @@ export const TablePreview = React.memo(function TablePreview({
             </colgroup>
 
             {/* 헤더 */}
-            <thead>
-              {tableHeaderGrid && tableHeaderGrid.length > 0 ? (
-                tableHeaderGrid.map((headerRow, rowIdx) => (
-                  <tr key={`header-row-${rowIdx}`}>
-                    {headerRow.map((cell) => (
-                      <th
-                        key={cell.id}
-                        className="border border-gray-300 bg-gray-50 p-3 text-center font-medium"
-                        colSpan={cell.colspan}
-                        rowSpan={cell.rowspan}
-                      >
-                        {cell.label || <span className="text-sm text-gray-400 italic"></span>}
-                      </th>
-                    ))}
+            {!hideColumnLabels && (
+              <thead>
+                {tableHeaderGrid && tableHeaderGrid.length > 0 ? (
+                  tableHeaderGrid.map((headerRow, rowIdx) => (
+                    <tr key={`header-row-${rowIdx}`}>
+                      {headerRow.map((cell) => (
+                        <th
+                          key={cell.id}
+                          className="border border-gray-300 bg-gray-50 p-3 text-center font-medium"
+                          colSpan={cell.colspan}
+                          rowSpan={cell.rowspan}
+                        >
+                          {cell.label || <span className="text-sm text-gray-400 italic"></span>}
+                        </th>
+                      ))}
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    {columns.map((column, colIndex) => {
+                      if (column.isHeaderHidden) return null;
+                      const headerColspan = column.colspan || 1;
+                      const mergedWidth = headerColspan > 1
+                        ? columns.slice(colIndex, colIndex + headerColspan).reduce((sum, col) => sum + (col.width || 150), 0)
+                        : (column.width || 150);
+                      return (
+                        <th
+                          key={column.id}
+                          className="border border-gray-300 bg-gray-50 p-3 text-center font-medium"
+                          style={{ width: `${mergedWidth}px` }}
+                          colSpan={headerColspan}
+                        >
+                          {column.label || <span className="text-sm text-gray-400 italic"></span>}
+                        </th>
+                      );
+                    })}
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  {columns.map((column, colIndex) => {
-                    if (column.isHeaderHidden) return null;
-                    const headerColspan = column.colspan || 1;
-                    const mergedWidth = headerColspan > 1
-                      ? columns.slice(colIndex, colIndex + headerColspan).reduce((sum, col) => sum + (col.width || 150), 0)
-                      : (column.width || 150);
-                    return (
-                      <th
-                        key={column.id}
-                        className="border border-gray-300 bg-gray-50 p-3 text-center font-medium"
-                        style={{ width: `${mergedWidth}px` }}
-                        colSpan={headerColspan}
-                      >
-                        {column.label || <span className="text-sm text-gray-400 italic"></span>}
-                      </th>
-                    );
-                  })}
-                </tr>
-              )}
-            </thead>
+                )}
+              </thead>
+            )}
 
             {/* 본문 */}
             <tbody>

@@ -81,7 +81,7 @@ interface InteractiveTableResponseProps {
   allResponses?: Record<string, unknown>;
   allQuestions?: Question[];
   dynamicRowConfigs?: DynamicRowGroupConfig[];
-  hideRowLabels?: boolean;
+  hideColumnLabels?: boolean;
 }
 
 export const InteractiveTableResponse = React.memo(function InteractiveTableResponse({
@@ -97,7 +97,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
   allResponses,
   allQuestions,
   dynamicRowConfigs,
-  hideRowLabels = false,
+  hideColumnLabels = false,
 }: InteractiveTableResponseProps) {
   // Zustand: 현재 질문만 구독 (다른 질문 변경 시 리렌더 방지)
   const updateTestResponse = useTestResponseStore((state) => state.updateTestResponse);
@@ -461,7 +461,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
               <div className={`border-b p-4 ${completed ? 'bg-green-100/50' : 'bg-gray-50/80'}`}>
                 <div className="flex items-center justify-between">
                   <div className="text-lg font-semibold text-gray-900">
-                    {hideRowLabels ? `항목 ${rowIndex + 1}` : (row.label || `항목 ${rowIndex + 1}`)}
+                    {row.label || `항목 ${rowIndex + 1}`}
                   </div>
                   {completed && (
                     <div className="flex items-center gap-1.5 rounded-full bg-green-100 px-2 py-1 text-sm font-medium text-green-600">
@@ -484,12 +484,14 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
                       key={cell.id}
                       className={`space-y-2 pt-4 first:pt-0 ${index > 0 ? 'mt-2' : ''}`}
                     >
-                      <div className="flex items-start gap-2">
-                        <span className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-blue-500" />
-                        <div className="text-sm leading-snug font-semibold text-gray-700">
-                          {columnLabel}
+                      {!hideColumnLabels && (
+                        <div className="flex items-start gap-2">
+                          <span className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-blue-500" />
+                          <div className="text-sm leading-snug font-semibold text-gray-700">
+                            {columnLabel}
+                          </div>
                         </div>
-                      </div>
+                      )}
                       <div
                         className={`flex pl-3.5 ${
                           cell.horizontalAlign === 'left'
@@ -607,46 +609,48 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
             </colgroup>
 
             {/* 헤더 */}
-            <thead>
-              {visibleHeaderGrid && visibleHeaderGrid.length > 0 ? (
-                // 다단계 헤더
-                visibleHeaderGrid.map((headerRow, rowIdx) => (
-                  <tr key={`header-row-${rowIdx}`} className="bg-gray-50">
-                    {headerRow.map((cell) => (
-                      <th
-                        key={cell.id}
-                        className="h-full border-r border-b border-gray-300 px-4 py-3 text-center align-middle font-semibold text-gray-800"
-                        colSpan={cell.colspan}
-                        rowSpan={cell.rowspan}
-                      >
-                        {cell.label || <span className="text-sm text-gray-400 italic"></span>}
-                      </th>
-                    ))}
+            {!hideColumnLabels && (
+              <thead>
+                {visibleHeaderGrid && visibleHeaderGrid.length > 0 ? (
+                  // 다단계 헤더
+                  visibleHeaderGrid.map((headerRow, rowIdx) => (
+                    <tr key={`header-row-${rowIdx}`} className="bg-gray-50">
+                      {headerRow.map((cell) => (
+                        <th
+                          key={cell.id}
+                          className="h-full border-r border-b border-gray-300 px-4 py-3 text-center align-middle font-semibold text-gray-800"
+                          colSpan={cell.colspan}
+                          rowSpan={cell.rowspan}
+                        >
+                          {cell.label || <span className="text-sm text-gray-400 italic"></span>}
+                        </th>
+                      ))}
+                    </tr>
+                  ))
+                ) : (
+                  // 기존 단일 행 헤더 (폴백)
+                  <tr className="bg-gray-50">
+                    {visibleColumns.map((column, colIndex) => {
+                      if (column.isHeaderHidden) return null;
+                      const headerColspan = column.colspan || 1;
+                      const mergedWidth = headerColspan > 1
+                        ? visibleColumns.slice(colIndex, colIndex + headerColspan).reduce((sum, col) => sum + (col.width || 150), 0)
+                        : (column.width || 150);
+                      return (
+                        <th
+                          key={column.id}
+                          className="h-full border-r border-b border-gray-300 px-4 py-3 text-center align-middle font-semibold text-gray-800"
+                          style={{ width: `${mergedWidth}px` }}
+                          colSpan={headerColspan}
+                        >
+                          {column.label || <span className="text-sm text-gray-400 italic"></span>}
+                        </th>
+                      );
+                    })}
                   </tr>
-                ))
-              ) : (
-                // 기존 단일 행 헤더 (폴백)
-                <tr className="bg-gray-50">
-                  {visibleColumns.map((column, colIndex) => {
-                    if (column.isHeaderHidden) return null;
-                    const headerColspan = column.colspan || 1;
-                    const mergedWidth = headerColspan > 1
-                      ? visibleColumns.slice(colIndex, colIndex + headerColspan).reduce((sum, col) => sum + (col.width || 150), 0)
-                      : (column.width || 150);
-                    return (
-                      <th
-                        key={column.id}
-                        className="h-full border-r border-b border-gray-300 px-4 py-3 text-center align-middle font-semibold text-gray-800"
-                        style={{ width: `${mergedWidth}px` }}
-                        colSpan={headerColspan}
-                      >
-                        {column.label || <span className="text-sm text-gray-400 italic"></span>}
-                      </th>
-                    );
-                  })}
-                </tr>
-              )}
-            </thead>
+                )}
+              </thead>
+            )}
 
             {/* 본문 */}
             <tbody>
