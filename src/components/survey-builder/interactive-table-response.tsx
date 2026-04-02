@@ -4,8 +4,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { CheckCircle2, ChevronLeft, ChevronRight, FileText, ListChecks } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { useTestResponseStore } from '@/stores/test-response-store';
@@ -46,27 +44,26 @@ const SelectorRow = React.memo(function SelectorRow({
   return (
     <div
       className={cn(
-        'bg-muted/30 p-2',
-        buttonAlign === 'center' ? 'text-center'
-          : buttonAlign === 'right' ? 'text-right'
-          : 'text-left',
+        'flex items-center gap-3 bg-white px-4 py-2.5',
+        buttonAlign === 'center' ? 'justify-center'
+          : buttonAlign === 'right' ? 'justify-end'
+          : 'justify-start',
       )}
       style={{ gridColumn: '1 / -1' }}
     >
-      <Button
-        variant="outline"
-        size="sm"
-        className="gap-2"
+      <button
+        className="group flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-4 py-1.5 text-sm text-gray-700 transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 active:scale-[0.98]"
         onClick={() => onSelect(groupId)}
       >
-        <ListChecks className="h-4 w-4" />
-        {label || '항목 선택'}
+        <ListChecks className="h-3.5 w-3.5 text-gray-400 transition-colors group-hover:text-blue-500" />
+        <span className="font-medium">{label || '항목 선택'}</span>
         {selectedCount > 0 && (
-          <Badge variant="secondary" className="ml-1">
-            {selectedCount}개 선택
-          </Badge>
+          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-100 px-1.5 text-xs font-semibold text-blue-700">
+            {selectedCount}
+          </span>
         )}
-      </Button>
+        <ChevronRight className="h-3.5 w-3.5 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-blue-400" />
+      </button>
     </div>
   );
 });
