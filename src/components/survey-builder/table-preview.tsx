@@ -60,7 +60,7 @@ export const TablePreview = React.memo(function TablePreview({
         headerRow.map((cell) => (
           <div
             key={cell.id}
-            className="flex items-center justify-center bg-gray-50 px-4 py-3 text-center font-medium"
+            className="flex items-center justify-center border-r border-b border-gray-300 bg-gray-50 px-4 py-3 text-center font-medium"
             style={getGridSpanStyle(cell.colspan, cell.rowspan)}
             {...getGridCellAria('columnheader', cell.colspan, cell.rowspan)}
           >
@@ -98,11 +98,10 @@ export const TablePreview = React.memo(function TablePreview({
         <div className="overflow-x-auto">
           <div
             role="grid"
-            className="mx-auto overflow-hidden rounded-lg border border-gray-300 bg-gray-300"
+            className="mx-auto overflow-hidden rounded-lg border-t border-l border-gray-300 bg-white"
             style={{
               display: 'grid',
               gridTemplateColumns: gridTemplateCols,
-              gap: '1px',
               width: `${totalWidth}px`,
             }}
           >
@@ -118,7 +117,7 @@ export const TablePreview = React.memo(function TablePreview({
                   <div
                     key={cell.id}
                     className={cn(
-                      'min-w-0 bg-white p-3',
+                      'min-w-0 border-r border-b border-gray-300 bg-white p-3',
                       getAlignmentClasses(cell.horizontalAlign, cell.verticalAlign),
                     )}
                     style={getGridSpanStyle(cell.colspan, cell.rowspan)}

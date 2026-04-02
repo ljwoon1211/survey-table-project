@@ -153,7 +153,7 @@ export const EditorTableRow = React.memo(function EditorTableRow({
     <>
       {/* 행 라벨 셀 (sticky) */}
       <div
-        className="sticky left-0 z-10 bg-gray-50 p-1"
+        className="sticky left-0 z-10 border-r border-b border-gray-300 bg-gray-50 p-1"
         style={{ minHeight: rowHeight }}
       >
         <div className="space-y-1">
@@ -292,7 +292,7 @@ export const EditorTableRow = React.memo(function EditorTableRow({
             data-row-index={rowIndex}
             data-cell-index={cellIndex}
             className={cn(
-              'relative min-w-0 bg-white p-2',
+              'relative min-w-0 border-r border-b border-gray-300 bg-white p-2',
               isSelected && 'ring-2 ring-inset ring-blue-500 bg-blue-50',
             )}
             style={{

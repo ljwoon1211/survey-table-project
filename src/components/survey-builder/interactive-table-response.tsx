@@ -46,7 +46,7 @@ const SelectorRow = React.memo(function SelectorRow({
   return (
     <div
       className={cn(
-        'flex items-center gap-3 bg-white px-4 py-2.5',
+        'flex items-center gap-3 border-r border-b border-gray-300 bg-white px-4 py-2.5',
         buttonAlign === 'center' ? 'justify-center'
           : buttonAlign === 'right' ? 'justify-end'
           : 'justify-start',
@@ -504,7 +504,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
         headerRow.map((cell) => (
           <div
             key={cell.id}
-            className="flex items-center justify-center bg-gray-50 px-4 py-3 text-center font-semibold text-gray-800"
+            className="flex items-center justify-center border-r border-b border-gray-300 bg-gray-50 px-4 py-3 text-center font-semibold text-gray-800"
             style={getGridSpanStyle(cell.colspan, cell.rowspan)}
             {...getGridCellAria('columnheader', cell.colspan, cell.rowspan)}
           >
@@ -576,11 +576,10 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
         {/* CSS Grid 테이블 */}
         <div
           role="grid"
-          className="mx-auto overflow-hidden rounded-lg border border-gray-300 bg-gray-300 text-base shadow-sm"
+          className="mx-auto overflow-hidden rounded-lg border-t border-l border-gray-300 bg-white text-base shadow-sm"
           style={{
             display: 'grid',
             gridTemplateColumns: gridTemplateCols,
-            gap: '1px',
             minWidth: totalWidth ? `${totalWidth}px` : '100%',
             width: totalWidth ? `${totalWidth}px` : '100%',
           }}
@@ -604,7 +603,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
                     <div
                       key={cell.id}
                       className={cn(
-                        'min-w-0 p-3 transition-colors duration-200',
+                        'min-w-0 border-r border-b border-gray-300 p-3 transition-colors duration-200',
                         completed ? 'bg-green-50/40' : 'bg-white',
                         getAlignmentClasses(cell.horizontalAlign, cell.verticalAlign),
                       )}

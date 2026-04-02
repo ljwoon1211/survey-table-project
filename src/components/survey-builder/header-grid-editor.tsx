@@ -455,7 +455,7 @@ export function HeaderGridEditor({ headerGrid, columnCount, onChange }: HeaderGr
 
       {/* 헤더 그리드 — CSS Grid */}
       <div
-        className="select-none overflow-auto rounded-lg bg-gray-300"
+        className="select-none overflow-auto rounded-lg border-t border-l border-gray-300 bg-white"
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
@@ -463,7 +463,6 @@ export function HeaderGridEditor({ headerGrid, columnCount, onChange }: HeaderGr
           style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${columnCount}, minmax(80px, 1fr))`,
-            gap: '1px',
           }}
         >
           {cellPositions.map(({ rowIdx, cellIdx, cell, gridCol }) => {
@@ -483,7 +482,7 @@ export function HeaderGridEditor({ headerGrid, columnCount, onChange }: HeaderGr
             return (
               <div
                 key={cell.id}
-                className={`p-1 text-center text-sm transition-colors ${
+                className={`border-r border-b border-gray-300 p-1 text-center text-sm transition-colors ${
                   isSelected
                     ? 'bg-blue-100 ring-2 ring-inset ring-blue-400'
                     : isMerged
