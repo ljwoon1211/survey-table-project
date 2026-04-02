@@ -455,7 +455,7 @@ export function HeaderGridEditor({ headerGrid, columnCount, onChange }: HeaderGr
 
       {/* 헤더 그리드 — CSS Grid */}
       <div
-        className="select-none overflow-auto rounded-md border border-gray-300 bg-white"
+        className="select-none overflow-auto rounded-md border-t border-l border-r border-gray-300 bg-white"
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
