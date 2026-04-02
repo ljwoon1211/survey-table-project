@@ -304,22 +304,27 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
   }, [hasDynamicRows, groupConfigMap, visibleRows, rows]);
 
   // 여러 셀렉터 행 삽입 시 rowspan 보정
-  const displayRows = useMemo(() => {
-    if (selectorAnchors.size === 0) return visibleRows;
-    const anchorIndices: number[] = [];
+  // 같은 앵커에 복수 셀렉터 → 실제 삽입 행 수로 카운트 (deduplicate 금지)
+  const selectorCountByAnchorIdx = useMemo(() => {
+    const countMap = new Map<number, number>(); // visibleRows index → 셀렉터 수
     for (const [, anchorId] of selectorAnchors) {
       const idx = visibleRows.findIndex((r) => r.id === anchorId);
-      if (idx !== -1) anchorIndices.push(idx);
+      if (idx !== -1) countMap.set(idx, (countMap.get(idx) || 0) + 1);
     }
-    const uniqueAnchors = [...new Set(anchorIndices)].sort((a, b) => a - b);
-    if (uniqueAnchors.length === 0) return visibleRows;
+    return countMap;
+  }, [selectorAnchors, visibleRows]);
+
+  const displayRows = useMemo(() => {
+    if (selectorCountByAnchorIdx.size === 0) return visibleRows;
+
+    const anchorIndices = [...selectorCountByAnchorIdx.keys()].sort((a, b) => a - b);
 
     return visibleRows.map((row, rowIdx) => {
       const needsAdjust = row.cells.some((cell) => {
         if (cell.isHidden) return false;
         const span = cell.rowspan || 1;
         if (span <= 1) return false;
-        return uniqueAnchors.some((ai) => ai >= rowIdx && ai < rowIdx + span - 1);
+        return anchorIndices.some((ai) => ai >= rowIdx && ai < rowIdx + span - 1);
       });
       if (!needsAdjust) return row;
       return {
@@ -329,13 +334,19 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
           const span = cell.rowspan || 1;
           if (span <= 1) return cell;
           const spanEnd = rowIdx + span;
-          const insertedCount = uniqueAnchors.filter((ai) => ai >= rowIdx && ai < spanEnd - 1).length;
+          // 범위 내 앵커별 실제 셀렉터 수 합산
+          let insertedCount = 0;
+          for (const ai of anchorIndices) {
+            if (ai >= rowIdx && ai < spanEnd - 1) {
+              insertedCount += selectorCountByAnchorIdx.get(ai) || 0;
+            }
+          }
           if (insertedCount === 0) return cell;
           return { ...cell, rowspan: span + insertedCount };
         }),
       };
     });
-  }, [visibleRows, selectorAnchors]);
+  }, [visibleRows, selectorCountByAnchorIdx]);
 
   // 행별 완료 상태 맵
   const rowCompletionMap = useMemo(() => {
