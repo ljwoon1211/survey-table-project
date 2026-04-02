@@ -608,13 +608,13 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
                 {row.cells.map((cell, cellIndex) => {
                   const col = cellIndex + 1; // 1-based grid column
 
-                  // hidden 셀: border-only placeholder
+                  // hidden 셀: border-only placeholder (병합 셀 위에 grid line 표시)
                   if (cell.isHidden) {
                     return (
                       <div
                         key={cell.id}
-                        className="border-r border-b border-gray-300"
-                        style={{ gridRow, gridColumn: col }}
+                        className="pointer-events-none border-r border-b border-gray-300"
+                        style={{ gridRow, gridColumn: col, zIndex: 1 }}
                         aria-hidden
                       />
                     );
