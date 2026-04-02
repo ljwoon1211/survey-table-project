@@ -400,8 +400,6 @@ export function HeaderGridEditor({ headerGrid, columnCount, onChange }: HeaderGr
     return positions;
   }, [headerGrid, columnCount, occupiedMap]);
 
-  const colWidth = columnCount > 0 ? 100 / columnCount : 100;
-
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
