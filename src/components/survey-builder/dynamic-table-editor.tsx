@@ -446,7 +446,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
             <div
               ref={tableRef}
               role="grid"
-              className="mx-auto overflow-hidden rounded-lg border-t border-l border-gray-300 bg-white"
+              className="mx-auto overflow-hidden rounded-md border border-gray-300 bg-white"
               style={{
                 display: 'grid',
                 gridTemplateColumns: `120px ${currentColumns.map((col) => `${col.width || 150}px`).join(' ')}`,
