@@ -279,15 +279,7 @@ export const EditorTableRow = React.memo(function EditorTableRow({
 
       {/* 데이터 셀들 */}
       {row.cells.map((cell, cellIndex) => {
-        if (cell.isHidden) {
-          return (
-            <div
-              key={cell.id}
-              className="border-r border-b border-gray-300"
-              aria-hidden
-            />
-          );
-        }
+        if (cell.isHidden) return null;
 
         const rowspan = cell.rowspan || 1;
         const colspan = cell.colspan || 1;
