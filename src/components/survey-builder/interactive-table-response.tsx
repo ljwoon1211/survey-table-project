@@ -21,8 +21,13 @@ import {
   recalculateRowspansForVisibleRows,
 } from '@/utils/table-merge-helpers';
 
+import { useTablePerf } from '@/hooks/use-table-perf';
+
 import { InteractiveCell } from './cells';
 import { DynamicRowSelectorModal } from './dynamic-row-selector-modal';
+import { VirtualizedTableGrid } from './virtualized-table-grid';
+
+const VIRTUALIZATION_THRESHOLD = 100;
 
 // ── 셀렉터 행 (동적 행 선택 버튼) ──
 
@@ -111,6 +116,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     useCallback((state) => state.testResponses[questionId], [questionId]),
   );
   const tableContainerRef = useRef<HTMLDivElement>(null);
+  useTablePerf(`InteractiveTable(${rows.length}×${columns.length})`);
   const [showLeftShadow, setShowLeftShadow] = useState(false);
   const [showRightShadow, setShowRightShadow] = useState(false);
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
@@ -545,7 +551,10 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     });
   };
 
-  // ── 데스크톱 Grid 뷰 ──
+  // ── 가상화 여부 판단 ──
+  const shouldVirtualize = displayRows.length >= VIRTUALIZATION_THRESHOLD;
+
+  // ── 데스크톱 Grid 뷰 (30행 미만 — 기존 코드) ──
   const renderTableView = () => (
     <div className="group relative">
       {/* 스크롤 버튼 */}
@@ -587,85 +596,123 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
         className="-mx-4 overflow-x-auto px-4 pb-4 md:mx-0 md:px-0"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
-        {/* CSS Grid 테이블 */}
-        <div
-          role="grid"
-          className="mx-auto overflow-hidden rounded-md border-t border-l border-r border-gray-300 bg-white text-base"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: gridTemplateCols,
-            minWidth: totalWidth ? `${totalWidth}px` : '100%',
-            width: totalWidth ? `${totalWidth}px` : '100%',
-          }}
-        >
-          {/* 헤더 */}
-          {renderHeaderCells()}
+        {shouldVirtualize ? (
+          /* 가상화: 동일한 Grid 구조, 뷰포트 밖 셀만 빈 div */
+          <VirtualizedTableGrid
+            questionId={questionId}
+            displayRows={displayRows}
+            visibleColumns={visibleColumns}
+            rowCompletionMap={rowCompletionMap}
+            rowGridMap={rowGridMap}
+            isTestMode={isTestMode}
+            value={value}
+            onChange={onChange}
+            gridTemplateCols={gridTemplateCols}
+            totalWidth={totalWidth}
+            renderHeaderCells={renderHeaderCells}
+            renderSelectorRows={() =>
+              Array.from(selectorGridMap.entries()).map(([groupId, gridRow]) => {
+                const config = groupConfigMap.get(groupId);
+                if (!config) return null;
+                const anchorId = selectorAnchors.get(groupId);
+                const anchorRow = anchorId ? displayRows.find((r) => r.id === anchorId) : undefined;
+                const hasMergedAbove = anchorRow?.cells.some((c) => !c.isHidden && (c.rowspan || 1) > 1) ?? false;
+                return (
+                  <SelectorRow
+                    key={`selector-${groupId}`}
+                    groupId={groupId}
+                    label={config.label}
+                    buttonAlign={config.buttonAlign}
+                    selectedCount={groupSelectedCountMap.get(groupId) ?? 0}
+                    onSelect={handleSelectGroup}
+                    gridRow={gridRow}
+                    hasMergedAbove={hasMergedAbove}
+                  />
+                );
+              })
+            }
+          />
+        ) : (
+          /* 기존: CSS Grid 테이블 */
+          <div
+            role="grid"
+            className="mx-auto overflow-hidden rounded-md border-t border-l border-r border-gray-300 bg-white text-base"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: gridTemplateCols,
+              minWidth: totalWidth ? `${totalWidth}px` : '100%',
+              width: totalWidth ? `${totalWidth}px` : '100%',
+            }}
+          >
+            {/* 헤더 */}
+            {renderHeaderCells()}
 
-          {/* 바디 — 명시적 grid-row 배치 */}
-          {displayRows.map((row) => {
-            const completed = rowCompletionMap.get(row.id) ?? false;
-            const gridRow = rowGridMap.get(row.id);
+            {/* 바디 — 명시적 grid-row 배치 */}
+            {displayRows.map((row) => {
+              const completed = rowCompletionMap.get(row.id) ?? false;
+              const gridRow = rowGridMap.get(row.id);
 
-            return (
-              <React.Fragment key={row.id}>
-                {row.cells.map((cell, cellIndex) => {
-                  if (cell.isHidden) return null;
+              return (
+                <React.Fragment key={row.id}>
+                  {row.cells.map((cell, cellIndex) => {
+                    if (cell.isHidden) return null;
 
-                  const col = cellIndex + 1;
-                  const rs = cell.rowspan || 1;
-                  const cs = cell.colspan || 1;
+                    const col = cellIndex + 1;
+                    const rs = cell.rowspan || 1;
+                    const cs = cell.colspan || 1;
 
-                  return (
-                    <div
-                      key={cell.id}
-                      className={cn(
-                        'min-w-0 border-r border-b border-gray-300 p-3 transition-colors duration-200',
-                        completed ? 'bg-green-50/40' : 'bg-white',
-                        getAlignmentClasses(cell.horizontalAlign, cell.verticalAlign),
-                      )}
-                      style={{
-                        gridRow: rs > 1 ? `${gridRow} / span ${rs}` : gridRow,
-                        gridColumn: cs > 1 ? `${col} / span ${cs}` : col,
-                      }}
-                      data-row-id={row.id}
-                      {...getGridCellAria('gridcell', cs, rs)}
-                    >
-                      <InteractiveCell
-                        cell={cell}
-                        questionId={questionId}
-                        isTestMode={isTestMode}
-                        value={value}
-                        onChange={onChange}
-                      />
-                    </div>
-                  );
-                })}
-              </React.Fragment>
-            );
-          })}
+                    return (
+                      <div
+                        key={cell.id}
+                        className={cn(
+                          'min-w-0 border-r border-b border-gray-300 p-3 transition-colors duration-200',
+                          completed ? 'bg-green-50/40' : 'bg-white',
+                          getAlignmentClasses(cell.horizontalAlign, cell.verticalAlign),
+                        )}
+                        style={{
+                          gridRow: rs > 1 ? `${gridRow} / span ${rs}` : gridRow,
+                          gridColumn: cs > 1 ? `${col} / span ${cs}` : col,
+                        }}
+                        data-row-id={row.id}
+                        data-grid-cell
+                        {...getGridCellAria('gridcell', cs, rs)}
+                      >
+                        <InteractiveCell
+                          cell={cell}
+                          questionId={questionId}
+                          isTestMode={isTestMode}
+                          value={value}
+                          onChange={onChange}
+                        />
+                      </div>
+                    );
+                  })}
+                </React.Fragment>
+              );
+            })}
 
-          {/* 셀렉터 행들 — 명시적 grid-row 배치 */}
-          {Array.from(selectorGridMap.entries()).map(([groupId, gridRow]) => {
-            const config = groupConfigMap.get(groupId);
-            if (!config) return null;
-            // 앵커 행에 rowspan > 1 셀이 있으면 병합 영역과 겹침 → border-t 필요
-            const anchorId = selectorAnchors.get(groupId);
-            const anchorRow = anchorId ? displayRows.find((r) => r.id === anchorId) : undefined;
-            const hasMergedAbove = anchorRow?.cells.some((c) => !c.isHidden && (c.rowspan || 1) > 1) ?? false;
-            return (
-              <SelectorRow
-                key={`selector-${groupId}`}
-                groupId={groupId}
-                label={config.label}
-                buttonAlign={config.buttonAlign}
-                selectedCount={groupSelectedCountMap.get(groupId) ?? 0}
-                onSelect={handleSelectGroup}
-                gridRow={gridRow}
-                hasMergedAbove={hasMergedAbove}
-              />
-            );
-          })}
-        </div>
+            {/* 셀렉터 행들 — 명시적 grid-row 배치 */}
+            {Array.from(selectorGridMap.entries()).map(([groupId, gridRow]) => {
+              const config = groupConfigMap.get(groupId);
+              if (!config) return null;
+              const anchorId = selectorAnchors.get(groupId);
+              const anchorRow = anchorId ? displayRows.find((r) => r.id === anchorId) : undefined;
+              const hasMergedAbove = anchorRow?.cells.some((c) => !c.isHidden && (c.rowspan || 1) > 1) ?? false;
+              return (
+                <SelectorRow
+                  key={`selector-${groupId}`}
+                  groupId={groupId}
+                  label={config.label}
+                  buttonAlign={config.buttonAlign}
+                  selectedCount={groupSelectedCountMap.get(groupId) ?? 0}
+                  onSelect={handleSelectGroup}
+                  gridRow={gridRow}
+                  hasMergedAbove={hasMergedAbove}
+                />
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
