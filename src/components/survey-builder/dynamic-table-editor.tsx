@@ -443,22 +443,17 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
             className="overflow-x-auto"
             style={dragCopyState?.isDragging ? { cursor: 'crosshair', userSelect: 'none' } : undefined}
           >
-            <table
+            <div
               ref={tableRef}
-              className="mx-auto border-collapse border border-gray-300"
+              role="grid"
+              className="mx-auto overflow-hidden rounded-lg bg-gray-300"
               style={{
-                tableLayout: 'fixed',
+                display: 'grid',
+                gridTemplateColumns: `120px ${currentColumns.map((col) => `${col.width || 150}px`).join(' ')}`,
+                gap: '1px',
                 width: `${120 + currentColumns.reduce((sum, col) => sum + (col.width || 150), 0)}px`,
               }}
             >
-              {/* 열 너비 정의 */}
-              <colgroup>
-                <col style={{ width: '120px' }} />
-                {currentColumns.map((column, index) => (
-                  <col key={`col-${index}`} style={{ width: `${column.width || 150}px` }} />
-                ))}
-              </colgroup>
-
               {/* 헤더 행 */}
               <TableHeaderSection
                 columns={currentColumns}
@@ -476,40 +471,38 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
               />
 
               {/* 데이터 행들 */}
-              <tbody>
-                {currentRows.map((row, rowIndex) => (
-                  <EditorTableRow
-                    key={row.id}
-                    row={row}
-                    rowIndex={rowIndex}
-                    columnWidths={columnWidths}
-                    columnCount={currentColumns.length}
-                    totalRowCount={currentRows.length}
-                    hasQuestions={allQuestions.length > 0}
-                    hasCopiedCell={!!copiedCell}
-                    hasCopiedRegion={!!copiedRegion}
-                    isDragCopyActive={!!dragCopyState}
-                    dragSelectionCellsKey={dragCopyTargetsByRow?.get(rowIndex) ?? ''}
-                    onStartDragCopy={startDragCopy}
-                    onUpdateRowLabel={updateRowLabel}
-                    onUpdateRowCode={updateRowCode}
-                    onOpenRowConditionModal={openRowConditionModal}
-                    dynamicRowConfigs={dynamicRowConfigs}
-                    onSetDynamicGroupId={setDynamicGroupId}
-                    onSetShowWhenDynamicGroupId={setShowWhenDynamicGroupId}
-                    onDuplicateRow={duplicateRow}
-                    onDeleteRow={deleteRow}
-                    onSelectCell={handleSelectCell}
-                    onMoveColumn={moveColumn}
-                    onDeleteCell={deleteCell}
-                    onCopyCell={copyCell}
-                    onPasteCell={pasteCell}
-                    onSaveCell={handleSaveCell}
-                    onLoadCell={handleLoadCell}
-                  />
-                ))}
-              </tbody>
-            </table>
+              {currentRows.map((row, rowIndex) => (
+                <EditorTableRow
+                  key={row.id}
+                  row={row}
+                  rowIndex={rowIndex}
+                  columnWidths={columnWidths}
+                  columnCount={currentColumns.length}
+                  totalRowCount={currentRows.length}
+                  hasQuestions={allQuestions.length > 0}
+                  hasCopiedCell={!!copiedCell}
+                  hasCopiedRegion={!!copiedRegion}
+                  isDragCopyActive={!!dragCopyState}
+                  dragSelectionCellsKey={dragCopyTargetsByRow?.get(rowIndex) ?? ''}
+                  onStartDragCopy={startDragCopy}
+                  onUpdateRowLabel={updateRowLabel}
+                  onUpdateRowCode={updateRowCode}
+                  onOpenRowConditionModal={openRowConditionModal}
+                  dynamicRowConfigs={dynamicRowConfigs}
+                  onSetDynamicGroupId={setDynamicGroupId}
+                  onSetShowWhenDynamicGroupId={setShowWhenDynamicGroupId}
+                  onDuplicateRow={duplicateRow}
+                  onDeleteRow={deleteRow}
+                  onSelectCell={handleSelectCell}
+                  onMoveColumn={moveColumn}
+                  onDeleteCell={deleteCell}
+                  onCopyCell={copyCell}
+                  onPasteCell={pasteCell}
+                  onSaveCell={handleSaveCell}
+                  onLoadCell={handleLoadCell}
+                />
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>

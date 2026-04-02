@@ -142,7 +142,7 @@ export function useTableEditor({
     cellIndex: number;
   } | null>(null);
 
-  const tableRef = useRef<HTMLTableElement>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
 
   const [editingColumnWidth, setEditingColumnWidth] = useState<{
     columnIndex: number;

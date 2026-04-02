@@ -21,8 +21,10 @@ import {
 
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 import { DynamicRowGroupConfig, TableCell, TableRow } from '@/types/survey';
 import { isCellSaveable } from '@/utils/cell-library-helpers';
+import { getAlignmentClasses, getGridSpanStyle } from '@/utils/table-grid-utils';
 
 const GROUP_COLORS = [
   'bg-purple-500', 'bg-green-500', 'bg-yellow-500', 'bg-blue-500',
@@ -32,7 +34,7 @@ const GROUP_COLORS = [
   'bg-fuchsia-500', 'bg-stone-500',
 ];
 
-/** 에디터 셀 내용 표시 컴포넌트 (매 렌더마다 함수 재생성 방지) */
+/** 에디터 셀 내용 표시 */
 function EditorCellContent({ cell }: { cell: TableCell }) {
   const hasText = cell.content && cell.content.trim().length > 0;
 
@@ -45,88 +47,41 @@ function EditorCellContent({ cell }: { cell: TableCell }) {
   ) : null;
 
   let typeContent = null;
-
   switch (cell.type) {
     case 'checkbox':
-      typeContent =
-        cell.checkboxOptions && cell.checkboxOptions.length > 0 ? (
-          <div className="flex items-center gap-2">
-            <CheckSquare className="h-4 w-4 text-green-500" />
-            <span className="truncate text-sm text-gray-600">
-              체크박스 ({cell.checkboxOptions.length}개)
-            </span>
-          </div>
-        ) : (
-          <span className="text-sm text-gray-400">체크박스 없음</span>
-        );
+      typeContent = cell.checkboxOptions && cell.checkboxOptions.length > 0
+        ? (<div className="flex items-center gap-2"><CheckSquare className="h-4 w-4 text-green-500" /><span className="truncate text-sm text-gray-600">체크박스 ({cell.checkboxOptions.length}개)</span></div>)
+        : (<span className="text-sm text-gray-400">체크박스 없음</span>);
       break;
     case 'radio':
-      typeContent =
-        cell.radioOptions && cell.radioOptions.length > 0 ? (
-          <div className="flex items-center justify-center gap-2">
-            <Circle className="h-4 w-4 text-purple-500" />
-            <span className="truncate text-sm text-gray-600">
-              라디오 ({cell.radioOptions.length}개)
-            </span>
-          </div>
-        ) : (
-          <span className="text-sm text-gray-400">라디오 없음</span>
-        );
+      typeContent = cell.radioOptions && cell.radioOptions.length > 0
+        ? (<div className="flex items-center justify-center gap-2"><Circle className="h-4 w-4 text-purple-500" /><span className="truncate text-sm text-gray-600">라디오 ({cell.radioOptions.length}개)</span></div>)
+        : (<span className="text-sm text-gray-400">라디오 없음</span>);
       break;
     case 'image':
-      typeContent = cell.imageUrl ? (
-        <div className="flex items-center gap-2">
-          <Image className="h-4 w-4 text-blue-500" aria-label="이미지 아이콘" />
-          <span className="truncate text-sm text-gray-600">이미지</span>
-        </div>
-      ) : (
-        <span className="text-sm text-gray-400">이미지 없음</span>
-      );
+      typeContent = cell.imageUrl
+        ? (<div className="flex items-center gap-2"><Image className="h-4 w-4 text-blue-500" aria-label="이미지 아이콘" /><span className="truncate text-sm text-gray-600">이미지</span></div>)
+        : (<span className="text-sm text-gray-400">이미지 없음</span>);
       break;
     case 'video':
-      typeContent = cell.videoUrl ? (
-        <div className="flex items-center gap-2">
-          <Video className="h-4 w-4 text-red-500" />
-          <span className="truncate text-sm text-gray-600">동영상</span>
-        </div>
-      ) : (
-        <span className="text-sm text-gray-400">동영상 없음</span>
-      );
+      typeContent = cell.videoUrl
+        ? (<div className="flex items-center gap-2"><Video className="h-4 w-4 text-red-500" /><span className="truncate text-sm text-gray-600">동영상</span></div>)
+        : (<span className="text-sm text-gray-400">동영상 없음</span>);
       break;
     case 'input':
-      typeContent = (
-        <div className="flex items-center gap-2">
-          <span className="truncate text-sm text-gray-600">
-            {cell.placeholder ? `입력 필드: ${cell.placeholder}` : '단답형 입력'}
-          </span>
-        </div>
-      );
+      typeContent = (<div className="flex items-center gap-2"><span className="truncate text-sm text-gray-600">{cell.placeholder ? `입력 필드: ${cell.placeholder}` : '단답형 입력'}</span></div>);
       break;
     case 'select':
-      typeContent =
-        cell.selectOptions && cell.selectOptions.length > 0 ? (
-          <div className="flex items-center gap-2">
-            <span className="truncate text-sm text-gray-600">
-              선택 ({cell.selectOptions.length}개)
-            </span>
-          </div>
-        ) : (
-          <span className="text-sm text-gray-400">선택 옵션 없음</span>
-        );
+      typeContent = cell.selectOptions && cell.selectOptions.length > 0
+        ? (<div className="flex items-center gap-2"><span className="truncate text-sm text-gray-600">선택 ({cell.selectOptions.length}개)</span></div>)
+        : (<span className="text-sm text-gray-400">선택 옵션 없음</span>);
       break;
     case 'text':
-      typeContent = null;
-      break;
     default:
-      typeContent = <span className="text-sm text-gray-400"></span>;
+      typeContent = null;
   }
 
-  return (
-    <div className="w-full">
-      {textContent}
-      {typeContent}
-    </div>
-  );
+  return (<div className="w-full">{textContent}{typeContent}</div>);
 }
 
 export interface EditorTableRowProps {
@@ -138,11 +93,9 @@ export interface EditorTableRowProps {
   hasQuestions: boolean;
   hasCopiedCell: boolean;
   hasCopiedRegion: boolean;
-  // 드래그 복사
   isDragCopyActive: boolean;
-  dragSelectionCellsKey: string; // 선택 영역 셀 indices ("2,3,5" 형태, 빈 문자열이면 없음)
+  dragSelectionCellsKey: string;
   onStartDragCopy: (rowIndex: number, cellIndex: number) => void;
-  // 기존 핸들러
   onUpdateRowLabel: (rowIndex: number, label: string) => void;
   onUpdateRowCode: (rowIndex: number, rowCode: string) => void;
   onOpenRowConditionModal: (rowIndex: number) => void;
@@ -160,7 +113,7 @@ export interface EditorTableRowProps {
   onLoadCell: (rowIndex: number, cellIndex: number) => void;
 }
 
-/** 에디터 테이블 행 컴포넌트 (React.memo로 변경 안 된 행 리렌더 방지) */
+/** 에디터 테이블 행 — CSS Grid 셀들을 반환 (Fragment) */
 export const EditorTableRow = React.memo(function EditorTableRow({
   row,
   rowIndex,
@@ -189,18 +142,20 @@ export const EditorTableRow = React.memo(function EditorTableRow({
   onSaveCell,
   onLoadCell,
 }: EditorTableRowProps) {
-  // 드래그 선택 영역 셀 Set (문자열 → Set<number>)
   const dragSelectionCells = React.useMemo(() => {
     if (!dragSelectionCellsKey) return null;
     return new Set(dragSelectionCellsKey.split(',').map(Number));
   }, [dragSelectionCellsKey]);
+
+  const rowHeight = row.height ? `${row.height}px` : '60px';
+
   return (
-    <tr
-      style={{ height: row.height ? `${row.height}px` : '60px' }}
-      className="group/row"
-    >
-      {/* 행 이름(라벨) 입력칸 */}
-      <td className="sticky left-0 z-10 w-[120px] min-w-[120px] border border-gray-300 bg-gray-50 p-1">
+    <>
+      {/* 행 라벨 셀 (sticky) */}
+      <div
+        className="sticky left-0 z-10 border-r border-b border-gray-300 bg-gray-50 p-1"
+        style={{ minHeight: rowHeight }}
+      >
         <div className="space-y-1">
           <Input
             value={row.label}
@@ -209,7 +164,6 @@ export const EditorTableRow = React.memo(function EditorTableRow({
             placeholder="행 라벨"
             title={`행 라벨: ${row.label}`}
           />
-          {/* 요약 아이콘 + 설정 Popover */}
           <div className="flex items-center justify-center gap-0.5">
             <span className="truncate text-[10px] text-gray-400">{row.rowCode || `r${rowIndex + 1}`}</span>
             {row.displayCondition && row.displayCondition.conditions.length > 0 && (
@@ -234,7 +188,6 @@ export const EditorTableRow = React.memo(function EditorTableRow({
               </PopoverTrigger>
               <PopoverContent className="w-48 p-1" side="right" align="start">
                 <div className="space-y-0.5">
-                  {/* 행 코드 */}
                   <div className="px-2 py-1.5">
                     <label className="mb-1 block text-[10px] font-medium text-gray-500">행 코드 (엑셀용)</label>
                     <Input
@@ -244,8 +197,6 @@ export const EditorTableRow = React.memo(function EditorTableRow({
                       placeholder="행 코드"
                     />
                   </div>
-
-                  {/* 조건부 표시 */}
                   {hasQuestions && (
                     <>
                       <div className="my-1 border-t" />
@@ -264,8 +215,6 @@ export const EditorTableRow = React.memo(function EditorTableRow({
                       </button>
                     </>
                   )}
-
-                  {/* 동적 그룹 */}
                   {dynamicRowConfigs.length > 0 && (
                     <>
                       <div className="my-1 border-t" />
@@ -306,8 +255,6 @@ export const EditorTableRow = React.memo(function EditorTableRow({
                       ))}
                     </>
                   )}
-
-                  {/* 행 복제 / 삭제 */}
                   <div className="my-1 border-t" />
                   <button
                     onClick={() => onDuplicateRow(rowIndex)}
@@ -328,69 +275,50 @@ export const EditorTableRow = React.memo(function EditorTableRow({
             </Popover>
           </div>
         </div>
-      </td>
+      </div>
 
-      {/* 셀들 */}
+      {/* 데이터 셀들 */}
       {row.cells.map((cell, cellIndex) => {
         if (cell.isHidden) return null;
 
-        const columnWidth = columnWidths[cellIndex] ?? 150;
         const rowspan = cell.rowspan || 1;
         const colspan = cell.colspan || 1;
         const isMerged = rowspan > 1 || colspan > 1;
-
-        const verticalAlignClass =
-          cell.verticalAlign === 'middle'
-            ? 'align-middle'
-            : cell.verticalAlign === 'bottom'
-              ? 'align-bottom'
-              : 'align-top';
-
         const isSelected = dragSelectionCells?.has(cellIndex) ?? false;
 
         return (
-          <td
+          <div
             key={cell.id}
             data-row-index={rowIndex}
             data-cell-index={cellIndex}
-            className={`relative border border-gray-300 p-2 ${verticalAlignClass} ${
-              isSelected ? 'ring-2 ring-inset ring-blue-500 bg-blue-50' : ''
-            }`}
+            className={cn(
+              'relative min-w-0 border-r border-b border-gray-300 bg-white p-2',
+              isSelected && 'ring-2 ring-inset ring-blue-500 bg-blue-50',
+            )}
             style={{
-              width: `${columnWidth}px`,
-              maxWidth: `${columnWidth}px`,
-              height: row.height ? `${row.height}px` : '60px',
+              ...getGridSpanStyle(colspan, rowspan),
+              minHeight: rowHeight,
             }}
-            rowSpan={rowspan}
-            colSpan={colspan}
           >
             <div
-              className={`group relative flex h-full cursor-pointer flex-col rounded p-2 transition-colors hover:bg-gray-50 ${
-                cell.verticalAlign === 'top'
-                  ? 'justify-start'
-                  : cell.verticalAlign === 'middle'
-                    ? 'justify-center'
-                    : 'justify-end'
-              }`}
+              className={cn(
+                'group relative flex h-full cursor-pointer flex-col rounded p-2 transition-colors hover:bg-gray-50',
+                getAlignmentClasses(cell.horizontalAlign, cell.verticalAlign),
+                // flex-col 유지하면서 세로 정렬
+                cell.verticalAlign === 'middle' ? 'justify-center'
+                  : cell.verticalAlign === 'bottom' ? 'justify-end'
+                  : 'justify-start',
+              )}
               onClick={() => onSelectCell(row.id, cell.id)}
-              style={{
-                minHeight: row.minHeight ? `${row.minHeight - 16}px` : '40px',
-              }}
+              style={{ minHeight: row.minHeight ? `${row.minHeight - 16}px` : '40px' }}
             >
-              <div
-                className={`mb-2 flex items-start justify-between ${
-                  cell.type === 'radio' ? 'w-full justify-center' : ''
-                }`}
-              >
-                <div
-                  className={`${cell.type === 'radio' ? '' : 'w-full flex-1'} ${
-                    cell.horizontalAlign === 'left'
-                      ? 'flex items-start justify-start'
-                      : cell.horizontalAlign === 'center'
-                        ? 'flex items-center justify-center'
-                        : 'flex items-end justify-end'
-                  }`}
-                >
+              <div className="mb-2 flex items-start justify-between">
+                <div className={cn(
+                  'flex-1',
+                  cell.horizontalAlign === 'center' ? 'flex justify-center'
+                    : cell.horizontalAlign === 'right' ? 'flex justify-end'
+                    : '',
+                )}>
                   <EditorCellContent cell={cell} />
                 </div>
                 <Popover>
@@ -405,54 +333,30 @@ export const EditorTableRow = React.memo(function EditorTableRow({
                   </PopoverTrigger>
                   <PopoverContent className="w-40 p-1" side="bottom" align="end" onClick={(e) => e.stopPropagation()}>
                     <div className="space-y-0.5">
-                      <button
-                        onClick={() => onCopyCell(rowIndex, cellIndex)}
-                        className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
-                      >
+                      <button onClick={() => onCopyCell(rowIndex, cellIndex)} className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100">
                         <Copy className="h-3 w-3" /> 셀 복사
                       </button>
                       {(hasCopiedCell || hasCopiedRegion) && (
-                        <button
-                          onClick={() => onPasteCell(rowIndex, cellIndex)}
-                          className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-blue-600 hover:bg-blue-50"
-                        >
+                        <button onClick={() => onPasteCell(rowIndex, cellIndex)} className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-blue-600 hover:bg-blue-50">
                           <Clipboard className="h-3 w-3" /> 셀 붙여넣기
                         </button>
                       )}
-                      <button
-                        onClick={() => onDeleteCell(rowIndex, cellIndex)}
-                        className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50"
-                      >
+                      <button onClick={() => onDeleteCell(rowIndex, cellIndex)} className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50">
                         <Trash2 className="h-3 w-3" /> 셀 삭제
                       </button>
                       <div className="my-1 border-t" />
-                      <button
-                        onClick={() => onSaveCell(rowIndex, cellIndex)}
-                        disabled={!isCellSaveable(cell)}
-                        className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-purple-600 hover:bg-purple-50 disabled:opacity-30"
-                      >
+                      <button onClick={() => onSaveCell(rowIndex, cellIndex)} disabled={!isCellSaveable(cell)} className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-purple-600 hover:bg-purple-50 disabled:opacity-30">
                         <Archive className="h-3 w-3" /> 셀 보관
                       </button>
-                      <button
-                        onClick={() => onLoadCell(rowIndex, cellIndex)}
-                        className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-green-600 hover:bg-green-50"
-                      >
+                      <button onClick={() => onLoadCell(rowIndex, cellIndex)} className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-green-600 hover:bg-green-50">
                         <Download className="h-3 w-3" /> 셀 불러오기
                       </button>
                       <div className="my-1 border-t" />
                       <div className="flex gap-0.5 px-1">
-                        <button
-                          onClick={() => onMoveColumn(cellIndex, 'left')}
-                          disabled={cellIndex === 0}
-                          className="flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-30"
-                        >
+                        <button onClick={() => onMoveColumn(cellIndex, 'left')} disabled={cellIndex === 0} className="flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-30">
                           <ArrowLeft className="h-3 w-3" /> 왼쪽
                         </button>
-                        <button
-                          onClick={() => onMoveColumn(cellIndex, 'right')}
-                          disabled={cellIndex === columnCount - 1}
-                          className="flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-30"
-                        >
+                        <button onClick={() => onMoveColumn(cellIndex, 'right')} disabled={cellIndex === columnCount - 1} className="flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-30">
                           오른쪽 <ArrowRight className="h-3 w-3" />
                         </button>
                       </div>
@@ -460,63 +364,35 @@ export const EditorTableRow = React.memo(function EditorTableRow({
                   </PopoverContent>
                 </Popover>
               </div>
+
               {/* Fill Handle — 드래그 복사 시작점 */}
               {!isDragCopyActive && (
                 <div
                   className="absolute bottom-0 right-0 z-10 flex h-3 w-3 cursor-crosshair items-center justify-center opacity-0 group-hover:opacity-100"
                   style={{ padding: '3px', margin: '-3px' }}
-                  onMouseDown={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    onStartDragCopy(rowIndex, cellIndex);
-                  }}
+                  onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); onStartDragCopy(rowIndex, cellIndex); }}
                 >
                   <div className="h-1.5 w-1.5 rounded-sm bg-blue-500" />
                 </div>
               )}
+
               <div className="mt-1 border-t border-gray-100 pt-1 text-xs text-gray-400">
                 <div className="flex items-center justify-between">
-                  <span>
-                    셀 ({rowIndex + 1}, {cellIndex + 1})
-                  </span>
+                  <span>셀 ({rowIndex + 1}, {cellIndex + 1})</span>
                   <span className="font-medium capitalize">{cell.type}</span>
                 </div>
-                {isMerged && (
-                  <div className="mt-1 font-medium text-orange-600">
-                    🔗 병합: {rowspan}행 × {colspan}열
-                  </div>
-                )}
-                {cell.type === 'checkbox' && cell.checkboxOptions && (
-                  <div className="mt-1 text-green-600">
-                    체크박스 {cell.checkboxOptions.length}개
-                  </div>
-                )}
-                {cell.type === 'radio' && cell.radioOptions && (
-                  <div className="mt-1 text-purple-600">
-                    라디오 {cell.radioOptions.length}개
-                  </div>
-                )}
-                {cell.type === 'select' && cell.selectOptions && (
-                  <div className="mt-1 text-indigo-600">
-                    선택 {cell.selectOptions.length}개
-                  </div>
-                )}
-                {cell.type === 'input' && (
-                  <div className="mt-1 text-teal-600">
-                    {cell.placeholder || '단답형 입력'}
-                  </div>
-                )}
-                {cell.type === 'image' && cell.imageUrl && (
-                  <div className="mt-1 text-blue-600">이미지 설정됨</div>
-                )}
-                {cell.type === 'video' && cell.videoUrl && (
-                  <div className="mt-1 text-red-600">비디오 설정됨</div>
-                )}
+                {isMerged && <div className="mt-1 font-medium text-orange-600">🔗 병합: {rowspan}행 × {colspan}열</div>}
+                {cell.type === 'checkbox' && cell.checkboxOptions && <div className="mt-1 text-green-600">체크박스 {cell.checkboxOptions.length}개</div>}
+                {cell.type === 'radio' && cell.radioOptions && <div className="mt-1 text-purple-600">라디오 {cell.radioOptions.length}개</div>}
+                {cell.type === 'select' && cell.selectOptions && <div className="mt-1 text-indigo-600">선택 {cell.selectOptions.length}개</div>}
+                {cell.type === 'input' && <div className="mt-1 text-teal-600">{cell.placeholder || '단답형 입력'}</div>}
+                {cell.type === 'image' && cell.imageUrl && <div className="mt-1 text-blue-600">이미지 설정됨</div>}
+                {cell.type === 'video' && cell.videoUrl && <div className="mt-1 text-red-600">비디오 설정됨</div>}
               </div>
             </div>
-          </td>
+          </div>
         );
       })}
-    </tr>
+    </>
   );
 });
