@@ -7,7 +7,7 @@ import { useMemo } from 'react';
 import { prepare, layout } from '@chenglou/pretext';
 import type { PreparedText } from '@chenglou/pretext';
 
-import type { TableCell, TableRow } from '@/types/survey';
+import type { TableCell, TableColumn, TableRow } from '@/types/survey';
 
 // 셀 렌더링 상수 (CSS와 동기화 필요)
 const MIN_ROW_HEIGHT = 44;
@@ -25,7 +25,7 @@ const TABLE_FONT = '14px Pretendard';
 /**
  * 셀 타입에 따른 높이 계산
  */
-function computeCellHeight(
+export function computeCellHeight(
   cell: TableCell,
   colWidth: number,
   preparedCache: Map<string, PreparedText>,
@@ -130,4 +130,56 @@ export function useRowHeights({
   }, [displayRows, columnWidths, preparedCache]);
 
   return rowHeights;
+}
+
+// ── 헤더/행 합산 상수 ──
+const HEADER_ROW_HEIGHT = 45; // py-3 + font + border
+const TABLE_CARD_PADDING = 32; // CardContent padding + border
+
+/**
+ * 테이블 전체 높이를 pretext로 사전 계산 (DOM 접근 없음)
+ * LazyMount placeholder 높이로 사용 → 스크롤 밀림 방지
+ */
+export function computeTableEstimatedHeight(
+  columns: TableColumn[],
+  rows: TableRow[],
+  headerGrid?: { colspan?: number; rowspan?: number; label?: string }[][],
+  font = TABLE_FONT,
+): number {
+  if (columns.length === 0 || rows.length === 0) return 128;
+
+  // 열 너비 (column.width 또는 기본 150px)
+  const columnWidths = columns.map((col) => col.width || 150);
+
+  // prepare 캐시 (텍스트 셀만)
+  const preparedCache = new Map<string, PreparedText>();
+  for (const row of rows) {
+    for (let colIdx = 0; colIdx < row.cells.length; colIdx++) {
+      const cell = row.cells[colIdx];
+      if (!cell || cell.isHidden) continue;
+      if (cell.type === 'text' && cell.content) {
+        preparedCache.set(`${row.id}-${colIdx}`, prepare(cell.content, font));
+      }
+    }
+  }
+
+  // 행 높이 합산
+  let totalRowHeight = 0;
+  for (const row of rows) {
+    let maxHeight = MIN_ROW_HEIGHT;
+    for (let colIdx = 0; colIdx < row.cells.length; colIdx++) {
+      const cell = row.cells[colIdx];
+      if (!cell || cell.isHidden) continue;
+      const colWidth = columnWidths[colIdx] ?? 150;
+      const cellHeight = computeCellHeight(cell, colWidth, preparedCache, `${row.id}-${colIdx}`);
+      maxHeight = Math.max(maxHeight, cellHeight);
+    }
+    totalRowHeight += maxHeight;
+  }
+
+  // 헤더 높이
+  const headerRows = headerGrid?.length || 1;
+  const headerHeight = headerRows * HEADER_ROW_HEIGHT;
+
+  return headerHeight + totalRowHeight + TABLE_CARD_PADDING;
 }

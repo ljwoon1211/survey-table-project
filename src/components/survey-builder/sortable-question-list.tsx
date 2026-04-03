@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useShallow } from 'zustand/react/shallow';
 
@@ -49,7 +49,116 @@ import { generateId, isEmptyHtml, isValidUUID } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { useTestResponseStore } from '@/stores/test-response-store';
 import { useSurveyUIStore } from '@/stores/ui-store';
+import { computeTableEstimatedHeight } from '@/hooks/use-row-heights';
 import { Question } from '@/types/survey';
+
+const noop = () => {};
+
+// ── 카드 높이 추정 상수 (CSS와 동기화) ──
+
+// 공통
+const DESC_ESTIMATE = 60;
+const INPUT_H = 40;
+const TEXTAREA_H = 84;
+const OPT_ROW = 28;
+const ML_LEVEL = 70;
+
+// 테스트 모드 (QuestionTestCard): p-6, border-l-4
+const TEST_SHELL = 48 + 32 + 28 + 12; // padding + header + title + gap
+
+// 편집 모드 (SortableQuestion): p-6, 드래그 핸들 헤더, bg-gray-50 preview wrapper
+const EDIT_SHELL = 48 + 52 + 28 + 12 + 24; // padding + header(drag+buttons) + title + gap + preview wrapper(p-3×2)
+
+function estimateInputHeight(question: Question): number {
+  switch (question.type) {
+    case 'text':
+    case 'select':
+      return INPUT_H;
+    case 'textarea':
+      return TEXTAREA_H;
+    case 'radio':
+    case 'checkbox': {
+      const n = (question.options?.length ?? 0) + (question.allowOtherOption ? 1 : 0);
+      return n * OPT_ROW + 8;
+    }
+    case 'multiselect':
+      return (question.selectLevels?.length ?? 1) * ML_LEVEL;
+    case 'table':
+      return computeTableEstimatedHeight(
+        question.tableColumns ?? [],
+        question.tableRowsData ?? [],
+        question.tableHeaderGrid,
+      );
+    case 'notice':
+      return 80 + (question.requiresAcknowledgment ? 52 : 0);
+    default:
+      return INPUT_H;
+  }
+}
+
+function estimateCardHeight(question: Question, mode: 'edit' | 'test'): number {
+  const shell = mode === 'test' ? TEST_SHELL : EDIT_SHELL;
+  let h = shell + estimateInputHeight(question);
+  if (question.description && !isEmptyHtml(question.description)) {
+    h += DESC_ESTIMATE + 16;
+  }
+  return h;
+}
+
+// LazyMount에서 그룹 접기/펼치기 시 이전 마운트 상태 기억
+const mountedTableIdsRef = { current: new Set<string>() };
+
+// table 질문의 무거운 내부 컴포넌트만 IO lazy mount
+function LazyMount({
+  children,
+  estimatedHeight = 128,
+  immediate = false,
+  questionId,
+}: {
+  children: React.ReactNode;
+  estimatedHeight?: number;
+  immediate?: boolean;
+  questionId?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(
+    immediate || (questionId ? mountedTableIdsRef.current.has(questionId) : false),
+  );
+
+  useEffect(() => {
+    if (mounted && questionId) mountedTableIdsRef.current.add(questionId);
+  }, [mounted, questionId]);
+
+  useEffect(() => {
+    if (mounted) return;
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setMounted(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: '800px 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [mounted]);
+
+  if (mounted) return <>{children}</>;
+
+  return (
+    <div ref={ref}>
+      <div
+        style={{ height: estimatedHeight }}
+        className="flex items-center justify-center rounded-lg border border-dashed border-gray-200 text-sm text-gray-400"
+      >
+        테이블 로딩 중...
+      </div>
+    </div>
+  );
+}
 
 import { GroupHeader } from './group-header';
 import { InteractiveTableResponse } from './interactive-table-response';
@@ -69,6 +178,7 @@ interface SortableQuestionProps {
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
   onSaveToLibrary?: (question: Question) => void;
+  isDragOverlay?: boolean;
 }
 
 const SortableQuestion = React.memo(function SortableQuestion({
@@ -80,6 +190,7 @@ const SortableQuestion = React.memo(function SortableQuestion({
   onDelete,
   onDuplicate,
   onSaveToLibrary,
+  isDragOverlay = false,
 }: SortableQuestionProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: question.id,
@@ -210,7 +321,18 @@ const SortableQuestion = React.memo(function SortableQuestion({
 
         {/* Question preview */}
         <div className="rounded-lg bg-gray-50 p-3">
-          <QuestionPreview question={question} />
+          {question.type === 'table' ? (
+            <LazyMount
+              questionId={question.id}
+              
+              estimatedHeight={computeTableEstimatedHeight(question.tableColumns ?? [], question.tableRowsData ?? [], question.tableHeaderGrid)}
+              immediate={isDragOverlay}
+            >
+              <QuestionPreview question={question} />
+            </LazyMount>
+          ) : (
+            <QuestionPreview question={question} />
+          )}
         </div>
       </div>
     </Card>
@@ -334,15 +456,21 @@ function QuestionTestCard({ question, index }: { question: Question; index: numb
       </div>
 
       <div className="space-y-3">
-        <QuestionTestInput
-          question={question}
-          value={testResponse}
-          onChange={handleResponse}
-        />
+        {question.type === 'table' ? (
+          <LazyMount
+            questionId={question.id}
+            estimatedHeight={computeTableEstimatedHeight(question.tableColumns ?? [], question.tableRowsData ?? [], question.tableHeaderGrid)}
+          >
+            <QuestionTestInput question={question} value={testResponse} onChange={handleResponse} />
+          </LazyMount>
+        ) : (
+          <QuestionTestInput question={question} value={testResponse} onChange={handleResponse} />
+        )}
       </div>
     </Card>
   );
 }
+
 
 // 기타 옵션 관련 타입 정의
 type OtherChoiceValue = {
@@ -836,18 +964,18 @@ function getQuestionTypeLabel(type: string): string {
 }
 
 interface SortableQuestionListProps {
-  questions: Question[];
   selectedQuestionId: string | null;
   isTestMode?: boolean;
   onSaveToLibrary?: (question: Question) => void;
 }
 
 export function SortableQuestionList({
-  questions,
   selectedQuestionId,
   isTestMode = false,
   onSaveToLibrary,
 }: SortableQuestionListProps) {
+  // 스토어에서 직접 구독 (편집 페이지 리렌더와 분리)
+  const questions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
   const { reorderQuestions, deleteQuestion, updateQuestion, addQuestion } =
     useSurveyBuilderStore(
       useShallow((s) => ({
@@ -866,6 +994,20 @@ export function SortableQuestionList({
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+
+  // 콜백 안정화용 ref (questions 참조를 useCallback deps에서 제거)
+  const questionsRef = useRef(questions);
+  questionsRef.current = questions;
+
+  // content-visibility용 카드 높이 캐시 (pretext 계산은 questions 변경 시만 실행)
+  const cardHeightMap = useMemo(() => {
+    const mode = isTestMode ? 'test' as const : 'edit' as const;
+    const map = new Map<string, number>();
+    for (const q of questions) {
+      map.set(q.id, estimateCardHeight(q, mode));
+    }
+    return map;
+  }, [questions, isTestMode]);
 
   // 중복 제거: 같은 ID를 가진 그룹이 있으면 첫 번째 것만 사용
   const uniqueGroups = Array.from(new Map(groups.map((g) => [g.id, g])).values());
@@ -917,6 +1059,17 @@ export function SortableQuestionList({
 
   // 그룹 없는 질문들
   const ungroupedQuestions = questionsByGroup['ungrouped'] || [];
+
+  // 선택된 질문으로 스크롤
+  useEffect(() => {
+    if (!selectedQuestionId) return;
+    requestAnimationFrame(() => {
+      const el = document.querySelector(`[data-question-id="${selectedQuestionId}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+  }, [selectedQuestionId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -986,14 +1139,13 @@ export function SortableQuestionList({
     setOverId(null);
   }
 
-  const handleEdit = (questionId: string) => {
+  const handleEdit = useCallback((questionId: string) => {
     setEditingQuestionId(questionId);
-  };
+  }, []);
 
-  const handleDelete = async (questionId: string) => {
+  const handleDelete = useCallback(async (questionId: string) => {
     if (confirm('이 질문을 삭제하시겠습니까?')) {
-      // 삭제 전 질문에서 이미지 추출 및 삭제
-      const questionToDelete = questions.find((q) => q.id === questionId);
+      const questionToDelete = questionsRef.current.find((q) => q.id === questionId);
       if (questionToDelete) {
         const images = extractImageUrlsFromQuestion(questionToDelete);
         if (images.length > 0) {
@@ -1001,15 +1153,12 @@ export function SortableQuestionList({
             await deleteImagesFromR2(images);
           } catch (error) {
             console.error('질문 삭제 시 이미지 삭제 실패:', error);
-            // 이미지 삭제 실패해도 질문 삭제는 진행
           }
         }
       }
 
-      // 로컬 스토어에서 삭제
       deleteQuestion(questionId);
 
-      // UUID 형식인 경우에만 서버에 질문 삭제 API 호출 (임시 질문은 DB에 없으므로 호출 불필요)
       if (isValidUUID(questionId)) {
         try {
           await deleteQuestionAction(questionId);
@@ -1018,10 +1167,10 @@ export function SortableQuestionList({
         }
       }
     }
-  };
+  }, [deleteQuestion]);
 
-  const handleDuplicate = async (questionId: string) => {
-    const questionToDuplicate = questions.find((q) => q.id === questionId);
+  const handleDuplicate = useCallback(async (questionId: string) => {
+    const questionToDuplicate = questionsRef.current.find((q) => q.id === questionId);
     if (questionToDuplicate) {
       // 먼저 컬럼을 복제하여 새 컬럼 ID들을 확보
       const newTableColumns = questionToDuplicate.tableColumns
@@ -1086,7 +1235,8 @@ export function SortableQuestionList({
         : undefined;
 
       // 기존 질문들의 최대 order를 찾아서 +1 (없으면 1부터 시작)
-      const maxOrder = questions.length > 0 ? Math.max(...questions.map((q) => q.order), 0) : 0;
+      const currentQuestions = questionsRef.current;
+      const maxOrder = currentQuestions.length > 0 ? Math.max(...currentQuestions.map((q) => q.order), 0) : 0;
 
       // 새로운 ID를 가진 완전한 복사본 생성
       const newQuestion: Question = {
@@ -1151,7 +1301,7 @@ export function SortableQuestionList({
         }
       }
     }
-  };
+  }, [surveyId]);
 
   if (questions.length === 0) {
     return null;
@@ -1175,23 +1325,17 @@ export function SortableQuestionList({
               />
               {!group.collapsed && (
                 <>
-                  {/* 최상위 그룹의 질문들 */}
                   {groupQuestions.length > 0 && (
                     <div className="space-y-4 pl-4">
                       {groupQuestions.map((question) => (
-                        <QuestionTestCard
-                          key={question.id}
-                          question={question}
-                          index={questions.indexOf(question)}
-                        />
+                        <div key={question.id} data-question-id={question.id} style={{ contentVisibility: 'auto', containIntrinsicSize: `auto ${cardHeightMap.get(question.id) ?? estimateCardHeight(question, isTestMode ? 'test' : 'edit')}px` }}>
+                          <QuestionTestCard question={question} index={questions.indexOf(question)} />
+                        </div>
                       ))}
                     </div>
                   )}
-
-                  {/* 하위 그룹들 */}
                   {subGroups.map((subGroup) => {
                     const subGroupQuestions = questionsByGroup[subGroup.id] || [];
-
                     return (
                       <div key={subGroup.id} className="ml-4 space-y-4">
                         <GroupHeader
@@ -1202,11 +1346,9 @@ export function SortableQuestionList({
                         {!subGroup.collapsed && (
                           <div className="space-y-4 pl-4">
                             {subGroupQuestions.map((question) => (
-                              <QuestionTestCard
-                                key={question.id}
-                                question={question}
-                                index={questions.indexOf(question)}
-                              />
+                              <div key={question.id} data-question-id={question.id}>
+                                <QuestionTestCard question={question} index={questions.indexOf(question)} />
+                              </div>
                             ))}
                           </div>
                         )}
@@ -1219,7 +1361,6 @@ export function SortableQuestionList({
           );
         })}
 
-        {/* 그룹 없는 질문들 */}
         {ungroupedQuestions.length > 0 && (
           <div className="space-y-4">
             {topLevelGroups.length > 0 && (
@@ -1229,12 +1370,10 @@ export function SortableQuestionList({
                 <div className="h-px flex-1 bg-gray-200" />
               </div>
             )}
-            {ungroupedQuestions.map((question, index) => (
-              <QuestionTestCard
-                key={question.id}
-                question={question}
-                index={questions.indexOf(question)}
-              />
+            {ungroupedQuestions.map((question) => (
+              <div key={question.id} data-question-id={question.id}>
+                <QuestionTestCard question={question} index={questions.indexOf(question)} />
+              </div>
             ))}
           </div>
         )}
@@ -1267,34 +1406,32 @@ export function SortableQuestionList({
                   />
                   {!group.collapsed && (
                     <>
-                      {/* 최상위 그룹의 질문들 */}
                       {groupQuestions.length > 0 && (
                         <div className="space-y-4 pl-4">
-                          {groupQuestions.map((question) => (
-                            <div key={question.id} className="relative">
-                              {/* 드롭 영역 표시 */}
-                              {overId === question.id && activeId !== question.id && (
-                                <div className="absolute -top-2 right-0 left-0 z-10 h-1 animate-pulse rounded-full bg-blue-500" />
-                              )}
-                              <SortableQuestion
-                                question={question}
-                                index={questions.indexOf(question)}
-                                isSelected={selectedQuestionId === question.id}
-                                onSelect={selectQuestion}
-                                onEdit={handleEdit}
-                                onDelete={handleDelete}
-                                onDuplicate={handleDuplicate}
-                                onSaveToLibrary={onSaveToLibrary}
-                              />
-                            </div>
-                          ))}
+                          {groupQuestions.map((question) => {
+                            const qIdx = questions.indexOf(question);
+                            return (
+                              <div key={question.id} data-question-id={question.id} className="relative" style={{ contentVisibility: 'auto', containIntrinsicSize: `auto ${cardHeightMap.get(question.id) ?? estimateCardHeight(question, isTestMode ? 'test' : 'edit')}px` }}>
+                                {overId === question.id && activeId !== question.id && (
+                                  <div className="absolute -top-2 right-0 left-0 z-10 h-1 animate-pulse rounded-full bg-blue-500" />
+                                )}
+                                <SortableQuestion
+                                  question={question}
+                                  index={qIdx}
+                                  isSelected={selectedQuestionId === question.id}
+                                  onSelect={selectQuestion}
+                                  onEdit={handleEdit}
+                                  onDelete={handleDelete}
+                                  onDuplicate={handleDuplicate}
+                                  onSaveToLibrary={onSaveToLibrary}
+                                />
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
-
-                      {/* 하위 그룹들 */}
                       {subGroups.map((subGroup) => {
                         const subGroupQuestions = questionsByGroup[subGroup.id] || [];
-
                         return (
                           <div key={subGroup.id} className="ml-4 space-y-4">
                             <GroupHeader
@@ -1304,24 +1441,26 @@ export function SortableQuestionList({
                             />
                             {!subGroup.collapsed && (
                               <div className="space-y-4 pl-4">
-                                {subGroupQuestions.map((question) => (
-                                  <div key={question.id} className="relative">
-                                    {/* 드롭 영역 표시 */}
-                                    {overId === question.id && activeId !== question.id && (
-                                      <div className="absolute -top-2 right-0 left-0 z-10 h-1 animate-pulse rounded-full bg-blue-500" />
-                                    )}
-                                    <SortableQuestion
-                                      question={question}
-                                      index={questions.indexOf(question)}
-                                      isSelected={selectedQuestionId === question.id}
-                                      onSelect={selectQuestion}
-                                      onEdit={handleEdit}
-                                      onDelete={handleDelete}
-                                      onDuplicate={handleDuplicate}
-                                      onSaveToLibrary={onSaveToLibrary}
-                                    />
-                                  </div>
-                                ))}
+                                {subGroupQuestions.map((question) => {
+                                  const qIdx = questions.indexOf(question);
+                                  return (
+                                    <div key={question.id} data-question-id={question.id} className="relative" style={{ contentVisibility: 'auto', containIntrinsicSize: `auto ${cardHeightMap.get(question.id) ?? estimateCardHeight(question, isTestMode ? 'test' : 'edit')}px` }}>
+                                      {overId === question.id && activeId !== question.id && (
+                                        <div className="absolute -top-2 right-0 left-0 z-10 h-1 animate-pulse rounded-full bg-blue-500" />
+                                      )}
+                                      <SortableQuestion
+                                        question={question}
+                                        index={qIdx}
+                                        isSelected={selectedQuestionId === question.id}
+                                        onSelect={selectQuestion}
+                                        onEdit={handleEdit}
+                                        onDelete={handleDelete}
+                                        onDuplicate={handleDuplicate}
+                                        onSaveToLibrary={onSaveToLibrary}
+                                      />
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
@@ -1333,7 +1472,6 @@ export function SortableQuestionList({
               );
             })}
 
-            {/* 그룹 없는 질문들 */}
             {ungroupedQuestions.length > 0 && (
               <div className="space-y-4">
                 {topLevelGroups.length > 0 && (
@@ -1343,24 +1481,26 @@ export function SortableQuestionList({
                     <div className="h-px flex-1 bg-gray-200" />
                   </div>
                 )}
-                {ungroupedQuestions.map((question, index) => (
-                  <div key={question.id} className="relative">
-                    {/* 드롭 영역 표시 */}
-                    {overId === question.id && activeId !== question.id && (
-                      <div className="absolute -top-2 right-0 left-0 z-10 h-1 animate-pulse rounded-full bg-blue-500" />
-                    )}
-                    <SortableQuestion
-                      question={question}
-                      index={questions.indexOf(question)}
-                      isSelected={selectedQuestionId === question.id}
-                      onSelect={selectQuestion}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                      onDuplicate={handleDuplicate}
-                      onSaveToLibrary={onSaveToLibrary}
-                    />
-                  </div>
-                ))}
+                {ungroupedQuestions.map((question) => {
+                  const qIdx = questions.indexOf(question);
+                  return (
+                    <div key={question.id} data-question-id={question.id} className="relative" style={{ contentVisibility: 'auto', containIntrinsicSize: `auto ${cardHeightMap.get(question.id) ?? estimateCardHeight(question, isTestMode ? 'test' : 'edit')}px` }}>
+                      {overId === question.id && activeId !== question.id && (
+                        <div className="absolute -top-2 right-0 left-0 z-10 h-1 animate-pulse rounded-full bg-blue-500" />
+                      )}
+                      <SortableQuestion
+                        question={question}
+                        index={qIdx}
+                        isSelected={selectedQuestionId === question.id}
+                        onSelect={selectQuestion}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                        onDuplicate={handleDuplicate}
+                        onSaveToLibrary={onSaveToLibrary}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1373,10 +1513,11 @@ export function SortableQuestionList({
                 question={questions.find((q) => q.id === activeId)!}
                 index={questions.findIndex((q) => q.id === activeId)}
                 isSelected={false}
-                onSelect={() => {}}
-                onEdit={() => {}}
-                onDelete={() => {}}
-                onDuplicate={() => {}}
+                onSelect={noop}
+                onEdit={noop}
+                onDelete={noop}
+                onDuplicate={noop}
+                isDragOverlay
               />
             </div>
           ) : null}

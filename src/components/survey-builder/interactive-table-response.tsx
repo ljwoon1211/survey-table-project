@@ -131,6 +131,36 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     return (value || {}) as Record<string, any>;
   }, [isTestMode, testQuestionResponse, value]);
 
+  // displayCondition에서 참조하는 질문 ID만 추출 → 관련 응답만 의존
+  const relevantResponseKeys = useMemo(() => {
+    const ids = new Set<string>();
+    for (const col of columns) {
+      if (col.displayCondition?.conditions) {
+        for (const c of col.displayCondition.conditions) {
+          if (c.sourceQuestionId) ids.add(c.sourceQuestionId);
+        }
+      }
+    }
+    for (const row of rows) {
+      if (row.displayCondition?.conditions) {
+        for (const c of row.displayCondition.conditions) {
+          if (c.sourceQuestionId) ids.add(c.sourceQuestionId);
+        }
+      }
+    }
+    return ids;
+  }, [columns, rows]);
+
+  // 관련 응답만 안정적으로 추출 (JSON 직렬화로 값 비교)
+  const relevantResponsesJson = useMemo(() => {
+    if (!allResponses || relevantResponseKeys.size === 0) return '';
+    const subset: Record<string, unknown> = {};
+    for (const key of relevantResponseKeys) {
+      if (key in allResponses) subset[key] = allResponses[key];
+    }
+    return JSON.stringify(subset);
+  }, [allResponses, relevantResponseKeys]);
+
   // displayCondition 기반 가시 열 필터링 + colspan 재계산
   const { visibleColumns, columnFilteredRows, visibleHeaderGrid } = useMemo(() => {
     if (!allResponses || !allQuestions || columns.length === 0) {
@@ -152,7 +182,8 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
       columnFilteredRows: result.rows,
       visibleHeaderGrid: result.headerGrid,
     };
-  }, [columns, rows, tableHeaderGrid, allResponses, allQuestions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [columns, rows, tableHeaderGrid, relevantResponsesJson, allQuestions]);
 
   // 동적 행 관련 데이터 추출 (다중 그룹)
   const groupConfigMap = useMemo(() => {
@@ -209,7 +240,8 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
 
     const visibleRowIds = new Set(filtered.map((r) => r.id));
     return recalculateRowspansForVisibleRows(columnFilteredRows, visibleRowIds);
-  }, [columnFilteredRows, allResponses, allQuestions, hasDynamicRows, selectedRowIds, groupConfigMap]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [columnFilteredRows, relevantResponsesJson, allQuestions, hasDynamicRows, selectedRowIds, groupConfigMap]);
 
   // 스크롤 인디케이터
   const checkScrollState = useCallback(() => {

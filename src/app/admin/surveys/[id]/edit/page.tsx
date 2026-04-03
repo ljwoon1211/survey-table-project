@@ -135,9 +135,10 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
     })),
   );
 
-  // 배열 (요소별 shallow 비교)
-  const surveyQuestions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
-  const surveyGroups = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.groups));
+  // 질문/그룹 배열은 SortableQuestionList 내부에서 직접 구독
+  // 페이지에서는 길이만 구독하여 리렌더 최소화
+  const questionCount = useSurveyBuilderStore((s) => s.currentSurvey.questions.length);
+  const groupCount = useSurveyBuilderStore((s) => (s.currentSurvey.groups || []).length);
 
   const { selectedQuestionId, isTestMode, selectQuestion, toggleTestMode } = useSurveyUIStore(
     useShallow((s) => ({
@@ -630,8 +631,8 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                 <div className="mt-6 border-t border-gray-200 pt-6">
                   <h4 className="mb-3 text-sm font-medium text-gray-700">설문 정보</h4>
                   <div className="space-y-1 text-xs text-gray-500">
-                    <p>그룹 수: {(surveyGroups || []).length}개</p>
-                    <p>질문 수: {surveyQuestions.length}개</p>
+                    <p>그룹 수: {groupCount}개</p>
+                    <p>질문 수: {questionCount}개</p>
                   </div>
                 </div>
               </TabsContent>
@@ -673,12 +674,12 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                       테스트 모드
                     </span>
                   )}
-                  {!isTestMode && surveyQuestions.length > 0 && (
+                  {!isTestMode && questionCount > 0 && (
                     <div className="flex items-center space-x-2">
                       <Input
                         type="number"
                         min="1"
-                        max={surveyQuestions.length}
+                        max={questionCount}
                         value={questionNumberInput}
                         onChange={(e) => setQuestionNumberInput(e.target.value)}
                         onKeyPress={handleQuestionNumberKeyPress}
@@ -686,17 +687,17 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                         className="h-8 w-24 text-sm"
                       />
                       <span className="text-xs text-gray-500">
-                        / {surveyQuestions.length}
+                        / {questionCount}
                       </span>
                     </div>
                   )}
                 </div>
-                <div className="text-sm text-gray-500">{surveyQuestions.length}개 질문</div>
+                <div className="text-sm text-gray-500">{questionCount}개 질문</div>
               </div>
             </div>
 
             <div className="p-6">
-              {surveyQuestions.length === 0 ? (
+              {questionCount === 0 ? (
                 <div className="py-16 text-center">
                   <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
                     <Plus className="h-8 w-8 text-gray-400" />
@@ -755,7 +756,6 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                 </div>
               ) : (
                 <SortableQuestionList
-                  questions={surveyQuestions}
                   selectedQuestionId={selectedQuestionId}
                   isTestMode={isTestMode}
                   onSaveToLibrary={handleSaveToLibrary}

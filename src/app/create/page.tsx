@@ -439,7 +439,6 @@ export default function CreateSurveyPage() {
                 </div>
               ) : (
                 <SortableQuestionList
-                  questions={currentSurvey.questions}
                   selectedQuestionId={selectedQuestionId}
                   isTestMode={isTestMode}
                 />
