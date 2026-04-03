@@ -995,19 +995,38 @@ export function SortableQuestionList({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
 
+  // 테스트 모드 lazy 첫 마운트: 첫 토글 전까지 테스트 트리를 렌더하지 않음
+  const [testModeEverActivated, setTestModeEverActivated] = useState(isTestMode);
+  useEffect(() => {
+    if (isTestMode && !testModeEverActivated) setTestModeEverActivated(true);
+  }, [isTestMode, testModeEverActivated]);
+
+  // querySelector 스코프용 컨테이너 ref
+  const editContainerRef = useRef<HTMLDivElement>(null);
+  const testContainerRef = useRef<HTMLDivElement>(null);
+
   // 콜백 안정화용 ref (questions 참조를 useCallback deps에서 제거)
   const questionsRef = useRef(questions);
   questionsRef.current = questions;
 
-  // content-visibility용 카드 높이 캐시 (pretext 계산은 questions 변경 시만 실행)
-  const cardHeightMap = useMemo(() => {
-    const mode = isTestMode ? 'test' as const : 'edit' as const;
+  // content-visibility용 카드 높이 캐시 (모드별 분리)
+  const editHeightMap = useMemo(() => {
     const map = new Map<string, number>();
-    for (const q of questions) {
-      map.set(q.id, estimateCardHeight(q, mode));
-    }
+    for (const q of questions) map.set(q.id, estimateCardHeight(q, 'edit'));
     return map;
-  }, [questions, isTestMode]);
+  }, [questions]);
+
+  const testHeightMap = useMemo(() => {
+    if (!testModeEverActivated) return new Map<string, number>();
+    const map = new Map<string, number>();
+    for (const q of questions) map.set(q.id, estimateCardHeight(q, 'test'));
+    return map;
+  }, [questions, testModeEverActivated]);
+
+  // SPA 내비게이션 시 모듈 레벨 mountedTableIdsRef 정리
+  useEffect(() => {
+    return () => { mountedTableIdsRef.current.clear(); };
+  }, []);
 
   // 중복 제거: 같은 ID를 가진 그룹이 있으면 첫 번째 것만 사용
   const uniqueGroups = Array.from(new Map(groups.map((g) => [g.id, g])).values());
@@ -1060,16 +1079,18 @@ export function SortableQuestionList({
   // 그룹 없는 질문들
   const ungroupedQuestions = questionsByGroup['ungrouped'] || [];
 
-  // 선택된 질문으로 스크롤
+  // 선택된 질문으로 스크롤 (활성 모드 컨테이너 내에서 검색)
   useEffect(() => {
     if (!selectedQuestionId) return;
     requestAnimationFrame(() => {
-      const el = document.querySelector(`[data-question-id="${selectedQuestionId}"]`);
+      const container = isTestMode ? testContainerRef.current : editContainerRef.current;
+      const el = container?.querySelector(`[data-question-id="${selectedQuestionId}"]`)
+        ?? document.querySelector(`[data-question-id="${selectedQuestionId}"]`);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     });
-  }, [selectedQuestionId]);
+  }, [selectedQuestionId, isTestMode]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -1307,223 +1328,151 @@ export function SortableQuestionList({
     return null;
   }
 
-  // 테스트 모드일 때는 인터랙티브한 질문 테스트 모드
-  if (isTestMode) {
+  // 편집/테스트 모드를 display:none으로 토글 (언마운트 방지 → 즉시 전환)
+  const editStyle = isTestMode ? { display: 'none' as const } : undefined;
+  const testStyle = isTestMode ? undefined : { display: 'none' as const };
+
+  // 질문 카드 렌더 헬퍼 — 테스트 모드
+  const renderTestCard = (question: Question) => (
+    <div
+      key={question.id}
+      data-question-id={question.id}
+      style={{ contentVisibility: 'auto', containIntrinsicSize: `auto ${testHeightMap.get(question.id) ?? estimateCardHeight(question, 'test')}px` }}
+    >
+      <QuestionTestCard question={question} index={questions.indexOf(question)} />
+    </div>
+  );
+
+  // 질문 카드 렌더 헬퍼 — 편집 모드
+  const renderEditCard = (question: Question) => {
+    const qIdx = questions.indexOf(question);
     return (
-      <div className="space-y-6">
-        {/* 그룹별로 렌더링 (2단계 계층) */}
-        {topLevelGroups.map((group) => {
-          const groupQuestions = questionsByGroup[group.id] || [];
-          const subGroups = getSubGroups(group.id);
-
-          return (
-            <div key={group.id} className="space-y-4">
-              <GroupHeader
-                group={group}
-                questionCount={getTotalQuestionCount(group.id)}
-                subGroupCount={getTotalSubGroupCount(group.id)}
-              />
-              {!group.collapsed && (
-                <>
-                  {groupQuestions.length > 0 && (
-                    <div className="space-y-4 pl-4">
-                      {groupQuestions.map((question) => (
-                        <div key={question.id} data-question-id={question.id} style={{ contentVisibility: 'auto', containIntrinsicSize: `auto ${cardHeightMap.get(question.id) ?? estimateCardHeight(question, isTestMode ? 'test' : 'edit')}px` }}>
-                          <QuestionTestCard question={question} index={questions.indexOf(question)} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {subGroups.map((subGroup) => {
-                    const subGroupQuestions = questionsByGroup[subGroup.id] || [];
-                    return (
-                      <div key={subGroup.id} className="ml-4 space-y-4">
-                        <GroupHeader
-                          group={subGroup}
-                          questionCount={getTotalQuestionCount(subGroup.id)}
-                          subGroupCount={getTotalSubGroupCount(subGroup.id)}
-                        />
-                        {!subGroup.collapsed && (
-                          <div className="space-y-4 pl-4">
-                            {subGroupQuestions.map((question) => (
-                              <div key={question.id} data-question-id={question.id}>
-                                <QuestionTestCard question={question} index={questions.indexOf(question)} />
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </>
-              )}
-            </div>
-          );
-        })}
-
-        {ungroupedQuestions.length > 0 && (
-          <div className="space-y-4">
-            {topLevelGroups.length > 0 && (
-              <div className="flex items-center space-x-2 py-2">
-                <div className="h-px flex-1 bg-gray-200" />
-                <span className="text-xs text-gray-400">그룹 없음</span>
-                <div className="h-px flex-1 bg-gray-200" />
-              </div>
-            )}
-            {ungroupedQuestions.map((question) => (
-              <div key={question.id} data-question-id={question.id}>
-                <QuestionTestCard question={question} index={questions.indexOf(question)} />
-              </div>
-            ))}
-          </div>
+      <div
+        key={question.id}
+        data-question-id={question.id}
+        className="relative"
+        style={{ contentVisibility: 'auto', containIntrinsicSize: `auto ${editHeightMap.get(question.id) ?? estimateCardHeight(question, 'edit')}px` }}
+      >
+        {overId === question.id && activeId !== question.id && (
+          <div className="absolute -top-2 right-0 left-0 z-10 h-1 animate-pulse rounded-full bg-blue-500" />
         )}
+        <SortableQuestion
+          question={question}
+          index={qIdx}
+          isSelected={selectedQuestionId === question.id}
+          onSelect={selectQuestion}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onDuplicate={handleDuplicate}
+          onSaveToLibrary={onSaveToLibrary}
+        />
       </div>
     );
-  }
+  };
 
-  return (
+  // 그룹 렌더 헬퍼
+  const renderGroups = (renderCard: (q: Question) => React.ReactNode) => (
     <>
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext items={questions.map((q) => q.id)} strategy={verticalListSortingStrategy}>
-          <div className="space-y-6">
-            {/* 그룹별로 렌더링 (2단계 계층) */}
-            {topLevelGroups.map((group) => {
-              const groupQuestions = questionsByGroup[group.id] || [];
-              const subGroups = getSubGroups(group.id);
-
-              return (
-                <div key={group.id} className="space-y-4">
-                  <GroupHeader
-                    group={group}
-                    questionCount={getTotalQuestionCount(group.id)}
-                    subGroupCount={getTotalSubGroupCount(group.id)}
-                  />
-                  {!group.collapsed && (
-                    <>
-                      {groupQuestions.length > 0 && (
-                        <div className="space-y-4 pl-4">
-                          {groupQuestions.map((question) => {
-                            const qIdx = questions.indexOf(question);
-                            return (
-                              <div key={question.id} data-question-id={question.id} className="relative" style={{ contentVisibility: 'auto', containIntrinsicSize: `auto ${cardHeightMap.get(question.id) ?? estimateCardHeight(question, isTestMode ? 'test' : 'edit')}px` }}>
-                                {overId === question.id && activeId !== question.id && (
-                                  <div className="absolute -top-2 right-0 left-0 z-10 h-1 animate-pulse rounded-full bg-blue-500" />
-                                )}
-                                <SortableQuestion
-                                  question={question}
-                                  index={qIdx}
-                                  isSelected={selectedQuestionId === question.id}
-                                  onSelect={selectQuestion}
-                                  onEdit={handleEdit}
-                                  onDelete={handleDelete}
-                                  onDuplicate={handleDuplicate}
-                                  onSaveToLibrary={onSaveToLibrary}
-                                />
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                      {subGroups.map((subGroup) => {
-                        const subGroupQuestions = questionsByGroup[subGroup.id] || [];
-                        return (
-                          <div key={subGroup.id} className="ml-4 space-y-4">
-                            <GroupHeader
-                              group={subGroup}
-                              questionCount={getTotalQuestionCount(subGroup.id)}
-                              subGroupCount={getTotalSubGroupCount(subGroup.id)}
-                            />
-                            {!subGroup.collapsed && (
-                              <div className="space-y-4 pl-4">
-                                {subGroupQuestions.map((question) => {
-                                  const qIdx = questions.indexOf(question);
-                                  return (
-                                    <div key={question.id} data-question-id={question.id} className="relative" style={{ contentVisibility: 'auto', containIntrinsicSize: `auto ${cardHeightMap.get(question.id) ?? estimateCardHeight(question, isTestMode ? 'test' : 'edit')}px` }}>
-                                      {overId === question.id && activeId !== question.id && (
-                                        <div className="absolute -top-2 right-0 left-0 z-10 h-1 animate-pulse rounded-full bg-blue-500" />
-                                      )}
-                                      <SortableQuestion
-                                        question={question}
-                                        index={qIdx}
-                                        isSelected={selectedQuestionId === question.id}
-                                        onSelect={selectQuestion}
-                                        onEdit={handleEdit}
-                                        onDelete={handleDelete}
-                                        onDuplicate={handleDuplicate}
-                                        onSaveToLibrary={onSaveToLibrary}
-                                      />
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </>
-                  )}
-                </div>
-              );
-            })}
-
-            {ungroupedQuestions.length > 0 && (
-              <div className="space-y-4">
-                {topLevelGroups.length > 0 && (
-                  <div className="flex items-center space-x-2 py-2">
-                    <div className="h-px flex-1 bg-gray-200" />
-                    <span className="text-xs text-gray-400">그룹 없음</span>
-                    <div className="h-px flex-1 bg-gray-200" />
+      {topLevelGroups.map((group) => {
+        const groupQuestions = questionsByGroup[group.id] || [];
+        const subGroups = getSubGroups(group.id);
+        return (
+          <div key={group.id} className="space-y-4">
+            <GroupHeader
+              group={group}
+              questionCount={getTotalQuestionCount(group.id)}
+              subGroupCount={getTotalSubGroupCount(group.id)}
+            />
+            {!group.collapsed && (
+              <>
+                {groupQuestions.length > 0 && (
+                  <div className="space-y-4 pl-4">
+                    {groupQuestions.map(renderCard)}
                   </div>
                 )}
-                {ungroupedQuestions.map((question) => {
-                  const qIdx = questions.indexOf(question);
+                {subGroups.map((subGroup) => {
+                  const subGroupQuestions = questionsByGroup[subGroup.id] || [];
                   return (
-                    <div key={question.id} data-question-id={question.id} className="relative" style={{ contentVisibility: 'auto', containIntrinsicSize: `auto ${cardHeightMap.get(question.id) ?? estimateCardHeight(question, isTestMode ? 'test' : 'edit')}px` }}>
-                      {overId === question.id && activeId !== question.id && (
-                        <div className="absolute -top-2 right-0 left-0 z-10 h-1 animate-pulse rounded-full bg-blue-500" />
-                      )}
-                      <SortableQuestion
-                        question={question}
-                        index={qIdx}
-                        isSelected={selectedQuestionId === question.id}
-                        onSelect={selectQuestion}
-                        onEdit={handleEdit}
-                        onDelete={handleDelete}
-                        onDuplicate={handleDuplicate}
-                        onSaveToLibrary={onSaveToLibrary}
+                    <div key={subGroup.id} className="ml-4 space-y-4">
+                      <GroupHeader
+                        group={subGroup}
+                        questionCount={getTotalQuestionCount(subGroup.id)}
+                        subGroupCount={getTotalSubGroupCount(subGroup.id)}
                       />
+                      {!subGroup.collapsed && (
+                        <div className="space-y-4 pl-4">
+                          {subGroupQuestions.map(renderCard)}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
-              </div>
+              </>
             )}
           </div>
-        </SortableContext>
-
-        <DragOverlay>
-          {activeId ? (
-            <div className="opacity-95">
-              <SortableQuestion
-                question={questions.find((q) => q.id === activeId)!}
-                index={questions.findIndex((q) => q.id === activeId)}
-                isSelected={false}
-                onSelect={noop}
-                onEdit={noop}
-                onDelete={noop}
-                onDuplicate={noop}
-                isDragOverlay
-              />
+        );
+      })}
+      {ungroupedQuestions.length > 0 && (
+        <div className="space-y-4">
+          {topLevelGroups.length > 0 && (
+            <div className="flex items-center space-x-2 py-2">
+              <div className="h-px flex-1 bg-gray-200" />
+              <span className="text-xs text-gray-400">그룹 없음</span>
+              <div className="h-px flex-1 bg-gray-200" />
             </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+          )}
+          {ungroupedQuestions.map(renderCard)}
+        </div>
+      )}
+    </>
+  );
 
+  return (
+    <>
+      {/* 편집 모드 */}
+      <div ref={editContainerRef} style={editStyle}>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={questions.map((q) => q.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-6">
+              {renderGroups(renderEditCard)}
+            </div>
+          </SortableContext>
+
+          <DragOverlay>
+            {activeId ? (
+              <div className="opacity-95">
+                <SortableQuestion
+                  question={questions.find((q) => q.id === activeId)!}
+                  index={questions.findIndex((q) => q.id === activeId)}
+                  isSelected={false}
+                  onSelect={noop}
+                  onEdit={noop}
+                  onDelete={noop}
+                  onDuplicate={noop}
+                  isDragOverlay
+                />
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
+      </div>
+
+      {/* 테스트 모드 (첫 토글 시에만 마운트) */}
+      {testModeEverActivated && (
+        <div ref={testContainerRef} style={testStyle}>
+          <div className="space-y-6">
+            {renderGroups(renderTestCard)}
+          </div>
+        </div>
+      )}
+
+      {/* 모달 — 양 모드 밖 */}
       <QuestionEditModal
         questionId={editingQuestionId}
         isOpen={!!editingQuestionId}
