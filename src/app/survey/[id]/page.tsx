@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useParams, useRouter } from 'next/navigation';
 
@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useMultiLineDetection } from '@/hooks/use-line-count-detection';
+import { useMediaQuery } from '@/hooks/use-media-query';
 import { parsesurveyIdentifier } from '@/lib/survey-url';
 import { isEmptyHtml } from '@/lib/utils';
 
@@ -46,10 +47,7 @@ export default function SurveyResponsePage() {
         resetResponseState: s.resetResponseState,
       })),
     );
-  // currentResponseId는 제출 시에만 사용 → ref로 리렌더 없이 접근
-  const currentResponseIdRef = useRef<string | null>(null);
   const currentResponseId = useSurveyResponseStore((s) => s.currentResponseId);
-  currentResponseIdRef.current = currentResponseId;
 
   // 설문 로딩 상태
   const [isLoading, setIsLoading] = useState(true);
@@ -143,24 +141,8 @@ export default function SurveyResponsePage() {
     return questions.filter((q) => shouldDisplayQuestion(q, responses, questions, groups));
   }, [questions, responses, groups]);
 
-  // 모바일 화면 감지
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768); // md 브레이크포인트
-    };
-
-    // 초기 체크
-    checkMobile();
-
-    // 리사이즈 이벤트 리스너
-    window.addEventListener('resize', checkMobile);
-
-    return () => {
-      window.removeEventListener('resize', checkMobile);
-    };
-  }, []);
+  // 모바일 화면 감지 (matchMedia — resize 루프 방지)
+  const isMobile = useMediaQuery('(max-width: 767px)');
 
   // 질문 타이틀 줄 수 감지 (pretext 기반 — DOM 비의존, 리렌더 0회)
   const titleHasMultipleLines = useMultiLineDetection(isMobile, currentQuestion?.title);
