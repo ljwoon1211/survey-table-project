@@ -1,6 +1,6 @@
 'use client';
 
-import { RefObject, useEffect, useRef, useState } from 'react';
+import { type RefObject, useEffect, useRef, useState } from 'react';
 
 /**
  * 텍스트 요소의 줄 수를 감지하여 2줄 이상인지 확인하는 커스텀 훅
@@ -23,47 +23,22 @@ export function useLineCountDetection<T extends HTMLElement>(
 
     const element = ref.current;
 
-    // 요소가 렌더링되고 레이아웃이 계산될 때까지 대기
-    const checkLineCount = () => {
+    // 1회 측정만 수행 — ResizeObserver 없음
+    // 이유: 폰트 크기가 결과에 따라 바뀌므로 (text-xl ↔ text-base)
+    //       ResizeObserver 사용 시 true→false→true 진동 발생
+    const rAF = requestAnimationFrame(() => {
       if (!element) return;
-
       const computedStyle = window.getComputedStyle(element);
       const lineHeight = parseFloat(computedStyle.lineHeight);
-
-      // lineHeight가 유효하지 않은 경우 (normal 등) 폰트 크기 * 1.2로 추정
       const effectiveLineHeight =
         isNaN(lineHeight) || lineHeight === 0
           ? parseFloat(computedStyle.fontSize) * 1.2
           : lineHeight;
-
-      const height = element.scrollHeight;
-      const lineCount = height / effectiveLineHeight;
-
-      // 2줄 이상이면 true
+      const lineCount = element.scrollHeight / effectiveLineHeight;
       setHasMultipleLines(lineCount >= 2);
-    };
-
-    // 초기 측정
-    checkLineCount();
-
-    // ResizeObserver로 크기 변화 감지
-    const resizeObserver = new ResizeObserver(() => {
-      checkLineCount();
     });
 
-    resizeObserver.observe(element);
-
-    // 윈도우 리사이즈 시에도 재측정 (폰트 로딩 등으로 인한 지연 대응)
-    const handleResize = () => {
-      setTimeout(checkLineCount, 100);
-    };
-
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener('resize', handleResize);
-    };
+    return () => cancelAnimationFrame(rAF);
   }, [isMobile, content]);
 
   return [ref, hasMultipleLines];

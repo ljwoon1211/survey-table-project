@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useParams, useRouter } from 'next/navigation';
 
@@ -21,6 +21,7 @@ import { parsesurveyIdentifier } from '@/lib/survey-url';
 import { isEmptyHtml } from '@/lib/utils';
 
 import { useSurveyResponseStore } from '@/stores/survey-response-store';
+import { useShallow } from 'zustand/react/shallow';
 import { Question, Survey } from '@/types/survey';
 import {
   getNextQuestionIndex,
@@ -36,9 +37,19 @@ export default function SurveyResponsePage() {
   // URL 인코딩된 한글 slug를 디코딩
   const identifier = decodeURIComponent(params.id as string);
 
-  // 응답 스토어
-  const { currentResponseId, setCurrentResponseId, setPendingResponse, resetResponseState } =
-    useSurveyResponseStore();
+  // 응답 스토어 — 액션만 셀렉트 (전체 구독 → 불필요 리렌더 방지)
+  const { setCurrentResponseId, setPendingResponse, resetResponseState } =
+    useSurveyResponseStore(
+      useShallow((s) => ({
+        setCurrentResponseId: s.setCurrentResponseId,
+        setPendingResponse: s.setPendingResponse,
+        resetResponseState: s.resetResponseState,
+      })),
+    );
+  // currentResponseId는 제출 시에만 사용 → ref로 리렌더 없이 접근
+  const currentResponseIdRef = useRef<string | null>(null);
+  const currentResponseId = useSurveyResponseStore((s) => s.currentResponseId);
+  currentResponseIdRef.current = currentResponseId;
 
   // 설문 로딩 상태
   const [isLoading, setIsLoading] = useState(true);
@@ -224,11 +235,18 @@ export default function SurveyResponsePage() {
     return findNextDisplayableIndex(nextIndex) === -1;
   }, [currentQuestion, currentQuestionIndex, findNextDisplayableIndex, questions, responses]);
 
-  const handleResponse = (questionId: string, value: unknown) => {
+  const handleResponse = useCallback((questionId: string, value: unknown) => {
     setResponses((prev) => ({ ...prev, [questionId]: value }));
-    // 스토어에도 임시 응답 저장
     setPendingResponse(questionId, value);
-  };
+  }, [setPendingResponse]);
+
+  const currentQuestionId = currentQuestion?.id;
+  const currentQuestionOnChange = useCallback(
+    (value: unknown) => {
+      if (currentQuestionId) handleResponse(currentQuestionId, value);
+    },
+    [handleResponse, currentQuestionId],
+  );
 
   const isQuestionRequired = (question: Question) => {
     return question.required;
@@ -492,7 +510,7 @@ export default function SurveyResponsePage() {
 
   // 현재 질문이 테이블 타입인지 확인
   const isTableQuestion = currentQuestion?.type === 'table';
-  const containerMaxWidth = 'max-w-4xl';
+  const containerMaxWidth = isTableQuestion ? 'max-w-7xl' : 'max-w-4xl';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -565,7 +583,7 @@ export default function SurveyResponsePage() {
               <QuestionInput
                 question={currentQuestion}
                 value={responses[currentQuestion.id]}
-                onChange={(value) => handleResponse(currentQuestion.id, value)}
+                onChange={currentQuestionOnChange}
                 allResponses={responses as Record<string, unknown>}
                 allQuestions={questions}
               />

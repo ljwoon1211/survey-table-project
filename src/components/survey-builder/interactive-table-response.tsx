@@ -2,11 +2,12 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { CheckCircle2, ChevronLeft, ChevronRight, FileText, ListChecks } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileText, ListChecks } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useDynamicRowLayout } from '@/hooks/use-dynamic-row-layout';
 import { useDynamicRowState } from '@/hooks/use-dynamic-row-state';
+import { useMobileView } from '@/hooks/use-media-query';
 import { useTablePerf } from '@/hooks/use-table-perf';
 import { cn } from '@/lib/utils';
 import { DynamicRowGroupConfig, HeaderCell, Question, TableColumn, TableRow } from '@/types/survey';
@@ -25,6 +26,7 @@ import {
 
 import { InteractiveCell } from './cells';
 import { DynamicRowSelectorModal } from './dynamic-row-selector-modal';
+import { MobileTableStepper } from './mobile-table-stepper';
 import { VirtualizedTableGrid } from './virtualized-table-grid';
 
 const VIRTUALIZATION_THRESHOLD = 100;
@@ -130,6 +132,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
   useTablePerf(`InteractiveTable(${rows.length}×${columns.length})`);
+  const isMobileView = useMobileView();
   const [showLeftShadow, setShowLeftShadow] = useState(false);
   const [showRightShadow, setShowRightShadow] = useState(false);
 
@@ -239,23 +242,24 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
   }, []);
 
   useEffect(() => {
+    if (isMobileView) return; // 모바일에서는 스크롤 리스너 불필요
     const container = tableContainerRef.current;
-    if (container) {
-      checkScrollState();
-      container.addEventListener('scroll', checkScrollState);
-      window.addEventListener('resize', checkScrollState);
-      return () => {
-        container.removeEventListener('scroll', checkScrollState);
-        window.removeEventListener('resize', checkScrollState);
-      };
-    }
-  }, [checkScrollState]);
+    if (!container) return;
+    checkScrollState();
+    container.addEventListener('scroll', checkScrollState);
+    window.addEventListener('resize', checkScrollState);
+    return () => {
+      container.removeEventListener('scroll', checkScrollState);
+      window.removeEventListener('resize', checkScrollState);
+    };
+  }, [checkScrollState, isMobileView]);
 
   useEffect(() => {
+    if (isMobileView) return;
     checkScrollState();
     const timeoutId = setTimeout(checkScrollState, 100);
     return () => clearTimeout(timeoutId);
-  }, [visibleColumns.length, visibleRows.length, checkScrollState]);
+  }, [visibleColumns.length, visibleRows.length, checkScrollState, isMobileView]);
 
   // Grid 관련 계산
   const totalWidth = useMemo(() => calcTotalWidth(visibleColumns), [visibleColumns]);
@@ -315,74 +319,6 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     );
   }
 
-  // ── 모바일 카드 뷰 ──
-  const renderMobileCardView = () => (
-    <div className="space-y-6">
-      {displayRows.map((row, rowIndex) => {
-        const completed = rowCompletionMap.get(row.id) ?? false;
-        return (
-          <Card
-            key={row.id}
-            className={cn(
-              'overflow-hidden transition-all duration-200',
-              completed
-                ? 'border-green-500 bg-green-50/30 ring-1 ring-green-500'
-                : 'border-gray-200 hover:shadow-md',
-            )}
-          >
-            <div className={cn('border-b p-4', completed ? 'bg-green-100/50' : 'bg-gray-50/80')}>
-              <div className="flex items-center justify-between">
-                <div className="text-lg font-semibold text-gray-900">
-                  {row.label || `항목 ${rowIndex + 1}`}
-                </div>
-                {completed && (
-                  <div className="flex items-center gap-1.5 rounded-full bg-green-100 px-2 py-1 text-sm font-medium text-green-600">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>완료</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <CardContent className="space-y-6 divide-y divide-dashed divide-gray-200 p-4">
-              {row.cells.map((cell, index) => {
-                if (cell.isHidden) return null;
-                const columnLabel = visibleColumns[index]?.label || `질문 ${index + 1}`;
-
-                return (
-                  <div key={cell.id} className={cn('space-y-2 pt-4 first:pt-0', index > 0 && 'mt-2')}>
-                    {!hideColumnLabels && (
-                      <div className="flex items-start gap-2">
-                        <span className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-blue-500" />
-                        <div className="text-sm leading-snug font-semibold text-gray-700">
-                          {columnLabel}
-                        </div>
-                      </div>
-                    )}
-                    <div
-                      className={cn(
-                        'pl-3.5',
-                        getAlignmentClasses(cell.horizontalAlign, cell.verticalAlign),
-                      )}
-                    >
-                      <InteractiveCell
-                        cell={cell}
-                        questionId={questionId}
-                        isTestMode={isTestMode}
-                        value={value}
-                        onChange={onChange}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
-  );
-
   // ── 스크롤 함수 ──
   const scrollTable = useCallback((direction: 'left' | 'right') => {
     if (tableContainerRef.current) {
@@ -404,7 +340,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
         headerRow.map((cell) => (
           <div
             key={cell.id}
-            className="flex items-center justify-center border-r border-b border-gray-300 bg-gray-50 px-4 py-3 text-center font-semibold text-gray-800"
+            className="flex items-center justify-center border-r border-b border-gray-300 bg-gray-50 px-3 py-2 text-center font-semibold text-gray-800"
             style={getGridSpanStyle(cell.colspan, cell.rowspan)}
             {...getGridCellAria('columnheader', cell.colspan, cell.rowspan)}
           >
@@ -421,7 +357,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
       return (
         <div
           key={column.id}
-          className="flex items-center justify-center border-r border-b border-gray-300 bg-gray-50 px-4 py-3 text-center font-semibold text-gray-800"
+          className="flex items-center justify-center border-r border-b border-gray-300 bg-gray-50 px-3 py-2 text-center font-semibold text-gray-800"
           style={getGridSpanStyle(headerColspan)}
           {...getGridCellAria('columnheader', headerColspan)}
         >
@@ -517,7 +453,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
           /* 기존: CSS Grid 테이블 */
           <div
             role="grid"
-            className="mx-auto overflow-hidden rounded-md border-t border-l border-r border-gray-300 bg-white text-base"
+            className="mx-auto overflow-hidden rounded-md border-t border-l border-r border-gray-300 bg-white text-sm"
             style={{
               display: 'grid',
               gridTemplateColumns: gridTemplateCols,
@@ -546,7 +482,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
                       <div
                         key={cell.id}
                         className={cn(
-                          'min-w-0 border-r border-b border-gray-300 p-3 transition-colors duration-200',
+                          'min-w-0 border-r border-b border-gray-300 p-2 transition-colors duration-200',
                           completed ? 'bg-green-50/40' : 'bg-white',
                           getAlignmentClasses(cell.horizontalAlign, cell.verticalAlign),
                         )}
@@ -588,8 +524,28 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
             <CardTitle className="text-lg font-medium">{tableTitle}</CardTitle>
           </CardHeader>
         )}
-        <CardContent className="overflow-hidden p-0 sm:p-6">
-          <div className="w-full">{renderTableView()}</div>
+        <CardContent className={cn('overflow-hidden', isMobileView ? 'p-3 sm:p-4' : 'p-0 sm:p-6')}>
+          <div className="w-full">
+            {isMobileView ? (
+              <MobileTableStepper
+                questionId={questionId}
+                displayRows={displayRows}
+                visibleColumns={visibleColumns}
+                visibleHeaderGrid={visibleHeaderGrid}
+                currentResponse={currentResponse}
+                hideColumnLabels={hideColumnLabels}
+                isTestMode={isTestMode}
+                value={value}
+                onChange={onChange}
+                hasDynamicRows={hasDynamicRows}
+                selectedRowIds={selectedRowIds}
+                groupConfigMap={groupConfigMap}
+                onSelectGroup={handleSelectGroup}
+              />
+            ) : (
+              renderTableView()
+            )}
+          </div>
 
           {isTestMode && (
             <div className="mx-4 mt-4 mb-4 rounded-lg bg-blue-50 p-3 sm:mx-0 sm:mb-0">

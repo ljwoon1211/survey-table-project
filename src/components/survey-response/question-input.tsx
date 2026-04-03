@@ -135,7 +135,7 @@ export function QuestionInput({
               ? (value as Record<string, unknown>)
               : undefined
           }
-          onChange={(v) => onChange(v)}
+          onChange={onChange as (v: Record<string, unknown>) => void}
           isTestMode={false}
           className="border-0 shadow-none"
           allResponses={allResponses}
