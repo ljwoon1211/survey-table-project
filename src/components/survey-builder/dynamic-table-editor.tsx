@@ -13,7 +13,7 @@ import { generateId } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { DynamicRowGroupConfig, HeaderCell, TableCell, TableColumn, TableRow } from '@/types/survey';
 
-import { BulkRowGeneratorModal } from './bulk-row-generator-modal';
+import { BulkGeneratorModal, BulkColumnDef } from './bulk-generator';
 import { CellContentModal } from './cell-content-modal';
 import { EditorTableRow } from './editor-table-row';
 import { HeaderGridEditor } from './header-grid-editor';
@@ -94,6 +94,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
     setEditingColumnWidth,
     mergeColumnHeaders,
     unmergeColumnHeader,
+    addBulkColumns,
     addRow,
     addBulkRows,
     duplicateRow,
@@ -145,6 +146,19 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
       setTimeout(() => setBulkRowToast(null), 2500);
     },
     [addBulkRows],
+  );
+
+  // ── 열 일괄 생성 상태 ──
+  const [bulkColumnModalOpen, setBulkColumnModalOpen] = useState(false);
+  const [bulkColumnToast, setBulkColumnToast] = useState<{ count: number; visible: boolean } | null>(null);
+
+  const handleBulkColumnGenerate = useCallback(
+    (columnDefs: BulkColumnDef[]) => {
+      addBulkColumns(columnDefs);
+      setBulkColumnToast({ count: columnDefs.length, visible: true });
+      setTimeout(() => setBulkColumnToast(null), 2500);
+    },
+    [addBulkColumns],
   );
 
   // ── 셀 보관함 상태 ──
@@ -427,6 +441,9 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
               )}
               <Button onClick={addColumn} size="sm" variant="outline">
                 <Plus className="mr-1 h-4 w-4" />열 추가
+              </Button>
+              <Button onClick={() => setBulkColumnModalOpen(true)} size="sm" variant="outline">
+                <Plus className="mr-1 h-4 w-4" />열 일괄 생성
               </Button>
               <Button onClick={addRow} size="sm" variant="outline">
                 <Plus className="mr-1 h-4 w-4" />행 추가
@@ -728,11 +745,12 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
       />
 
       {/* 행 일괄 생성 모달 */}
-      <BulkRowGeneratorModal
+      <BulkGeneratorModal
+        mode="row"
         open={bulkRowModalOpen}
         onOpenChange={setBulkRowModalOpen}
         currentQuestionId={currentQuestionId}
-        existingRowCodes={currentRows.map((r) => r.rowCode).filter(Boolean) as string[]}
+        existingCodes={currentRows.map((r) => r.rowCode).filter(Boolean) as string[]}
         dynamicRowGroups={dynamicRowConfigs}
         onGenerate={handleBulkGenerate}
       />
@@ -742,6 +760,25 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4 duration-200">
           <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-700 shadow-lg">
             <span className="font-medium">{bulkRowToast.count}개 행 추가됨</span>
+          </div>
+        </div>
+      )}
+
+      {/* 열 일괄 생성 모달 */}
+      <BulkGeneratorModal
+        mode="column"
+        open={bulkColumnModalOpen}
+        onOpenChange={setBulkColumnModalOpen}
+        currentQuestionId={currentQuestionId}
+        existingCodes={currentColumns.map((c) => c.columnCode).filter(Boolean) as string[]}
+        onGenerate={handleBulkColumnGenerate}
+      />
+
+      {/* 열 일괄 생성 토스트 */}
+      {bulkColumnToast?.visible && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-700 shadow-lg">
+            <span className="font-medium">{bulkColumnToast.count}개 열 추가됨</span>
           </div>
         </div>
       )}

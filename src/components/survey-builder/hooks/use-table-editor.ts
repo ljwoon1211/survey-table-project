@@ -622,6 +622,78 @@ export function useTableEditor({
     [notifyChange],
   );
 
+  // ── 열 일괄 생성 ──
+
+  const addBulkColumns = useCallback(
+    (
+      columnDefs: Array<{
+        label: string;
+        columnCode: string;
+        width?: number;
+        displayCondition?: QuestionConditionGroup;
+        cellType?: TableCell['type'];
+        cellTemplate?: Partial<TableCell>;
+      }>,
+      insertAfterIndex?: number,
+    ) => {
+      const columns = currentColumnsRef.current;
+      const rows = currentRowsRef.current;
+
+      // 1. 새 열 생성
+      const newColumns: TableColumn[] = columnDefs.map((def) => ({
+        id: generateId(),
+        label: def.label,
+        columnCode: def.columnCode,
+        width: def.width ?? 150,
+        displayCondition: def.displayCondition,
+      }));
+
+      // 2. 삽입 위치 결정
+      const insertIdx =
+        insertAfterIndex != null ? insertAfterIndex + 1 : columns.length;
+      const updatedColumns = [
+        ...columns.slice(0, insertIdx),
+        ...newColumns,
+        ...columns.slice(insertIdx),
+      ];
+
+      // 3. 모든 행에 셀 삽입 (같은 위치)
+      const updatedRows = rows.map((row) => {
+        const newCells: TableCell[] = newColumns.map((col, i) => {
+          const def = columnDefs[i];
+          return {
+            id: `cell-${row.id}-${col.id}`,
+            content: '',
+            type: def.cellType ?? ('text' as const),
+            ...def.cellTemplate,
+          };
+        });
+        return {
+          ...row,
+          cells: [
+            ...row.cells.slice(0, insertIdx),
+            ...newCells,
+            ...row.cells.slice(insertIdx),
+          ],
+        };
+      });
+
+      // 4. cellCode 자동 재생성
+      const rowsWithCodes = generateAllCellCodes(
+        questionCodeRef.current,
+        questionTitleRef.current,
+        updatedColumns,
+        updatedRows,
+      );
+      const finalRows = recalculateHiddenCells(rowsWithCodes);
+
+      setCurrentColumns(updatedColumns);
+      setCurrentRows(finalRows);
+      notifyChange(currentTitleRef.current, updatedColumns, finalRows);
+    },
+    [notifyChange],
+  );
+
   const duplicateRow = useCallback(
     (rowIndex: number) => {
       const rows = currentRowsRef.current;
@@ -1154,6 +1226,7 @@ export function useTableEditor({
       setEditingColumnWidth,
       mergeColumnHeaders,
       unmergeColumnHeader,
+      addBulkColumns,
       // 행
       addRow,
       addBulkRows,
