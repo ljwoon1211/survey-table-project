@@ -5,6 +5,7 @@ import { RotateCcw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { getOtherOptionCode } from '@/utils/option-code-generator';
 
 interface OptionDisplay {
   id: string;
@@ -92,7 +93,7 @@ export function SpssVariableEditor({
       {allowOtherOption && displayValue && (
         <div className="rounded border border-dashed border-amber-300 bg-amber-50 px-3 py-2">
           <p className="text-xs font-medium text-amber-700">
-            기타 입력 변수: <span className="font-mono font-semibold">{displayValue}_etc</span>
+            기타 입력 변수: <span className="font-mono font-semibold">{displayValue}_{getOtherOptionCode(options)}_etc</span>
           </p>
         </div>
       )}

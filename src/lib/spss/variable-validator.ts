@@ -1,5 +1,7 @@
 import type { Question } from '@/types/survey';
 
+import { getOtherOptionCode } from '@/utils/option-code-generator';
+
 export interface ValidationError {
   code:
     | 'EMPTY'
@@ -118,15 +120,18 @@ export function validateNoSubVarConflicts(questions: Question[]): ValidationErro
     if (q.type !== 'checkbox' || !q.questionCode || !q.options) continue;
 
     for (let i = 0; i < q.options.length; i++) {
-      const subVar = `${q.questionCode}M${i + 1}`.toUpperCase();
+      const opt = q.options[i];
+      const optCode = opt.optionCode ?? String(i + 1);
+      const subVarName = `${q.questionCode}_${optCode}`;
+      const subVar = subVarName.toUpperCase();
       const conflictId = allVarNames.get(subVar);
 
       if (conflictId && conflictId !== q.id) {
         errors.push({
           code: 'SUB_VAR_CONFLICT',
-          message: `체크박스 '${q.questionCode}'의 하위 변수 '${q.questionCode}M${i + 1}'이(가) 다른 질문의 변수명과 충돌합니다.`,
+          message: `체크박스 '${q.questionCode}'의 하위 변수 '${subVarName}'이(가) 다른 질문의 변수명과 충돌합니다.`,
           questionId: q.id,
-          varName: `${q.questionCode}M${i + 1}`,
+          varName: subVarName,
         });
       }
     }
@@ -136,15 +141,16 @@ export function validateNoSubVarConflicts(questions: Question[]): ValidationErro
   for (const q of questions) {
     if (!q.allowOtherOption || !q.questionCode) continue;
 
-    const etcVar = `${q.questionCode}_ETC`.toUpperCase();
+    const etcVarName = `${q.questionCode}_${getOtherOptionCode(q.options)}_etc`;
+    const etcVar = etcVarName.toUpperCase();
     const conflictId = allVarNames.get(etcVar);
 
     if (conflictId && conflictId !== q.id) {
       errors.push({
         code: 'SUB_VAR_CONFLICT',
-        message: `'${q.questionCode}'의 기타 변수 '${q.questionCode}_etc'이(가) 다른 질문의 변수명과 충돌합니다.`,
+        message: `'${q.questionCode}'의 기타 변수 '${etcVarName}'이(가) 다른 질문의 변수명과 충돌합니다.`,
         questionId: q.id,
-        varName: `${q.questionCode}_etc`,
+        varName: etcVarName,
       });
     }
   }

@@ -4,6 +4,7 @@ import type { Question, SurveySubmission } from '@/types/survey';
 
 import { transformCheckbox, transformSingleChoice, transformTableCell, transformText } from '@/lib/spss/data-transformer';
 import { generateFullSyntax } from '@/lib/spss/spss-syntax-generator';
+import { getOtherOptionCode } from '@/utils/option-code-generator';
 
 export interface SPSSExportColumn {
   spssVarName: string;
@@ -64,7 +65,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
       for (let i = 0; i < q.options.length; i++) {
         const opt = q.options[i];
         columns.push({
-          spssVarName: `${q.questionCode}M${i + 1}`,
+          spssVarName: `${q.questionCode}_${opt.optionCode ?? String(i + 1)}`,
           questionText: q.title,
           optionLabel: opt.label,
           questionId: q.id,
@@ -75,8 +76,9 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
       }
       // 기타 옵션이 있으면 기타 텍스트 컬럼 추가
       if (q.allowOtherOption) {
+        const otherCode = getOtherOptionCode(q.options);
         columns.push({
-          spssVarName: `${q.questionCode}_etc`,
+          spssVarName: `${q.questionCode}_${otherCode}_etc`,
           questionText: q.title,
           optionLabel: '기타 입력',
           questionId: q.id,
@@ -96,8 +98,9 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
       });
       // 기타 옵션이 있으면 기타 텍스트 컬럼 추가
       if (q.allowOtherOption) {
+        const otherCode = getOtherOptionCode(q.options);
         columns.push({
-          spssVarName: `${q.questionCode}_etc`,
+          spssVarName: `${q.questionCode}_${otherCode}_etc`,
           questionText: q.title,
           optionLabel: '기타 입력',
           questionId: q.id,
@@ -125,7 +128,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
             for (let optIdx = 0; optIdx < cell.checkboxOptions.length; optIdx++) {
               const opt = cell.checkboxOptions[optIdx];
               columns.push({
-                spssVarName: `${varName}M${optIdx + 1}`,
+                spssVarName: `${varName}_${opt.optionCode ?? String(optIdx + 1)}`,
                 questionText: q.title,
                 optionLabel: opt.label,
                 questionId: q.id,

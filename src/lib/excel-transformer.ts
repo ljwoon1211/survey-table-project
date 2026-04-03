@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 
 import { buildDataRows, generateSPSSColumns } from '@/lib/analytics/spss-excel-export';
 import { Survey, SurveySubmission } from '@/types/survey';
+import { getOtherOptionCode } from '@/utils/option-code-generator';
 
 interface ExportOptions {
   includeRawData: boolean;
@@ -495,7 +496,7 @@ function generateVariableMap(survey: Survey) {
           mapData.push({
             '질문 ID': '',
             '타입': 'Option',
-            'SPSS 변수명': q.type === 'checkbox' ? `${q.questionCode}M${i + 1}` : '',
+            'SPSS 변수명': q.type === 'checkbox' ? `${q.questionCode}_${opt.optionCode ?? String(i + 1)}` : '',
             '질문 제목': `  ${opt.spssNumericCode ?? i + 1}. ${opt.label}`,
             '값 라벨': `Value: ${opt.value}`,
           });
@@ -505,7 +506,7 @@ function generateVariableMap(survey: Survey) {
           mapData.push({
             '질문 ID': '',
             '타입': 'Other',
-            'SPSS 변수명': `${q.questionCode}_etc`,
+            'SPSS 변수명': `${q.questionCode}_${getOtherOptionCode(q.options)}_etc`,
             '질문 제목': '  기타 입력',
             '값 라벨': '(기타 텍스트)',
           });

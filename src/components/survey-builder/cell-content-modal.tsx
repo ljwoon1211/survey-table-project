@@ -41,6 +41,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { getProxiedImageUrl, optimizeImage, validateImageFile } from '@/lib/image-utils';
 import { generateId, isValidUUID } from '@/lib/utils';
+import { getMaxSpssCode } from '@/utils/option-code-generator';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { CheckboxOption, QuestionOption, RadioOption, TableCell } from '@/types/survey';
 import { useShallow } from 'zustand/react/shallow';
@@ -1250,6 +1251,7 @@ export function CellContentModal({
                     label: '새 옵션',
                     value: `option-${checkboxOptions.length + 1}`,
                     checked: false,
+                    spssNumericCode: getMaxSpssCode(checkboxOptions) + 1,
                   };
                   setCheckboxOptions((prev) => [...prev, newOption]);
                 }}
@@ -1518,6 +1520,7 @@ export function CellContentModal({
                     label: '새 옵션',
                     value: `option-${radioOptions.length + 1}`,
                     selected: false,
+                    spssNumericCode: getMaxSpssCode(radioOptions) + 1,
                   };
                   setRadioOptions((prev) => [...prev, newOption]);
                 }}
@@ -1675,6 +1678,7 @@ export function CellContentModal({
                     id: generateId(),
                     label: '새 옵션',
                     value: `option-${selectOptions.length + 1}`,
+                    spssNumericCode: getMaxSpssCode(selectOptions) + 1,
                   };
                   setSelectOptions((prev) => [...prev, newOption]);
                 }}

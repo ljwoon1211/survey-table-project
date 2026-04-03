@@ -57,7 +57,7 @@ export function transformCheckbox(
     const code = opt.spssNumericCode ?? idx + 1;
     const isSelected = selectedSet.has(opt.id) || selectedSet.has(opt.value);
     return {
-      varName: `${question.questionCode}M${idx + 1}`,
+      varName: `${question.questionCode}_${opt.optionCode ?? String(idx + 1)}`,
       value: isSelected ? code : null,
     };
   });

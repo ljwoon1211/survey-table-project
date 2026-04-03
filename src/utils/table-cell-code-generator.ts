@@ -1,5 +1,7 @@
 import type { TableCell, TableColumn, TableRow } from '@/types/survey';
 
+import { generateAllOptionCodes } from './option-code-generator';
+
 /** 입력 가능한 셀 타입 (SPSS 변수 생성 대상) */
 export const INTERACTIVE_CELL_TYPES = new Set(['checkbox', 'radio', 'select', 'input']);
 
@@ -121,6 +123,29 @@ function applyAutoCodeToCell(
   if (!cell.spssMeasure && INTERACTIVE_CELL_TYPES.has(cell.type)) {
     updates.spssMeasure = inferSpssMeasure(cell.type);
     hasChanges = true;
+  }
+
+  // 셀 내부 옵션(checkbox/radio/select)에 optionCode/spssNumericCode 자동 할당
+  if (cell.checkboxOptions && cell.checkboxOptions.length > 0) {
+    const updated = generateAllOptionCodes(cell.checkboxOptions);
+    if (updated !== cell.checkboxOptions) {
+      updates.checkboxOptions = updated;
+      hasChanges = true;
+    }
+  }
+  if (cell.radioOptions && cell.radioOptions.length > 0) {
+    const updated = generateAllOptionCodes(cell.radioOptions);
+    if (updated !== cell.radioOptions) {
+      updates.radioOptions = updated;
+      hasChanges = true;
+    }
+  }
+  if (cell.selectOptions && cell.selectOptions.length > 0) {
+    const updated = generateAllOptionCodes(cell.selectOptions);
+    if (updated !== cell.selectOptions) {
+      updates.selectOptions = updated;
+      hasChanges = true;
+    }
   }
 
   if (!hasChanges) return cell;

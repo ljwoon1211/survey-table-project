@@ -1,5 +1,7 @@
 import type { Question } from '@/types/survey';
 
+import { getOtherOptionCode } from '@/utils/option-code-generator';
+
 /** SPSS 문자열 리터럴에서 작은따옴표를 이스케이프한다. */
 function esc(str: string): string {
   return str.replace(/'/g, "''");
@@ -27,15 +29,15 @@ export function generateVariableLabels(questions: Question[]): string {
     if (q.type === 'checkbox' && q.options) {
       for (let i = 0; i < q.options.length; i++) {
         const opt = q.options[i];
-        lines.push(`  ${q.questionCode}M${i + 1} '${esc(q.title)} - ${i + 1}. ${esc(opt.label)}'`);
+        lines.push(`  ${q.questionCode}_${opt.optionCode ?? String(i + 1)} '${esc(q.title)} - ${i + 1}. ${esc(opt.label)}'`);
       }
       if (q.allowOtherOption) {
-        lines.push(`  ${q.questionCode}_etc '${esc(q.title)} - 기타 입력'`);
+        lines.push(`  ${q.questionCode}_${getOtherOptionCode(q.options)}_etc '${esc(q.title)} - 기타 입력'`);
       }
     } else {
       lines.push(`  ${q.questionCode} '${esc(q.title)}'`);
       if ((q.type === 'radio' || q.type === 'select') && q.allowOtherOption) {
-        lines.push(`  ${q.questionCode}_etc '${esc(q.title)} - 기타 입력'`);
+        lines.push(`  ${q.questionCode}_${getOtherOptionCode(q.options)}_etc '${esc(q.title)} - 기타 입력'`);
       }
     }
   }
@@ -71,8 +73,9 @@ export function generateValueLabels(questions: Question[]): string {
       entries.push(`  ${q.questionCode} ${valuePairs}`);
     } else if (q.type === 'checkbox') {
       for (let i = 0; i < q.options.length; i++) {
-        const code = q.options[i].spssNumericCode ?? i + 1;
-        entries.push(`  ${q.questionCode}M${i + 1} ${code} '선택'`);
+        const opt = q.options[i];
+        const code = opt.spssNumericCode ?? i + 1;
+        entries.push(`  ${q.questionCode}_${opt.optionCode ?? String(i + 1)} ${code} '선택'`);
       }
     }
   }
@@ -104,14 +107,15 @@ export function generateVariableLevel(questions: Question[]): string {
     if (q.type === 'radio' || q.type === 'select') {
       nominal.push(q.questionCode);
       if (q.allowOtherOption) {
-        scale.push(`${q.questionCode}_etc`);
+        scale.push(`${q.questionCode}_${getOtherOptionCode(q.options)}_etc`);
       }
     } else if (q.type === 'checkbox' && q.options) {
       for (let i = 0; i < q.options.length; i++) {
-        nominal.push(`${q.questionCode}M${i + 1}`);
+        const opt = q.options[i];
+        nominal.push(`${q.questionCode}_${opt.optionCode ?? String(i + 1)}`);
       }
       if (q.allowOtherOption) {
-        scale.push(`${q.questionCode}_etc`);
+        scale.push(`${q.questionCode}_${getOtherOptionCode(q.options)}_etc`);
       }
     } else {
       scale.push(q.questionCode);
@@ -140,7 +144,7 @@ export function generateMrsets(questions: Question[]): string {
   for (const q of questions) {
     if (q.type !== 'checkbox' || !q.questionCode || !q.options) continue;
 
-    const vars = q.options.map((_, i) => `${q.questionCode}M${i + 1}`).join(' ');
+    const vars = q.options.map((opt, i) => `${q.questionCode}_${opt.optionCode ?? String(i + 1)}`).join(' ');
     sets.push(`  /MCGROUP NAME=$${q.questionCode} LABEL='${esc(q.title)}' VARIABLES=${vars}`);
   }
 

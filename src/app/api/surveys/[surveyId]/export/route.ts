@@ -13,6 +13,7 @@ import {
   generateVariableMapWorkbook,
 } from '@/lib/excel-transformer';
 import { Question, Survey, SurveySubmission } from '@/types/survey';
+import { generateAllOptionCodes } from '@/utils/option-code-generator';
 import { generateAllCellCodes } from '@/utils/table-cell-code-generator';
 
 // Vercel serverless 최대 실행시간 30초 (기본 10초)
@@ -54,6 +55,10 @@ export async function GET(
         (q as any).tableRowsData = generateAllCellCodes(
           q.questionCode ?? undefined, q.title, q.tableColumns as any, q.tableRowsData as any,
         );
+      }
+      // 일반 질문 옵션 코드 복원
+      if ((q as any).options && ['radio', 'checkbox', 'select', 'multiselect'].includes(q.type)) {
+        (q as any).options = generateAllOptionCodes((q as any).options);
       }
     }
 

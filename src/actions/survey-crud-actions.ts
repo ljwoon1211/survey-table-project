@@ -30,6 +30,7 @@ import type {
   Survey as SurveyType,
   SurveySettings,
 } from '@/types/survey';
+import { stripOptionCodes } from '@/utils/option-code-generator';
 import { stripTableRowsData } from '@/utils/table-cell-optimizer';
 
 // ========================
@@ -219,7 +220,7 @@ export async function duplicateSurvey(surveyId: string) {
         description: question.description,
         required: question.required,
         order: question.order,
-        options: question.options as NewQuestion['options'],
+        options: (question.options ? stripOptionCodes(question.options) : question.options) as NewQuestion['options'],
         selectLevels: question.selectLevels as NewQuestion['selectLevels'],
         tableTitle: question.tableTitle,
         tableColumns: question.tableColumns as NewQuestion['tableColumns'],
@@ -385,7 +386,7 @@ export async function saveSurveyDiff(payload: SurveyDiffPayload) {
           description: question.description,
           required: question.required,
           order: question.order,
-          options: question.options as NewQuestion['options'],
+          options: (question.options ? stripOptionCodes(question.options) : question.options) as NewQuestion['options'],
           selectLevels: question.selectLevels as NewQuestion['selectLevels'],
           tableTitle: question.tableTitle,
           tableColumns: question.tableColumns as NewQuestion['tableColumns'],
@@ -636,7 +637,7 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
           description: question.description,
           required: question.required,
           order: question.order,
-          options: question.options as NewQuestion['options'],
+          options: (question.options ? stripOptionCodes(question.options) : question.options) as NewQuestion['options'],
           selectLevels: question.selectLevels as NewQuestion['selectLevels'],
           tableTitle: question.tableTitle,
           tableColumns: question.tableColumns as NewQuestion['tableColumns'],

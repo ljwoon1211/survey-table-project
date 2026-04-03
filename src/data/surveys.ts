@@ -3,6 +3,7 @@ import { and, desc, eq, gte, ilike, lte } from 'drizzle-orm';
 import { db } from '@/db';
 import { questionGroups, questions, surveys, surveyVersions } from '@/db/schema';
 import type { QuestionGroup, Question as QuestionType, Survey as SurveyType } from '@/types/survey';
+import { generateAllOptionCodes } from '@/utils/option-code-generator';
 import { generateAllCellCodes } from '@/utils/table-cell-code-generator';
 
 // ========================
@@ -163,6 +164,10 @@ export async function getSurveyWithDetails(surveyId: string): Promise<SurveyType
         mapped.tableRowsData = generateAllCellCodes(
           mapped.questionCode, mapped.title, mapped.tableColumns, mapped.tableRowsData,
         );
+      }
+      // 일반 질문 옵션 코드 복원
+      if (mapped.options && ['radio', 'checkbox', 'select', 'multiselect'].includes(mapped.type)) {
+        mapped.options = generateAllOptionCodes(mapped.options);
       }
       return mapped;
     }),

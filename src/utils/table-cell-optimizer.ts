@@ -1,5 +1,6 @@
 import type { TableCell, TableColumn, TableRow } from '@/types/survey';
 
+import { stripOptionCodes } from './option-code-generator';
 import { inferSpssMeasure, inferSpssVarType } from './table-cell-code-generator';
 
 /**
@@ -43,6 +44,17 @@ function stripCell(cell: TableCell): TableCell {
   const inferredMeasure = inferSpssMeasure(cell.type);
   if (stripped.spssMeasure !== undefined && stripped.spssMeasure === inferredMeasure) {
     delete stripped.spssMeasure;
+  }
+
+  // 셀 내부 옵션의 자동생성 필드 제거
+  if (stripped.checkboxOptions && stripped.checkboxOptions.length > 0) {
+    stripped.checkboxOptions = stripOptionCodes(stripped.checkboxOptions);
+  }
+  if (stripped.radioOptions && stripped.radioOptions.length > 0) {
+    stripped.radioOptions = stripOptionCodes(stripped.radioOptions);
+  }
+  if (stripped.selectOptions && stripped.selectOptions.length > 0) {
+    stripped.selectOptions = stripOptionCodes(stripped.selectOptions);
   }
 
   return stripped;

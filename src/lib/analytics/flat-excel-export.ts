@@ -127,7 +127,7 @@ function expandCheckboxToColumns(question: Question): ExportColumn[] {
 
   if (question.options) {
     question.options.forEach((option) => {
-      const optCode = option.optionCode || option.value;
+      const optCode = (option.isCustomOptionCode ? option.optionCode : undefined) || option.value;
       const code = `${qCode}_${optCode}`;
       const header = `${qLabel}_${option.label}`;
 
@@ -197,7 +197,7 @@ function expandTableToColumns(question: Question): ExportColumn[] {
       if (cell.type === 'checkbox' && cell.checkboxOptions) {
         // 체크박스 셀: 각 옵션별 열 생성
         cell.checkboxOptions.forEach((option) => {
-          const optCode = option.optionCode || option.value;
+          const optCode = (option.isCustomOptionCode ? option.optionCode : undefined) || option.value;
           const code = `${qCode}_${rowCode}_${cellCode}_${optCode}`;
           const header = `${qCode}_${rowLabel}_${cellLabel}_${option.label}`;
 

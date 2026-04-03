@@ -5,6 +5,7 @@ import { RefreshCw, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Question } from '@/types/survey';
 import type { ValidationError } from '@/lib/spss/variable-validator';
+import { getOtherOptionCode } from '@/utils/option-code-generator';
 
 interface SpssVariableManagerProps {
   questions: Question[];
@@ -21,11 +22,13 @@ function getSubVarLabel(q: Question): string {
   const parts: string[] = [];
 
   if (q.type === 'checkbox' && q.options && q.options.length > 0) {
-    parts.push(`${q.questionCode}M1~${q.questionCode}M${q.options.length}`);
+    const firstCode = q.options[0]?.optionCode ?? '1';
+    const lastCode = q.options[q.options.length - 1]?.optionCode ?? String(q.options.length);
+    parts.push(`${q.questionCode}_${firstCode}~${q.questionCode}_${lastCode}`);
   }
 
   if (q.allowOtherOption && q.questionCode) {
-    parts.push(`${q.questionCode}_etc`);
+    parts.push(`${q.questionCode}_${getOtherOptionCode(q.options)}_etc`);
   }
 
   return parts.join(', ');

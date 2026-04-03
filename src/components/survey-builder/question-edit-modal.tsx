@@ -33,6 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { extractImageUrlsFromQuestion } from '@/lib/image-extractor';
 import { deleteImagesFromR2 } from '@/lib/image-utils';
 import { generateId, isValidUUID } from '@/lib/utils';
+import { generateOptionCode, getMaxSpssCode } from '@/utils/option-code-generator';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { Question, QuestionOption, SelectLevel } from '@/types/survey';
 import { useShallow } from 'zustand/react/shallow';
@@ -403,10 +404,12 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
   const modalSize = isTableType ? 'max-w-6xl' : 'max-w-3xl';
 
   const addOption = () => {
+    const existingOptions = formData.options || [];
     const newOption: QuestionOption = {
       id: generateId(),
-      label: `옵션 ${(formData.options?.length || 0) + 1}`,
-      value: `옵션${(formData.options?.length || 0) + 1}`,
+      label: `옵션 ${existingOptions.length + 1}`,
+      value: `옵션${existingOptions.length + 1}`,
+      spssNumericCode: getMaxSpssCode(existingOptions) + 1,
     };
     setFormData((prev) => ({
       ...prev,
@@ -948,6 +951,31 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                               </p>
                             )}
                           </div>
+
+                          <Input
+                            value={option.optionCode ?? generateOptionCode(index, formData.options?.length ?? 0)}
+                            onChange={(e) => updateOption(option.id, {
+                              optionCode: e.target.value,
+                              isCustomOptionCode: true,
+                            } as Partial<QuestionOption>)}
+                            className="w-16 text-center text-xs"
+                            title="SPSS 옵션 코드"
+                          />
+                          {option.isCustomOptionCode && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => updateOption(option.id, {
+                                optionCode: undefined,
+                                isCustomOptionCode: false,
+                              } as Partial<QuestionOption>)}
+                              className="px-1 text-xs text-gray-400 hover:text-blue-500"
+                              title="자동 코드로 복원"
+                            >
+                              자동
+                            </Button>
+                          )}
 
                           <Button
                             type="button"
