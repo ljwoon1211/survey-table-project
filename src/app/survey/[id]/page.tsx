@@ -16,7 +16,7 @@ import { QuestionInput } from '@/components/survey-response/question-input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { useLineCountDetection } from '@/hooks/use-line-count-detection';
+import { useMultiLineDetection } from '@/hooks/use-line-count-detection';
 import { parsesurveyIdentifier } from '@/lib/survey-url';
 import { isEmptyHtml } from '@/lib/utils';
 
@@ -162,17 +162,8 @@ export default function SurveyResponsePage() {
     };
   }, []);
 
-  // 질문 타이틀 줄 수 감지
-  const [titleRef, titleHasMultipleLines] = useLineCountDetection<HTMLParagraphElement>(
-    isMobile,
-    currentQuestion?.title,
-  );
-
-  // 질문 설명 줄 수 감지
-  const [descriptionRef, descriptionHasMultipleLines] = useLineCountDetection<HTMLDivElement>(
-    isMobile,
-    currentQuestion?.description,
-  );
+  // 질문 타이틀 줄 수 감지 (pretext 기반 — DOM 비의존, 리렌더 0회)
+  const titleHasMultipleLines = useMultiLineDetection(isMobile, currentQuestion?.title);
 
   const currentVisibleNumber = useMemo(() => {
     if (!currentQuestion) return 0;
@@ -548,9 +539,8 @@ export default function SurveyResponsePage() {
               </span>
               <div className="min-w-0 flex-1">
                 <CardTitle
-                  ref={titleRef}
                   className={`${
-                    titleHasMultipleLines && isMobile
+                    titleHasMultipleLines
                       ? 'text-base md:text-2xl'
                       : 'text-xl md:text-2xl'
                   } leading-relaxed font-semibold break-keep text-gray-900`}
@@ -564,10 +554,7 @@ export default function SurveyResponsePage() {
                 </CardTitle>
                 {!isEmptyHtml(currentQuestion.description) && (
                   <div
-                    ref={descriptionRef}
-                    className={`${
-                      descriptionHasMultipleLines && isMobile ? 'text-base' : 'text-base'
-                    } prose prose-base mt-3 max-h-[60vh] max-w-none overflow-auto text-gray-600 [&_p]:min-h-[1.6em] [&_table]:my-2 [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-200 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:px-4 [&_table_td]:py-2 [&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:bg-gray-50 [&_table_th]:px-4 [&_table_th]:py-2 [&_table_th]:font-semibold`}
+                    className="prose prose-base mt-3 max-h-[60vh] max-w-none overflow-auto text-base text-gray-600 [&_p]:min-h-[1.6em] [&_table]:my-2 [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-200 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:px-4 [&_table_td]:py-2 [&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:bg-gray-50 [&_table_th]:px-4 [&_table_th]:py-2 [&_table_th]:font-semibold"
                     style={{
                       WebkitOverflowScrolling: 'touch',
                     }}
