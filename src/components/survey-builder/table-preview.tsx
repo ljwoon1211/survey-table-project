@@ -77,7 +77,7 @@ export const TablePreview = React.memo(function TablePreview({
       return (
         <div
           key={column.id}
-          className="bg-gray-50 px-4 py-3 text-center font-medium"
+          className="border-r border-b border-gray-300 bg-gray-50 px-4 py-3 text-center font-medium"
           style={getGridSpanStyle(headerColspan)}
           {...getGridCellAria('columnheader', headerColspan)}
         >
