@@ -5,8 +5,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, ChevronLeft, ChevronRight, FileText, ListChecks } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useDynamicRowLayout } from '@/hooks/use-dynamic-row-layout';
+import { useDynamicRowState } from '@/hooks/use-dynamic-row-state';
+import { useTablePerf } from '@/hooks/use-table-perf';
 import { cn } from '@/lib/utils';
-import { useTestResponseStore } from '@/stores/test-response-store';
 import { DynamicRowGroupConfig, HeaderCell, Question, TableColumn, TableRow } from '@/types/survey';
 import { shouldDisplayColumn, shouldDisplayRow } from '@/utils/branch-logic';
 import {
@@ -20,8 +22,6 @@ import {
   recalculateColspansForVisibleColumns,
   recalculateRowspansForVisibleRows,
 } from '@/utils/table-merge-helpers';
-
-import { useTablePerf } from '@/hooks/use-table-perf';
 
 import { InteractiveCell } from './cells';
 import { DynamicRowSelectorModal } from './dynamic-row-selector-modal';
@@ -38,7 +38,6 @@ interface SelectorRowProps {
   selectedCount: number;
   onSelect: (groupId: string) => void;
   gridRow?: number;
-  hasMergedAbove?: boolean;
 }
 
 const SelectorRow = React.memo(function SelectorRow({
@@ -48,13 +47,11 @@ const SelectorRow = React.memo(function SelectorRow({
   selectedCount,
   onSelect,
   gridRow,
-  hasMergedAbove,
 }: SelectorRowProps) {
   return (
     <div
       className={cn(
         'flex items-center gap-3 border-r border-b border-gray-300 bg-white px-4 py-2.5',
-        hasMergedAbove && 'border-t',
         buttonAlign === 'center' ? 'justify-center'
           : buttonAlign === 'right' ? 'justify-end'
           : 'justify-start',
@@ -111,25 +108,30 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
   dynamicRowConfigs,
   hideColumnLabels = false,
 }: InteractiveTableResponseProps) {
-  const updateTestResponse = useTestResponseStore((state) => state.updateTestResponse);
-  const testQuestionResponse = useTestResponseStore(
-    useCallback((state) => state.testResponses[questionId], [questionId]),
-  );
+  // 1) 동적 행 상태 — store 구독, 상태, 핸들러
+  const {
+    currentResponse,
+    groupConfigMap,
+    dynamicRows,
+    hasDynamicRows,
+    selectedRowIds,
+    activeGroupId,
+    handleSelectGroup,
+    handleDynamicRowSelect,
+    closeModal,
+  } = useDynamicRowState({
+    questionId,
+    rows,
+    dynamicRowConfigs,
+    isTestMode,
+    value,
+    onChange,
+  });
+
   const tableContainerRef = useRef<HTMLDivElement>(null);
   useTablePerf(`InteractiveTable(${rows.length}×${columns.length})`);
   const [showLeftShadow, setShowLeftShadow] = useState(false);
   const [showRightShadow, setShowRightShadow] = useState(false);
-  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
-
-  // 현재 질문의 응답 데이터
-  const currentResponse = useMemo(() => {
-    if (isTestMode) {
-      return typeof testQuestionResponse === 'object' && testQuestionResponse !== null
-        ? (testQuestionResponse as Record<string, any>)
-        : {};
-    }
-    return (value || {}) as Record<string, any>;
-  }, [isTestMode, testQuestionResponse, value]);
 
   // displayCondition에서 참조하는 질문 ID만 추출 → 관련 응답만 의존
   const relevantResponseKeys = useMemo(() => {
@@ -184,22 +186,6 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [columns, rows, tableHeaderGrid, relevantResponsesJson, allQuestions]);
-
-  // 동적 행 관련 데이터 추출 (다중 그룹)
-  const groupConfigMap = useMemo(() => {
-    if (!dynamicRowConfigs || !Array.isArray(dynamicRowConfigs)) return new Map<string, DynamicRowGroupConfig>();
-    return new Map(dynamicRowConfigs.filter((g) => g.enabled).map((g) => [g.groupId, g]));
-  }, [dynamicRowConfigs]);
-
-  const dynamicRows = useMemo(
-    () => rows.filter((r) => r.dynamicGroupId && groupConfigMap.has(r.dynamicGroupId)),
-    [rows, groupConfigMap],
-  );
-  const hasDynamicRows = dynamicRows.length > 0;
-  const selectedRowIds = useMemo(
-    () => (currentResponse?.__selectedRowIds as string[]) || [],
-    [currentResponse],
-  );
 
   // displayCondition 기반 가시 행 필터링 + 동적 행 필터링 + rowspan 재계산
   const visibleRows = useMemo(() => {
@@ -271,156 +257,6 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     return () => clearTimeout(timeoutId);
   }, [visibleColumns.length, visibleRows.length, checkScrollState]);
 
-  // ref 패턴으로 안정적 참조 유지
-  const dynamicRowsRef = useRef(dynamicRows);
-  dynamicRowsRef.current = dynamicRows;
-  const selectedRowIdsRef = useRef(selectedRowIds);
-  selectedRowIdsRef.current = selectedRowIds;
-  const valueRef = useRef(value);
-  valueRef.current = value;
-
-  // 동적 행 선택 확인 핸들러
-  const handleDynamicRowSelect = useCallback(
-    (rowIdsFromModal: string[]) => {
-      const currentDynamicRows = dynamicRowsRef.current;
-      const currentSelectedRowIds = selectedRowIdsRef.current;
-
-      const thisGroupRowIds = new Set(
-        currentDynamicRows.filter((r) => r.dynamicGroupId === activeGroupId).map((r) => r.id),
-      );
-      const otherSelections = currentSelectedRowIds.filter((id) => !thisGroupRowIds.has(id));
-      const merged = [...otherSelections, ...rowIdsFromModal];
-
-      if (isTestMode) {
-        const currentState = useTestResponseStore.getState();
-        const latestResponse =
-          typeof currentState.testResponses[questionId] === 'object'
-            ? currentState.testResponses[questionId]
-            : {};
-        updateTestResponse(questionId, {
-          ...(latestResponse as Record<string, any>),
-          __selectedRowIds: merged,
-        });
-      } else if (onChange) {
-        onChange({
-          ...((valueRef.current || {}) as Record<string, any>),
-          __selectedRowIds: merged,
-        });
-      }
-    },
-    [isTestMode, questionId, updateTestResponse, onChange, activeGroupId],
-  );
-
-  // 그룹별 셀렉터 앵커 위치
-  const selectorAnchors = useMemo(() => {
-    if (!hasDynamicRows) return new Map<string, string>();
-    const anchors = new Map<string, string>();
-    for (const [groupId, config] of groupConfigMap) {
-      if (config.insertAfterRowId && visibleRows.some((r) => r.id === config.insertAfterRowId)) {
-        anchors.set(groupId, config.insertAfterRowId);
-        continue;
-      }
-      const groupRows = visibleRows.filter((r) => r.dynamicGroupId === groupId);
-      if (groupRows.length > 0) {
-        const firstIdx = visibleRows.indexOf(groupRows[0]);
-        if (firstIdx > 0) { anchors.set(groupId, visibleRows[firstIdx - 1].id); continue; }
-      }
-      if (config.insertAfterRowId) {
-        const origIdx = rows.findIndex((r) => r.id === config.insertAfterRowId);
-        if (origIdx !== -1) {
-          for (let i = origIdx; i >= 0; i--) {
-            const found = visibleRows.find((vr) => vr.id === rows[i].id);
-            if (found) { anchors.set(groupId, found.id); break; }
-          }
-        }
-      }
-      if (!anchors.has(groupId) && visibleRows.length > 0) {
-        const lastNonDynamic = [...visibleRows].reverse().find(
-          (r) => !r.dynamicGroupId && !r.showWhenDynamicGroupId,
-        );
-        if (lastNonDynamic) anchors.set(groupId, lastNonDynamic.id);
-      }
-    }
-    return anchors;
-  }, [hasDynamicRows, groupConfigMap, visibleRows, rows]);
-
-  // 여러 셀렉터 행 삽입 시 rowspan 보정
-  // 같은 앵커에 복수 셀렉터 → 실제 삽입 행 수로 카운트 (deduplicate 금지)
-  const selectorCountByAnchorIdx = useMemo(() => {
-    const countMap = new Map<number, number>(); // visibleRows index → 셀렉터 수
-    for (const [, anchorId] of selectorAnchors) {
-      const idx = visibleRows.findIndex((r) => r.id === anchorId);
-      if (idx !== -1) countMap.set(idx, (countMap.get(idx) || 0) + 1);
-    }
-    return countMap;
-  }, [selectorAnchors, visibleRows]);
-
-  const displayRows = useMemo(() => {
-    if (selectorCountByAnchorIdx.size === 0) return visibleRows;
-
-    const anchorIndices = [...selectorCountByAnchorIdx.keys()].sort((a, b) => a - b);
-
-    return visibleRows.map((row, rowIdx) => {
-      const needsAdjust = row.cells.some((cell) => {
-        if (cell.isHidden) return false;
-        const span = cell.rowspan || 1;
-        if (span <= 1) return false;
-        return anchorIndices.some((ai) => ai >= rowIdx && ai < rowIdx + span - 1);
-      });
-      if (!needsAdjust) return row;
-      return {
-        ...row,
-        cells: row.cells.map((cell) => {
-          if (cell.isHidden) return cell;
-          const span = cell.rowspan || 1;
-          if (span <= 1) return cell;
-          const spanEnd = rowIdx + span;
-          // 범위 내 앵커별 실제 셀렉터 수 합산
-          let insertedCount = 0;
-          for (const ai of anchorIndices) {
-            if (ai >= rowIdx && ai < spanEnd - 1) {
-              insertedCount += selectorCountByAnchorIdx.get(ai) || 0;
-            }
-          }
-          if (insertedCount === 0) return cell;
-          return { ...cell, rowspan: span + insertedCount };
-        }),
-      };
-    });
-  }, [visibleRows, selectorCountByAnchorIdx]);
-
-  // 행별 완료 상태 맵
-  const rowCompletionMap = useMemo(() => {
-    const map = new Map<string, boolean>();
-    for (const row of displayRows) {
-      const completed = row.cells.every((cell) => {
-        if (['text', 'checkbox', 'radio', 'select', 'input'].includes(cell.type)) {
-          const val = currentResponse[cell.id];
-          return val !== undefined && val !== null && val !== '';
-        }
-        return true;
-      });
-      map.set(row.id, completed);
-    }
-    return map;
-  }, [displayRows, currentResponse]);
-
-  // 그룹별 선택 카운트 맵
-  const groupSelectedCountMap = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const [groupId] of groupConfigMap) {
-      const count = selectedRowIds.filter((id) =>
-        rows.find((r) => r.id === id)?.dynamicGroupId === groupId,
-      ).length;
-      map.set(groupId, count);
-    }
-    return map;
-  }, [groupConfigMap, selectedRowIds, rows]);
-
-  const handleSelectGroup = useCallback((groupId: string) => {
-    setActiveGroupId(groupId);
-  }, []);
-
   // Grid 관련 계산
   const totalWidth = useMemo(() => calcTotalWidth(visibleColumns), [visibleColumns]);
   const gridTemplateCols = useMemo(() => buildGridTemplateCols(visibleColumns), [visibleColumns]);
@@ -432,26 +268,38 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     return 1;
   }, [hideColumnLabels, visibleHeaderGrid]);
 
-  // 명시적 grid-row 위치 계산 (셀렉터 행 포함)
-  const { rowGridMap, selectorGridMap } = useMemo(() => {
-    const rowMap = new Map<string, number>(); // rowId → grid row (1-based)
-    const selMap = new Map<string, number>(); // groupId → grid row
+  // 3) 동적 행 레이아웃 — selectorAnchors, displayRows, gridMap
+  const {
+    displayRows,
+    selectorAnchors,
+    rowGridMap,
+    selectorGridMap,
+    groupSelectedCountMap,
+  } = useDynamicRowLayout({
+    rows,
+    visibleRows,
+    groupConfigMap,
+    selectedRowIds,
+    hasDynamicRows,
+    headerRowCount,
+  });
 
-    let gridRow = headerRowCount + 1;
+  // 행별 완료 상태 맵
+  const rowCompletionMap = useMemo(() => {
+    const map = new Map<string, boolean>();
     for (const row of displayRows) {
-      rowMap.set(row.id, gridRow);
-      gridRow++;
-
-      // 이 행 뒤에 삽입되는 셀렉터 행들
-      for (const [groupId, anchorId] of selectorAnchors) {
-        if (anchorId === row.id) {
-          selMap.set(groupId, gridRow);
-          gridRow++;
+      const completed = row.cells.every((cell) => {
+        if (cell._isContinuation) return true;
+        if (['text', 'checkbox', 'radio', 'select', 'input'].includes(cell.type)) {
+          const val = currentResponse[cell.id];
+          return val !== undefined && val !== null && val !== '';
         }
-      }
+        return true;
+      });
+      map.set(row.id, completed);
     }
-    return { rowGridMap: rowMap, selectorGridMap: selMap };
-  }, [displayRows, selectorAnchors, headerRowCount]);
+    return map;
+  }, [displayRows, currentResponse]);
 
   // ── 빈 테이블 ──
   if (columns.length === 0 || rows.length === 0) {
@@ -583,6 +431,27 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     });
   };
 
+  // 4) 셀렉터 행 렌더링 (가상화/비가상화 공용)
+  const renderSelectorRows = useCallback(
+    () =>
+      Array.from(selectorGridMap.entries()).map(([groupId, gridRow]) => {
+        const config = groupConfigMap.get(groupId);
+        if (!config) return null;
+        return (
+          <SelectorRow
+            key={`selector-${groupId}`}
+            groupId={groupId}
+            label={config.label}
+            buttonAlign={config.buttonAlign}
+            selectedCount={groupSelectedCountMap.get(groupId) ?? 0}
+            onSelect={handleSelectGroup}
+            gridRow={gridRow}
+          />
+        );
+      }),
+    [selectorGridMap, groupConfigMap, groupSelectedCountMap, handleSelectGroup],
+  );
+
   // ── 가상화 여부 판단 ──
   const shouldVirtualize = displayRows.length >= VIRTUALIZATION_THRESHOLD;
 
@@ -642,27 +511,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
             gridTemplateCols={gridTemplateCols}
             totalWidth={totalWidth}
             renderHeaderCells={renderHeaderCells}
-            renderSelectorRows={() =>
-              Array.from(selectorGridMap.entries()).map(([groupId, gridRow]) => {
-                const config = groupConfigMap.get(groupId);
-                if (!config) return null;
-                const anchorId = selectorAnchors.get(groupId);
-                const anchorRow = anchorId ? displayRows.find((r) => r.id === anchorId) : undefined;
-                const hasMergedAbove = anchorRow?.cells.some((c) => !c.isHidden && (c.rowspan || 1) > 1) ?? false;
-                return (
-                  <SelectorRow
-                    key={`selector-${groupId}`}
-                    groupId={groupId}
-                    label={config.label}
-                    buttonAlign={config.buttonAlign}
-                    selectedCount={groupSelectedCountMap.get(groupId) ?? 0}
-                    onSelect={handleSelectGroup}
-                    gridRow={gridRow}
-                    hasMergedAbove={hasMergedAbove}
-                  />
-                );
-              })
-            }
+            renderSelectorRows={renderSelectorRows}
           />
         ) : (
           /* 기존: CSS Grid 테이블 */
@@ -724,25 +573,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
             })}
 
             {/* 셀렉터 행들 — 명시적 grid-row 배치 */}
-            {Array.from(selectorGridMap.entries()).map(([groupId, gridRow]) => {
-              const config = groupConfigMap.get(groupId);
-              if (!config) return null;
-              const anchorId = selectorAnchors.get(groupId);
-              const anchorRow = anchorId ? displayRows.find((r) => r.id === anchorId) : undefined;
-              const hasMergedAbove = anchorRow?.cells.some((c) => !c.isHidden && (c.rowspan || 1) > 1) ?? false;
-              return (
-                <SelectorRow
-                  key={`selector-${groupId}`}
-                  groupId={groupId}
-                  label={config.label}
-                  buttonAlign={config.buttonAlign}
-                  selectedCount={groupSelectedCountMap.get(groupId) ?? 0}
-                  onSelect={handleSelectGroup}
-                  gridRow={gridRow}
-                  hasMergedAbove={hasMergedAbove}
-                />
-              );
-            })}
+            {renderSelectorRows()}
           </div>
         )}
       </div>
@@ -774,9 +605,11 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
       {activeGroupId && (
         <DynamicRowSelectorModal
           open={!!activeGroupId}
-          onOpenChange={(open) => { if (!open) setActiveGroupId(null); }}
+          onOpenChange={(open) => { if (!open) closeModal(); }}
           dynamicRows={dynamicRows.filter((r) => r.dynamicGroupId === activeGroupId)}
-          selectedRowIds={selectedRowIds}
+          selectedRowIds={selectedRowIds.filter((id) =>
+            dynamicRows.some((r) => r.id === id && r.dynamicGroupId === activeGroupId)
+          )}
           label={groupConfigMap.get(activeGroupId)?.label}
           onConfirm={handleDynamicRowSelect}
         />

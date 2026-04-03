@@ -128,6 +128,8 @@ export interface TableCell {
   // 셀 컨텐츠 정렬 관련 속성
   horizontalAlign?: 'left' | 'center' | 'right'; // 가로 정렬 (기본값: left)
   verticalAlign?: 'top' | 'middle' | 'bottom'; // 세로 정렬 (기본값: top)
+  // 런타임 전용: 셀렉터 경계에서 분리된 continuation 셀 마커
+  _isContinuation?: boolean;
 }
 
 export interface CheckboxOption {
