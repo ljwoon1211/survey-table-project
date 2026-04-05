@@ -51,9 +51,6 @@ module.exports = {
           500: '#FF3B30'
         }
       },
-      fontFamily: {
-        sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
-      },
       fontSize: {
         'display': ['28px', '34px'],
         'headline': ['24px', '30px'],
