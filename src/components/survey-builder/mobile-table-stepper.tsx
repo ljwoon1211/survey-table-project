@@ -136,7 +136,7 @@ const RowCard = React.memo(function RowCard({
 
       <CardContent className="space-y-3 p-4">
         {inputCells.map(({ cell, colIdx }, arrIdx) => {
-          const columnLabel = visibleColumns[colIdx]?.label || `항목 ${colIdx + 1}`;
+          const columnLabel = cell.exportLabel || visibleColumns[colIdx]?.label || `항목 ${colIdx + 1}`;
 
           let sectionHeader: string | null = null;
           if (columnSectionMap) {
