@@ -12,11 +12,13 @@ import {
   createSurvey,
   deleteSurvey as deleteSurveyAction,
   duplicateSurvey as duplicateSurveyAction,
-  saveSurveyDiff,
-  saveSurveyWithDetails,
   updateSurvey,
 } from '@/actions/survey-crud-actions';
-import type { SurveyDiffPayload } from '@/actions/survey-crud-actions';
+import {
+  saveSurveyDiff,
+  saveSurveyWithDetails,
+} from '@/actions/survey-save-actions';
+import type { SurveyDiffPayload } from '@/actions/survey-save-actions';
 import type { Survey } from '@/types/survey';
 
 // ========================

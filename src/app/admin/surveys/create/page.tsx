@@ -474,7 +474,7 @@ export default function CreateSurveyPage() {
                   <div className="space-y-1 text-xs text-gray-500">
                     <p>그룹 수: {(currentSurvey.groups || []).length}개</p>
                     <p>질문 수: {currentSurvey.questions.length}개</p>
-                    <p>마지막 수정: {currentSurvey.updatedAt.toLocaleDateString()}</p>
+                    <p suppressHydrationWarning>마지막 수정: {currentSurvey.updatedAt.toLocaleDateString()}</p>
                   </div>
                 </div>
               </TabsContent>

@@ -1,9 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
-  AlertCircle,
   AlignCenter,
   AlignLeft,
   AlignRight,
@@ -14,10 +13,8 @@ import {
   ChevronDown,
   Circle,
   Image,
-  Loader2,
   PenLine,
   Type,
-  Upload,
   Video,
   X,
 } from 'lucide-react';
@@ -27,6 +24,7 @@ import {
   updateQuestion as updateQuestionAction,
 } from '@/actions/question-actions';
 import { Button } from '@/components/ui/button';
+import { useEnsureSurveyInDb } from '@/hooks/use-ensure-survey-in-db';
 import {
   Dialog,
   DialogContent,
@@ -39,12 +37,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { getProxiedImageUrl, optimizeImage, validateImageFile } from '@/lib/image-utils';
-import { generateId, isValidUUID } from '@/lib/utils';
-import { getMaxSpssCode } from '@/utils/option-code-generator';
-import { useSurveyBuilderStore } from '@/stores/survey-store';
-import { CheckboxOption, QuestionOption, RadioOption, TableCell } from '@/types/survey';
-import { useShallow } from 'zustand/react/shallow';
+import { isValidUUID } from '@/lib/utils';
 import {
   INTERACTIVE_CELL_TYPES,
   generateCellCode,
@@ -52,8 +45,12 @@ import {
   inferSpssMeasure,
   inferSpssVarType,
 } from '@/utils/table-cell-code-generator';
+import { useSurveyBuilderStore } from '@/stores/survey-store';
+import { CheckboxOption, QuestionOption, RadioOption, TableCell } from '@/types/survey';
+import { useShallow } from 'zustand/react/shallow';
 
-import { BranchRuleEditor } from './branch-rule-editor';
+import { CellChoiceEditor } from './cell-choice-editor';
+import { CellImageEditor } from './cell-image-editor';
 
 interface CellContentModalProps {
   isOpen: boolean;
@@ -83,6 +80,7 @@ export function CellContentModal({
   columnLabel,
 }: CellContentModalProps) {
   const questions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
+  const ensureSurvey = useEnsureSurveyInDb();
   const [isSaving, setIsSaving] = useState(false);
   const [contentType, setContentType] = useState<
     'text' | 'image' | 'video' | 'checkbox' | 'radio' | 'select' | 'input'
@@ -90,16 +88,47 @@ export function CellContentModal({
   const [textContent, setTextContent] = useState(cell.content || '');
   const [imageUrl, setImageUrl] = useState(cell.imageUrl || '');
   const [videoUrl, setVideoUrl] = useState(cell.videoUrl || '');
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(
-    cell.imageUrl && contentType === 'image' ? cell.imageUrl : null,
+
+  const [checkboxOptions, setCheckboxOptions] = useState<CheckboxOption[]>(
+    cell.checkboxOptions || [],
   );
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [imageError, setImageError] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const uploadAbortController = useRef<AbortController | null>(null);
+  const [radioOptions, setRadioOptions] = useState<RadioOption[]>(cell.radioOptions || []);
+  const [radioGroupName, setRadioGroupName] = useState(cell.radioGroupName || '');
+  const [selectOptions, setSelectOptions] = useState<QuestionOption[]>(cell.selectOptions || []);
+  const [allowOtherOption, setAllowOtherOption] = useState(cell.allowOtherOption || false);
+  const [inputPlaceholder, setInputPlaceholder] = useState(cell.placeholder || '');
+  const [inputMaxLength, setInputMaxLength] = useState<number | ''>(cell.inputMaxLength || '');
+  const [minSelections, setMinSelections] = useState<number | undefined>(cell.minSelections);
+  const [maxSelections, setMaxSelections] = useState<number | undefined>(cell.maxSelections);
+
+  // 정렬 관련 state
+  const [horizontalAlign, setHorizontalAlign] = useState<'left' | 'center' | 'right'>(
+    cell.horizontalAlign || 'left',
+  );
+  const [verticalAlign, setVerticalAlign] = useState<'top' | 'middle' | 'bottom'>(
+    cell.verticalAlign || 'top',
+  );
+
+  // 셀 병합 관련 state
+  const [isMergeEnabled, setIsMergeEnabled] = useState(
+    (cell.rowspan && cell.rowspan > 1) || (cell.colspan && cell.colspan > 1) || false,
+  );
+  const [rowspan, setRowspan] = useState<number | ''>(cell.rowspan || 1);
+  const [colspan, setColspan] = useState<number | ''>(cell.colspan || 1);
+
+  // 셀 코드 및 엑셀 라벨
+  const [cellCode, setCellCode] = useState(cell.cellCode || '');
+  const [isCustomCellCode, setIsCustomCellCode] = useState(cell.isCustomCellCode ?? !!cell.cellCode);
+  const [exportLabel, setExportLabel] = useState(cell.exportLabel || '');
+  const [isCustomExportLabel, setIsCustomExportLabel] = useState(cell.isCustomExportLabel ?? !!cell.exportLabel);
+
+  // SPSS 변수 타입 / 측정 수준 (셀 단위)
+  const [spssVarType, setSpssVarType] = useState<TableCell['spssVarType']>(cell.spssVarType);
+  const [spssMeasure, setSpssMeasure] = useState<TableCell['spssMeasure']>(cell.spssMeasure);
+
+  // 자동생성 셀코드/라벨 계산
+  const autoCellCode = generateCellCode(questionCode, rowCode, columnCode);
+  const autoExportLabel = generateExportLabel(questionTitle, columnLabel, rowLabel);
 
   // 셀이 변경될 때 상태 동기화 (모달이 열릴 때마다 최신 셀 데이터 반영)
   useEffect(() => {
@@ -108,7 +137,6 @@ export function CellContentModal({
       setTextContent(cell.content || '');
       setImageUrl(cell.imageUrl || '');
       setVideoUrl(cell.videoUrl || '');
-      setPreviewUrl(cell.imageUrl && cell.type === 'image' ? cell.imageUrl : null);
       setCheckboxOptions(cell.checkboxOptions || []);
       setRadioOptions(cell.radioOptions || []);
       setRadioGroupName(cell.radioGroupName || '');
@@ -134,138 +162,14 @@ export function CellContentModal({
     }
   }, [isOpen, cell]);
 
-  // imageUrl이 바뀔 때 에러 상태 리셋
-  useEffect(() => {
-    setImageError(false);
-  }, [imageUrl]);
-  const [checkboxOptions, setCheckboxOptions] = useState<CheckboxOption[]>(
-    cell.checkboxOptions || [],
-  );
-  const [radioOptions, setRadioOptions] = useState<RadioOption[]>(cell.radioOptions || []);
-  const [radioGroupName, setRadioGroupName] = useState(cell.radioGroupName || '');
-  const [selectOptions, setSelectOptions] = useState<QuestionOption[]>(cell.selectOptions || []);
-  const [allowOtherOption, setAllowOtherOption] = useState(cell.allowOtherOption || false);
-  const [inputPlaceholder, setInputPlaceholder] = useState(cell.placeholder || '');
-  const [inputMaxLength, setInputMaxLength] = useState<number | ''>(cell.inputMaxLength || '');
-  const [minSelections, setMinSelections] = useState<number | undefined>(cell.minSelections);
-  const [maxSelections, setMaxSelections] = useState<number | undefined>(cell.maxSelections);
-
-  // 정렬 관련 state
-  const [horizontalAlign, setHorizontalAlign] = useState<'left' | 'center' | 'right'>(
-    cell.horizontalAlign || 'left',
-  );
-  const [verticalAlign, setVerticalAlign] = useState<'top' | 'middle' | 'bottom'>(
-    cell.verticalAlign || 'top',
-  );
-
-  // 조건부 분기 토글 상태
-  const [showBranchSettings, setShowBranchSettings] = useState(false);
-
-  // 셀 병합 관련 state
-  const [isMergeEnabled, setIsMergeEnabled] = useState(
-    (cell.rowspan && cell.rowspan > 1) || (cell.colspan && cell.colspan > 1) || false,
-  );
-  const [rowspan, setRowspan] = useState<number | ''>(cell.rowspan || 1);
-  const [colspan, setColspan] = useState<number | ''>(cell.colspan || 1);
-
-  // 셀 코드 및 엑셀 라벨
-  const [cellCode, setCellCode] = useState(cell.cellCode || '');
-  const [isCustomCellCode, setIsCustomCellCode] = useState(cell.isCustomCellCode ?? !!cell.cellCode);
-  const [exportLabel, setExportLabel] = useState(cell.exportLabel || '');
-  const [isCustomExportLabel, setIsCustomExportLabel] = useState(cell.isCustomExportLabel ?? !!cell.exportLabel);
-
-  // SPSS 변수 타입 / 측정 수준 (셀 단위)
-  const [spssVarType, setSpssVarType] = useState<TableCell['spssVarType']>(cell.spssVarType);
-  const [spssMeasure, setSpssMeasure] = useState<TableCell['spssMeasure']>(cell.spssMeasure);
-
-  // 자동생성 셀코드/라벨 계산
-  const autoCellCode = generateCellCode(questionCode, rowCode, columnCode);
-  const autoExportLabel = generateExportLabel(questionTitle, columnLabel, rowLabel);
-
-  // 기타 옵션 관리 상수들
-  const OTHER_OPTION_ID = 'other-option';
-  const OTHER_OPTION_LABEL = '기타';
-
-  // 기타 옵션 헬퍼 함수들
-  const addOtherCheckboxOption = (options: CheckboxOption[]) => {
-    const hasOtherOption = options.some((option) => option.id === OTHER_OPTION_ID);
-    if (!hasOtherOption) {
-      return [
-        ...options,
-        {
-          id: OTHER_OPTION_ID,
-          label: OTHER_OPTION_LABEL,
-          value: 'other',
-          checked: false,
-          hasOther: true,
-        },
-      ];
+  // YouTube URL을 임베드 URL로 변환
+  const getYouTubeEmbedUrl = (url: string) => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    if (match && match[2].length === 11) {
+      return `https://www.youtube.com/embed/${match[2]}`;
     }
-    return options;
-  };
-
-  const removeOtherCheckboxOption = (options: CheckboxOption[]) => {
-    return options.filter((option) => option.id !== OTHER_OPTION_ID);
-  };
-
-  const addOtherRadioOption = (options: RadioOption[]) => {
-    const hasOtherOption = options.some((option) => option.id === OTHER_OPTION_ID);
-    if (!hasOtherOption) {
-      return [
-        ...options,
-        {
-          id: OTHER_OPTION_ID,
-          label: OTHER_OPTION_LABEL,
-          value: 'other',
-          selected: false,
-          hasOther: true,
-        },
-      ];
-    }
-    return options;
-  };
-
-  const removeOtherRadioOption = (options: RadioOption[]) => {
-    return options.filter((option) => option.id !== OTHER_OPTION_ID);
-  };
-
-  const addOtherSelectOption = (options: QuestionOption[]) => {
-    const hasOtherOption = options.some((option) => option.id === OTHER_OPTION_ID);
-    if (!hasOtherOption) {
-      return [
-        ...options,
-        {
-          id: OTHER_OPTION_ID,
-          label: OTHER_OPTION_LABEL,
-          value: 'other',
-          hasOther: true,
-        },
-      ];
-    }
-    return options;
-  };
-
-  const removeOtherSelectOption = (options: QuestionOption[]) => {
-    return options.filter((option) => option.id !== OTHER_OPTION_ID);
-  };
-
-  // 기타 옵션 토글 핸들러
-  const handleOtherOptionToggle = (enabled: boolean) => {
-    setAllowOtherOption(enabled);
-
-    if (contentType === 'checkbox') {
-      setCheckboxOptions((prev) =>
-        enabled ? addOtherCheckboxOption(prev) : removeOtherCheckboxOption(prev),
-      );
-    } else if (contentType === 'radio') {
-      setRadioOptions((prev) =>
-        enabled ? addOtherRadioOption(prev) : removeOtherRadioOption(prev),
-      );
-    } else if (contentType === 'select') {
-      setSelectOptions((prev) =>
-        enabled ? addOtherSelectOption(prev) : removeOtherSelectOption(prev),
-      );
-    }
+    return url;
   };
 
   const handleSave = async () => {
@@ -323,6 +227,8 @@ export function CellContentModal({
           }));
 
           try {
+            await ensureSurvey();
+
             if (isValidUUID(currentQuestionId)) {
               // 이미 DB에 저장된 질문: 업데이트
               await updateQuestionAction(currentQuestionId, {
@@ -383,11 +289,6 @@ export function CellContentModal({
     setTextContent(cell.content || '');
     setImageUrl(cell.imageUrl || '');
     setVideoUrl(cell.videoUrl || '');
-    setPreviewUrl(cell.imageUrl && cell.type === 'image' ? cell.imageUrl : null);
-    setSelectedFile(null);
-    setUploadError(null);
-    setUploadProgress(0);
-    setIsUploading(false);
     setCheckboxOptions(cell.checkboxOptions || []);
     setRadioOptions(cell.radioOptions || []);
     setRadioGroupName(cell.radioGroupName || '');
@@ -412,161 +313,6 @@ export function CellContentModal({
     setSpssMeasure(cell.spssMeasure);
     onClose();
   };
-
-  // YouTube URL을 임베드 URL로 변환
-  const getYouTubeEmbedUrl = (url: string) => {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    if (match && match[2].length === 11) {
-      return `https://www.youtube.com/embed/${match[2]}`;
-    }
-    return url;
-  };
-
-  // 파일 선택 핸들러
-  const handleFileSelect = useCallback(async (file: File) => {
-    // 파일 유효성 검사
-    const validation = validateImageFile(file);
-    if (!validation.valid) {
-      setUploadError(validation.error || '파일 검증에 실패했습니다.');
-      return;
-    }
-
-    setUploadError(null);
-    setSelectedFile(file);
-
-    // 미리보기 생성
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setPreviewUrl(e.target?.result as string);
-    };
-    reader.readAsDataURL(file);
-  }, []);
-
-  // 드래그 앤 드롭 핸들러
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const file = e.dataTransfer.files[0];
-      if (file) {
-        handleFileSelect(file);
-      }
-    },
-    [handleFileSelect],
-  );
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
-
-  // 이미지 업로드
-  const handleImageUpload = useCallback(async () => {
-    if (!selectedFile) return;
-
-    setIsUploading(true);
-    setUploadProgress(0);
-    setUploadError(null);
-
-    uploadAbortController.current = new AbortController();
-
-    try {
-      // 이미지 최적화
-      const optimizedBlob = await optimizeImage(selectedFile);
-      const optimizedFile = new File([optimizedBlob], selectedFile.name, {
-        type: optimizedBlob.type || selectedFile.type,
-      });
-
-      // FormData 생성
-      const formData = new FormData();
-      formData.append('file', optimizedFile);
-
-      // 업로드 (진행률 추적)
-      const xhr = new XMLHttpRequest();
-
-      // 진행률 업데이트
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-          const percentComplete = (e.loaded / e.total) * 100;
-          setUploadProgress(percentComplete);
-        }
-      });
-
-      // Promise로 래핑
-      const uploadPromise = new Promise<string>((resolve, reject) => {
-        xhr.addEventListener('load', () => {
-          if (xhr.status === 200) {
-            const response = JSON.parse(xhr.responseText);
-            resolve(response.url);
-          } else {
-            const errorResponse = JSON.parse(xhr.responseText);
-            reject(new Error(errorResponse.error || '업로드에 실패했습니다.'));
-          }
-        });
-
-        xhr.addEventListener('error', () => {
-          reject(new Error('네트워크 오류가 발생했습니다.'));
-        });
-
-        xhr.addEventListener('abort', () => {
-          reject(new Error('업로드가 취소되었습니다.'));
-        });
-
-        xhr.open('POST', '/api/upload/image');
-        xhr.send(formData);
-      });
-
-      const uploadedImageUrl = await uploadPromise;
-
-      // 이미지 URL 설정
-      setImageUrl(uploadedImageUrl);
-      setPreviewUrl(uploadedImageUrl);
-
-      // 상태 초기화
-      setSelectedFile(null);
-      setUploadProgress(0);
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : '업로드 중 오류가 발생했습니다.';
-      setUploadError(errorMessage);
-      setUploadProgress(0);
-    } finally {
-      setIsUploading(false);
-      uploadAbortController.current = null;
-    }
-  }, [selectedFile]);
-
-  // 업로드 취소
-  const handleCancelUpload = useCallback(() => {
-    if (uploadAbortController.current) {
-      uploadAbortController.current.abort();
-    }
-    setSelectedFile(null);
-    if (imageUrl) {
-      setPreviewUrl(imageUrl);
-    } else {
-      setPreviewUrl(null);
-    }
-    setUploadError(null);
-    setUploadProgress(0);
-    setIsUploading(false);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  }, [imageUrl]);
-
-  // 이미지 삭제
-  const handleRemoveImage = useCallback(() => {
-    setImageUrl('');
-    setPreviewUrl(null);
-    setSelectedFile(null);
-    setUploadError(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  }, []);
 
   return (
     <Dialog
@@ -731,12 +477,6 @@ export function CellContentModal({
               | 'select'
               | 'input';
             setContentType(newType);
-            // 이미지 탭으로 변경될 때 미리보기 URL 설정
-            if (newType === 'image' && imageUrl) {
-              setPreviewUrl(imageUrl);
-            } else if (newType !== 'image') {
-              setPreviewUrl(null);
-            }
             // 셀 타입 변경 시 SPSS 필드 자동 처리
             if (INTERACTIVE_CELL_TYPES.has(newType)) {
               // 입력 타입으로 변경 → 변수 타입/측정 수준 자동 설정 (기존값 없을 때만)
@@ -799,197 +539,10 @@ export function CellContentModal({
 
           {/* 이미지 탭 */}
           <TabsContent value="image" className="space-y-4">
-            {/* 드래그 앤 드롭 영역 또는 파일 선택 */}
-            {!selectedFile && !isUploading && !imageUrl && (
-              <div
-                className="cursor-pointer rounded-lg border-2 border-dashed border-blue-300 p-6 text-center transition-colors hover:border-blue-400"
-                onDrop={handleDrop}
-                onDragOver={handleDragOver}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/svg+xml,image/bmp"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      handleFileSelect(file);
-                    }
-                  }}
-                  className="hidden"
-                />
-                <Upload className="mx-auto mb-2 h-8 w-8 text-blue-500" />
-                <p className="mb-2 text-sm text-gray-600">
-                  이미지를 드래그 앤 드롭하거나 클릭하여 선택하세요
-                </p>
-                <p className="text-xs text-gray-500">
-                  지원 형식: JPG, PNG, GIF, WebP, SVG (최대 10MB)
-                </p>
-              </div>
-            )}
-
-            {/* 선택된 파일 미리보기 (업로드 전) */}
-            {selectedFile && previewUrl && !isUploading && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-gray-700">
-                      {selectedFile.name}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleCancelUpload}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="overflow-hidden rounded-lg border bg-white">
-                  <img
-                    key={previewUrl}
-                    src={getProxiedImageUrl(previewUrl || '')}
-                    alt="미리보기"
-                    className="max-h-48 w-full object-contain"
-                  />
-                </div>
-                <Button type="button" size="sm" onClick={handleImageUpload} className="w-full">
-                  업로드
-                </Button>
-              </div>
-            )}
-
-            {/* 업로드 진행 중 */}
-            {isUploading && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">업로드 중...</span>
-                  <span className="text-sm text-gray-500">{Math.round(uploadProgress)}%</span>
-                </div>
-                <div className="h-2 w-full rounded-full bg-gray-200">
-                  <div
-                    className="h-2 rounded-full bg-blue-500 transition-all duration-300"
-                    style={{ width: `${uploadProgress}%` }}
-                  />
-                </div>
-                {previewUrl && (
-                  <div className="overflow-hidden rounded-lg border bg-white">
-                    <img
-                      key={previewUrl}
-                      src={getProxiedImageUrl(previewUrl)}
-                      alt="업로드 중"
-                      className="max-h-48 w-full object-contain opacity-50"
-                    />
-                  </div>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCancelUpload}
-                  className="w-full"
-                  disabled={uploadProgress >= 100}
-                >
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  업로드 취소
-                </Button>
-              </div>
-            )}
-
-            {/* 업로드된 이미지 미리보기 */}
-            {imageUrl && !isUploading && !selectedFile && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>업로드된 이미지</Label>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleRemoveImage}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <X className="mr-1 h-4 w-4" />
-                    삭제
-                  </Button>
-                </div>
-                <div className="overflow-hidden rounded-lg border bg-gray-50">
-                  <div key={imageUrl}>
-                    {imageError ? (
-                      <div className="p-3 text-center">
-                        <p className="text-sm text-red-500">이미지를 불러올 수 없습니다.</p>
-                      </div>
-                    ) : (
-                      <img
-                        src={getProxiedImageUrl(imageUrl)}
-                        alt="셀 내용 이미지 미리보기"
-                        className="max-h-48 w-full object-contain"
-                        onError={() => setImageError(true)}
-                      />
-                    )}
-                  </div>
-                </div>
-                <div
-                  className="cursor-pointer rounded-lg border-2 border-dashed border-gray-300 p-4 text-center transition-colors hover:border-blue-400"
-                  onDrop={handleDrop}
-                  onDragOver={handleDragOver}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/svg+xml,image/bmp"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        handleFileSelect(file);
-                      }
-                    }}
-                    className="hidden"
-                  />
-                  <p className="text-sm text-gray-600">다른 이미지로 교체하기</p>
-                </div>
-              </div>
-            )}
-
-            {/* 에러 메시지 */}
-            {uploadError && (
-              <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
-                <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-600" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-red-900">업로드 실패</p>
-                  <p className="mt-1 text-sm text-red-700">{uploadError}</p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setUploadError(null);
-                      if (selectedFile) {
-                        handleImageUpload();
-                      }
-                    }}
-                    className="mt-2"
-                  >
-                    다시 시도
-                  </Button>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setUploadError(null)}
-                  className="text-red-600 hover:text-red-700"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
+            <CellImageEditor
+              imageUrl={imageUrl}
+              onImageUrlChange={setImageUrl}
+            />
           </TabsContent>
 
           {/* 동영상 탭 */}
@@ -1135,591 +688,74 @@ export function CellContentModal({
 
           {/* 체크박스 탭 */}
           <TabsContent value="checkbox" className="space-y-4">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label>체크박스 옵션 관리</Label>
-                <div className="flex items-center space-x-4">
-                  {/* 기타 옵션 토글 */}
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="checkbox-allow-other"
-                      checked={allowOtherOption}
-                      onCheckedChange={handleOtherOptionToggle}
-                      className="scale-75"
-                    />
-                    <Label htmlFor="checkbox-allow-other" className="text-xs text-gray-600">
-                      기타 옵션 추가
-                    </Label>
-                  </div>
-                  {/* 조건부 분기 토글 */}
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="checkbox-show-branch"
-                      checked={showBranchSettings}
-                      onCheckedChange={setShowBranchSettings}
-                      className="scale-75"
-                    />
-                    <Label htmlFor="checkbox-show-branch" className="text-xs text-gray-600">
-                      조건부 분기
-                    </Label>
-                  </div>
-                </div>
-              </div>
-
-              <div className="max-h-[300px] space-y-3 overflow-y-auto pr-2">
-                {checkboxOptions.map((option, index) => (
-                  <div
-                    key={option.id}
-                    className="overflow-hidden rounded-lg border border-gray-200"
-                  >
-                    <div className="flex items-center gap-2 p-3">
-                      <input
-                        type="checkbox"
-                        checked={option.checked || false}
-                        onChange={(e) => {
-                          const updated = [...checkboxOptions];
-                          updated[index] = { ...option, checked: e.target.checked };
-                          setCheckboxOptions(updated);
-                        }}
-                        className="rounded"
-                      />
-                      <div className="flex-1 space-y-1">
-                        <div className="flex gap-2">
-                          <Input
-                            value={option.label}
-                            onChange={(e) => {
-                              const updated = [...checkboxOptions];
-                              updated[index] = { ...option, label: e.target.value };
-                              setCheckboxOptions(updated);
-                            }}
-                            placeholder="옵션 텍스트"
-                            className="flex-1"
-                          />
-                          <Input
-                            value={option.optionCode || ''}
-                            onChange={(e) => {
-                              const updated = [...checkboxOptions];
-                              updated[index] = { ...option, optionCode: e.target.value };
-                              setCheckboxOptions(updated);
-                            }}
-                            placeholder="코드"
-                            className="w-20 text-xs"
-                            title="엑셀 내보내기용 코드 (선택)"
-                          />
-                        </div>
-                        {option.id === OTHER_OPTION_ID && (
-                          <p className="text-xs text-blue-600">🔹 기타 옵션 (수정 가능)</p>
-                        )}
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setCheckboxOptions((prev) => prev.filter((_, i) => i !== index));
-                        }}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        삭제
-                      </Button>
-                    </div>
-
-                    {/* 분기 규칙 설정 - 토글이 켜져있을 때만 표시 */}
-                    {showBranchSettings && (
-                      <div className="px-3 pb-3">
-                        <BranchRuleEditor
-                          branchRule={option.branchRule}
-                          allQuestions={questions}
-                          currentQuestionId={currentQuestionId}
-                          onChange={(branchRule) => {
-                            const updated = [...checkboxOptions];
-                            updated[index] = { ...option, branchRule };
-                            setCheckboxOptions(updated);
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  const newOption: CheckboxOption = {
-                    id: generateId(),
-                    label: '새 옵션',
-                    value: `option-${checkboxOptions.length + 1}`,
-                    checked: false,
-                    spssNumericCode: getMaxSpssCode(checkboxOptions) + 1,
-                  };
-                  setCheckboxOptions((prev) => [...prev, newOption]);
-                }}
-                className="w-full"
-              >
-                옵션 추가
-              </Button>
-
-              {allowOtherOption && (
-                <div className="rounded-lg bg-blue-50 p-3">
-                  <p className="text-sm text-blue-700">
-                    <strong>💡 기타 옵션이 활성화되었습니다.</strong>
-                    <br />
-                    마지막에 &quot;기타&quot; 체크박스가 자동으로 추가되어 사용자가 직접 텍스트를
-                    입력할 수 있습니다.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* 선택 개수 제한 (체크박스 셀 전용) */}
-            {checkboxOptions.length > 0 && (
-              <div className="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <Label className="text-base font-medium">선택 개수 제한</Label>
-                <p className="text-sm text-gray-600">
-                  사용자가 선택할 수 있는 최소/최대 개수를 설정할 수 있습니다.
-                </p>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="cell-min-selections" className="text-sm">
-                      최소 선택 개수
-                    </Label>
-                    <Input
-                      id="cell-min-selections"
-                      type="number"
-                      min="1"
-                      max={checkboxOptions.length}
-                      value={minSelections || ''}
-                      onChange={(e) => {
-                        const value =
-                          e.target.value === '' ? undefined : parseInt(e.target.value, 10);
-                        setMinSelections(value);
-                        // 최소값이 최대값보다 크면 최대값 조정
-                        if (
-                          value !== undefined &&
-                          maxSelections !== undefined &&
-                          value > maxSelections
-                        ) {
-                          setMaxSelections(value);
-                        }
-                      }}
-                      placeholder="제한 없음"
-                      className="w-full"
-                    />
-                    <p className="text-xs text-gray-500">
-                      {checkboxOptions.length}개 옵션 중 최소 선택 개수
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="cell-max-selections" className="text-sm">
-                      최대 선택 개수
-                    </Label>
-                    <Input
-                      id="cell-max-selections"
-                      type="number"
-                      min={minSelections ? minSelections : 1}
-                      max={checkboxOptions.length}
-                      value={maxSelections || ''}
-                      onChange={(e) => {
-                        const value =
-                          e.target.value === '' ? undefined : parseInt(e.target.value, 10);
-                        setMaxSelections(value);
-                      }}
-                      placeholder="제한 없음"
-                      className="w-full"
-                    />
-                    <p className="text-xs text-gray-500">
-                      {checkboxOptions.length}개 옵션 중 최대 선택 개수
-                    </p>
-                  </div>
-                </div>
-
-                {minSelections !== undefined &&
-                  maxSelections !== undefined &&
-                  minSelections > maxSelections && (
-                    <p className="text-sm text-red-500">
-                      최소 선택 개수는 최대 선택 개수보다 작거나 같아야 합니다.
-                    </p>
-                  )}
-
-                {minSelections !== undefined && minSelections > checkboxOptions.length && (
-                  <p className="text-sm text-red-500">
-                    최소 선택 개수는 옵션 개수보다 작거나 같아야 합니다.
-                  </p>
-                )}
-
-                {maxSelections !== undefined && maxSelections > checkboxOptions.length && (
-                  <p className="text-sm text-red-500">
-                    최대 선택 개수는 옵션 개수보다 작거나 같아야 합니다.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {checkboxOptions.length > 0 && (
-              <div className="space-y-2">
-                <Label>미리보기</Label>
-                <div className="max-h-[150px] overflow-y-auto rounded-md border bg-gray-50 p-3">
-                  {/* 셀 텍스트 설명 (있는 경우) */}
-                  {textContent && textContent.trim() && (
-                    <div className="mb-3 border-b border-gray-200 pb-2 text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
-                      {textContent}
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    {checkboxOptions.map((option) => (
-                      <div key={option.id} className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={option.checked || false}
-                          readOnly
-                          className="rounded"
-                        />
-                        <span className="text-sm">{option.label}</span>
-                        {option.id === OTHER_OPTION_ID && (
-                          <span className="ml-2 text-xs text-blue-600">(텍스트 입력)</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
+            <CellChoiceEditor
+              cellType="checkbox"
+              textContent={textContent}
+              currentQuestionId={currentQuestionId}
+              questions={questions}
+              checkboxOptions={checkboxOptions}
+              onCheckboxOptionsChange={setCheckboxOptions}
+              radioOptions={radioOptions}
+              onRadioOptionsChange={setRadioOptions}
+              radioGroupName={radioGroupName}
+              onRadioGroupNameChange={setRadioGroupName}
+              selectOptions={selectOptions}
+              onSelectOptionsChange={setSelectOptions}
+              allowOtherOption={allowOtherOption}
+              onAllowOtherOptionChange={setAllowOtherOption}
+              minSelections={minSelections}
+              onMinSelectionsChange={setMinSelections}
+              maxSelections={maxSelections}
+              onMaxSelectionsChange={setMaxSelections}
+            />
           </TabsContent>
 
           {/* 라디오 버튼 탭 */}
           <TabsContent value="radio" className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="radio-group-name">라디오 그룹명</Label>
-              <Input
-                id="radio-group-name"
-                value={radioGroupName}
-                onChange={(e) => setRadioGroupName(e.target.value)}
-                placeholder="라디오 버튼 그룹명 (예: payment-type)"
-              />
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label>라디오 버튼 옵션 관리</Label>
-                <div className="flex items-center space-x-4">
-                  {/* 기타 옵션 토글 */}
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="radio-allow-other"
-                      checked={allowOtherOption}
-                      onCheckedChange={handleOtherOptionToggle}
-                      className="scale-75"
-                    />
-                    <Label htmlFor="radio-allow-other" className="text-xs text-gray-600">
-                      기타 옵션 추가
-                    </Label>
-                  </div>
-                  {/* 조건부 분기 토글 */}
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="radio-show-branch"
-                      checked={showBranchSettings}
-                      onCheckedChange={setShowBranchSettings}
-                      className="scale-75"
-                    />
-                    <Label htmlFor="radio-show-branch" className="text-xs text-gray-600">
-                      조건부 분기
-                    </Label>
-                  </div>
-                </div>
-              </div>
-
-              <div className="max-h-[300px] space-y-3 overflow-y-auto pr-2">
-                {radioOptions.map((option, index) => (
-                  <div
-                    key={option.id}
-                    className="overflow-hidden rounded-lg border border-gray-200"
-                  >
-                    <div className="flex items-center gap-2 p-3">
-                      <input
-                        type="radio"
-                        name="preview-radio"
-                        checked={option.selected || false}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            const updated = radioOptions.map((opt, i) => ({
-                              ...opt,
-                              selected: i === index,
-                            }));
-                            setRadioOptions(updated);
-                          }
-                        }}
-                      />
-                      <div className="flex-1 space-y-1">
-                        <div className="flex gap-2">
-                          <Input
-                            value={option.label}
-                            onChange={(e) => {
-                              const updated = [...radioOptions];
-                              updated[index] = { ...option, label: e.target.value };
-                              setRadioOptions(updated);
-                            }}
-                            placeholder="옵션 텍스트"
-                            className="flex-1"
-                          />
-                          <Input
-                            value={option.optionCode || ''}
-                            onChange={(e) => {
-                              const updated = [...radioOptions];
-                              updated[index] = { ...option, optionCode: e.target.value };
-                              setRadioOptions(updated);
-                            }}
-                            placeholder="코드"
-                            className="w-20 text-xs"
-                            title="엑셀 내보내기용 코드 (선택)"
-                          />
-                        </div>
-                        {option.id === OTHER_OPTION_ID && (
-                          <p className="text-xs text-blue-600">🔹 기타 옵션 (수정 가능)</p>
-                        )}
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setRadioOptions((prev) => prev.filter((_, i) => i !== index));
-                        }}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        삭제
-                      </Button>
-                    </div>
-
-                    {/* 분기 규칙 설정 - 토글이 켜져있을 때만 표시 */}
-                    {showBranchSettings && (
-                      <div className="px-3 pb-3">
-                        <BranchRuleEditor
-                          branchRule={option.branchRule}
-                          allQuestions={questions}
-                          currentQuestionId={currentQuestionId}
-                          onChange={(branchRule) => {
-                            const updated = [...radioOptions];
-                            updated[index] = { ...option, branchRule };
-                            setRadioOptions(updated);
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  const newOption: RadioOption = {
-                    id: generateId(),
-                    label: '새 옵션',
-                    value: `option-${radioOptions.length + 1}`,
-                    selected: false,
-                    spssNumericCode: getMaxSpssCode(radioOptions) + 1,
-                  };
-                  setRadioOptions((prev) => [...prev, newOption]);
-                }}
-                className="w-full"
-              >
-                옵션 추가
-              </Button>
-
-              {allowOtherOption && (
-                <div className="rounded-lg bg-blue-50 p-3">
-                  <p className="text-sm text-blue-700">
-                    <strong>💡 기타 옵션이 활성화되었습니다.</strong>
-                    <br />
-                    마지막에 &quot;기타&quot; 라디오 버튼이 자동으로 추가되어 사용자가 직접 텍스트를
-                    입력할 수 있습니다.
-                  </p>
-                </div>
-              )}
-            </div>
-            {radioOptions.length > 0 && (
-              <div className="space-y-2">
-                <Label>미리보기</Label>
-                <div className="max-h-[150px] overflow-y-auto rounded-md border bg-gray-50 p-3">
-                  {/* 셀 텍스트 설명 (있는 경우) */}
-                  {textContent && textContent.trim() && (
-                    <div className="mb-3 border-b border-gray-200 pb-2 text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
-                      {textContent}
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    {radioOptions.map((option) => (
-                      <div key={option.id} className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="preview-radio-display"
-                          checked={option.selected || false}
-                          readOnly
-                        />
-                        <span className="text-sm">{option.label}</span>
-                        {option.id === OTHER_OPTION_ID && (
-                          <span className="ml-2 text-xs text-blue-600">(텍스트 입력)</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
+            <CellChoiceEditor
+              cellType="radio"
+              textContent={textContent}
+              currentQuestionId={currentQuestionId}
+              questions={questions}
+              checkboxOptions={checkboxOptions}
+              onCheckboxOptionsChange={setCheckboxOptions}
+              radioOptions={radioOptions}
+              onRadioOptionsChange={setRadioOptions}
+              radioGroupName={radioGroupName}
+              onRadioGroupNameChange={setRadioGroupName}
+              selectOptions={selectOptions}
+              onSelectOptionsChange={setSelectOptions}
+              allowOtherOption={allowOtherOption}
+              onAllowOtherOptionChange={setAllowOtherOption}
+              minSelections={minSelections}
+              onMinSelectionsChange={setMinSelections}
+              maxSelections={maxSelections}
+              onMaxSelectionsChange={setMaxSelections}
+            />
           </TabsContent>
 
           {/* Select 탭 */}
           <TabsContent value="select" className="space-y-4">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label>Select 옵션 관리</Label>
-                <div className="flex items-center space-x-4">
-                  {/* 기타 옵션 토글 */}
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="select-allow-other"
-                      checked={allowOtherOption}
-                      onCheckedChange={handleOtherOptionToggle}
-                      className="scale-75"
-                    />
-                    <Label htmlFor="select-allow-other" className="text-xs text-gray-600">
-                      기타 옵션 추가
-                    </Label>
-                  </div>
-                  {/* 조건부 분기 토글 */}
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="select-show-branch"
-                      checked={showBranchSettings}
-                      onCheckedChange={setShowBranchSettings}
-                      className="scale-75"
-                    />
-                    <Label htmlFor="select-show-branch" className="text-xs text-gray-600">
-                      조건부 분기
-                    </Label>
-                  </div>
-                </div>
-              </div>
-
-              <div className="max-h-[300px] space-y-3 overflow-y-auto pr-2">
-                {selectOptions.map((option, index) => (
-                  <div
-                    key={option.id}
-                    className="overflow-hidden rounded-lg border border-gray-200"
-                  >
-                    <div className="flex items-center gap-2 p-3">
-                      <div className="flex-1 space-y-1">
-                        <div className="flex gap-2">
-                          <Input
-                            value={option.label}
-                            onChange={(e) => {
-                              const updated = [...selectOptions];
-                              updated[index] = { ...option, label: e.target.value };
-                              setSelectOptions(updated);
-                            }}
-                            placeholder="옵션 텍스트"
-                            className="flex-1"
-                          />
-                          <Input
-                            value={option.optionCode || ''}
-                            onChange={(e) => {
-                              const updated = [...selectOptions];
-                              updated[index] = { ...option, optionCode: e.target.value };
-                              setSelectOptions(updated);
-                            }}
-                            placeholder="코드"
-                            className="w-20 text-xs"
-                            title="엑셀 내보내기용 코드 (선택)"
-                          />
-                        </div>
-                        {option.id === OTHER_OPTION_ID && (
-                          <p className="text-xs text-blue-600">🔹 기타 옵션 (수정 가능)</p>
-                        )}
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectOptions((prev) => prev.filter((_, i) => i !== index));
-                        }}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        삭제
-                      </Button>
-                    </div>
-
-                    {/* 분기 규칙 설정 - 토글이 켜져있을 때만 표시 */}
-                    {showBranchSettings && (
-                      <div className="px-3 pb-3">
-                        <BranchRuleEditor
-                          branchRule={option.branchRule}
-                          allQuestions={questions}
-                          currentQuestionId={currentQuestionId}
-                          onChange={(branchRule) => {
-                            const updated = [...selectOptions];
-                            updated[index] = { ...option, branchRule };
-                            setSelectOptions(updated);
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  const newOption: QuestionOption = {
-                    id: generateId(),
-                    label: '새 옵션',
-                    value: `option-${selectOptions.length + 1}`,
-                    spssNumericCode: getMaxSpssCode(selectOptions) + 1,
-                  };
-                  setSelectOptions((prev) => [...prev, newOption]);
-                }}
-                className="w-full"
-              >
-                옵션 추가
-              </Button>
-
-              {allowOtherOption && (
-                <div className="rounded-lg bg-blue-50 p-3">
-                  <p className="text-sm text-blue-700">
-                    <strong>💡 기타 옵션이 활성화되었습니다.</strong>
-                    <br />
-                    마지막에 &quot;기타&quot; 선택 옵션이 자동으로 추가되어 사용자가 직접 텍스트를
-                    입력할 수 있습니다.
-                  </p>
-                </div>
-              )}
-            </div>
-            {selectOptions.length > 0 && (
-              <div className="space-y-2">
-                <Label>미리보기</Label>
-                <div className="rounded-md border bg-gray-50 p-3">
-                  {/* 셀 텍스트 설명 (있는 경우) */}
-                  {textContent && textContent.trim() && (
-                    <div className="mb-3 border-b border-gray-200 pb-2 text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
-                      {textContent}
-                    </div>
-                  )}
-                  <select className="w-full rounded border p-2">
-                    <option value="">선택하세요...</option>
-                    {selectOptions.map((option) => (
-                      <option key={option.id} value={option.value}>
-                        {option.label}
-                        {option.id === OTHER_OPTION_ID && ' (텍스트 입력)'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            )}
+            <CellChoiceEditor
+              cellType="select"
+              textContent={textContent}
+              currentQuestionId={currentQuestionId}
+              questions={questions}
+              checkboxOptions={checkboxOptions}
+              onCheckboxOptionsChange={setCheckboxOptions}
+              radioOptions={radioOptions}
+              onRadioOptionsChange={setRadioOptions}
+              radioGroupName={radioGroupName}
+              onRadioGroupNameChange={setRadioGroupName}
+              selectOptions={selectOptions}
+              onSelectOptionsChange={setSelectOptions}
+              allowOtherOption={allowOtherOption}
+              onAllowOtherOptionChange={setAllowOtherOption}
+              minSelections={minSelections}
+              onMinSelectionsChange={setMinSelections}
+              maxSelections={maxSelections}
+              onMaxSelectionsChange={setMaxSelections}
+            />
           </TabsContent>
         </Tabs>
 

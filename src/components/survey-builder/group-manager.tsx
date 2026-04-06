@@ -23,6 +23,7 @@ import {
 import { FolderPlus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { useEnsureSurveyInDb } from '@/hooks/use-ensure-survey-in-db';
 import { isUUID } from '@/lib/survey-url';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { QuestionConditionGroup, QuestionGroup } from '@/types/survey';
@@ -49,6 +50,7 @@ export function GroupManager({ className }: GroupManagerProps) {
   const groups = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.groups));
   const questions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
   const surveyId = useSurveyBuilderStore((s) => s.currentSurvey.id);
+  const ensureSurvey = useEnsureSurveyInDb();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<QuestionGroup | null>(null);
@@ -168,6 +170,7 @@ export function GroupManager({ className }: GroupManagerProps) {
       // DB에 그룹 저장
       if (surveyId && isUUID(surveyId)) {
         try {
+          await ensureSurvey();
           const { createQuestionGroup } = await import('@/actions/question-group-actions');
           const createdGroup = await createQuestionGroup({
             surveyId: surveyId,
@@ -259,13 +262,15 @@ export function GroupManager({ className }: GroupManagerProps) {
 
       // DB에 저장 (그룹 ID가 UUID인 경우에만)
       if (surveyId && isUUID(surveyId) && isUUID(editingGroup.id)) {
-        import('@/actions/question-group-actions').then(({ updateQuestionGroup }) => {
-          updateQuestionGroup(editingGroup.id, {
-            displayCondition: conditionGroup,
-          }).catch((error) => {
-            console.error('그룹 표시 조건 저장 실패:', error);
-          });
-        });
+        ensureSurvey().then(() =>
+          import('@/actions/question-group-actions').then(({ updateQuestionGroup }) => {
+            updateQuestionGroup(editingGroup.id, {
+              displayCondition: conditionGroup,
+            }).catch((error) => {
+              console.error('그룹 표시 조건 저장 실패:', error);
+            });
+          }),
+        );
       }
     }
   };
@@ -318,6 +323,7 @@ export function GroupManager({ className }: GroupManagerProps) {
           (!newParentGroupId || isUUID(newParentGroupId))
         ) {
           try {
+            await ensureSurvey();
             const { updateQuestionGroup } = await import('@/actions/question-group-actions');
             await updateQuestionGroup(editingGroup.id, {
               name: groupName.trim(),
@@ -345,6 +351,7 @@ export function GroupManager({ className }: GroupManagerProps) {
         // DB에 저장 (그룹 ID가 UUID인 경우에만)
         if (surveyId && isUUID(surveyId) && isUUID(editingGroup.id)) {
           try {
+            await ensureSurvey();
             const { updateQuestionGroup } = await import('@/actions/question-group-actions');
             await updateQuestionGroup(editingGroup.id, {
               name: groupName.trim(),
@@ -377,6 +384,7 @@ export function GroupManager({ className }: GroupManagerProps) {
       // DB에서 그룹 삭제 (deleteQuestionGroup이 재귀적으로 하위 그룹도 함께 처리)
       if (surveyId && isUUID(surveyId)) {
         try {
+          await ensureSurvey();
           const { deleteQuestionGroup } = await import('@/actions/question-group-actions');
           // 최상위 그룹만 삭제하면, 서버 액션에서 하위 그룹도 함께 처리됨
           await deleteQuestionGroup(groupId);
@@ -435,6 +443,7 @@ export function GroupManager({ className }: GroupManagerProps) {
         // DB에 저장 (UUID인 그룹 ID만 필터링)
         if (surveyId && isUUID(surveyId)) {
           try {
+            await ensureSurvey();
             const { reorderGroups: reorderGroupsAction } = await import('@/actions/question-group-actions');
             const uuidGroupIds = newGroupIds.filter((id) => isUUID(id));
             if (uuidGroupIds.length > 0) {
@@ -474,6 +483,7 @@ export function GroupManager({ className }: GroupManagerProps) {
           // DB에 저장 (그룹 ID가 UUID인 경우에만)
           if (surveyId && isUUID(surveyId)) {
             try {
+              await ensureSurvey();
               const { updateQuestionGroup } = await import('@/actions/question-group-actions');
               await Promise.all(
                 newOrder

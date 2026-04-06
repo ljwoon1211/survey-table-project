@@ -16,10 +16,12 @@ import {
 import {
   deleteSurvey as deleteSurveyAction,
   duplicateSurvey as duplicateSurveyAction,
+} from '@/actions/survey-crud-actions';
+import {
   saveSurveyDiff,
   saveSurveyWithDetails,
-} from '@/actions/survey-crud-actions';
-import type { SurveyDiffPayload } from '@/actions/survey-crud-actions';
+} from '@/actions/survey-save-actions';
+import type { SurveyDiffPayload } from '@/actions/survey-save-actions';
 import {
   useSurveyBuilderStore,
   useSurveyListStore,

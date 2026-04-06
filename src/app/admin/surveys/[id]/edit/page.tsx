@@ -31,7 +31,7 @@ import { useShallow } from 'zustand/react/shallow';
 
 import { isSlugAvailable as checkSlugAvailable } from '@/actions/query-actions';
 import { createQuestion as createQuestionAction } from '@/actions/question-actions';
-import { publishSurvey } from '@/actions/survey-crud-actions';
+import { publishSurvey } from '@/actions/survey-publish-actions';
 import { ImportExportLibraryModal } from '@/components/survey-builder/import-export-library-modal';
 import { QuestionLibraryPanel } from '@/components/survey-builder/question-library-panel';
 import { SaveQuestionModal } from '@/components/survey-builder/save-question-modal';

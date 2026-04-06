@@ -37,6 +37,9 @@ export interface SurveyBuilderState {
   isDirty: boolean; // 변경사항 있음 표시
   isModifiedSincePublish: boolean; // 배포 후 수정되었는지
 
+  // DB 저장 여부 (CREATE 페이지에서 서버 액션 호출 전 설문 존재 보장용)
+  isSavedToDb: boolean;
+
   // Diff 기반 저장을 위한 changeset
   questionChanges: QuestionChangeset;
   isMetadataDirty: boolean; // 설문 메타데이터/그룹 변경 여부
@@ -72,6 +75,7 @@ export interface SurveyBuilderState {
   // 초기화
   resetSurvey: () => void;
   markClean: () => void; // 저장 후 dirty 플래그 초기화
+  markSavedToDb: () => void; // DB에 설문 레코드 생성 완료 마킹
 
   // Diff 저장용 changeset 관리
   snapshotChanges: () => { questionChanges: QuestionChangeset; isMetadataDirty: boolean };
@@ -110,6 +114,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
     immer<SurveyBuilderState>((set, get) => ({
       currentSurvey: createDefaultSurvey(),
       isDirty: false,
+      isSavedToDb: false,
       isModifiedSincePublish: false,
       questionChanges: emptyChangeset(),
       isMetadataDirty: false,
@@ -120,6 +125,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
         set((state) => {
           state.currentSurvey = survey;
           state.isDirty = false;
+          state.isSavedToDb = true;
           state.isModifiedSincePublish = false;
           state.questionChanges = emptyChangeset();
           state.isMetadataDirty = false;
@@ -483,6 +489,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
         set((state) => {
           state.currentSurvey = createDefaultSurvey();
           state.isDirty = false;
+          state.isSavedToDb = false;
           state.isModifiedSincePublish = false;
           state.questionChanges = emptyChangeset();
           state.isMetadataDirty = false;
@@ -493,6 +500,11 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           state.isDirty = false;
           state.questionChanges = emptyChangeset();
           state.isMetadataDirty = false;
+        }),
+
+      markSavedToDb: () =>
+        set((state) => {
+          state.isSavedToDb = true;
         }),
 
       // 저장 시작 시 changeset 스냅샷 후 초기화 (저장 중 새 변경은 새 changeset에 쌓임)

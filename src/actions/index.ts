@@ -4,9 +4,15 @@ export {
   updateSurvey,
   deleteSurvey,
   duplicateSurvey,
-  saveSurveyWithDetails,
-  publishSurvey,
 } from './survey-crud-actions';
+
+export {
+  saveSurveyDiff,
+  saveSurveyWithDetails,
+} from './survey-save-actions';
+export type { SurveyDiffPayload } from './survey-save-actions';
+
+export { publishSurvey } from './survey-publish-actions';
 
 export {
   createQuestionGroup,
