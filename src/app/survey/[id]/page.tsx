@@ -567,18 +567,9 @@ export default function SurveyResponsePage() {
           {/* 연속형 프로그레스바 — 데스크톱/모바일 동일 디자인 */}
           <div className="mt-3">
             <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
-              {/* 완료 영역 (초록) */}
               <div
-                className="absolute inset-y-0 left-0 rounded-full bg-green-500 transition-all duration-500"
-                style={{ width: `${(answeredCount / Math.max(totalVisibleCount, 1)) * 100}%` }}
-              />
-              {/* 현재 위치 (파랑) */}
-              <div
-                className="absolute inset-y-0 rounded-full bg-blue-500 transition-all duration-500"
-                style={{
-                  left: `${((currentVisibleNumber - 1) / Math.max(totalVisibleCount, 1)) * 100}%`,
-                  width: `${Math.max((1 / Math.max(totalVisibleCount, 1)) * 100, 2)}%`,
-                }}
+                className="absolute inset-y-0 left-0 rounded-full bg-blue-500 transition-all duration-500"
+                style={{ width: `${(currentVisibleNumber / Math.max(totalVisibleCount, 1)) * 100}%` }}
               />
             </div>
             {/* 모바일: 요약 텍스트 */}
@@ -600,16 +591,16 @@ export default function SurveyResponsePage() {
       <div className={`${containerMaxWidth} mx-auto px-4 py-6 transition-all duration-300 md:px-6 md:py-8 ${isMobile && !keyboardOpen ? 'pb-28' : ''}`}>
         {/* 모바일: 제목/설명을 카드 밖으로 분리 */}
         {isMobile && (
-          <div className="mb-3">
+          <div className="mb-4 space-y-2.5">
             {currentGroupName && (
-              <span className="mb-2 inline-block rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+              <span className="inline-block rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
                 {currentGroupName}
               </span>
             )}
             <h2
               className={`${
                 titleHasMultipleLines ? 'text-base' : 'text-lg'
-              } leading-relaxed font-semibold break-keep text-gray-900`}
+              } leading-[1.6] font-bold break-keep text-gray-900`}
             >
               {currentQuestion.title}
               {isQuestionRequired(currentQuestion) && (
@@ -618,7 +609,7 @@ export default function SurveyResponsePage() {
             </h2>
             {!isEmptyHtml(currentQuestion.description) && (
               <div
-                className="prose prose-sm mt-2 max-h-[40vh] max-w-none overflow-auto text-sm text-gray-600 [&_p]:min-h-[1.4em] [&_table]:my-2 [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-200 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:px-3 [&_table_td]:py-1.5 [&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:bg-gray-50 [&_table_th]:px-3 [&_table_th]:py-1.5 [&_table_th]:font-semibold"
+                className="prose prose-sm max-h-[40vh] max-w-none overflow-auto leading-relaxed text-[13px] text-gray-500 [&_p]:min-h-[1.5em] [&_p]:leading-relaxed [&_table]:my-2 [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-200 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:px-3 [&_table_td]:py-1.5 [&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:bg-gray-50 [&_table_th]:px-3 [&_table_th]:py-1.5 [&_table_th]:font-semibold"
                 style={{ WebkitOverflowScrolling: 'touch' }}
                 dangerouslySetInnerHTML={{ __html: currentQuestion.description! }}
               />
