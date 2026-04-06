@@ -15,6 +15,10 @@ import { InteractiveCell } from './cells';
 // ── 상수 ──
 
 const SMALL_TABLE_THRESHOLD = 10;
+const PRE_SELECT_MIN_ROWS = 5; // 사전선택 최소 행 수 (5행 이하는 전체 표시가 나음)
+
+// ── 타입: 사전선택 Phase ──
+type StepperPhase = 'group-select' | 'row-select' | 'detail';
 
 // ── 타입 ──
 
@@ -47,7 +51,7 @@ function getRowShortLabel(row: TableRow, idx: number): string {
     return match ? match[0] : `${idx + 1}`;
   }
   if (row.label) {
-    return row.label.length > 6 ? row.label.slice(0, 6) + '…' : row.label;
+    return row.label.length > 12 ? row.label.slice(0, 12) + '…' : row.label;
   }
   return `${idx + 1}`;
 }
@@ -130,8 +134,8 @@ const RowCard = React.memo(function RowCard({
         </div>
       </div>
 
-      <CardContent className="space-y-4 p-4">
-        {inputCells.map(({ cell, colIdx }) => {
+      <CardContent className="space-y-3 p-4">
+        {inputCells.map(({ cell, colIdx }, arrIdx) => {
           const columnLabel = visibleColumns[colIdx]?.label || `항목 ${colIdx + 1}`;
 
           let sectionHeader: string | null = null;
@@ -143,36 +147,64 @@ const RowCard = React.memo(function RowCard({
             }
           }
 
+          // 열 라벨에서 섹션 접두사 제거
+          const shortLabel = sectionHeader
+            ? columnLabel // 섹션 헤더가 방금 바뀌었으면 원본 사용 (첫 항목)
+            : lastSection && columnLabel.startsWith(lastSection)
+              ? columnLabel.slice(lastSection.length).replace(/^[_\s·]+/, '') || columnLabel
+              : columnLabel;
+
+          // 수량+단위 쌍 감지: 다음 셀이 "_단위" 또는 "단위"로 끝나면 한 줄로 묶기
+          const nextEntry = inputCells[arrIdx + 1];
+          const nextLabel = nextEntry ? (visibleColumns[nextEntry.colIdx]?.label || '') : '';
+          const isUnitPairStart = nextLabel.endsWith('_단위') || nextLabel.endsWith('단위');
+          // 현재 셀이 단위 셀이면 이전 셀과 묶여서 이미 렌더링됨 → 스킵
+          const isUnitCell = columnLabel.endsWith('_단위') || columnLabel === '단위';
+          const prevEntry = arrIdx > 0 ? inputCells[arrIdx - 1] : null;
+          const prevLabel = prevEntry ? (visibleColumns[prevEntry.colIdx]?.label || '') : '';
+          const wasAlreadyPaired = isUnitCell && (
+            prevLabel + '_단위' === columnLabel ||
+            columnLabel === '단위'
+          );
+
+          if (wasAlreadyPaired) return null; // 이전 셀과 한 줄로 묶임
+
           return (
             <React.Fragment key={cell.id}>
               {sectionHeader && (
-                <div className="flex items-center gap-2 pt-2 first:pt-0">
+                <div className="flex items-center gap-2 pt-1 first:pt-0">
                   <div className="h-px flex-1 bg-gray-200" />
                   <span className="text-xs font-semibold text-gray-500">{sectionHeader}</span>
                   <div className="h-px flex-1 bg-gray-200" />
                 </div>
               )}
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 {!hideColumnLabels && (
                   <div className="flex items-start gap-1.5">
                     <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
-                    <span className="text-xs font-medium text-gray-600">{columnLabel}</span>
+                    <span className="line-clamp-1 text-xs font-medium text-gray-500">{shortLabel}</span>
                   </div>
                 )}
-                <div
-                  className={cn(
-                    'pl-3',
-                    getAlignmentClasses(cell.horizontalAlign, cell.verticalAlign),
-                  )}
-                >
-                  <InteractiveCell
-                    cell={cell}
-                    questionId={questionId}
-                    isTestMode={isTestMode}
-                    value={value}
-                    onChange={onChange}
-                  />
-                </div>
+                {isUnitPairStart && nextEntry ? (
+                  // 수량 + 단위를 한 줄에 배치
+                  <div className="flex items-end gap-2 pl-3">
+                    <div className="flex-1">
+                      <InteractiveCell cell={cell} questionId={questionId} isTestMode={isTestMode} value={value} onChange={onChange} />
+                    </div>
+                    <div className="w-28 shrink-0">
+                      <InteractiveCell cell={nextEntry.cell} questionId={questionId} isTestMode={isTestMode} value={value} onChange={onChange} />
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className={cn(
+                      'pl-3',
+                      getAlignmentClasses(cell.horizontalAlign, cell.verticalAlign),
+                    )}
+                  >
+                    <InteractiveCell cell={cell} questionId={questionId} isTestMode={isTestMode} value={value} onChange={onChange} />
+                  </div>
+                )}
               </div>
             </React.Fragment>
           );
@@ -279,8 +311,54 @@ export const MobileTableStepper = React.memo(function MobileTableStepper({
     currentGroupIdx === rowGroups.length - 1 &&
     currentRowInGroup === (rowGroups[rowGroups.length - 1]?.rows.length ?? 1) - 1;
 
-  // ── 소형 테이블 ──
-  if (displayRows.length <= SMALL_TABLE_THRESHOLD) {
+  // ── 사전선택 Phase 상태 ──
+  // displayCondition이 없는 테이블 → 사전선택 적용 (이미 필터링된 테이블은 스킵)
+  const hasRowFiltering = displayRows.some((r) => r.displayCondition != null);
+  const needsPreSelect = !hasDynamicRows && !hasRowFiltering && displayRows.length > PRE_SELECT_MIN_ROWS;
+  const skipGroupSelect = rowGroups.length <= 1;
+  const initialPhase: StepperPhase = needsPreSelect
+    ? skipGroupSelect ? 'row-select' : 'group-select'
+    : 'detail';
+
+  const [phase, setPhase] = useState<StepperPhase>(initialPhase);
+  const [preSelectedGroupIndices, setPreSelectedGroupIndices] = useState<Set<number>>(new Set());
+  const [preSelectedRowIds, setPreSelectedRowIds] = useState<Set<string>>(new Set());
+
+  const toggleGroupIndex = useCallback((idx: number) => {
+    setPreSelectedGroupIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) {
+        next.delete(idx);
+        // 해당 그룹의 행도 해제
+        const group = rowGroups[idx];
+        if (group) group.rows.forEach((r) => setPreSelectedRowIds((p) => { const n = new Set(p); n.delete(r.id); return n; }));
+      } else {
+        next.add(idx);
+        // 해당 그룹의 행을 전체 선택
+        const group = rowGroups[idx];
+        if (group) group.rows.forEach((r) => setPreSelectedRowIds((p) => new Set(p).add(r.id)));
+      }
+      return next;
+    });
+  }, [rowGroups]);
+
+  const toggleRowId = useCallback((rowId: string) => {
+    setPreSelectedRowIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowId)) next.delete(rowId);
+      else next.add(rowId);
+      return next;
+    });
+  }, []);
+
+  // 사전선택된 행만 필터링 (Phase 3에서 사용)
+  const filteredRows = useMemo(() => {
+    if (!needsPreSelect || phase !== 'detail') return displayRows;
+    return displayRows.filter((r) => preSelectedRowIds.has(r.id));
+  }, [needsPreSelect, phase, displayRows, preSelectedRowIds]);
+
+  // ── 소형 테이블 (사전선택 대상이 아닐 때만) ──
+  if (!needsPreSelect && displayRows.length <= SMALL_TABLE_THRESHOLD) {
     return (
       <div className="space-y-4">
         {displayRows.map((row) => (
@@ -301,7 +379,160 @@ export const MobileTableStepper = React.memo(function MobileTableStepper({
     );
   }
 
-  // ── 스테퍼 ──
+  // ── 사전선택 Phase 1: 그룹 선택 ──
+  if (phase === 'group-select') {
+    return (
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-gray-700">응답할 항목을 선택하세요</p>
+        {rowGroups.map((group, idx) => (
+          <label
+            key={idx}
+            className={cn(
+              'flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition-all',
+              preSelectedGroupIndices.has(idx)
+                ? 'border-blue-400 bg-blue-50/50'
+                : 'border-gray-200 bg-white',
+            )}
+          >
+            <input
+              type="checkbox"
+              checked={preSelectedGroupIndices.has(idx)}
+              onChange={() => toggleGroupIndex(idx)}
+              className="h-5 w-5 rounded border-gray-300 text-blue-600"
+            />
+            <span className="flex-1 text-sm font-medium text-gray-900">{group.label}</span>
+            <span className="text-xs text-gray-400">{group.rows.length}개</span>
+          </label>
+        ))}
+        <button
+          disabled={preSelectedGroupIndices.size === 0}
+          onClick={() => setPhase('row-select')}
+          className="mt-2 flex w-full items-center justify-center gap-1 rounded-xl bg-blue-600 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400"
+        >
+          상세 입력 ({preSelectedGroupIndices.size}개 선택) <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
+
+  // ── 사전선택 Phase 2: 행 선택 ──
+  if (phase === 'row-select') {
+    const selectedGroups = skipGroupSelect
+      ? rowGroups
+      : rowGroups.filter((_, idx) => preSelectedGroupIndices.has(idx));
+
+    return (
+      <div className="space-y-3">
+        <p className="text-sm font-medium text-gray-700">세부 항목을 선택하세요</p>
+        {selectedGroups.map((group) => (
+          <div key={group.label}>
+            {!skipGroupSelect && (
+              <h3 className="mb-1.5 text-xs font-semibold text-gray-500">{group.label}</h3>
+            )}
+            <div className="space-y-1.5">
+              {group.rows.map((row) => {
+                const label = row.label || row.cells.find((c) => c.type === 'text' && !c.isHidden)?.content || row.id;
+                return (
+                  <label
+                    key={row.id}
+                    className={cn(
+                      'flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-all',
+                      preSelectedRowIds.has(row.id)
+                        ? 'border-blue-400 bg-blue-50/50'
+                        : 'border-gray-200 bg-white',
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={preSelectedRowIds.has(row.id)}
+                      onChange={() => toggleRowId(row.id)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                    />
+                    <span className="text-sm text-gray-900">{label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        <div className="flex gap-2 pt-1">
+          {!skipGroupSelect && (
+            <button
+              onClick={() => setPhase('group-select')}
+              className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600"
+            >
+              <ChevronLeft className="h-4 w-4" /> 그룹
+            </button>
+          )}
+          <button
+            disabled={preSelectedRowIds.size === 0}
+            onClick={() => { setPhase('detail'); setCurrentGroupIdx(0); setCurrentRowInGroup(0); }}
+            className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400"
+          >
+            상세 입력 ({preSelectedRowIds.size}개 선택) <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── 사전선택 Phase 3: 상세 입력 (선택된 행만) ──
+  if (needsPreSelect && phase === 'detail' && filteredRows.length > 0) {
+    const detailIdx = currentRowInGroup;
+    const detailRow = filteredRows[detailIdx] || filteredRows[0];
+    if (!detailRow) return null;
+
+    const detailIsFirst = detailIdx === 0;
+    const detailIsLast = detailIdx === filteredRows.length - 1;
+    const detailCompletedCount = filteredRows.filter((r) => rowCompletionMap.get(r.id)).length;
+
+    return (
+      <div className="space-y-3">
+        <button
+          onClick={() => setPhase(skipGroupSelect ? 'row-select' : 'row-select')}
+          className="flex items-center gap-1 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800"
+        >
+          <ChevronLeft className="h-4 w-4" /> 항목 선택으로 돌아가기
+        </button>
+
+        <div className="flex items-center justify-between text-xs text-gray-400">
+          <span>{detailIdx + 1} / {filteredRows.length}</span>
+          <span>{detailCompletedCount} / {filteredRows.length} 완료</span>
+        </div>
+
+        <RowCard
+          row={detailRow}
+          visibleColumns={visibleColumns}
+          columnSectionMap={columnSectionMap}
+          completed={rowCompletionMap.get(detailRow.id) ?? false}
+          hideColumnLabels={hideColumnLabels}
+          questionId={questionId}
+          isTestMode={isTestMode}
+          value={value}
+          onChange={onChange}
+        />
+
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={() => setCurrentRowInGroup((c) => Math.max(0, c - 1))}
+            disabled={detailIsFirst}
+            className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-gray-200 bg-white py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <ChevronLeft className="h-4 w-4" /> 이전
+          </button>
+          <button
+            onClick={() => setCurrentRowInGroup((c) => Math.min(filteredRows.length - 1, c + 1))}
+            disabled={detailIsLast}
+            className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-blue-600 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+          >
+            다음 <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── 기존 스테퍼 (사전선택 불필요 or dynamicRows) ──
   const currentGroup = rowGroups[currentGroupIdx] || rowGroups[0];
   if (!currentGroup) return null;
   const currentRow = currentGroup.rows[currentRowInGroup];
@@ -357,7 +588,7 @@ export const MobileTableStepper = React.memo(function MobileTableStepper({
                 )}
               >
                 {allDone && !isActive && <Check className="h-3 w-3" />}
-                <span className="max-w-[120px] truncate">{group.label}</span>
+                <span className="max-w-[180px] truncate">{group.label}</span>
               </button>
             );
           })}

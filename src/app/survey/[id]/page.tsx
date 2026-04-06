@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useParams, useRouter } from 'next/navigation';
 
-import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle, Loader2, Lock } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle, ChevronLeft, ChevronRight, Loader2, Lock } from 'lucide-react';
 
 import {
   getSurveyByPrivateToken,
@@ -15,7 +15,7 @@ import { completeResponse, startResponse } from '@/actions/response-actions';
 import { QuestionInput } from '@/components/survey-response/question-input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
+
 import { useMultiLineDetection } from '@/hooks/use-line-count-detection';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { parsesurveyIdentifier } from '@/lib/survey-url';
@@ -61,6 +61,16 @@ export default function SurveyResponsePage() {
   const [questionHistory, setQuestionHistory] = useState<number[]>([]);
   const [responseStarted, setResponseStarted] = useState(false);
   const [versionId, setVersionId] = useState<string | null>(null);
+
+  // iOS 키보드 감지 (#7) — 키보드 올라오면 고정 하단바 숨김
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const handler = () => setKeyboardOpen(vv.height < window.innerHeight * 0.75);
+    vv.addEventListener('resize', handler);
+    return () => vv.removeEventListener('resize', handler);
+  }, []);
 
   // URL 식별자로 설문 조회
   useEffect(() => {
@@ -155,7 +165,8 @@ export default function SurveyResponsePage() {
 
   const totalVisibleCount = visibleQuestions.length;
 
-  const progress = totalVisibleCount > 0 ? (currentVisibleNumber / totalVisibleCount) * 100 : 0;
+  // 필수 미응답 하이라이트 상태 (제출 시도 후)
+  const [showRequiredHighlight, setShowRequiredHighlight] = useState(false);
 
   const findNextDisplayableIndex = useCallback(
     (startIndex: number): number => {
@@ -242,7 +253,6 @@ export default function SurveyResponsePage() {
         return response !== null && response !== undefined && response !== '';
       case 'checkbox':
         if (!Array.isArray(response) || response.length === 0) return false;
-        // 최소 선택 개수 검증
         if (question.minSelections !== undefined && question.minSelections > 0) {
           return response.length >= question.minSelections;
         }
@@ -260,6 +270,18 @@ export default function SurveyResponsePage() {
     }
   };
 
+  // 응답 완료 카운트 (피드백)
+  const answeredCount = useMemo(
+    () => visibleQuestions.filter((q) => isQuestionAnswered(q)).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [visibleQuestions, responses],
+  );
+  const requiredRemaining = useMemo(
+    () => visibleQuestions.filter((q) => q.required && !isQuestionAnswered(q)).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [visibleQuestions, responses],
+  );
+
   const canProceed = () => {
     if (!currentQuestion) return false;
     return !isQuestionRequired(currentQuestion) || isQuestionAnswered(currentQuestion);
@@ -276,7 +298,7 @@ export default function SurveyResponsePage() {
     });
 
     if (nextIndex === -1) {
-      // 마지막 질문이면 제출
+      // 마지막 질문 — 제출 확인: 버튼이 이미 "제출"로 표시되므로 진행 (#19)
       handleSubmit();
       return;
     } else if (nextIndex < questions.length) {
@@ -288,6 +310,7 @@ export default function SurveyResponsePage() {
       }
       // 다음 질문으로 이동
       setCurrentQuestionIndex(nextDisplayable);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -303,8 +326,37 @@ export default function SurveyResponsePage() {
       setCurrentQuestionIndex(previousQuestionIndex);
       // 현재 질문 인덱스를 히스토리에서 제거
       setQuestionHistory((prev) => prev.slice(0, lastIndex));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
+
+  // 브라우저 뒤로가기 → 이전 질문 이동 (#24)
+  const hasResponses = Object.keys(responses).length > 0;
+  useEffect(() => {
+    if (!loadedSurvey || isCompleted) return;
+
+    window.history.pushState({ questionIndex: currentQuestionIndex }, '');
+
+    const handlePopState = () => {
+      if (questionHistory.length > 0) {
+        handlePrevious();
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedSurvey, currentQuestionIndex, isCompleted]);
+
+  // 페이지 이탈 시 경고 (#29)
+  useEffect(() => {
+    if (!hasResponses || isCompleted) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hasResponses, isCompleted]);
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
@@ -317,18 +369,20 @@ export default function SurveyResponsePage() {
       });
 
       if (unansweredRequired.length > 0) {
-        const errorMessages = unansweredRequired.map((q) => {
-          if (q.type === 'checkbox' && q.minSelections !== undefined && q.minSelections > 0) {
-            const response = responses[q.id];
-            const count = Array.isArray(response) ? response.length : 0;
-            return `${q.title} (최소 ${q.minSelections}개 선택 필요, 현재 ${count}개 선택됨)`;
-          }
-          return q.title;
-        });
-        alert(`다음 필수 질문에 답해주세요:\n${errorMessages.join('\n')}`);
+        // 세그먼트에 필수 미응답 하이라이트 (#4 Step 4)
+        setShowRequiredHighlight(true);
+        // 첫 번째 미응답 필수 질문으로 이동
+        const firstUnanswered = unansweredRequired[0];
+        const targetIdx = questions.findIndex((q) => q.id === firstUnanswered.id);
+        if (targetIdx !== -1 && targetIdx !== currentQuestionIndex) {
+          setCurrentQuestionIndex(targetIdx);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
         setIsSubmitting(false);
         return;
       }
+      // 제출 성공 시 하이라이트 해제
+      setShowRequiredHighlight(false);
 
       // 서버에 응답 및 노출 데이터 저장
       if (currentResponseId) {
@@ -393,6 +447,13 @@ export default function SurveyResponsePage() {
       setIsSubmitting(false);
     }
   };
+
+  // 현재 질문의 그룹명 조회
+  const currentGroupName = useMemo(() => {
+    if (!currentQuestion?.groupId) return null;
+    const group = groups.find((g) => g.id === currentQuestion.groupId);
+    return group?.name || null;
+  }, [currentQuestion?.groupId, groups]);
 
   // 로딩 중
   if (isLoading) {
@@ -489,65 +550,112 @@ export default function SurveyResponsePage() {
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
       <div className="border-b border-gray-200 bg-white">
-        <div className={`${containerMaxWidth} mx-auto px-6 py-4 transition-all duration-300`}>
+        <div className={`${containerMaxWidth} mx-auto px-4 py-4 transition-all duration-300 md:px-6`}>
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-xl font-semibold text-gray-900">{loadedSurvey.title}</h1>
+              <h1 className="text-lg font-semibold text-gray-900 md:text-xl">{loadedSurvey.title}</h1>
               {!isEmptyHtml(loadedSurvey.description) && (
                 <p className="mt-1 text-sm text-gray-600">{loadedSurvey.description}</p>
               )}
             </div>
-            <div className="self-start text-sm text-gray-500 md:self-auto">
+            <div className="hidden self-start text-sm text-gray-500 md:block md:self-auto">
               {currentVisibleNumber || 1} / {Math.max(totalVisibleCount, 1)}
               <span className="ml-2 text-xs text-gray-400">(전체 {questions.length}개)</span>
             </div>
           </div>
 
-          {loadedSurvey.settings.showProgressBar && (
-            <div className="mt-4">
-              <Progress value={progress} className="w-full" />
+          {/* 연속형 프로그레스바 — 데스크톱/모바일 동일 디자인 */}
+          <div className="mt-3">
+            <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+              {/* 완료 영역 (초록) */}
+              <div
+                className="absolute inset-y-0 left-0 rounded-full bg-green-500 transition-all duration-500"
+                style={{ width: `${(answeredCount / Math.max(totalVisibleCount, 1)) * 100}%` }}
+              />
+              {/* 현재 위치 (파랑) */}
+              <div
+                className="absolute inset-y-0 rounded-full bg-blue-500 transition-all duration-500"
+                style={{
+                  left: `${((currentVisibleNumber - 1) / Math.max(totalVisibleCount, 1)) * 100}%`,
+                  width: `${Math.max((1 / Math.max(totalVisibleCount, 1)) * 100, 2)}%`,
+                }}
+              />
             </div>
-          )}
+            {/* 모바일: 요약 텍스트 */}
+            {isMobile && (
+              <div className="mt-1.5 flex items-center justify-between text-[11px] text-gray-400">
+                <span>{answeredCount}/{totalVisibleCount} 응답 완료</span>
+                {requiredRemaining > 0 && (
+                  <span className={showRequiredHighlight ? 'font-medium text-orange-500' : ''}>
+                    필수 {requiredRemaining}개 남음
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* 메인 콘텐츠 */}
-      <div className={`${containerMaxWidth} mx-auto px-6 py-8 transition-all duration-300`}>
-        <Card>
-          <CardHeader className="pb-4">
-            <div className="flex items-start gap-4">
-              <span className="mt-0.5 hidden h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-600 shadow-sm md:flex">
-                {currentVisibleNumber || 1}
+      <div className={`${containerMaxWidth} mx-auto px-4 py-6 transition-all duration-300 md:px-6 md:py-8 ${isMobile && !keyboardOpen ? 'pb-28' : ''}`}>
+        {/* 모바일: 제목/설명을 카드 밖으로 분리 */}
+        {isMobile && (
+          <div className="mb-3">
+            {currentGroupName && (
+              <span className="mb-2 inline-block rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+                {currentGroupName}
               </span>
-              <div className="min-w-0 flex-1">
-                <CardTitle
-                  className={`${
-                    titleHasMultipleLines
-                      ? 'text-base md:text-2xl'
-                      : 'text-xl md:text-2xl'
-                  } leading-relaxed font-semibold break-keep text-gray-900`}
-                >
-                  {currentQuestion.title}
-                  {isQuestionRequired(currentQuestion) && (
-                    <span className="ml-1.5 align-top text-sm text-red-500" aria-label="필수 질문">
-                      *
-                    </span>
-                  )}
-                </CardTitle>
-                {!isEmptyHtml(currentQuestion.description) && (
-                  <div
-                    className="prose prose-base mt-3 max-h-[60vh] max-w-none overflow-auto text-base text-gray-600 [&_p]:min-h-[1.6em] [&_table]:my-2 [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-200 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:px-4 [&_table_td]:py-2 [&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:bg-gray-50 [&_table_th]:px-4 [&_table_th]:py-2 [&_table_th]:font-semibold"
-                    style={{
-                      WebkitOverflowScrolling: 'touch',
-                    }}
-                    dangerouslySetInnerHTML={{ __html: currentQuestion.description! }}
-                  />
-                )}
-              </div>
-            </div>
-          </CardHeader>
+            )}
+            <h2
+              className={`${
+                titleHasMultipleLines ? 'text-base' : 'text-lg'
+              } leading-relaxed font-semibold break-keep text-gray-900`}
+            >
+              {currentQuestion.title}
+              {isQuestionRequired(currentQuestion) && (
+                <span className="ml-1 align-top text-sm text-red-500" aria-label="필수 질문">*</span>
+              )}
+            </h2>
+            {!isEmptyHtml(currentQuestion.description) && (
+              <div
+                className="prose prose-sm mt-2 max-h-[40vh] max-w-none overflow-auto text-sm text-gray-600 [&_p]:min-h-[1.4em] [&_table]:my-2 [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-200 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:px-3 [&_table_td]:py-1.5 [&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:bg-gray-50 [&_table_th]:px-3 [&_table_th]:py-1.5 [&_table_th]:font-semibold"
+                style={{ WebkitOverflowScrolling: 'touch' }}
+                dangerouslySetInnerHTML={{ __html: currentQuestion.description! }}
+              />
+            )}
+          </div>
+        )}
 
-          <CardContent className={isTableQuestion ? '' : 'md:px-16'}>
+        <Card key={currentQuestion.id} className="animate-in fade-in duration-200">
+          {/* 데스크톱: 기존 카드 안에 제목+설명 유지 */}
+          {!isMobile && (
+            <CardHeader className="pb-4">
+              <div className="flex items-start gap-4">
+                <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-600 shadow-sm">
+                  {currentVisibleNumber || 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <CardTitle className="text-2xl leading-relaxed font-semibold break-keep text-gray-900">
+                    {currentQuestion.title}
+                    {isQuestionRequired(currentQuestion) && (
+                      <span className="ml-1.5 align-top text-sm text-red-500" aria-label="필수 질문">
+                        *
+                      </span>
+                    )}
+                  </CardTitle>
+                  {!isEmptyHtml(currentQuestion.description) && (
+                    <div
+                      className="prose prose-base mt-3 max-h-[60vh] max-w-none overflow-auto text-base text-gray-600 [&_p]:min-h-[1.6em] [&_table]:my-2 [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-200 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:px-4 [&_table_td]:py-2 [&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:bg-gray-50 [&_table_th]:px-4 [&_table_th]:py-2 [&_table_th]:font-semibold"
+                      style={{ WebkitOverflowScrolling: 'touch' }}
+                      dangerouslySetInnerHTML={{ __html: currentQuestion.description! }}
+                    />
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+          )}
+
+          <CardContent className={`${isMobile ? 'p-4' : ''} ${isTableQuestion ? '' : 'md:px-16'}`}>
             <div className="space-y-4">
               <QuestionInput
                 question={currentQuestion}
@@ -560,8 +668,8 @@ export default function SurveyResponsePage() {
           </CardContent>
         </Card>
 
-        {/* 네비게이션 */}
-        <div className="mt-8 flex items-center justify-between">
+        {/* 데스크톱 네비게이션 */}
+        <div className="mt-8 hidden items-center justify-between md:flex">
           <Button variant="outline" onClick={handlePrevious} disabled={!hasPreviousDisplayable}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             이전
@@ -585,6 +693,53 @@ export default function SurveyResponsePage() {
           )}
         </div>
       </div>
+
+      {/* 모바일 고정 하단 네비게이션 (#4: 테이블 질문은 MobileTableStepper가 자체 네비게이션 보유 → 숨김) */}
+      {isMobile && !keyboardOpen && (
+        <div
+          className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.05)] md:hidden"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        >
+          <div className="flex items-center justify-between px-4 py-3">
+            <button
+              onClick={handlePrevious}
+              disabled={!hasPreviousDisplayable}
+              className="flex items-center gap-1 rounded-lg px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 active:scale-[0.98] disabled:pointer-events-none disabled:text-gray-300"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              이전
+            </button>
+
+            <div className="flex flex-col items-center">
+              <span className="text-sm font-medium text-gray-900">
+                {currentVisibleNumber || 1} / {Math.max(totalVisibleCount, 1)}
+              </span>
+              {isQuestionRequired(currentQuestion) && !isQuestionAnswered(currentQuestion) && (
+                <span className="text-[11px] text-red-500">필수 질문</span>
+              )}
+            </div>
+
+            {isLastVisibleStep ? (
+              <button
+                onClick={handleNext}
+                disabled={!canProceed() || isSubmitting}
+                className="flex items-center gap-1 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.98] disabled:pointer-events-none disabled:bg-gray-200 disabled:text-gray-400"
+              >
+                {isSubmitting ? '제출 중...' : '제출'}
+              </button>
+            ) : (
+              <button
+                onClick={handleNext}
+                disabled={!canProceed()}
+                className="flex items-center gap-1 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.98] disabled:pointer-events-none disabled:bg-gray-200 disabled:text-gray-400"
+              >
+                다음
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
