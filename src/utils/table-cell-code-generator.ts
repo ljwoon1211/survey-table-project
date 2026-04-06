@@ -1,4 +1,4 @@
-import type { TableCell, TableColumn, TableRow } from '@/types/survey';
+import type { Question, TableCell, TableColumn, TableRow } from '@/types/survey';
 
 import { generateAllOptionCodes } from './option-code-generator';
 
@@ -21,6 +21,45 @@ function isEffectivelyCustomLabel(cell: TableCell): boolean {
   if (cell.isCustomExportLabel === true) return true;
   if (cell.isCustomExportLabel === undefined && cell.exportLabel) return true;
   return false;
+}
+
+// ── SPSS 변수명 폴백 생성 (내보내기용, 자릿수 패딩 포함) ──
+
+/**
+ * SPSS 내보내기 시 cellCode가 없는 셀의 폴백 변수명을 생성한다.
+ * 행/열 수에 따라 자릿수를 자동 패딩하여 정렬 보장.
+ *
+ * 예) 행 15개, 열 3개:
+ *   Q1_r01_c1, Q1_r02_c1, ..., Q1_r15_c3
+ *
+ * 예) 행 3개, 열 12개:
+ *   Q1_r1_c01, Q1_r1_c02, ..., Q1_r3_c12
+ */
+export function buildTableCellVarName(
+  q: Question,
+  row: TableRow,
+  colIdx: number,
+  columns: TableColumn[],
+  rows: TableRow[],
+): string {
+  const qCode = q.questionCode || q.id.slice(0, 8);
+
+  // rowCode가 있으면 그대로 사용, 없으면 행 인덱스 기반 패딩 생성
+  let rCode = row.rowCode;
+  if (!rCode) {
+    const rowIdx = rows.indexOf(row);
+    const rowPad = rows.length >= 100 ? 3 : rows.length >= 10 ? 2 : 1;
+    rCode = `r${String((rowIdx === -1 ? 0 : rowIdx) + 1).padStart(rowPad, '0')}`;
+  }
+
+  // columnCode가 있으면 그대로 사용, 없으면 열 인덱스 기반 패딩 생성
+  let cCode = columns[colIdx]?.columnCode;
+  if (!cCode) {
+    const colPad = columns.length >= 100 ? 3 : columns.length >= 10 ? 2 : 1;
+    cCode = `c${String(colIdx + 1).padStart(colPad, '0')}`;
+  }
+
+  return `${qCode}_${rCode}_${cCode}`;
 }
 
 // ── 셀코드 생성 ──

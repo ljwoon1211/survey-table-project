@@ -5,6 +5,7 @@ import type { Question, SurveySubmission } from '@/types/survey';
 import { transformCheckbox, transformSingleChoice, transformTableCell, transformText } from '@/lib/spss/data-transformer';
 import { generateFullSyntax } from '@/lib/spss/spss-syntax-generator';
 import { getOtherOptionCode } from '@/utils/option-code-generator';
+import { buildTableCellVarName } from '@/utils/table-cell-code-generator';
 
 export interface SPSSExportColumn {
   spssVarName: string;
@@ -121,7 +122,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
           // 변수명: cellCode > questionCode_rowCode_colCode (폴백)
           // exportLabel은 한국어가 포함될 수 있어 SPSS 변수명으로 부적합
           const varName = cell.cellCode
-            || `${q.questionCode || q.id.slice(0, 8)}_${tRow.rowCode || `r${tRow.id.slice(0, 4)}`}_${q.tableColumns[colIdx].columnCode || `c${colIdx + 1}`}`;
+            || buildTableCellVarName(q, tRow, colIdx, q.tableColumns, q.tableRowsData!);
 
           // checkbox 셀: checkboxOptions가 있으면 옵션별 분리 변수 생성
           if (cell.type === 'checkbox' && cell.checkboxOptions && cell.checkboxOptions.length > 0) {
