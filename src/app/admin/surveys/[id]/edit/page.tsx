@@ -22,9 +22,7 @@ import {
   Rocket,
   Save,
   Share2,
-  Sparkles,
   Table,
-  Tv,
   Type,
 } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
@@ -48,7 +46,6 @@ import { generateSlugFromTitle, validateSlug } from '@/lib/survey-url';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { useSurveyUIStore } from '@/stores/ui-store';
 import { Question } from '@/types/survey';
-import { generateOTTSurvey } from '@/utils/ott-survey-generator';
 
 const questionTypes = [
   {
@@ -159,6 +156,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   const [slugError, setSlugError] = useState('');
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [addingQuestionIds, setAddingQuestionIds] = useState<Set<string>>(new Set());
+  const [initializedSurveyId, setInitializedSurveyId] = useState<string | null>(null);
 
   // 라이브러리 관련 상태
   const [leftSidebarTab, setLeftSidebarTab] = useState<'types' | 'library'>('types');
@@ -167,14 +165,15 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   const [showImportExportModal, setShowImportExportModal] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
 
-  // 설문 불러오기 - TanStack Query 데이터가 로드되면 스토어에 설정
+  // 설문 불러오기 - 초기 로드 또는 다른 설문으로 전환 시에만 스토어 세팅
   useEffect(() => {
-    if (survey) {
-      useSurveyBuilderStore.setState({ currentSurvey: survey });
+    if (survey && initializedSurveyId !== id) {
+      useSurveyBuilderStore.getState().setSurvey(survey);
       setTitleInput(survey.title);
       setSlugInput(survey.slug || '');
+      setInitializedSurveyId(id);
     }
-  }, [survey]);
+  }, [survey, initializedSurveyId, id]);
 
   // 슬러그 입력 핸들러 (입력값만 업데이트, 서버 호출은 제거)
   const handleSlugChange = (value: string) => {
@@ -267,19 +266,6 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // OTT 설문지 예제 추가 함수
-  const handleAddOTTSurvey = () => {
-    const ottQuestion = generateOTTSurvey();
-    const currentTitle = useSurveyBuilderStore.getState().currentSurvey.title;
-
-    if (currentTitle === '새 설문조사') {
-      updateSurveyTitle('OTT 서비스 이용 현황 조사');
-      setTitleInput('OTT 서비스 이용 현황 조사');
-    }
-
-    addPreparedQuestion(ottQuestion);
-  };
-
   // 설문 저장 (diff 기반)
   const handleSaveSurvey = async () => {
     const latestSurvey = useSurveyBuilderStore.getState().currentSurvey;
@@ -292,7 +278,12 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
       await saveSurvey();
       setShowSaveModal(true);
     } catch (error) {
-      console.error('설문 저장 실패:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes('이미 사용 중인 URL') || message.includes('slug_unique') || message.includes('23505')) {
+        setSlugError('이미 사용 중인 URL입니다. 다른 URL을 입력해주세요.');
+      } else {
+        alert('설문 저장에 실패했습니다. 다시 시도해주세요.');
+      }
     }
   };
 
@@ -602,30 +593,6 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                       </Card>
                     );
                   })}
-                </div>
-
-                {/* OTT 설문지 예제 버튼 */}
-                <div className="mt-6 border-t border-gray-200 pt-6">
-                  <h4 className="mb-3 text-sm font-medium text-gray-700">설문 예제</h4>
-                  <Card
-                    className="hover-lift cursor-pointer border-gray-200 p-4 transition-all duration-200 hover:border-orange-200"
-                    onClick={handleAddOTTSurvey}
-                  >
-                    <div className="flex items-start space-x-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 text-orange-600">
-                        <Tv className="h-5 w-5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h4 className="flex items-center gap-1 text-sm font-medium text-gray-900">
-                          OTT 설문지
-                          <Sparkles className="h-3 w-3 text-yellow-500" />
-                        </h4>
-                        <p className="mt-1 text-xs text-gray-500">
-                          업로드한 이미지와 동일한 OTT 서비스 설문지
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
                 </div>
 
                 <div className="mt-6 border-t border-gray-200 pt-6">

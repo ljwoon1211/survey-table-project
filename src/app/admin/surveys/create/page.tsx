@@ -28,9 +28,7 @@ import {
   RefreshCw,
   Save,
   Share2,
-  Sparkles,
   Table,
-  Tv,
   Type,
 } from 'lucide-react';
 
@@ -58,7 +56,6 @@ import { generateId } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { useSurveyUIStore } from '@/stores/ui-store';
 import { Question } from '@/types/survey';
-import { generateOTTSurvey } from '@/utils/ott-survey-generator';
 
 const questionTypes = [
   {
@@ -276,20 +273,6 @@ export default function CreateSurveyPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // OTT 설문지 예제 추가 함수
-  const handleAddOTTSurvey = () => {
-    const ottQuestion = generateOTTSurvey();
-
-    // 설문 제목을 OTT 관련으로 업데이트
-    if (currentSurvey.title === '새 설문조사') {
-      updateSurveyTitle('OTT 서비스 이용 현황 조사');
-      setTitleInput('OTT 서비스 이용 현황 조사');
-    }
-
-    // 질문을 현재 설문에 추가
-    addPreparedQuestion(ottQuestion);
-  };
-
   // 설문 저장
   const handleSaveSurvey = async () => {
     // ID가 없으면 새로 생성
@@ -300,10 +283,19 @@ export default function CreateSurveyPage() {
       await handleAutoGenerateSlug();
     }
 
-    await saveSurvey(surveyToSave);
-    setShowSaveModal(true);
-    setCopySuccess(false);
-    setIsEditingSlugInModal(false);
+    try {
+      await saveSurvey(surveyToSave);
+      setShowSaveModal(true);
+      setCopySuccess(false);
+      setIsEditingSlugInModal(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.includes('이미 사용 중인 URL') || message.includes('slug_unique') || message.includes('23505')) {
+        setSlugError('이미 사용 중인 URL입니다. 다른 URL을 입력해주세요.');
+      } else {
+        alert('설문 저장에 실패했습니다. 다시 시도해주세요.');
+      }
+    }
   };
 
   // 맨 위로 스크롤
@@ -443,30 +435,6 @@ export default function CreateSurveyPage() {
                       </Card>
                     );
                   })}
-                </div>
-
-                {/* OTT 설문지 예제 버튼 */}
-                <div className="mt-6 border-t border-gray-200 pt-6">
-                  <h4 className="mb-3 text-sm font-medium text-gray-700">설문 예제</h4>
-                  <Card
-                    className="hover-lift cursor-pointer border-gray-200 p-4 transition-all duration-200 hover:border-orange-200"
-                    onClick={handleAddOTTSurvey}
-                  >
-                    <div className="flex items-start space-x-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 text-orange-600">
-                        <Tv className="h-5 w-5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h4 className="flex items-center gap-1 text-sm font-medium text-gray-900">
-                          OTT 설문지
-                          <Sparkles className="h-3 w-3 text-yellow-500" />
-                        </h4>
-                        <p className="mt-1 text-xs text-gray-500">
-                          업로드한 이미지와 동일한 OTT 서비스 설문지
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
                 </div>
 
                 <div className="mt-6 border-t border-gray-200 pt-6">
