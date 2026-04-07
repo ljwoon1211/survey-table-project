@@ -192,12 +192,12 @@ export function CellChoiceEditor({
                         className="flex-1"
                       />
                       <Input
-                        type="number"
-                        min={1}
+                        inputMode="numeric"
                         value={option.spssNumericCode ?? ''}
                         onChange={(e) => {
+                          const v = e.target.value.replace(/\D/g, '');
                           const updated = [...checkboxOptions];
-                          updated[index] = { ...option, spssNumericCode: e.target.value ? parseInt(e.target.value, 10) : undefined };
+                          updated[index] = { ...option, spssNumericCode: v ? parseInt(v, 10) : undefined };
                           onCheckboxOptionsChange(updated);
                         }}
                         placeholder={String(index + 1)}
@@ -459,12 +459,12 @@ export function CellChoiceEditor({
                         className="flex-1"
                       />
                       <Input
-                        type="number"
-                        min={1}
+                        inputMode="numeric"
                         value={option.spssNumericCode ?? ''}
                         onChange={(e) => {
+                          const v = e.target.value.replace(/\D/g, '');
                           const updated = [...radioOptions];
-                          updated[index] = { ...option, spssNumericCode: e.target.value ? parseInt(e.target.value, 10) : undefined };
+                          updated[index] = { ...option, spssNumericCode: v ? parseInt(v, 10) : undefined };
                           onRadioOptionsChange(updated);
                         }}
                         placeholder={String(index + 1)}
@@ -627,12 +627,12 @@ export function CellChoiceEditor({
                       className="flex-1"
                     />
                     <Input
-                      type="number"
-                      min={1}
+                      inputMode="numeric"
                       value={option.spssNumericCode ?? ''}
                       onChange={(e) => {
+                        const v = e.target.value.replace(/\D/g, '');
                         const updated = [...selectOptions];
-                        updated[index] = { ...option, spssNumericCode: e.target.value ? parseInt(e.target.value, 10) : undefined };
+                        updated[index] = { ...option, spssNumericCode: v ? parseInt(v, 10) : undefined };
                         onSelectOptionsChange(updated);
                       }}
                       placeholder={String(index + 1)}

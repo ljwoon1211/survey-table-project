@@ -1005,12 +1005,14 @@ function SortableOptionItem({
         </div>
 
         <Input
-          type="number"
-          min={1}
+          inputMode="numeric"
           value={option.spssNumericCode ?? ''}
-          onChange={(e) => updateOption(option.id, {
-            spssNumericCode: e.target.value ? parseInt(e.target.value, 10) : undefined,
-          })}
+          onChange={(e) => {
+            const v = e.target.value.replace(/\D/g, '');
+            updateOption(option.id, {
+              spssNumericCode: v ? parseInt(v, 10) : undefined,
+            });
+          }}
           className="w-14 text-center text-xs"
           title="응답값"
           placeholder={String(index + 1)}
