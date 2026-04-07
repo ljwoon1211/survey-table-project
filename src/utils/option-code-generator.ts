@@ -21,8 +21,10 @@ export function getMaxSpssCode(options?: { spssNumericCode?: number }[]): number
   );
 }
 
-/** 기타 옵션의 코드��� 구한다 (max spssNumericCode + 1) */
-export function getOtherOptionCode(options?: { spssNumericCode?: number }[]): string {
+/** 기타 옵션의 코드를 구한다 (other-option의 spssNumericCode, 없으면 max + 1 fallback) */
+export function getOtherOptionCode(options?: { id?: string; spssNumericCode?: number }[]): string {
+  const otherOpt = options?.find((o) => o.id === 'other-option');
+  if (otherOpt?.spssNumericCode != null) return String(otherOpt.spssNumericCode);
   return String(getMaxSpssCode(options) + 1);
 }
 
