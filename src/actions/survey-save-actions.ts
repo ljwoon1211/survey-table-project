@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 
 import { db } from '@/db';
 import {
@@ -50,6 +50,17 @@ export async function saveSurveyDiff(payload: SurveyDiffPayload) {
   await requireAuth();
 
   const { surveyId, metadata, groups: incomingGroups, questionChanges } = payload;
+
+  // slug 중복 사전 검사
+  if (metadata?.slug) {
+    const duplicate = await db.query.surveys.findFirst({
+      where: and(eq(surveys.slug, metadata.slug), sql`${surveys.id} != ${surveyId}`),
+      columns: { id: true },
+    });
+    if (duplicate) {
+      throw new Error('이미 사용 중인 URL입니다. 다른 URL을 입력해주세요.');
+    }
+  }
 
   return await db.transaction(async (tx) => {
     // 1. 메타데이터 업데이트
@@ -261,6 +272,17 @@ export async function saveSurveyDiff(payload: SurveyDiffPayload) {
 
 export async function saveSurveyWithDetails(surveyData: SurveyType) {
   await requireAuth();
+
+  // slug 중복 사전 검사
+  if (surveyData.slug) {
+    const duplicate = await db.query.surveys.findFirst({
+      where: and(eq(surveys.slug, surveyData.slug), sql`${surveys.id} != ${surveyData.id}`),
+      columns: { id: true },
+    });
+    if (duplicate) {
+      throw new Error('이미 사용 중인 URL입니다. 다른 URL을 입력해주세요.');
+    }
+  }
 
   return await db.transaction(async (tx) => {
     const existingSurvey = await tx.query.surveys.findFirst({

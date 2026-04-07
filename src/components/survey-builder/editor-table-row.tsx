@@ -142,6 +142,8 @@ export const EditorTableRow = React.memo(function EditorTableRow({
   onSaveCell,
   onLoadCell,
 }: EditorTableRowProps) {
+  const [openPopoverCellId, setOpenPopoverCellId] = React.useState<string | null>(null);
+
   const dragSelectionCells = React.useMemo(() => {
     if (!dragSelectionCellsKey) return null;
     return new Set(dragSelectionCellsKey.split(',').map(Number));
@@ -312,7 +314,7 @@ export const EditorTableRow = React.memo(function EditorTableRow({
                 <div className="flex-1">
                   <EditorCellContent cell={cell} />
                 </div>
-                <Popover>
+                <Popover open={openPopoverCellId === cell.id} onOpenChange={(open) => setOpenPopoverCellId(open ? cell.id : null)}>
                   <PopoverTrigger asChild>
                     <button
                       className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-gray-400 opacity-0 transition-opacity hover:bg-gray-200 hover:text-gray-700 group-hover:opacity-100 data-[state=open]:opacity-100"
@@ -324,30 +326,30 @@ export const EditorTableRow = React.memo(function EditorTableRow({
                   </PopoverTrigger>
                   <PopoverContent className="w-40 p-1" side="bottom" align="end" onClick={(e) => e.stopPropagation()}>
                     <div className="space-y-0.5">
-                      <button onClick={() => onCopyCell(rowIndex, cellIndex)} className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100">
+                      <button onClick={() => { onCopyCell(rowIndex, cellIndex); setOpenPopoverCellId(null); }} className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100">
                         <Copy className="h-3 w-3" /> 셀 복사
                       </button>
                       {(hasCopiedCell || hasCopiedRegion) && (
-                        <button onClick={() => onPasteCell(rowIndex, cellIndex)} className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-blue-600 hover:bg-blue-50">
+                        <button onClick={() => { onPasteCell(rowIndex, cellIndex); setOpenPopoverCellId(null); }} className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-blue-600 hover:bg-blue-50">
                           <Clipboard className="h-3 w-3" /> 셀 붙여넣기
                         </button>
                       )}
-                      <button onClick={() => onDeleteCell(rowIndex, cellIndex)} className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50">
+                      <button onClick={() => { onDeleteCell(rowIndex, cellIndex); setOpenPopoverCellId(null); }} className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50">
                         <Trash2 className="h-3 w-3" /> 셀 삭제
                       </button>
                       <div className="my-1 border-t" />
-                      <button onClick={() => onSaveCell(rowIndex, cellIndex)} disabled={!isCellSaveable(cell)} className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-purple-600 hover:bg-purple-50 disabled:opacity-30">
+                      <button onClick={() => { onSaveCell(rowIndex, cellIndex); setOpenPopoverCellId(null); }} disabled={!isCellSaveable(cell)} className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-purple-600 hover:bg-purple-50 disabled:opacity-30">
                         <Archive className="h-3 w-3" /> 셀 보관
                       </button>
-                      <button onClick={() => onLoadCell(rowIndex, cellIndex)} className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-green-600 hover:bg-green-50">
+                      <button onClick={() => { onLoadCell(rowIndex, cellIndex); setOpenPopoverCellId(null); }} className="flex w-full items-center gap-2 rounded px-2 py-1 text-xs text-green-600 hover:bg-green-50">
                         <Download className="h-3 w-3" /> 셀 불러오기
                       </button>
                       <div className="my-1 border-t" />
                       <div className="flex gap-0.5 px-1">
-                        <button onClick={() => onMoveColumn(cellIndex, 'left')} disabled={cellIndex === 0} className="flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-30">
+                        <button onClick={() => { onMoveColumn(cellIndex, 'left'); setOpenPopoverCellId(null); }} disabled={cellIndex === 0} className="flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-30">
                           <ArrowLeft className="h-3 w-3" /> 왼쪽
                         </button>
-                        <button onClick={() => onMoveColumn(cellIndex, 'right')} disabled={cellIndex === columnCount - 1} className="flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-30">
+                        <button onClick={() => { onMoveColumn(cellIndex, 'right'); setOpenPopoverCellId(null); }} disabled={cellIndex === columnCount - 1} className="flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-30">
                           오른쪽 <ArrowRight className="h-3 w-3" />
                         </button>
                       </div>

@@ -125,9 +125,9 @@ export const SaveSuccessModal = React.memo(function SaveSuccessModal({
                   <Label className="text-xs text-gray-500">URL 슬러그 변경</Label>
                   <div className="flex gap-2">
                     <Input
-                      value={slugInput || generateSlugFromTitle(titleInput)}
+                      value={slugInput}
                       onChange={(e) => onSlugChange(e.target.value)}
-                      placeholder="my-survey"
+                      placeholder={generateSlugFromTitle(titleInput) || 'my-survey'}
                       className={`flex-1 ${slugError ? 'border-red-300' : ''}`}
                     />
                     <Button

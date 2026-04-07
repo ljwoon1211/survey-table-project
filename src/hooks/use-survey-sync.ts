@@ -2,6 +2,8 @@
 
 import { useCallback, useState, useTransition } from 'react';
 
+import { useQueryClient } from '@tanstack/react-query';
+
 import {
   calculateResponseSummary,
   getResponsesBySurvey,
@@ -22,6 +24,7 @@ import {
   saveSurveyWithDetails,
 } from '@/actions/survey-save-actions';
 import type { SurveyDiffPayload } from '@/actions/survey-save-actions';
+import { surveyKeys } from '@/hooks/queries/use-surveys';
 import {
   useSurveyBuilderStore,
   useSurveyListStore,
@@ -35,6 +38,7 @@ import {
  */
 export function useSurveySync() {
   const [isPending, startTransition] = useTransition();
+  const queryClient = useQueryClient();
   const { resetSurvey, markClean } = useSurveyBuilderStore();
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<Error | null>(null);
@@ -114,6 +118,9 @@ export function useSurveySync() {
 
         const result = await saveSurveyDiff(payload);
         markClean();
+        // 저장 후 TanStack Query 캐시 무효화 → 다음 로드 시 DB에서 최신 데이터 사용
+        queryClient.invalidateQueries({ queryKey: surveyKeys.detail(survey.id) });
+        queryClient.invalidateQueries({ queryKey: surveyKeys.lists() });
         return result;
       } catch (error) {
         // 실패 시 스냅샷을 현재 changeset에 merge back
@@ -126,7 +133,7 @@ export function useSurveySync() {
         setIsSaving(false);
       }
     },
-    [isSaving, markClean],
+    [isSaving, markClean, queryClient],
   );
 
   // DB에서 설문 불러오기
@@ -134,10 +141,8 @@ export function useSurveySync() {
     try {
       const survey = await getSurveyWithDetails(surveyId);
       if (survey) {
-        // Zustand store 업데이트
-        useSurveyBuilderStore.setState({
-          currentSurvey: survey,
-        });
+        // Zustand store 업데이트 (changeset도 함께 리셋)
+        useSurveyBuilderStore.getState().setSurvey(survey);
 
         // UI 상태 초기화
         const { selectQuestion, setTestMode } = useSurveyUIStore.getState();

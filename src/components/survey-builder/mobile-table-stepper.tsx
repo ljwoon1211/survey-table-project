@@ -136,7 +136,7 @@ const RowCard = React.memo(function RowCard({
 
       <CardContent className="space-y-3 p-4">
         {inputCells.map(({ cell, colIdx }, arrIdx) => {
-          const columnLabel = cell.exportLabel || visibleColumns[colIdx]?.label || `항목 ${colIdx + 1}`;
+          const columnLabel = visibleColumns[colIdx]?.label || `항목 ${colIdx + 1}`;
 
           let sectionHeader: string | null = null;
           if (columnSectionMap) {
@@ -182,7 +182,7 @@ const RowCard = React.memo(function RowCard({
                 {!hideColumnLabels && (
                   <div className="flex items-start gap-1.5">
                     <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
-                    <span className="line-clamp-1 text-xs font-medium text-gray-500">{shortLabel}</span>
+                    <span className="line-clamp-2 text-sm font-medium text-gray-900">{shortLabel}</span>
                   </div>
                 )}
                 {isUnitPairStart && nextEntry ? (

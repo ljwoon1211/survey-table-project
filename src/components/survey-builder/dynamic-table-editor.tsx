@@ -268,7 +268,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
 
     const handleMouseMove = (e: MouseEvent) => {
       const el = document.elementFromPoint(e.clientX, e.clientY);
-      const td = el?.closest('td[data-row-index]') as HTMLElement | null;
+      const td = el?.closest('[data-row-index]') as HTMLElement | null;
       if (td) {
         const rowIndex = parseInt(td.getAttribute('data-row-index')!, 10);
         const cellIndex = parseInt(td.getAttribute('data-cell-index')!, 10);
