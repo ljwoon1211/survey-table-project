@@ -15,6 +15,7 @@ export function addOtherOptionIfNeeded(options: QuestionOption[]): QuestionOptio
         label: OTHER_OPTION_LABEL,
         value: 'other',
         hasOther: true,
+        spssNumericCode: getMaxSpssCode(options) + 1,
       },
     ];
   }
@@ -137,6 +138,7 @@ export function createAddLevelOption(setFormData: SetFormData) {
         id: generateId(),
         label: `옵션 ${optionCount + 1}`,
         value: levelIndex === 0 ? `옵션${optionCount + 1}` : `상위옵션-옵션${optionCount + 1}`,
+        spssNumericCode: getMaxSpssCode(level.options) + 1,
       };
 
       return {

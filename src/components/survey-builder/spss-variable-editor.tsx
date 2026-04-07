@@ -75,7 +75,7 @@ export function SpssVariableEditor({
       {options && options.length > 0 && (
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">
-            옵션 코드
+            응답값
           </label>
           <div className="space-y-1">
             {options.map((opt) => (

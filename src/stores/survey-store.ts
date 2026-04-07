@@ -332,8 +332,8 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           groupId,
           ...(needsOptions(type) && {
             options: [
-              { id: generateId(), label: '옵션 1', value: '옵션1' },
-              { id: generateId(), label: '옵션 2', value: '옵션2' },
+              { id: generateId(), label: '옵션 1', value: '옵션1', spssNumericCode: 1 },
+              { id: generateId(), label: '옵션 2', value: '옵션2', spssNumericCode: 2 },
             ],
           }),
           ...(needsSelectLevels(type) && { selectLevels: getDefaultSelectLevels() }),
@@ -635,9 +635,9 @@ function getDefaultSelectLevels(): SelectLevel[] {
       placeholder: '음식종류를 선택하세요',
       order: 0,
       options: [
-        { id: generateId(), label: '한식', value: '한식' },
-        { id: generateId(), label: '중식', value: '중식' },
-        { id: generateId(), label: '양식', value: '양식' },
+        { id: generateId(), label: '한식', value: '한식', spssNumericCode: 1 },
+        { id: generateId(), label: '중식', value: '중식', spssNumericCode: 2 },
+        { id: generateId(), label: '양식', value: '양식', spssNumericCode: 3 },
       ],
     },
     {
@@ -646,15 +646,15 @@ function getDefaultSelectLevels(): SelectLevel[] {
       placeholder: '메뉴를 선택하세요',
       order: 1,
       options: [
-        { id: generateId(), label: '김치찌개', value: '한식-김치찌개' },
-        { id: generateId(), label: '불고기', value: '한식-불고기' },
-        { id: generateId(), label: '비빔밥', value: '한식-비빔밥' },
-        { id: generateId(), label: '짜장면', value: '중식-짜장면' },
-        { id: generateId(), label: '짬뽕', value: '중식-짬뽕' },
-        { id: generateId(), label: '탕수육', value: '중식-탕수육' },
-        { id: generateId(), label: '스테이크', value: '양식-스테이크' },
-        { id: generateId(), label: '파스타', value: '양식-파스타' },
-        { id: generateId(), label: '피자', value: '양식-피자' },
+        { id: generateId(), label: '김치찌개', value: '한식-김치찌개', spssNumericCode: 1 },
+        { id: generateId(), label: '불고기', value: '한식-불고기', spssNumericCode: 2 },
+        { id: generateId(), label: '비빔밥', value: '한식-비빔밥', spssNumericCode: 3 },
+        { id: generateId(), label: '짜장면', value: '중식-짜장면', spssNumericCode: 4 },
+        { id: generateId(), label: '짬뽕', value: '중식-짬뽕', spssNumericCode: 5 },
+        { id: generateId(), label: '탕수육', value: '중식-탕수육', spssNumericCode: 6 },
+        { id: generateId(), label: '스테이크', value: '양식-스테이크', spssNumericCode: 7 },
+        { id: generateId(), label: '파스타', value: '양식-파스타', spssNumericCode: 8 },
+        { id: generateId(), label: '피자', value: '양식-피자', spssNumericCode: 9 },
       ],
     },
   ];

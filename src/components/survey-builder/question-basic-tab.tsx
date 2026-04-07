@@ -444,7 +444,7 @@ export function QuestionBasicTab({
                       isCustomOptionCode: true,
                     } as Partial<QuestionOption>)}
                     className="w-16 text-center text-xs"
-                    title="SPSS 옵션 코드"
+                    title="변수 번호"
                   />
                   {option.isCustomOptionCode && (
                     <Button
