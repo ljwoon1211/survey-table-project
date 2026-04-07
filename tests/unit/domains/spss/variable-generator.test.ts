@@ -16,7 +16,6 @@ function makeQuestion(
     id: `q-${overrides.order}`,
     title: `문제${overrides.order}`,
     required: false,
-    order: overrides.order,
     ...overrides,
   } as Question;
 }
