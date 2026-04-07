@@ -22,7 +22,7 @@ function addOtherCheckboxOption(options: CheckboxOption[]): CheckboxOption[] {
   if (options.some((o) => o.id === OTHER_OPTION_ID)) return options;
   return [
     ...options,
-    { id: OTHER_OPTION_ID, label: OTHER_OPTION_LABEL, value: 'other', checked: false, hasOther: true },
+    { id: OTHER_OPTION_ID, label: OTHER_OPTION_LABEL, value: 'other', checked: false, hasOther: true, spssNumericCode: getMaxSpssCode(options) + 1 },
   ];
 }
 
@@ -34,7 +34,7 @@ function addOtherRadioOption(options: RadioOption[]): RadioOption[] {
   if (options.some((o) => o.id === OTHER_OPTION_ID)) return options;
   return [
     ...options,
-    { id: OTHER_OPTION_ID, label: OTHER_OPTION_LABEL, value: 'other', selected: false, hasOther: true },
+    { id: OTHER_OPTION_ID, label: OTHER_OPTION_LABEL, value: 'other', selected: false, hasOther: true, spssNumericCode: getMaxSpssCode(options) + 1 },
   ];
 }
 
@@ -46,7 +46,7 @@ function addOtherSelectOption(options: QuestionOption[]): QuestionOption[] {
   if (options.some((o) => o.id === OTHER_OPTION_ID)) return options;
   return [
     ...options,
-    { id: OTHER_OPTION_ID, label: OTHER_OPTION_LABEL, value: 'other', hasOther: true },
+    { id: OTHER_OPTION_ID, label: OTHER_OPTION_LABEL, value: 'other', hasOther: true, spssNumericCode: getMaxSpssCode(options) + 1 },
   ];
 }
 
