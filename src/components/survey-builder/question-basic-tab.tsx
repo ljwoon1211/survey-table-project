@@ -1004,28 +1004,32 @@ function SortableOptionItem({
           )}
         </div>
 
-        <Input
-          inputMode="numeric"
-          value={option.spssNumericCode ?? ''}
-          onChange={(e) => {
-            const v = e.target.value.replace(/\D/g, '');
-            updateOption(option.id, {
-              spssNumericCode: v ? parseInt(v, 10) : undefined,
-            });
-          }}
-          className="w-14 text-center text-xs"
-          title="응답값"
-          placeholder={String(index + 1)}
-        />
-        <Input
-          value={option.optionCode ?? generateOptionCode(index, totalCount)}
-          onChange={(e) => updateOption(option.id, {
-            optionCode: e.target.value,
-            isCustomOptionCode: true,
-          } as Partial<QuestionOption>)}
-          className="w-16 text-center text-xs"
-          title="변수 번호"
-        />
+        <div className="flex flex-col items-center gap-0.5">
+          <span className="text-[10px] text-gray-400">응답값</span>
+          <Input
+            inputMode="numeric"
+            value={option.spssNumericCode ?? ''}
+            onChange={(e) => {
+              const v = e.target.value.replace(/\D/g, '');
+              updateOption(option.id, {
+                spssNumericCode: v ? parseInt(v, 10) : undefined,
+              });
+            }}
+            className="w-14 text-center text-xs placeholder:text-gray-300"
+            placeholder={String(index + 1)}
+          />
+        </div>
+        <div className="flex flex-col items-center gap-0.5">
+          <span className="text-[10px] text-gray-400">변수번호</span>
+          <Input
+            value={option.optionCode ?? generateOptionCode(index, totalCount)}
+            onChange={(e) => updateOption(option.id, {
+              optionCode: e.target.value,
+              isCustomOptionCode: true,
+            } as Partial<QuestionOption>)}
+            className="w-16 text-center text-xs"
+          />
+        </div>
         {option.isCustomOptionCode && (
           <Button
             type="button"

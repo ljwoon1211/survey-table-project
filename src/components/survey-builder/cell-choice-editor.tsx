@@ -191,30 +191,34 @@ export function CellChoiceEditor({
                         placeholder="옵션 텍스트"
                         className="flex-1"
                       />
-                      <Input
-                        inputMode="numeric"
-                        value={option.spssNumericCode ?? ''}
-                        onChange={(e) => {
-                          const v = e.target.value.replace(/\D/g, '');
-                          const updated = [...checkboxOptions];
-                          updated[index] = { ...option, spssNumericCode: v ? parseInt(v, 10) : undefined };
-                          onCheckboxOptionsChange(updated);
-                        }}
-                        placeholder={String(index + 1)}
-                        className="w-14 text-center text-xs"
-                        title="응답값"
-                      />
-                      <Input
-                        value={option.optionCode || ''}
-                        onChange={(e) => {
-                          const updated = [...checkboxOptions];
-                          updated[index] = { ...option, optionCode: e.target.value };
-                          onCheckboxOptionsChange(updated);
-                        }}
-                        placeholder="코드"
-                        className="w-20 text-xs"
-                        title="변수 번호"
-                      />
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-[10px] text-gray-400">응답값</span>
+                        <Input
+                          inputMode="numeric"
+                          value={option.spssNumericCode ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value.replace(/\D/g, '');
+                            const updated = [...checkboxOptions];
+                            updated[index] = { ...option, spssNumericCode: v ? parseInt(v, 10) : undefined };
+                            onCheckboxOptionsChange(updated);
+                          }}
+                          placeholder={String(index + 1)}
+                          className="w-14 text-center text-xs placeholder:text-gray-300"
+                        />
+                      </div>
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-[10px] text-gray-400">변수번호</span>
+                        <Input
+                          value={option.optionCode || ''}
+                          onChange={(e) => {
+                            const updated = [...checkboxOptions];
+                            updated[index] = { ...option, optionCode: e.target.value };
+                            onCheckboxOptionsChange(updated);
+                          }}
+                          placeholder="코드"
+                          className="w-20 text-xs"
+                        />
+                      </div>
                     </div>
                     {option.id === OTHER_OPTION_ID && (
                       <p className="text-xs text-blue-600">🔹 기타 옵션 (수정 가능)</p>
@@ -458,30 +462,34 @@ export function CellChoiceEditor({
                         placeholder="옵션 텍스트"
                         className="flex-1"
                       />
-                      <Input
-                        inputMode="numeric"
-                        value={option.spssNumericCode ?? ''}
-                        onChange={(e) => {
-                          const v = e.target.value.replace(/\D/g, '');
-                          const updated = [...radioOptions];
-                          updated[index] = { ...option, spssNumericCode: v ? parseInt(v, 10) : undefined };
-                          onRadioOptionsChange(updated);
-                        }}
-                        placeholder={String(index + 1)}
-                        className="w-14 text-center text-xs"
-                        title="응답값"
-                      />
-                      <Input
-                        value={option.optionCode || ''}
-                        onChange={(e) => {
-                          const updated = [...radioOptions];
-                          updated[index] = { ...option, optionCode: e.target.value };
-                          onRadioOptionsChange(updated);
-                        }}
-                        placeholder="코드"
-                        className="w-20 text-xs"
-                        title="변수 번호"
-                      />
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-[10px] text-gray-400">응답값</span>
+                        <Input
+                          inputMode="numeric"
+                          value={option.spssNumericCode ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value.replace(/\D/g, '');
+                            const updated = [...radioOptions];
+                            updated[index] = { ...option, spssNumericCode: v ? parseInt(v, 10) : undefined };
+                            onRadioOptionsChange(updated);
+                          }}
+                          placeholder={String(index + 1)}
+                          className="w-14 text-center text-xs placeholder:text-gray-300"
+                        />
+                      </div>
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-[10px] text-gray-400">변수번호</span>
+                        <Input
+                          value={option.optionCode || ''}
+                          onChange={(e) => {
+                            const updated = [...radioOptions];
+                            updated[index] = { ...option, optionCode: e.target.value };
+                            onRadioOptionsChange(updated);
+                          }}
+                          placeholder="코드"
+                          className="w-20 text-xs"
+                        />
+                      </div>
                     </div>
                     {option.id === OTHER_OPTION_ID && (
                       <p className="text-xs text-blue-600">🔹 기타 옵션 (수정 가능)</p>
@@ -626,30 +634,34 @@ export function CellChoiceEditor({
                       placeholder="옵션 텍스트"
                       className="flex-1"
                     />
-                    <Input
-                      inputMode="numeric"
-                      value={option.spssNumericCode ?? ''}
-                      onChange={(e) => {
-                        const v = e.target.value.replace(/\D/g, '');
-                        const updated = [...selectOptions];
-                        updated[index] = { ...option, spssNumericCode: v ? parseInt(v, 10) : undefined };
-                        onSelectOptionsChange(updated);
-                      }}
-                      placeholder={String(index + 1)}
-                      className="w-14 text-center text-xs"
-                      title="응답값"
-                    />
-                    <Input
-                      value={option.optionCode || ''}
-                      onChange={(e) => {
-                        const updated = [...selectOptions];
-                        updated[index] = { ...option, optionCode: e.target.value };
-                        onSelectOptionsChange(updated);
-                      }}
-                      placeholder="코드"
-                      className="w-20 text-xs"
-                      title="변수 번호"
-                    />
+                    <div className="flex flex-col items-center gap-0.5">
+                      <span className="text-[10px] text-gray-400">응답값</span>
+                      <Input
+                        inputMode="numeric"
+                        value={option.spssNumericCode ?? ''}
+                        onChange={(e) => {
+                          const v = e.target.value.replace(/\D/g, '');
+                          const updated = [...selectOptions];
+                          updated[index] = { ...option, spssNumericCode: v ? parseInt(v, 10) : undefined };
+                          onSelectOptionsChange(updated);
+                        }}
+                        placeholder={String(index + 1)}
+                        className="w-14 text-center text-xs placeholder:text-gray-300"
+                      />
+                    </div>
+                    <div className="flex flex-col items-center gap-0.5">
+                      <span className="text-[10px] text-gray-400">변수번호</span>
+                      <Input
+                        value={option.optionCode || ''}
+                        onChange={(e) => {
+                          const updated = [...selectOptions];
+                          updated[index] = { ...option, optionCode: e.target.value };
+                          onSelectOptionsChange(updated);
+                        }}
+                        placeholder="코드"
+                        className="w-20 text-xs"
+                      />
+                    </div>
                   </div>
                   {option.id === OTHER_OPTION_ID && (
                     <p className="text-xs text-blue-600">🔹 기타 옵션 (수정 가능)</p>
