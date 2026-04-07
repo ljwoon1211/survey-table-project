@@ -1,5 +1,22 @@
 'use client';
 
+import React, { useMemo } from 'react';
+
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
   GripVertical,
   Image,
@@ -87,6 +104,27 @@ export function QuestionBasicTab({
   removeLevelOption,
 }: QuestionBasicTabProps) {
   const needsOptions = ['radio', 'checkbox', 'select'].includes(question.type);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
+  const optionIds = useMemo(
+    () => (formData.options ?? []).map((o) => o.id),
+    [formData.options],
+  );
+
+  const handleOptionDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setFormData((prev) => {
+      const options = prev.options || [];
+      const oldIndex = options.findIndex((o) => o.id === active.id);
+      const newIndex = options.findIndex((o) => o.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      return { ...prev, options: arrayMove(options, oldIndex, newIndex) };
+    });
+  };
   const needsSelectLevels = question.type === 'multiselect';
 
   return (
@@ -412,81 +450,25 @@ export function QuestionBasicTab({
             <p className="text-sm text-red-500">{validationErrors.options}</p>
           )}
 
-          <div className="space-y-2">
-            {formData.options?.map((option, index) => (
-              <div
-                key={option.id}
-                className="rounded-lg border border-gray-200 bg-white transition-shadow hover:shadow-sm"
-              >
-                <div className="flex items-center space-x-2 p-3">
-                  <div className="cursor-grab">
-                    <GripVertical className="h-4 w-4 text-gray-400" />
-                  </div>
-
-                  <div className="flex-1">
-                    <Input
-                      value={option.label}
-                      onChange={(e) => updateOption(option.id, { label: e.target.value })}
-                      placeholder={`옵션 ${index + 1}`}
-                      className="border-none bg-transparent px-0 focus:border focus:border-blue-200 focus:bg-white"
-                    />
-                    {option.id === OTHER_OPTION_ID && (
-                      <p className="mt-1 px-0 text-xs text-blue-600">
-                        🔹 기타 옵션 (수정 가능)
-                      </p>
-                    )}
-                  </div>
-
-                  <Input
-                    value={option.optionCode ?? generateOptionCode(index, formData.options?.length ?? 0)}
-                    onChange={(e) => updateOption(option.id, {
-                      optionCode: e.target.value,
-                      isCustomOptionCode: true,
-                    } as Partial<QuestionOption>)}
-                    className="w-16 text-center text-xs"
-                    title="변수 번호"
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleOptionDragEnd}>
+            <SortableContext items={optionIds} strategy={verticalListSortingStrategy}>
+              <div className="space-y-2">
+                {formData.options?.map((option, index) => (
+                  <SortableOptionItem
+                    key={option.id}
+                    option={option}
+                    index={index}
+                    totalCount={formData.options?.length ?? 0}
+                    updateOption={updateOption}
+                    removeOption={removeOption}
+                    showBranchSettings={showBranchSettings}
+                    questions={questions}
+                    questionId={questionId}
                   />
-                  {option.isCustomOptionCode && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => updateOption(option.id, {
-                        optionCode: undefined,
-                        isCustomOptionCode: false,
-                      } as Partial<QuestionOption>)}
-                      className="px-1 text-xs text-gray-400 hover:text-blue-500"
-                      title="자동 코드로 복원"
-                    >
-                      자동
-                    </Button>
-                  )}
-
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeOption(option.id)}
-                    className="text-red-500 hover:bg-red-50 hover:text-red-600"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {/* 분기 규칙 설정 - 토글이 켜져있을 때만 표시 */}
-                {showBranchSettings && (
-                  <div className="px-3 pb-3">
-                    <BranchRuleEditor
-                      branchRule={option.branchRule}
-                      allQuestions={questions}
-                      currentQuestionId={questionId || ''}
-                      onChange={(branchRule) => updateOption(option.id, { branchRule })}
-                    />
-                  </div>
-                )}
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
 
           {(formData.options?.length || 0) === 0 && (
             <div className="py-8 text-center text-gray-500">
@@ -957,5 +939,128 @@ export function QuestionBasicTab({
         </div>
       </div>
     </>
+  );
+}
+
+// --- Sortable Option Item ---
+
+interface SortableOptionItemProps {
+  option: QuestionOption;
+  index: number;
+  totalCount: number;
+  updateOption: (optionId: string, updates: Partial<QuestionOption>) => void;
+  removeOption: (optionId: string) => void;
+  showBranchSettings: boolean;
+  questions: Question[];
+  questionId: string;
+}
+
+function SortableOptionItem({
+  option,
+  index,
+  totalCount,
+  updateOption,
+  removeOption,
+  showBranchSettings,
+  questions,
+  questionId,
+}: SortableOptionItemProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: option.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition: isDragging ? 'none' : transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="rounded-lg border border-gray-200 bg-white transition-shadow hover:shadow-sm"
+    >
+      <div className="flex items-center space-x-2 p-3">
+        <div
+          className={isDragging ? 'cursor-grabbing' : 'cursor-grab'}
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4 text-gray-400" />
+        </div>
+
+        <div className="flex-1">
+          <Input
+            value={option.label}
+            onChange={(e) => updateOption(option.id, { label: e.target.value })}
+            placeholder={`옵션 ${index + 1}`}
+            className="border-none bg-transparent px-0 focus:border focus:border-blue-200 focus:bg-white"
+          />
+          {option.id === OTHER_OPTION_ID && (
+            <p className="mt-1 px-0 text-xs text-blue-600">
+              🔹 기타 옵션 (수정 가능)
+            </p>
+          )}
+        </div>
+
+        <Input
+          type="number"
+          min={1}
+          value={option.spssNumericCode ?? ''}
+          onChange={(e) => updateOption(option.id, {
+            spssNumericCode: e.target.value ? parseInt(e.target.value, 10) : undefined,
+          })}
+          className="w-14 text-center text-xs"
+          title="응답값"
+          placeholder={String(index + 1)}
+        />
+        <Input
+          value={option.optionCode ?? generateOptionCode(index, totalCount)}
+          onChange={(e) => updateOption(option.id, {
+            optionCode: e.target.value,
+            isCustomOptionCode: true,
+          } as Partial<QuestionOption>)}
+          className="w-16 text-center text-xs"
+          title="변수 번호"
+        />
+        {option.isCustomOptionCode && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => updateOption(option.id, {
+              optionCode: undefined,
+              isCustomOptionCode: false,
+            } as Partial<QuestionOption>)}
+            className="px-1 text-xs text-gray-400 hover:text-blue-500"
+            title="자동 코드로 복원"
+          >
+            자동
+          </Button>
+        )}
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => removeOption(option.id)}
+          className="text-red-500 hover:bg-red-50 hover:text-red-600"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {showBranchSettings && (
+        <div className="px-3 pb-3">
+          <BranchRuleEditor
+            branchRule={option.branchRule}
+            allQuestions={questions}
+            currentQuestionId={questionId || ''}
+            onChange={(branchRule) => updateOption(option.id, { branchRule })}
+          />
+        </div>
+      )}
+    </div>
   );
 }

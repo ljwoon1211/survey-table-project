@@ -192,6 +192,19 @@ export function CellChoiceEditor({
                         className="flex-1"
                       />
                       <Input
+                        type="number"
+                        min={1}
+                        value={option.spssNumericCode ?? ''}
+                        onChange={(e) => {
+                          const updated = [...checkboxOptions];
+                          updated[index] = { ...option, spssNumericCode: e.target.value ? parseInt(e.target.value, 10) : undefined };
+                          onCheckboxOptionsChange(updated);
+                        }}
+                        placeholder={String(index + 1)}
+                        className="w-14 text-center text-xs"
+                        title="응답값"
+                      />
+                      <Input
                         value={option.optionCode || ''}
                         onChange={(e) => {
                           const updated = [...checkboxOptions];
@@ -200,7 +213,7 @@ export function CellChoiceEditor({
                         }}
                         placeholder="코드"
                         className="w-20 text-xs"
-                        title="엑셀 내보내기용 코드 (선택)"
+                        title="변수 번호"
                       />
                     </div>
                     {option.id === OTHER_OPTION_ID && (
@@ -446,6 +459,19 @@ export function CellChoiceEditor({
                         className="flex-1"
                       />
                       <Input
+                        type="number"
+                        min={1}
+                        value={option.spssNumericCode ?? ''}
+                        onChange={(e) => {
+                          const updated = [...radioOptions];
+                          updated[index] = { ...option, spssNumericCode: e.target.value ? parseInt(e.target.value, 10) : undefined };
+                          onRadioOptionsChange(updated);
+                        }}
+                        placeholder={String(index + 1)}
+                        className="w-14 text-center text-xs"
+                        title="응답값"
+                      />
+                      <Input
                         value={option.optionCode || ''}
                         onChange={(e) => {
                           const updated = [...radioOptions];
@@ -454,7 +480,7 @@ export function CellChoiceEditor({
                         }}
                         placeholder="코드"
                         className="w-20 text-xs"
-                        title="엑셀 내보내기용 코드 (선택)"
+                        title="변수 번호"
                       />
                     </div>
                     {option.id === OTHER_OPTION_ID && (
@@ -601,6 +627,19 @@ export function CellChoiceEditor({
                       className="flex-1"
                     />
                     <Input
+                      type="number"
+                      min={1}
+                      value={option.spssNumericCode ?? ''}
+                      onChange={(e) => {
+                        const updated = [...selectOptions];
+                        updated[index] = { ...option, spssNumericCode: e.target.value ? parseInt(e.target.value, 10) : undefined };
+                        onSelectOptionsChange(updated);
+                      }}
+                      placeholder={String(index + 1)}
+                      className="w-14 text-center text-xs"
+                      title="응답값"
+                    />
+                    <Input
                       value={option.optionCode || ''}
                       onChange={(e) => {
                         const updated = [...selectOptions];
@@ -609,7 +648,7 @@ export function CellChoiceEditor({
                       }}
                       placeholder="코드"
                       className="w-20 text-xs"
-                      title="엑셀 내보내기용 코드 (선택)"
+                      title="변수 번호"
                     />
                   </div>
                   {option.id === OTHER_OPTION_ID && (
