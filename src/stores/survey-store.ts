@@ -316,6 +316,8 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           const group = state.currentSurvey.groups?.find((g) => g.id === groupId);
           if (group) {
             group.collapsed = !group.collapsed;
+            state.isDirty = true;
+            state.isMetadataDirty = true;
           }
         }),
 

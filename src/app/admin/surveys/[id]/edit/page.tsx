@@ -28,7 +28,6 @@ import {
 import { useShallow } from 'zustand/react/shallow';
 
 import { isSlugAvailable as checkSlugAvailable } from '@/actions/query-actions';
-import { createQuestion as createQuestionAction } from '@/actions/question-actions';
 import { publishSurvey } from '@/actions/survey-publish-actions';
 import { ImportExportLibraryModal } from '@/components/survey-builder/import-export-library-modal';
 import { QuestionLibraryPanel } from '@/components/survey-builder/question-library-panel';
@@ -155,7 +154,6 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   const [slugInput, setSlugInput] = useState('');
   const [slugError, setSlugError] = useState('');
   const [showSaveModal, setShowSaveModal] = useState(false);
-  const [addingQuestionIds, setAddingQuestionIds] = useState<Set<string>>(new Set());
   const [initializedSurveyId, setInitializedSurveyId] = useState<string | null>(null);
 
   // 라이브러리 관련 상태
@@ -352,53 +350,8 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   };
 
   // 라이브러리에서 질문 추가
-  const handleAddFromLibrary = async (question: Question) => {
-    // 중복 실행 방지
-    if (addingQuestionIds.has(question.id)) {
-      return;
-    }
-
-    setAddingQuestionIds((prev) => new Set(prev).add(question.id));
-
-    try {
-      // 로컬 스토어에 추가
-      addPreparedQuestion(question);
-
-      // 서버에 질문 생성 API 호출
-      if (surveyId) {
-        try {
-          await createQuestionAction({
-            surveyId: surveyId,
-            groupId: question.groupId,
-            type: question.type,
-            title: question.title,
-            description: question.description,
-            required: question.required,
-            order: question.order,
-            options: question.options,
-            selectLevels: question.selectLevels,
-            tableTitle: question.tableTitle,
-            tableColumns: question.tableColumns,
-            tableRowsData: question.tableRowsData,
-            imageUrl: question.imageUrl,
-            videoUrl: question.videoUrl,
-            allowOtherOption: question.allowOtherOption,
-            noticeContent: question.noticeContent,
-            requiresAcknowledgment: question.requiresAcknowledgment,
-            tableValidationRules: question.tableValidationRules,
-            displayCondition: question.displayCondition,
-          });
-        } catch (error) {
-          console.error('라이브러리에서 질문 추가 실패:', error);
-        }
-      }
-    } finally {
-      setAddingQuestionIds((prev) => {
-        const next = new Set(prev);
-        next.delete(question.id);
-        return next;
-      });
-    }
+  const handleAddFromLibrary = (question: Question) => {
+    addPreparedQuestion(question);
   };
 
   // 로딩 상태
@@ -539,42 +492,8 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                       <Card
                         key={questionType.type}
                         className="hover-lift cursor-pointer border-gray-200 p-4 transition-all duration-200 hover:border-blue-200"
-                        onClick={async () => {
-                          // 로컬 스토어에 추가
+                        onClick={() => {
                           addQuestion(questionType.type);
-
-                          // 서버에 질문 생성 API 호출 (getState로 최신 상태 읽기)
-                          const latest = useSurveyBuilderStore.getState().currentSurvey;
-                          if (latest.id) {
-                            const newQuestion = latest.questions[latest.questions.length - 1];
-                            if (newQuestion) {
-                              try {
-                                await createQuestionAction({
-                                  surveyId: latest.id,
-                                  groupId: newQuestion.groupId,
-                                  type: newQuestion.type,
-                                  title: newQuestion.title,
-                                  description: newQuestion.description,
-                                  required: newQuestion.required,
-                                  order: newQuestion.order,
-                                  options: newQuestion.options,
-                                  selectLevels: newQuestion.selectLevels,
-                                  tableTitle: newQuestion.tableTitle,
-                                  tableColumns: newQuestion.tableColumns,
-                                  tableRowsData: newQuestion.tableRowsData,
-                                  imageUrl: newQuestion.imageUrl,
-                                  videoUrl: newQuestion.videoUrl,
-                                  allowOtherOption: newQuestion.allowOtherOption,
-                                  noticeContent: newQuestion.noticeContent,
-                                  requiresAcknowledgment: newQuestion.requiresAcknowledgment,
-                                  tableValidationRules: newQuestion.tableValidationRules,
-                                  displayCondition: newQuestion.displayCondition,
-                                });
-                              } catch (error) {
-                                console.error('질문 생성 실패:', error);
-                              }
-                            }
-                          }
                         }}
                       >
                         <div className="flex items-start space-x-3">
@@ -675,42 +594,8 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
                   </p>
                   <div className="flex justify-center gap-2">
                     <Button
-                      onClick={async () => {
-                        // 로컬 스토어에 추가
+                      onClick={() => {
                         addQuestion('text');
-
-                        // 서버에 질문 생성 API 호출 (getState로 최신 상태 읽기)
-                        const latest2 = useSurveyBuilderStore.getState().currentSurvey;
-                        if (latest2.id) {
-                          const newQuestion = latest2.questions[latest2.questions.length - 1];
-                          if (newQuestion) {
-                            try {
-                              await createQuestionAction({
-                                surveyId: latest2.id,
-                                groupId: newQuestion.groupId,
-                                type: newQuestion.type,
-                                title: newQuestion.title,
-                                description: newQuestion.description,
-                                required: newQuestion.required,
-                                order: newQuestion.order,
-                                options: newQuestion.options,
-                                selectLevels: newQuestion.selectLevels,
-                                tableTitle: newQuestion.tableTitle,
-                                tableColumns: newQuestion.tableColumns,
-                                tableRowsData: newQuestion.tableRowsData,
-                                imageUrl: newQuestion.imageUrl,
-                                videoUrl: newQuestion.videoUrl,
-                                allowOtherOption: newQuestion.allowOtherOption,
-                                noticeContent: newQuestion.noticeContent,
-                                requiresAcknowledgment: newQuestion.requiresAcknowledgment,
-                                tableValidationRules: newQuestion.tableValidationRules,
-                                displayCondition: newQuestion.displayCondition,
-                              });
-                            } catch (error) {
-                              console.error('질문 생성 실패:', error);
-                            }
-                          }
-                        }
                       }}
                     >
                       <Plus className="mr-2 h-4 w-4" />첫 번째 질문 추가

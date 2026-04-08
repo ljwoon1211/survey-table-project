@@ -478,8 +478,10 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                 onUpdate={async (conditionGroup) => {
                   setFormData((prev) => ({ ...prev, displayCondition: conditionGroup }));
 
-                  // 조건 변경 시 즉시 DB에 저장 (질문 ID가 UUID인 경우에만)
-                  if (questionId && useSurveyBuilderStore.getState().currentSurvey.id && isValidUUID(questionId)) {
+                  // 조건 변경 시 즉시 DB에 저장 (질문 ID가 UUID이고 이미 DB에 존재하는 경우에만)
+                  const store = useSurveyBuilderStore.getState();
+                  const isNewQuestion = !!store.questionChanges.added[questionId || ''];
+                  if (questionId && store.currentSurvey.id && isValidUUID(questionId) && !isNewQuestion) {
                     try {
                       await updateQuestionAction(questionId, {
                         displayCondition: conditionGroup,

@@ -188,7 +188,7 @@ export const EditorTableRow = React.memo(function EditorTableRow({
                   <Settings2 className="h-3 w-3" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-48 p-1" side="right" align="start">
+              <PopoverContent className="max-h-[60vh] w-48 overflow-y-auto p-1" side="right" align="start">
                 <div className="space-y-0.5">
                   <div className="px-2 py-1.5">
                     <label className="mb-1 block text-[10px] font-medium text-gray-500">행 코드 (엑셀용)</label>

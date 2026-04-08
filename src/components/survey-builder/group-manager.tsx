@@ -38,13 +38,14 @@ interface GroupManagerProps {
 }
 
 export function GroupManager({ className }: GroupManagerProps) {
-  const { addGroup, updateGroup, deleteGroup, reorderGroups } =
+  const { addGroup, updateGroup, deleteGroup, reorderGroups, toggleGroupCollapse } =
     useSurveyBuilderStore(
       useShallow((s) => ({
         addGroup: s.addGroup,
         updateGroup: s.updateGroup,
         deleteGroup: s.deleteGroup,
         reorderGroups: s.reorderGroups,
+        toggleGroupCollapse: s.toggleGroupCollapse,
       })),
     );
   const groups = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.groups));
@@ -63,6 +64,20 @@ export function GroupManager({ className }: GroupManagerProps) {
   const [overId, setOverId] = useState<string | null>(null);
 
   const groupsOrEmpty = useMemo(() => groups || [], [groups]);
+
+  // Store의 collapsed 상태와 expandedGroups 동기화
+  useEffect(() => {
+    if (groupsOrEmpty.length === 0) return;
+    setExpandedGroups((prev) => {
+      const groupIds = new Set(groupsOrEmpty.map((g) => g.id));
+      const next = new Set<string>();
+      for (const g of groupsOrEmpty) {
+        if (!g.collapsed) next.add(g.id);
+      }
+      // 기존에 없던 그룹이 삭제된 경우 자동 cleanup (prev에서 groupIds에 없는 건 제거됨)
+      return next;
+    });
+  }, [groupsOrEmpty]);
 
   // 모달이 열려있는 동안 groups가 업데이트되면 editingGroup도 업데이트
   useEffect(() => {
@@ -235,6 +250,7 @@ export function GroupManager({ className }: GroupManagerProps) {
   };
 
   const handleToggleExpand = (groupId: string) => {
+    toggleGroupCollapse(groupId);
     setExpandedGroups((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(groupId)) {

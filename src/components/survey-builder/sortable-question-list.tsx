@@ -33,7 +33,6 @@ import {
 } from 'lucide-react';
 
 import {
-  createQuestion as createQuestionAction,
   deleteQuestion as deleteQuestionAction,
   reorderQuestions as reorderQuestionsAction,
 } from '@/actions/question-actions';
@@ -292,13 +291,11 @@ export function SortableQuestionList({
 }: SortableQuestionListProps) {
   // 스토어에서 직접 구독 (편집 페이지 리렌더와 분리)
   const questions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
-  const { reorderQuestions, deleteQuestion, updateQuestion, addQuestion } =
+  const { reorderQuestions, deleteQuestion } =
     useSurveyBuilderStore(
       useShallow((s) => ({
         reorderQuestions: s.reorderQuestions,
         deleteQuestion: s.deleteQuestion,
-        updateQuestion: s.updateQuestion,
-        addQuestion: s.addQuestion,
       })),
     );
   const { surveyId } = useSurveyBuilderStore(
@@ -463,10 +460,12 @@ export function SortableQuestionList({
         // 로컬 스토어 업데이트
         reorderQuestions(questionIds);
 
-        // 서버에 질문 순서 변경 API 호출
-        if (surveyId) {
+        // 서버에 질문 순서 변경 API 호출 (DB에 존재하는 질문만)
+        const added = useSurveyBuilderStore.getState().questionChanges.added;
+        const savedIds = questionIds.filter((id) => !added[id]);
+        if (surveyId && savedIds.length > 0) {
           ensureSurvey().then(() =>
-            reorderQuestionsAction(questionIds).catch((error) => {
+            reorderQuestionsAction(savedIds).catch((error) => {
               console.error('질문 순서 변경 실패:', error);
             }),
           );
@@ -496,9 +495,11 @@ export function SortableQuestionList({
         }
       }
 
+      const isNewQuestion = !!useSurveyBuilderStore.getState().questionChanges.added[questionId];
       deleteQuestion(questionId);
 
-      if (isValidUUID(questionId)) {
+      // DB에 이미 존재하는 질문만 서버 삭제 호출 (아직 저장 전인 질문은 스킵)
+      if (!isNewQuestion && isValidUUID(questionId)) {
         try {
           await ensureSurvey();
           await deleteQuestionAction(questionId);
@@ -608,41 +609,10 @@ export function SortableQuestionList({
         dynamicRowConfigs: newDynamicRowConfigs,
       };
 
-      // 로컬 스토어에 추가
+      // 로컬 스토어에 추가 (DB 저장은 saveSurveyDiff에서 일괄 처리)
       useSurveyBuilderStore.getState().addPreparedQuestion(newQuestion);
-
-      // 서버에 질문 생성 API 호출
-      if (surveyId) {
-        try {
-          await ensureSurvey();
-          await createQuestionAction({
-            surveyId: surveyId,
-            groupId: newQuestion.groupId,
-            type: newQuestion.type,
-            title: newQuestion.title,
-            description: newQuestion.description,
-            required: newQuestion.required,
-            order: newQuestion.order,
-            options: newQuestion.options,
-            selectLevels: newQuestion.selectLevels,
-            tableTitle: newQuestion.tableTitle,
-            tableColumns: newQuestion.tableColumns,
-            tableRowsData: newQuestion.tableRowsData,
-            imageUrl: newQuestion.imageUrl,
-            videoUrl: newQuestion.videoUrl,
-            allowOtherOption: newQuestion.allowOtherOption,
-            noticeContent: newQuestion.noticeContent,
-            requiresAcknowledgment: newQuestion.requiresAcknowledgment,
-            tableValidationRules: newQuestion.tableValidationRules,
-            displayCondition: newQuestion.displayCondition,
-            dynamicRowConfigs: newQuestion.dynamicRowConfigs,
-          });
-        } catch (error) {
-          console.error('질문 복제 실패:', error);
-        }
-      }
     }
-  }, [surveyId, ensureSurvey]);
+  }, [surveyId]);
 
   if (questions.length === 0) {
     return null;
