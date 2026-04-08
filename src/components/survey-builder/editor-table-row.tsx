@@ -26,6 +26,8 @@ import { DynamicRowGroupConfig, TableCell, TableRow } from '@/types/survey';
 import { isCellSaveable } from '@/utils/cell-library-helpers';
 import { getAlignmentClasses, getGridSpanStyle } from '@/utils/table-grid-utils';
 
+import { useDebouncedInput } from './hooks/use-debounced-input';
+
 const GROUP_COLORS = [
   'bg-purple-500', 'bg-green-500', 'bg-yellow-500', 'bg-blue-500',
   'bg-pink-500', 'bg-orange-500', 'bg-teal-500', 'bg-red-500',
@@ -35,7 +37,7 @@ const GROUP_COLORS = [
 ];
 
 /** 에디터 셀 내용 표시 */
-function EditorCellContent({ cell }: { cell: TableCell }) {
+const EditorCellContent = React.memo(function EditorCellContent({ cell }: { cell: TableCell }) {
   const hasText = cell.content && cell.content.trim().length > 0;
 
   const textContent = hasText ? (
@@ -82,7 +84,7 @@ function EditorCellContent({ cell }: { cell: TableCell }) {
   }
 
   return (<div className="w-full">{textContent}{typeContent}</div>);
-}
+});
 
 export interface EditorTableRowProps {
   row: TableRow;
@@ -144,6 +146,17 @@ export const EditorTableRow = React.memo(function EditorTableRow({
 }: EditorTableRowProps) {
   const [openPopoverCellId, setOpenPopoverCellId] = React.useState<string | null>(null);
 
+  const handleRowLabelCommit = React.useCallback(
+    (value: string) => onUpdateRowLabel(rowIndex, value),
+    [onUpdateRowLabel, rowIndex],
+  );
+  const handleRowCodeCommit = React.useCallback(
+    (value: string) => onUpdateRowCode(rowIndex, value),
+    [onUpdateRowCode, rowIndex],
+  );
+  const [localRowLabel, setLocalRowLabel] = useDebouncedInput(row.label, handleRowLabelCommit);
+  const [localRowCode, setLocalRowCode] = useDebouncedInput(row.rowCode || '', handleRowCodeCommit, 100);
+
   const dragSelectionCells = React.useMemo(() => {
     if (!dragSelectionCellsKey) return null;
     return new Set(dragSelectionCellsKey.split(',').map(Number));
@@ -160,14 +173,14 @@ export const EditorTableRow = React.memo(function EditorTableRow({
       >
         <div className="space-y-1">
           <Input
-            value={row.label}
-            onChange={(e) => onUpdateRowLabel(rowIndex, e.target.value)}
+            value={localRowLabel}
+            onChange={(e) => setLocalRowLabel(e.target.value)}
             className="h-6 bg-white px-1 text-center text-xs"
             placeholder="행 라벨"
-            title={`행 라벨: ${row.label}`}
+            title={`행 라벨: ${localRowLabel}`}
           />
           <div className="flex items-center justify-center gap-0.5">
-            <span className="truncate text-[10px] text-gray-400">{row.rowCode || `r${rowIndex + 1}`}</span>
+            <span className="truncate text-[10px] text-gray-400">{localRowCode || `r${rowIndex + 1}`}</span>
             {row.displayCondition && row.displayCondition.conditions.length > 0 && (
               <Eye className="h-2.5 w-2.5 shrink-0 text-blue-500" />
             )}
@@ -193,8 +206,8 @@ export const EditorTableRow = React.memo(function EditorTableRow({
                   <div className="px-2 py-1.5">
                     <label className="mb-1 block text-[10px] font-medium text-gray-500">행 코드 (엑셀용)</label>
                     <Input
-                      value={row.rowCode || ''}
-                      onChange={(e) => onUpdateRowCode(rowIndex, e.target.value)}
+                      value={localRowCode}
+                      onChange={(e) => setLocalRowCode(e.target.value)}
                       className="h-6 bg-gray-50 px-1.5 text-xs"
                       placeholder="행 코드"
                     />

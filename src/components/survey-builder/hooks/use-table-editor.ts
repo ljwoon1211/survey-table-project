@@ -167,11 +167,27 @@ export function useTableEditor({
   const currentTitleRef = useRef(currentTitle);
   currentTitleRef.current = currentTitle;
 
+  // dirty flag: label/code debounce 중 render-time ref 덮어쓰기 방지
+  const pendingColumnsSyncRef = useRef(false);
+  const pendingRowsSyncRef = useRef(false);
+
   const currentColumnsRef = useRef(currentColumns);
-  currentColumnsRef.current = currentColumns;
+  if (!pendingColumnsSyncRef.current) currentColumnsRef.current = currentColumns;
 
   const currentRowsRef = useRef(currentRows);
-  currentRowsRef.current = currentRows;
+  if (!pendingRowsSyncRef.current) currentRowsRef.current = currentRows;
+
+  // state + ref + dirty flag를 동시에 업데이트하는 래퍼
+  const commitRows = useCallback((rows: TableRow[]) => {
+    currentRowsRef.current = rows;
+    pendingRowsSyncRef.current = false;
+    setCurrentRows(rows);
+  }, []);
+  const commitColumns = useCallback((cols: TableColumn[]) => {
+    currentColumnsRef.current = cols;
+    pendingColumnsSyncRef.current = false;
+    setCurrentColumns(cols);
+  }, []);
 
   const headerGridRef = useRef(currentHeaderGrid);
   headerGridRef.current = currentHeaderGrid;
@@ -218,6 +234,15 @@ export function useTableEditor({
       if (pendingChangeRef.current) clearTimeout(pendingChangeRef.current);
       pendingArgsRef.current = { title, cols, rowsData };
       pendingChangeRef.current = setTimeout(() => {
+        // dirty ref → React state 일괄 동기화 (label/code 입력 지연 렌더)
+        if (pendingRowsSyncRef.current) {
+          pendingRowsSyncRef.current = false;
+          setCurrentRows(currentRowsRef.current);
+        }
+        if (pendingColumnsSyncRef.current) {
+          pendingColumnsSyncRef.current = false;
+          setCurrentColumns(currentColumnsRef.current);
+        }
         onTableChangeRef.current({
           tableTitle: title,
           tableColumns: cols,
@@ -244,6 +269,9 @@ export function useTableEditor({
         clearTimeout(pendingQuestionInfoRef.current);
         pendingQuestionInfoRef.current = null;
       }
+      // dirty flag 클리어
+      pendingRowsSyncRef.current = false;
+      pendingColumnsSyncRef.current = false;
       // 부모 알림 flush
       if (pendingChangeRef.current) {
         clearTimeout(pendingChangeRef.current);
@@ -277,7 +305,7 @@ export function useTableEditor({
         currentColumnsRef.current,
         currentRowsRef.current,
       );
-      setCurrentRows(updatedRows);
+      commitRows(updatedRows);
       notifyChangeDebounced(
         currentTitleRef.current,
         currentColumnsRef.current,
@@ -306,10 +334,10 @@ export function useTableEditor({
       cols[nextVisibleIndex] = { ...targetCol, colspan: undefined };
 
       const updatedCols = recalculateHiddenHeaders(cols);
-      setCurrentColumns(updatedCols);
+      commitColumns(updatedCols);
       notifyChange(currentTitleRef.current, updatedCols, currentRowsRef.current);
     },
-    [notifyChange],
+    [notifyChange, commitColumns],
   );
 
   const unmergeColumnHeader = useCallback(
@@ -318,7 +346,7 @@ export function useTableEditor({
       cols[columnIndex] = { ...cols[columnIndex], colspan: undefined };
 
       const updatedCols = recalculateHiddenHeaders(cols);
-      setCurrentColumns(updatedCols);
+      commitColumns(updatedCols);
       notifyChange(currentTitleRef.current, updatedCols, currentRowsRef.current);
     },
     [notifyChange],
@@ -341,10 +369,10 @@ export function useTableEditor({
       const updatedColumns = currentColumnsRef.current.map((col, index) =>
         index === columnIndex ? { ...col, width: Math.max(0, width) } : col,
       );
-      setCurrentColumns(updatedColumns);
+      commitColumns(updatedColumns);
       notifyChange(currentTitleRef.current, updatedColumns, currentRowsRef.current);
     },
-    [notifyChange],
+    [notifyChange, commitColumns],
   );
 
   // ── 열 코드 변경 ──
@@ -359,6 +387,8 @@ export function useTableEditor({
         currentColumnsRef.current,
         currentRowsRef.current,
       );
+      currentRowsRef.current = updatedRows;
+      pendingRowsSyncRef.current = false;
       setCurrentRows(updatedRows);
       notifyChangeDebounced(currentTitleRef.current, currentColumnsRef.current, updatedRows);
       pendingCellCodeRef.current = null;
@@ -367,11 +397,12 @@ export function useTableEditor({
 
   const updateColumnCode = useCallback(
     (columnIndex: number, newColumnCode: string) => {
-      // 즉시: 컬럼 코드 문자열만 업데이트
+      // 즉시: ref만 업데이트, state는 debounce 후 동기화
       const updatedColumns = currentColumnsRef.current.map((col, idx) =>
         idx === columnIndex ? { ...col, columnCode: newColumnCode } : col,
       );
-      setCurrentColumns(updatedColumns);
+      currentColumnsRef.current = updatedColumns;
+      pendingColumnsSyncRef.current = true;
       notifyChangeDebounced(currentTitleRef.current, updatedColumns, currentRowsRef.current);
       // 지연: 셀 코드 전체 재계산
       scheduleCellCodeRecalc();
@@ -419,10 +450,10 @@ export function useTableEditor({
       };
     });
 
-    setCurrentColumns(updatedColumns);
-    setCurrentRows(updatedRows);
+    commitColumns(updatedColumns);
+    commitRows(updatedRows);
     notifyChange(currentTitleRef.current, updatedColumns, updatedRows);
-  }, [notifyChange]);
+  }, [notifyChange, commitColumns, commitRows]);
 
   const deleteColumn = useCallback(
     (columnIndex: number) => {
@@ -458,11 +489,11 @@ export function useTableEditor({
       }));
 
       const finalRows = recalculateHiddenCells(updatedRows);
-      setCurrentColumns(updatedColumns);
-      setCurrentRows(finalRows);
+      commitColumns(updatedColumns);
+      commitRows(finalRows);
       notifyChange(currentTitleRef.current, updatedColumns, finalRows);
     },
-    [notifyChange],
+    [notifyChange, commitColumns, commitRows],
   );
 
   const moveColumn = useCallback(
@@ -491,11 +522,11 @@ export function useTableEditor({
       });
 
       const finalRows = recalculateHiddenCells(updatedRows);
-      setCurrentColumns(updatedColumns);
-      setCurrentRows(finalRows);
+      commitColumns(updatedColumns);
+      commitRows(finalRows);
       notifyChange(currentTitleRef.current, updatedColumns, finalRows);
     },
-    [notifyChange],
+    [notifyChange, commitColumns, commitRows],
   );
 
   const updateColumnLabel = useCallback(
@@ -503,7 +534,8 @@ export function useTableEditor({
       const updatedColumns = currentColumnsRef.current.map((col, index) =>
         index === columnIndex ? { ...col, label } : col,
       );
-      setCurrentColumns(updatedColumns);
+      currentColumnsRef.current = updatedColumns;
+      pendingColumnsSyncRef.current = true;
       notifyChangeDebounced(currentTitleRef.current, updatedColumns, currentRowsRef.current);
     },
     [notifyChangeDebounced],
@@ -571,7 +603,7 @@ export function useTableEditor({
     );
 
     const updatedRows = [...rows, newRowWithCodes];
-    setCurrentRows(updatedRows);
+    commitRows(updatedRows);
     notifyChange(currentTitleRef.current, columns, updatedRows);
   }, [notifyChange]);
 
@@ -616,7 +648,7 @@ export function useTableEditor({
 
       const updatedRows = [...existingRows, ...newRows];
       const finalRows = recalculateHiddenCells(updatedRows);
-      setCurrentRows(finalRows);
+      commitRows(finalRows);
       notifyChange(currentTitleRef.current, columns, finalRows);
     },
     [notifyChange],
@@ -687,11 +719,11 @@ export function useTableEditor({
       );
       const finalRows = recalculateHiddenCells(rowsWithCodes);
 
-      setCurrentColumns(updatedColumns);
-      setCurrentRows(finalRows);
+      commitColumns(updatedColumns);
+      commitRows(finalRows);
       notifyChange(currentTitleRef.current, updatedColumns, finalRows);
     },
-    [notifyChange],
+    [notifyChange, commitColumns, commitRows],
   );
 
   const duplicateRow = useCallback(
@@ -731,7 +763,7 @@ export function useTableEditor({
         ...rows.slice(rowIndex + 1),
       ];
       const finalRows = recalculateHiddenCells(updatedRows);
-      setCurrentRows(finalRows);
+      commitRows(finalRows);
       notifyChange(currentTitleRef.current, columns, finalRows);
     },
     [notifyChange],
@@ -771,7 +803,7 @@ export function useTableEditor({
         .filter((_, index) => index !== rowIndex);
 
       const finalRows = recalculateHiddenCells(updatedRows);
-      setCurrentRows(finalRows);
+      commitRows(finalRows);
       notifyChange(currentTitleRef.current, currentColumnsRef.current, finalRows);
     },
     [notifyChange],
@@ -782,7 +814,8 @@ export function useTableEditor({
       const updatedRows = currentRowsRef.current.map((row, index) =>
         index === rowIndex ? { ...row, label } : row,
       );
-      setCurrentRows(updatedRows);
+      currentRowsRef.current = updatedRows;
+      pendingRowsSyncRef.current = true;
       notifyChangeDebounced(currentTitleRef.current, currentColumnsRef.current, updatedRows);
     },
     [notifyChangeDebounced],
@@ -790,11 +823,12 @@ export function useTableEditor({
 
   const updateRowCode = useCallback(
     (rowIndex: number, rowCode: string) => {
-      // 즉시: 행 코드 문자열만 업데이트
+      // 즉시: ref만 업데이트, state는 debounce 후 동기화
       const updatedRows = currentRowsRef.current.map((row, index) =>
         index === rowIndex ? { ...row, rowCode } : row,
       );
-      setCurrentRows(updatedRows);
+      currentRowsRef.current = updatedRows;
+      pendingRowsSyncRef.current = true;
       notifyChangeDebounced(currentTitleRef.current, currentColumnsRef.current, updatedRows);
       // 지연: 셀 코드 전체 재계산
       scheduleCellCodeRecalc();
@@ -814,7 +848,7 @@ export function useTableEditor({
       const updatedRows = currentRowsRef.current.map((row, index) =>
         index === rowIndex ? { ...row, displayCondition: conditionGroup } : row,
       );
-      setCurrentRows(updatedRows);
+      commitRows(updatedRows);
       notifyChange(currentTitleRef.current, currentColumnsRef.current, updatedRows);
     },
     [notifyChange],
@@ -829,7 +863,7 @@ export function useTableEditor({
           ? { ...row, dynamicGroupId: groupId, showWhenDynamicGroupId: undefined }
           : row,
       );
-      setCurrentRows(updatedRows);
+      commitRows(updatedRows);
       notifyChange(currentTitleRef.current, currentColumnsRef.current, updatedRows);
     },
     [notifyChange],
@@ -842,7 +876,7 @@ export function useTableEditor({
           ? { ...row, showWhenDynamicGroupId: groupId, dynamicGroupId: undefined }
           : row,
       );
-      setCurrentRows(updatedRows);
+      commitRows(updatedRows);
       notifyChange(currentTitleRef.current, currentColumnsRef.current, updatedRows);
     },
     [notifyChange],
@@ -860,7 +894,7 @@ export function useTableEditor({
       const updatedColumns = currentColumnsRef.current.map((col, index) =>
         index === columnIndex ? { ...col, displayCondition: conditionGroup } : col,
       );
-      setCurrentColumns(updatedColumns);
+      commitColumns(updatedColumns);
       notifyChange(currentTitleRef.current, updatedColumns, currentRowsRef.current);
     },
     [notifyChange],
@@ -886,7 +920,7 @@ export function useTableEditor({
     currentColumnsRef,
     questionCodeRef,
     questionTitleRef,
-    setCurrentRows,
+    setCurrentRows: commitRows,
     notifyChange,
     currentTitleRef,
     recalculateHiddenCells,
@@ -965,7 +999,7 @@ export function useTableEditor({
       }
 
       const finalRows = recalculateHiddenCells(updatedRows);
-      setCurrentRows(finalRows);
+      commitRows(finalRows);
       notifyChange(currentTitleRef.current, columns, finalRows);
     },
     [notifyChange, dragCopy.copiedRegion, dragCopy.pasteRegion],
@@ -1000,7 +1034,7 @@ export function useTableEditor({
       }
 
       const finalRows = recalculateHiddenCells(updatedRows);
-      setCurrentRows(finalRows);
+      commitRows(finalRows);
       notifyChange(currentTitleRef.current, currentColumnsRef.current, finalRows);
       setSelectedCell(null);
     },
@@ -1077,7 +1111,7 @@ export function useTableEditor({
       }
 
       const finalRows = recalculateHiddenCells(updatedRows);
-      setCurrentRows(finalRows);
+      commitRows(finalRows);
       notifyChange(currentTitleRef.current, columns, finalRows);
     },
     [notifyChange],
@@ -1099,7 +1133,7 @@ export function useTableEditor({
     if (newRows === rows) return;
 
     const finalRows = recalculateHiddenCells(newRows);
-    setCurrentRows(finalRows);
+    commitRows(finalRows);
     notifyChange(currentTitleRef.current, currentColumnsRef.current, finalRows);
   }, [notifyChange]);
 
@@ -1193,6 +1227,7 @@ export function useTableEditor({
       currentTitle,
       currentColumns,
       currentRows,
+      currentRowsRef,
       selectedCell,
       copiedCell,
       copiedCellPosition,

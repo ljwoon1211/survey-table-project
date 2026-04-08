@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Clipboard, ListChecks, Plus, Undo2 } from 'lucide-react';
-import { useShallow } from 'zustand/react/shallow';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -51,7 +50,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
   const { dynamicRowConfigs: rawConfigs, onDynamicRowConfigsChange } = props;
   // 기존 단일 객체 → 배열 마이그레이션 호환
   const dynamicRowConfigs = Array.isArray(rawConfigs) ? rawConfigs : [];
-  const allQuestions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
+  const hasQuestions = useSurveyBuilderStore((s) => s.currentSurvey.questions.length > 0);
   const editingQuestionId = useSurveyBuilderStore((s) => s.editingQuestionId);
   const hideColumnLabels = useSurveyBuilderStore(
     (s) => s.currentSurvey.questions.find((q) => q.id === s.editingQuestionId)?.hideColumnLabels ?? false,
@@ -63,6 +62,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
     currentTitle,
     currentColumns,
     currentRows,
+    currentRowsRef,
     selectedCell,
     copiedCell,
     copiedCellPosition,
@@ -175,20 +175,20 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
 
   const handleSaveCell = useCallback(
     (rowIndex: number, cellIndex: number) => {
-      const cell = currentRows[rowIndex]?.cells[cellIndex];
+      const cell = currentRowsRef.current[rowIndex]?.cells[cellIndex];
       if (!cell) return;
       setSaveCellTarget({ rowIndex, cellIndex, cell });
     },
-    [currentRows],
+    [],
   );
 
   const handleLoadCell = useCallback(
     (rowIndex: number, cellIndex: number) => {
-      const cell = currentRows[rowIndex]?.cells[cellIndex];
+      const cell = currentRowsRef.current[rowIndex]?.cells[cellIndex];
       if (!cell) return;
       setLoadCellTarget({ rowIndex, cellIndex, targetCell: cell });
     },
-    [currentRows],
+    [],
   );
 
   const handleCellApplied = useCallback(
@@ -474,7 +474,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
               <TableHeaderSection
                 columns={currentColumns}
                 editingColumnWidth={editingColumnWidth}
-                hasQuestions={allQuestions.length > 0}
+                hasQuestions={hasQuestions}
                 onUpdateColumnLabel={updateColumnLabel}
                 onUpdateColumnCode={updateColumnCode}
                 onMoveColumn={moveColumn}
@@ -495,7 +495,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
                   columnWidths={columnWidths}
                   columnCount={currentColumns.length}
                   totalRowCount={currentRows.length}
-                  hasQuestions={allQuestions.length > 0}
+                  hasQuestions={hasQuestions}
                   hasCopiedCell={!!copiedCell}
                   hasCopiedRegion={!!copiedRegion}
                   isDragCopyActive={!!dragCopyState}
