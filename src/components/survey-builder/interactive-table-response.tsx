@@ -355,6 +355,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     expandedGroupRows,
   } = useDynamicRowLayout({
     rows,
+    columnFilteredRows,
     visibleRows,
     groupConfigMap,
     selectedRowIds,

@@ -5,13 +5,14 @@ import { recalculateRowspansForVisibleRows } from '@/utils/table-merge-helpers';
 
 interface UseDynamicRowLayoutParams {
   rows: TableRow[];
+  columnFilteredRows: TableRow[]; // 열 필터링 후 행 (expandedGroupRows 셀 기준)
   visibleRows: TableRow[];
   groupConfigMap: Map<string, DynamicRowGroupConfig>;
   selectedRowIds: string[];
   hasDynamicRows: boolean;
   headerRowCount: number;
   expandedGroupIds: Set<string>;
-  hiddenGroupIds?: Set<string>; // displayCondition=false인 그룹 (grid-row 계산에서 제외)
+  hiddenGroupIds?: Set<string>;
 }
 
 interface UseDynamicRowLayoutReturn {
@@ -25,6 +26,7 @@ interface UseDynamicRowLayoutReturn {
 
 export function useDynamicRowLayout({
   rows,
+  columnFilteredRows,
   visibleRows,
   groupConfigMap,
   selectedRowIds,
@@ -171,7 +173,7 @@ export function useDynamicRowLayout({
     return map;
   }, [groupConfigMap, selectedRowIds, rows]);
 
-  // 펼친 그룹의 표시 행 (선택된 행 + 소계 행)
+  // 펼친 그룹의 표시 행 (선택된 행 + 소계 행, 열 필터링 적용)
   const expandedGroupRows = useMemo(() => {
     const map = new Map<string, TableRow[]>();
     if (expandedGroupIds.size === 0) return map;
@@ -179,7 +181,7 @@ export function useDynamicRowLayout({
     const selectedSet = new Set(selectedRowIds);
     const groupsWithSelections = new Set<string>();
     for (const id of selectedRowIds) {
-      const row = rows.find((r) => r.id === id);
+      const row = columnFilteredRows.find((r) => r.id === id);
       if (row?.dynamicGroupId) groupsWithSelections.add(row.dynamicGroupId);
     }
 
@@ -187,23 +189,21 @@ export function useDynamicRowLayout({
       if (!groupConfigMap.has(groupId)) continue;
       const groupRows: TableRow[] = [];
 
-      for (const row of rows) {
-        // 선택된 동적 행
+      for (const row of columnFilteredRows) {
         if (row.dynamicGroupId === groupId && selectedSet.has(row.id)) {
           groupRows.push(row);
         }
-        // 소계 행: 해당 그룹에 선택이 있을 때만
         if (row.showWhenDynamicGroupId === groupId && groupsWithSelections.has(groupId)) {
           groupRows.push(row);
         }
       }
 
-      // rowspan을 그룹 내 선택된 행 수에 맞게 재계산
+      // rowspan을 그룹 내 선택된 행 수에 맞게 재계산 (열 필터링된 행 기준)
       const visibleIds = new Set(groupRows.map((r) => r.id));
-      map.set(groupId, recalculateRowspansForVisibleRows(rows, visibleIds));
+      map.set(groupId, recalculateRowspansForVisibleRows(columnFilteredRows, visibleIds));
     }
     return map;
-  }, [expandedGroupIds, selectedRowIds, rows, groupConfigMap]);
+  }, [expandedGroupIds, selectedRowIds, columnFilteredRows, groupConfigMap]);
 
   // 명시적 grid-row 위치 계산 (셀렉터 행 + 펼친 행 포함)
   const { rowGridMap, selectorGridMap } = useMemo(() => {
