@@ -299,6 +299,18 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     return 1;
   }, [hideColumnLabels, visibleHeaderGrid]);
 
+  // 그룹 조건부 표시: 숨겨야 할 그룹 ID 집합
+  const hiddenGroupIds = useMemo(() => {
+    if (!allResponses || !allQuestions || !dynamicRowConfigs) return undefined;
+    const hidden = new Set<string>();
+    for (const g of dynamicRowConfigs) {
+      if (g.enabled && g.displayCondition && !shouldDisplayDynamicGroup(g, allResponses, allQuestions)) {
+        hidden.add(g.groupId);
+      }
+    }
+    return hidden.size > 0 ? hidden : undefined;
+  }, [dynamicRowConfigs, allResponses, allQuestions]);
+
   // 3) 동적 행 레이아웃 — selectorAnchors, displayRows, gridMap
   const {
     displayRows,
@@ -315,6 +327,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     hasDynamicRows,
     headerRowCount,
     expandedGroupIds,
+    hiddenGroupIds,
   });
 
   // 행별 완료 상태 맵 (displayRows + 펼친 그룹 행 포함)

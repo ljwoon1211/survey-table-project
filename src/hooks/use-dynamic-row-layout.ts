@@ -11,6 +11,7 @@ interface UseDynamicRowLayoutParams {
   hasDynamicRows: boolean;
   headerRowCount: number;
   expandedGroupIds: Set<string>;
+  hiddenGroupIds?: Set<string>; // displayCondition=false인 그룹 (grid-row 계산에서 제외)
 }
 
 interface UseDynamicRowLayoutReturn {
@@ -30,6 +31,7 @@ export function useDynamicRowLayout({
   hasDynamicRows,
   headerRowCount,
   expandedGroupIds,
+  hiddenGroupIds,
 }: UseDynamicRowLayoutParams): UseDynamicRowLayoutReturn {
   // 그룹별 셀렉터 앵커 위치 (null = 헤더 바로 아래)
   const selectorAnchors = useMemo(() => {
@@ -210,12 +212,14 @@ export function useDynamicRowLayout({
 
     let gridRow = headerRowCount + 1;
 
+    const isGroupVisible = (groupId: string) => !hiddenGroupIds || !hiddenGroupIds.has(groupId);
+
     // Phase 1: null 앵커 (헤더 바로 아래) 셀렉터들 먼저 배치
     for (const [groupId, anchorId] of selectorAnchors) {
       if (anchorId !== null) continue;
+      if (!isGroupVisible(groupId)) continue;
       selMap.set(groupId, gridRow);
       gridRow++;
-      // 펼친 그룹의 행들
       if (expandedGroupIds.has(groupId)) {
         const groupRows = expandedGroupRows.get(groupId) ?? [];
         for (const gr of groupRows) {
@@ -232,9 +236,9 @@ export function useDynamicRowLayout({
 
       for (const [groupId, anchorId] of selectorAnchors) {
         if (anchorId !== row.id) continue;
+        if (!isGroupVisible(groupId)) continue;
         selMap.set(groupId, gridRow);
         gridRow++;
-        // 펼친 그룹의 행들
         if (expandedGroupIds.has(groupId)) {
           const groupRows = expandedGroupRows.get(groupId) ?? [];
           for (const gr of groupRows) {
@@ -245,7 +249,7 @@ export function useDynamicRowLayout({
       }
     }
     return { rowGridMap: rowMap, selectorGridMap: selMap };
-  }, [displayRows, selectorAnchors, headerRowCount, expandedGroupIds, expandedGroupRows]);
+  }, [displayRows, selectorAnchors, headerRowCount, expandedGroupIds, expandedGroupRows, hiddenGroupIds]);
 
   return {
     displayRows,
