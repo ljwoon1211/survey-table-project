@@ -98,6 +98,53 @@ const SelectorRow = React.memo(function SelectorRow({
   );
 });
 
+// ── 공통: 행의 셀들을 CSS Grid 셀로 렌더 ──
+
+interface RenderRowCellsProps {
+  row: TableRow;
+  gridRow: number | undefined;
+  completed: boolean;
+  questionId: string;
+  isTestMode: boolean;
+  value?: Record<string, any>;
+  onChange?: (v: Record<string, any>) => void;
+}
+
+function renderRowCells({ row, gridRow, completed, questionId, isTestMode, value, onChange }: RenderRowCellsProps) {
+  return row.cells.map((cell, cellIndex) => {
+    if (cell.isHidden) return null;
+    const col = cellIndex + 1;
+    const rs = cell.rowspan || 1;
+    const cs = cell.colspan || 1;
+
+    return (
+      <div
+        key={cell.id}
+        className={cn(
+          'min-w-0 border-r border-b border-gray-300 p-2 transition-colors duration-200',
+          completed ? 'bg-green-50/40' : 'bg-white',
+          getAlignmentClasses(cell.horizontalAlign, cell.verticalAlign),
+        )}
+        style={{
+          gridRow: rs > 1 ? `${gridRow} / span ${rs}` : gridRow,
+          gridColumn: cs > 1 ? `${col} / span ${cs}` : col,
+        }}
+        data-row-id={row.id}
+        data-grid-cell
+        {...getGridCellAria('gridcell', cs, rs)}
+      >
+        <InteractiveCell
+          cell={cell}
+          questionId={questionId}
+          isTestMode={isTestMode}
+          value={value}
+          onChange={onChange}
+        />
+      </div>
+    );
+  });
+}
+
 // ── 메인 컴포넌트 ──
 
 interface InteractiveTableResponseProps {
@@ -162,29 +209,16 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
   // displayCondition에서 참조하는 질문 ID만 추출 → 관련 응답만 의존
   const relevantResponseKeys = useMemo(() => {
     const ids = new Set<string>();
-    for (const col of columns) {
-      if (col.displayCondition?.conditions) {
-        for (const c of col.displayCondition.conditions) {
-          if (c.sourceQuestionId) ids.add(c.sourceQuestionId);
-        }
+    const collect = (conditions?: { sourceQuestionId?: string }[]) => {
+      if (!conditions) return;
+      for (const c of conditions) {
+        if (c.sourceQuestionId) ids.add(c.sourceQuestionId);
       }
-    }
-    for (const row of rows) {
-      if (row.displayCondition?.conditions) {
-        for (const c of row.displayCondition.conditions) {
-          if (c.sourceQuestionId) ids.add(c.sourceQuestionId);
-        }
-      }
-    }
-    // 그룹 레벨 displayCondition도 수집
+    };
+    for (const col of columns) collect(col.displayCondition?.conditions);
+    for (const row of rows) collect(row.displayCondition?.conditions);
     if (dynamicRowConfigs) {
-      for (const group of dynamicRowConfigs) {
-        if (group.displayCondition?.conditions) {
-          for (const c of group.displayCondition.conditions) {
-            if (c.sourceQuestionId) ids.add(c.sourceQuestionId);
-          }
-        }
-      }
+      for (const group of dynamicRowConfigs) collect(group.displayCondition?.conditions);
     }
     return ids;
   }, [columns, rows, dynamicRowConfigs]);
@@ -419,12 +453,10 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
       Array.from(selectorGridMap.entries()).flatMap(([groupId, selectorGridRow]) => {
         const config = groupConfigMap.get(groupId);
         if (!config) return [];
-        // 그룹 조건부 표시: displayCondition이 false면 셀렉터+행 모두 숨김
-        if (allResponses && allQuestions && !shouldDisplayDynamicGroup(config, allResponses, allQuestions)) {
-          return [];
-        }
-        const isExpanded = expandedGroupIds.has(groupId);
+        // hiddenGroupIds로 이미 grid-row에서 제외됨 — 렌더도 스킵
+        if (hiddenGroupIds?.has(groupId)) return [];
 
+        const isExpanded = expandedGroupIds.has(groupId);
         const elements: React.ReactNode[] = [
           <SelectorRow
             key={`selector-${groupId}`}
@@ -441,44 +473,14 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
 
         // 펼친 그룹의 선택된 행들 렌더
         if (isExpanded) {
-          const groupRows = expandedGroupRows.get(groupId) ?? [];
-          for (const row of groupRows) {
-            const rowGridRow = rowGridMap.get(row.id);
-            const completed = rowCompletionMap.get(row.id) ?? false;
-
+          for (const row of expandedGroupRows.get(groupId) ?? []) {
             elements.push(
               <React.Fragment key={row.id}>
-                {row.cells.map((cell, cellIndex) => {
-                  if (cell.isHidden) return null;
-                  const col = cellIndex + 1;
-                  const rs = cell.rowspan || 1;
-                  const cs = cell.colspan || 1;
-
-                  return (
-                    <div
-                      key={cell.id}
-                      className={cn(
-                        'min-w-0 border-r border-b border-gray-300 p-2 transition-colors duration-200',
-                        completed ? 'bg-green-50/40' : 'bg-white',
-                        getAlignmentClasses(cell.horizontalAlign, cell.verticalAlign),
-                      )}
-                      style={{
-                        gridRow: rs > 1 ? `${rowGridRow} / span ${rs}` : rowGridRow,
-                        gridColumn: cs > 1 ? `${col} / span ${cs}` : col,
-                      }}
-                      data-row-id={row.id}
-                      data-grid-cell
-                      {...getGridCellAria('gridcell', cs, rs)}
-                    >
-                      <InteractiveCell
-                        cell={cell}
-                        questionId={questionId}
-                        isTestMode={isTestMode}
-                        value={value}
-                        onChange={onChange}
-                      />
-                    </div>
-                  );
+                {renderRowCells({
+                  row,
+                  gridRow: rowGridMap.get(row.id),
+                  completed: rowCompletionMap.get(row.id) ?? false,
+                  questionId, isTestMode, value, onChange,
                 })}
               </React.Fragment>,
             );
@@ -489,8 +491,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
       }),
     [selectorGridMap, groupConfigMap, groupSelectedCountMap, handleSelectGroup,
      expandedGroupIds, toggleGroupExpanded, expandedGroupRows, rowGridMap,
-     rowCompletionMap, questionId, isTestMode, value, onChange,
-     allResponses, allQuestions],
+     rowCompletionMap, questionId, isTestMode, value, onChange, hiddenGroupIds],
   );
 
   // ── 가상화 여부 판단 ──
@@ -570,48 +571,16 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
             {renderHeaderCells()}
 
             {/* 바디 — 명시적 grid-row 배치 */}
-            {displayRows.map((row) => {
-              const completed = rowCompletionMap.get(row.id) ?? false;
-              const gridRow = rowGridMap.get(row.id);
-
-              return (
-                <React.Fragment key={row.id}>
-                  {row.cells.map((cell, cellIndex) => {
-                    if (cell.isHidden) return null;
-
-                    const col = cellIndex + 1;
-                    const rs = cell.rowspan || 1;
-                    const cs = cell.colspan || 1;
-
-                    return (
-                      <div
-                        key={cell.id}
-                        className={cn(
-                          'min-w-0 border-r border-b border-gray-300 p-2 transition-colors duration-200',
-                          completed ? 'bg-green-50/40' : 'bg-white',
-                          getAlignmentClasses(cell.horizontalAlign, cell.verticalAlign),
-                        )}
-                        style={{
-                          gridRow: rs > 1 ? `${gridRow} / span ${rs}` : gridRow,
-                          gridColumn: cs > 1 ? `${col} / span ${cs}` : col,
-                        }}
-                        data-row-id={row.id}
-                        data-grid-cell
-                        {...getGridCellAria('gridcell', cs, rs)}
-                      >
-                        <InteractiveCell
-                          cell={cell}
-                          questionId={questionId}
-                          isTestMode={isTestMode}
-                          value={value}
-                          onChange={onChange}
-                        />
-                      </div>
-                    );
-                  })}
-                </React.Fragment>
-              );
-            })}
+            {displayRows.map((row) => (
+              <React.Fragment key={row.id}>
+                {renderRowCells({
+                  row,
+                  gridRow: rowGridMap.get(row.id),
+                  completed: rowCompletionMap.get(row.id) ?? false,
+                  questionId, isTestMode, value, onChange,
+                })}
+              </React.Fragment>
+            ))}
 
             {/* 셀렉터 행들 — 명시적 grid-row 배치 */}
             {renderSelectorRows()}
