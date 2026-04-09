@@ -26,6 +26,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Question, Survey } from '@/types/survey';
 import {
   getNextQuestionIndex,
+  shouldDisplayDynamicGroup,
   shouldDisplayQuestion,
   shouldDisplayRow,
 } from '@/utils/branch-logic';
@@ -398,7 +399,9 @@ export default function SurveyResponsePage() {
               (qResponse?.__selectedRowIds as string[]) ?? [],
             );
             const enabledGroupIds = new Set(
-              (q.dynamicRowConfigs ?? []).filter((g) => g.enabled).map((g) => g.groupId),
+              (q.dynamicRowConfigs ?? [])
+                .filter((g) => g.enabled && shouldDisplayDynamicGroup(g, responses as Record<string, unknown>, questions))
+                .map((g) => g.groupId),
             );
             const hasDynamic = enabledGroupIds.size > 0 && q.tableRowsData!.some((r) => r.dynamicGroupId);
 

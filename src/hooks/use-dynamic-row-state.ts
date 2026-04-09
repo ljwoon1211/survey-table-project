@@ -24,6 +24,8 @@ interface UseDynamicRowStateReturn {
   handleSelectGroup: (id: string) => void;
   handleDynamicRowSelect: (rowIds: string[]) => void;
   closeModal: () => void;
+  expandedGroupIds: Set<string>;
+  toggleGroupExpanded: (groupId: string) => void;
 }
 
 export function useDynamicRowState({
@@ -42,6 +44,16 @@ export function useDynamicRowState({
   );
 
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(new Set());
+
+  const toggleGroupExpanded = useCallback((groupId: string) => {
+    setExpandedGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }, []);
 
   const currentResponse = useMemo(() => {
     if (isTestMode) {
@@ -103,6 +115,16 @@ export function useDynamicRowState({
           __selectedRowIds: merged,
         });
       }
+
+      // 모달에서 행을 선택했으면 해당 그룹 자동 펼침
+      if (activeGroupId && rowIdsFromModal.length > 0) {
+        setExpandedGroupIds((prev) => {
+          if (prev.has(activeGroupId)) return prev;
+          const next = new Set(prev);
+          next.add(activeGroupId);
+          return next;
+        });
+      }
     },
     [isTestMode, questionId, updateTestResponse, onChange, activeGroupId],
   );
@@ -125,5 +147,7 @@ export function useDynamicRowState({
     handleSelectGroup,
     handleDynamicRowSelect,
     closeModal,
+    expandedGroupIds,
+    toggleGroupExpanded,
   };
 }

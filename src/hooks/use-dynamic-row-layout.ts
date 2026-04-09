@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import type { DynamicRowGroupConfig, TableCell, TableRow } from '@/types/survey';
+import { recalculateRowspansForVisibleRows } from '@/utils/table-merge-helpers';
 
 interface UseDynamicRowLayoutParams {
   rows: TableRow[];
@@ -9,14 +10,16 @@ interface UseDynamicRowLayoutParams {
   selectedRowIds: string[];
   hasDynamicRows: boolean;
   headerRowCount: number;
+  expandedGroupIds: Set<string>;
 }
 
 interface UseDynamicRowLayoutReturn {
   displayRows: TableRow[];
-  selectorAnchors: Map<string, string>;
+  selectorAnchors: Map<string, string | null>;
   rowGridMap: Map<string, number>;
   selectorGridMap: Map<string, number>;
   groupSelectedCountMap: Map<string, number>;
+  expandedGroupRows: Map<string, TableRow[]>;
 }
 
 export function useDynamicRowLayout({
@@ -26,68 +29,49 @@ export function useDynamicRowLayout({
   selectedRowIds,
   hasDynamicRows,
   headerRowCount,
+  expandedGroupIds,
 }: UseDynamicRowLayoutParams): UseDynamicRowLayoutReturn {
-  // 그룹별 셀렉터 앵커 위치 (그룹 순서 인식)
+  // 그룹별 셀렉터 앵커 위치 (null = 헤더 바로 아래)
   const selectorAnchors = useMemo(() => {
-    if (!hasDynamicRows) return new Map<string, string>();
-    const anchors = new Map<string, string>();
-
-    const lastNonDynamicIdx = visibleRows.findLastIndex(
-      (r) => !r.dynamicGroupId && !r.showWhenDynamicGroupId,
-    );
-    let prevGroupLastIdx = lastNonDynamicIdx;
+    if (!hasDynamicRows) return new Map<string, string | null>();
+    const anchors = new Map<string, string | null>();
 
     for (const [groupId, config] of groupConfigMap) {
-      if (config.insertAfterRowId && visibleRows.some((r) => r.id === config.insertAfterRowId)) {
-        const explicitIdx = visibleRows.findIndex((r) => r.id === config.insertAfterRowId);
-        const resolvedIdx = Math.max(explicitIdx, prevGroupLastIdx);
-        anchors.set(groupId, visibleRows[resolvedIdx].id);
-      } else {
-        const groupRows = visibleRows.filter(
-          (r) => r.dynamicGroupId === groupId || r.showWhenDynamicGroupId === groupId,
-        );
-        if (groupRows.length > 0) {
-          const firstIdx = visibleRows.indexOf(groupRows[0]);
-          const anchorIdx = firstIdx > 0
-            ? Math.max(firstIdx - 1, prevGroupLastIdx)
-            : prevGroupLastIdx;
-          if (anchorIdx >= 0 && anchorIdx < visibleRows.length) {
-            anchors.set(groupId, visibleRows[anchorIdx].id);
-          }
-        } else if (config.insertAfterRowId) {
+      if (config.insertAfterRowId) {
+        // 명시적 삽입 위치: visibleRows에서 해당 행 찾기
+        const anchorRow = visibleRows.find((r) => r.id === config.insertAfterRowId);
+        if (anchorRow) {
+          anchors.set(groupId, anchorRow.id);
+        } else {
+          // 지정된 행이 보이지 않는 경우: 원본에서 역추적하여 가장 가까운 보이는 행 찾기
           const origIdx = rows.findIndex((r) => r.id === config.insertAfterRowId);
+          let placed = false;
           if (origIdx !== -1) {
             for (let i = origIdx; i >= 0; i--) {
               const found = visibleRows.find((vr) => vr.id === rows[i].id);
               if (found) {
-                const foundIdx = visibleRows.indexOf(found);
-                const resolvedIdx = Math.max(foundIdx, prevGroupLastIdx);
-                anchors.set(groupId, visibleRows[resolvedIdx].id);
+                anchors.set(groupId, found.id);
+                placed = true;
                 break;
               }
             }
           }
+          if (!placed) anchors.set(groupId, null);
         }
-
-        if (!anchors.has(groupId) && prevGroupLastIdx >= 0 && prevGroupLastIdx < visibleRows.length) {
-          anchors.set(groupId, visibleRows[prevGroupLastIdx].id);
-        }
-      }
-
-      const lastGroupRowIdx = visibleRows.findLastIndex(
-        (r) => r.dynamicGroupId === groupId || r.showWhenDynamicGroupId === groupId,
-      );
-      if (lastGroupRowIdx !== -1 && lastGroupRowIdx > prevGroupLastIdx) {
-        prevGroupLastIdx = lastGroupRowIdx;
+      } else {
+        // insertAfterRowId 미지정 → 헤더 바로 아래
+        anchors.set(groupId, null);
       }
     }
     return anchors;
   }, [hasDynamicRows, groupConfigMap, visibleRows, rows]);
 
   // 여러 셀렉터 행 삽입 시 앵커 인덱스별 셀렉터 수
+  // null 앵커(헤더 바로 아래)는 제외 — 데이터 행 병합과 무관
   const selectorCountByAnchorIdx = useMemo(() => {
     const countMap = new Map<number, number>();
     for (const [, anchorId] of selectorAnchors) {
+      if (anchorId === null) continue;
       const idx = visibleRows.findIndex((r) => r.id === anchorId);
       if (idx !== -1) countMap.set(idx, (countMap.get(idx) || 0) + 1);
     }
@@ -185,25 +169,83 @@ export function useDynamicRowLayout({
     return map;
   }, [groupConfigMap, selectedRowIds, rows]);
 
-  // 명시적 grid-row 위치 계산 (셀렉터 행 포함)
+  // 펼친 그룹의 표시 행 (선택된 행 + 소계 행)
+  const expandedGroupRows = useMemo(() => {
+    const map = new Map<string, TableRow[]>();
+    if (expandedGroupIds.size === 0) return map;
+
+    const selectedSet = new Set(selectedRowIds);
+    const groupsWithSelections = new Set<string>();
+    for (const id of selectedRowIds) {
+      const row = rows.find((r) => r.id === id);
+      if (row?.dynamicGroupId) groupsWithSelections.add(row.dynamicGroupId);
+    }
+
+    for (const groupId of expandedGroupIds) {
+      if (!groupConfigMap.has(groupId)) continue;
+      const groupRows: TableRow[] = [];
+
+      for (const row of rows) {
+        // 선택된 동적 행
+        if (row.dynamicGroupId === groupId && selectedSet.has(row.id)) {
+          groupRows.push(row);
+        }
+        // 소계 행: 해당 그룹에 선택이 있을 때만
+        if (row.showWhenDynamicGroupId === groupId && groupsWithSelections.has(groupId)) {
+          groupRows.push(row);
+        }
+      }
+
+      // rowspan을 그룹 내 선택된 행 수에 맞게 재계산
+      const visibleIds = new Set(groupRows.map((r) => r.id));
+      map.set(groupId, recalculateRowspansForVisibleRows(rows, visibleIds));
+    }
+    return map;
+  }, [expandedGroupIds, selectedRowIds, rows, groupConfigMap]);
+
+  // 명시적 grid-row 위치 계산 (셀렉터 행 + 펼친 행 포함)
   const { rowGridMap, selectorGridMap } = useMemo(() => {
     const rowMap = new Map<string, number>();
     const selMap = new Map<string, number>();
 
     let gridRow = headerRowCount + 1;
+
+    // Phase 1: null 앵커 (헤더 바로 아래) 셀렉터들 먼저 배치
+    for (const [groupId, anchorId] of selectorAnchors) {
+      if (anchorId !== null) continue;
+      selMap.set(groupId, gridRow);
+      gridRow++;
+      // 펼친 그룹의 행들
+      if (expandedGroupIds.has(groupId)) {
+        const groupRows = expandedGroupRows.get(groupId) ?? [];
+        for (const gr of groupRows) {
+          rowMap.set(gr.id, gridRow);
+          gridRow++;
+        }
+      }
+    }
+
+    // Phase 2: 데이터행 + 일반 앵커 셀렉터
     for (const row of displayRows) {
       rowMap.set(row.id, gridRow);
       gridRow++;
 
       for (const [groupId, anchorId] of selectorAnchors) {
-        if (anchorId === row.id) {
-          selMap.set(groupId, gridRow);
-          gridRow++;
+        if (anchorId !== row.id) continue;
+        selMap.set(groupId, gridRow);
+        gridRow++;
+        // 펼친 그룹의 행들
+        if (expandedGroupIds.has(groupId)) {
+          const groupRows = expandedGroupRows.get(groupId) ?? [];
+          for (const gr of groupRows) {
+            rowMap.set(gr.id, gridRow);
+            gridRow++;
+          }
         }
       }
     }
     return { rowGridMap: rowMap, selectorGridMap: selMap };
-  }, [displayRows, selectorAnchors, headerRowCount]);
+  }, [displayRows, selectorAnchors, headerRowCount, expandedGroupIds, expandedGroupRows]);
 
   return {
     displayRows,
@@ -211,5 +253,6 @@ export function useDynamicRowLayout({
     rowGridMap,
     selectorGridMap,
     groupSelectedCountMap,
+    expandedGroupRows,
   };
 }

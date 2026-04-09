@@ -176,8 +176,9 @@ export interface DynamicRowGroupConfig {
   groupId: string; // 그룹 고유 ID
   enabled: boolean;
   label?: string; // 선택 버튼 텍스트 (기본: "항목 선택")
-  insertAfterRowId?: string; // 이 행 다음에 선택 버튼 배치
+  insertAfterRowId?: string; // 이 행 다음에 선택 버튼 배치 (미지정 시 헤더 바로 아래)
   buttonAlign?: 'left' | 'center' | 'right'; // 버튼 정렬 (기본: 'left')
+  displayCondition?: QuestionConditionGroup; // 그룹 레벨 조건부 표시
 }
 
 export interface TableColumn {

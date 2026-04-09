@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ChevronLeft, ChevronRight, FileText, ListChecks } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, FileText, ListChecks } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useDynamicRowLayout } from '@/hooks/use-dynamic-row-layout';
@@ -11,7 +11,7 @@ import { useMobileView } from '@/hooks/use-media-query';
 import { useTablePerf } from '@/hooks/use-table-perf';
 import { cn } from '@/lib/utils';
 import { DynamicRowGroupConfig, HeaderCell, Question, TableColumn, TableRow } from '@/types/survey';
-import { shouldDisplayColumn, shouldDisplayRow } from '@/utils/branch-logic';
+import { shouldDisplayColumn, shouldDisplayDynamicGroup, shouldDisplayRow } from '@/utils/branch-logic';
 import {
   buildGridTemplateCols,
   calcTotalWidth,
@@ -40,6 +40,8 @@ interface SelectorRowProps {
   selectedCount: number;
   onSelect: (groupId: string) => void;
   gridRow?: number;
+  isExpanded: boolean;
+  onToggleExpand: (groupId: string) => void;
 }
 
 const SelectorRow = React.memo(function SelectorRow({
@@ -49,29 +51,48 @@ const SelectorRow = React.memo(function SelectorRow({
   selectedCount,
   onSelect,
   gridRow,
+  isExpanded,
+  onToggleExpand,
 }: SelectorRowProps) {
   return (
     <div
       className={cn(
-        'flex items-center gap-3 border-r border-b border-gray-300 bg-white px-4 py-2.5',
+        'flex items-center gap-2 border-r border-b border-gray-300 bg-white px-3 py-2',
         buttonAlign === 'center' ? 'justify-center'
           : buttonAlign === 'right' ? 'justify-end'
           : 'justify-start',
       )}
       style={{ gridColumn: '1 / -1', gridRow }}
     >
+      {/* 펼침/접힘 chevron — 선택된 행이 있을 때만 토글 */}
+      {selectedCount > 0 && (
+        <button
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+          onClick={(e) => { e.stopPropagation(); onToggleExpand(groupId); }}
+          aria-label={isExpanded ? '접기' : '펼치기'}
+        >
+          <ChevronDown className={cn(
+            'h-4 w-4 transition-transform',
+            isExpanded ? '' : '-rotate-90',
+          )} />
+        </button>
+      )}
+
+      {/* 그룹 바 본체 — 클릭 시 모달 열기 */}
       <button
-        className="group flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-4 py-1.5 text-sm text-gray-700 transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 active:scale-[0.98]"
+        className="group flex flex-1 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-blue-50"
         onClick={() => onSelect(groupId)}
       >
-        <ListChecks className="h-3.5 w-3.5 text-gray-400 transition-colors group-hover:text-blue-500" />
-        <span className="font-medium">{label || '항목 선택'}</span>
+        <ListChecks className="h-3.5 w-3.5 shrink-0 text-gray-400 group-hover:text-blue-500" />
+        <span className="text-sm font-medium text-gray-700 group-hover:text-blue-700">
+          {label || '항목 선택'}
+        </span>
         {selectedCount > 0 && (
           <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-100 px-1.5 text-xs font-semibold text-blue-700">
             {selectedCount}
           </span>
         )}
-        <ChevronRight className="h-3.5 w-3.5 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-blue-400" />
+        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-blue-400" />
       </button>
     </div>
   );
@@ -121,6 +142,8 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     handleSelectGroup,
     handleDynamicRowSelect,
     closeModal,
+    expandedGroupIds,
+    toggleGroupExpanded,
   } = useDynamicRowState({
     questionId,
     rows,
@@ -153,8 +176,18 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
         }
       }
     }
+    // 그룹 레벨 displayCondition도 수집
+    if (dynamicRowConfigs) {
+      for (const group of dynamicRowConfigs) {
+        if (group.displayCondition?.conditions) {
+          for (const c of group.displayCondition.conditions) {
+            if (c.sourceQuestionId) ids.add(c.sourceQuestionId);
+          }
+        }
+      }
+    }
     return ids;
-  }, [columns, rows]);
+  }, [columns, rows, dynamicRowConfigs]);
 
   // 관련 응답만 안정적으로 추출 (JSON 직렬화로 값 비교)
   const relevantResponsesJson = useMemo(() => {
@@ -209,19 +242,13 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     }
 
     if (hasDynamicRows) {
-      const selectedSet = new Set(selectedRowIds);
-      const groupsWithSelections = new Set<string>();
-      for (const row of filtered) {
-        if (row.dynamicGroupId && selectedSet.has(row.id)) {
-          groupsWithSelections.add(row.dynamicGroupId);
-        }
-      }
+      // 동적 그룹 소속 행은 메인 그리드에서 제외 (아코디언에서 렌더)
       filtered = filtered.filter((row) => {
         if (row.dynamicGroupId && groupConfigMap.has(row.dynamicGroupId)) {
-          return selectedSet.has(row.id);
+          return false;
         }
         if (row.showWhenDynamicGroupId && groupConfigMap.has(row.showWhenDynamicGroupId)) {
-          return groupsWithSelections.has(row.showWhenDynamicGroupId);
+          return false;
         }
         return true;
       });
@@ -279,6 +306,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     rowGridMap,
     selectorGridMap,
     groupSelectedCountMap,
+    expandedGroupRows,
   } = useDynamicRowLayout({
     rows,
     visibleRows,
@@ -286,12 +314,13 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     selectedRowIds,
     hasDynamicRows,
     headerRowCount,
+    expandedGroupIds,
   });
 
-  // 행별 완료 상태 맵
+  // 행별 완료 상태 맵 (displayRows + 펼친 그룹 행 포함)
   const rowCompletionMap = useMemo(() => {
     const map = new Map<string, boolean>();
-    for (const row of displayRows) {
+    const checkRow = (row: TableRow) => {
       const completed = row.cells.every((cell) => {
         if (cell._isContinuation) return true;
         if (['text', 'checkbox', 'radio', 'select', 'input'].includes(cell.type)) {
@@ -301,9 +330,13 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
         return true;
       });
       map.set(row.id, completed);
+    };
+    for (const row of displayRows) checkRow(row);
+    for (const groupRows of expandedGroupRows.values()) {
+      for (const row of groupRows) checkRow(row);
     }
     return map;
-  }, [displayRows, currentResponse]);
+  }, [displayRows, expandedGroupRows, currentResponse]);
 
   // ── 빈 테이블 ──
   if (columns.length === 0 || rows.length === 0) {
@@ -367,13 +400,19 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     });
   };
 
-  // 4) 셀렉터 행 렌더링 (가상화/비가상화 공용)
+  // 4) 셀렉터 행 + 펼친 그룹 행 렌더링 (가상화/비가상화 공용)
   const renderSelectorRows = useCallback(
     () =>
-      Array.from(selectorGridMap.entries()).map(([groupId, gridRow]) => {
+      Array.from(selectorGridMap.entries()).flatMap(([groupId, selectorGridRow]) => {
         const config = groupConfigMap.get(groupId);
-        if (!config) return null;
-        return (
+        if (!config) return [];
+        // 그룹 조건부 표시: displayCondition이 false면 셀렉터+행 모두 숨김
+        if (allResponses && allQuestions && !shouldDisplayDynamicGroup(config, allResponses, allQuestions)) {
+          return [];
+        }
+        const isExpanded = expandedGroupIds.has(groupId);
+
+        const elements: React.ReactNode[] = [
           <SelectorRow
             key={`selector-${groupId}`}
             groupId={groupId}
@@ -381,11 +420,64 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
             buttonAlign={config.buttonAlign}
             selectedCount={groupSelectedCountMap.get(groupId) ?? 0}
             onSelect={handleSelectGroup}
-            gridRow={gridRow}
-          />
-        );
+            gridRow={selectorGridRow}
+            isExpanded={isExpanded}
+            onToggleExpand={toggleGroupExpanded}
+          />,
+        ];
+
+        // 펼친 그룹의 선택된 행들 렌더
+        if (isExpanded) {
+          const groupRows = expandedGroupRows.get(groupId) ?? [];
+          for (const row of groupRows) {
+            const rowGridRow = rowGridMap.get(row.id);
+            const completed = rowCompletionMap.get(row.id) ?? false;
+
+            elements.push(
+              <React.Fragment key={row.id}>
+                {row.cells.map((cell, cellIndex) => {
+                  if (cell.isHidden) return null;
+                  const col = cellIndex + 1;
+                  const rs = cell.rowspan || 1;
+                  const cs = cell.colspan || 1;
+
+                  return (
+                    <div
+                      key={cell.id}
+                      className={cn(
+                        'min-w-0 border-r border-b border-gray-300 p-2 transition-colors duration-200',
+                        completed ? 'bg-green-50/40' : 'bg-white',
+                        getAlignmentClasses(cell.horizontalAlign, cell.verticalAlign),
+                      )}
+                      style={{
+                        gridRow: rs > 1 ? `${rowGridRow} / span ${rs}` : rowGridRow,
+                        gridColumn: cs > 1 ? `${col} / span ${cs}` : col,
+                      }}
+                      data-row-id={row.id}
+                      data-grid-cell
+                      {...getGridCellAria('gridcell', cs, rs)}
+                    >
+                      <InteractiveCell
+                        cell={cell}
+                        questionId={questionId}
+                        isTestMode={isTestMode}
+                        value={value}
+                        onChange={onChange}
+                      />
+                    </div>
+                  );
+                })}
+              </React.Fragment>,
+            );
+          }
+        }
+
+        return elements;
       }),
-    [selectorGridMap, groupConfigMap, groupSelectedCountMap, handleSelectGroup],
+    [selectorGridMap, groupConfigMap, groupSelectedCountMap, handleSelectGroup,
+     expandedGroupIds, toggleGroupExpanded, expandedGroupRows, rowGridMap,
+     rowCompletionMap, questionId, isTestMode, value, onChange,
+     allResponses, allQuestions],
   );
 
   // ── 가상화 여부 판단 ──

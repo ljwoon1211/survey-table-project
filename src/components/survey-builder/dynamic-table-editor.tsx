@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Clipboard, ListChecks, Plus, Undo2 } from 'lucide-react';
+import { Clipboard, Eye, ListChecks, Plus, Undo2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { generateId } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
-import { DynamicRowGroupConfig, HeaderCell, TableCell, TableColumn, TableRow } from '@/types/survey';
+import { DynamicRowGroupConfig, HeaderCell, Question, QuestionConditionGroup, TableCell, TableColumn, TableRow } from '@/types/survey';
 
 import { BulkGeneratorModal, BulkColumnDef } from './bulk-generator';
 import { CellContentModal } from './cell-content-modal';
@@ -18,6 +18,7 @@ import { EditorTableRow } from './editor-table-row';
 import { HeaderGridEditor } from './header-grid-editor';
 import { useTableEditor } from './hooks/use-table-editor';
 import { ColumnConditionModal } from './column-condition-modal';
+import { GroupConditionModal } from './group-condition-modal';
 import { LoadCellModal } from './load-cell-modal';
 import { RowConditionModal } from './row-condition-modal';
 import { SaveCellModal } from './save-cell-modal';
@@ -159,6 +160,22 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
       setTimeout(() => setBulkColumnToast(null), 2500);
     },
     [addBulkColumns],
+  );
+
+  // ── 그룹 조건 모달 상태 ──
+  const [editingGroupCondition, setEditingGroupCondition] = useState<DynamicRowGroupConfig | null>(null);
+  const currentQuestion = useSurveyBuilderStore(
+    (s) => s.currentSurvey.questions.find((q) => q.id === s.editingQuestionId),
+  );
+
+  const handleUpdateGroupCondition = useCallback(
+    (groupId: string, condition: QuestionConditionGroup | undefined) => {
+      const updated = dynamicRowConfigs.map((g) =>
+        g.groupId === groupId ? { ...g, displayCondition: condition } : g,
+      );
+      onDynamicRowConfigsChange?.(updated);
+    },
+    [dynamicRowConfigs, onDynamicRowConfigsChange],
   );
 
   // ── 셀 보관함 상태 ──
@@ -658,7 +675,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
                         }}
                         className="h-7 w-full rounded-md border border-input bg-background px-1 text-xs"
                       >
-                        <option value="">선택...</option>
+                        <option value="">헤더 바로 아래</option>
                         {nonDynamicRows.map((row) => (
                           <option key={row.id} value={row.id}>{row.label}</option>
                         ))}
@@ -682,6 +699,24 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
                         <option value="center">중앙</option>
                         <option value="right">우측</option>
                       </select>
+                    </div>
+                    {/* 그룹 표시 조건 */}
+                    <div className="col-span-3">
+                      <button
+                        onClick={() => setEditingGroupCondition(group)}
+                        className={`flex items-center gap-1 text-[10px] transition-colors ${
+                          group.displayCondition && group.displayCondition.conditions.length > 0
+                            ? 'text-blue-600 hover:text-blue-800'
+                            : 'text-gray-400 hover:text-gray-600'
+                        }`}
+                      >
+                        <Eye className="h-3 w-3" />
+                        <span>
+                          {group.displayCondition && group.displayCondition.conditions.length > 0
+                            ? `표시 조건 ${group.displayCondition.conditions.length}개`
+                            : '표시 조건 설정'}
+                        </span>
+                      </button>
                     </div>
                   </div>
                 )}
@@ -730,6 +765,17 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
         currentQuestion={currentQuestionAsQuestion}
         onUpdateCondition={updateColumnCondition}
       />
+
+      {/* 그룹 조건부 표시 설정 모달 */}
+      {currentQuestion && (
+        <GroupConditionModal
+          open={!!editingGroupCondition}
+          onOpenChange={(open) => { if (!open) setEditingGroupCondition(null); }}
+          group={editingGroupCondition}
+          currentQuestion={currentQuestion}
+          onUpdateCondition={handleUpdateGroupCondition}
+        />
+      )}
 
       {/* 셀 보관함 모달 */}
       <SaveCellModal

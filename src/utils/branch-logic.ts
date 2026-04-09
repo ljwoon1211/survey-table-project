@@ -1,5 +1,6 @@
 import {
   BranchRule,
+  DynamicRowGroupConfig,
   Question,
   QuestionCondition,
   QuestionConditionGroup,
@@ -877,6 +878,36 @@ export function shouldDisplayColumn(
   }
 
   const { conditions, logicType } = column.displayCondition;
+
+  const results = conditions
+    .filter((condition) => condition.enabled !== false)
+    .map((condition) => evaluateQuestionCondition(condition, allResponses, allQuestions));
+
+  switch (logicType) {
+    case 'AND':
+      return results.every((result) => result);
+    case 'OR':
+      return results.some((result) => result);
+    case 'NOT':
+      return !results.some((result) => result);
+    default:
+      return true;
+  }
+}
+
+/**
+ * 동적 행 그룹 표시 조건 확인
+ */
+export function shouldDisplayDynamicGroup(
+  group: DynamicRowGroupConfig,
+  allResponses: Record<string, unknown>,
+  allQuestions: Question[],
+): boolean {
+  if (!group.displayCondition) {
+    return true;
+  }
+
+  const { conditions, logicType } = group.displayCondition;
 
   const results = conditions
     .filter((condition) => condition.enabled !== false)
