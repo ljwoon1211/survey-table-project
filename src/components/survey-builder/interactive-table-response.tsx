@@ -417,18 +417,46 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     if (hideColumnLabels) return null;
 
     if (visibleHeaderGrid && visibleHeaderGrid.length > 0) {
-      return visibleHeaderGrid.flatMap((headerRow, rowIdx) =>
-        headerRow.map((cell) => (
-          <div
-            key={cell.id}
-            className="flex items-center justify-center border-r border-b border-gray-300 bg-gray-50 px-3 py-2 text-center font-semibold text-gray-800"
-            style={getGridSpanStyle(cell.colspan, cell.rowspan)}
-            {...getGridCellAria('columnheader', cell.colspan, cell.rowspan)}
-          >
-            {cell.label || <span className="text-sm text-gray-400 italic" />}
-          </div>
-        )),
-      );
+      // rowspan으로 점유된 열 위치를 추적하여 명시적 gridRow/gridColumn 배치
+      // occupied[row][col] = true이면 이전 행의 rowspan에 의해 점유됨
+      const totalRows = visibleHeaderGrid.length;
+      const occupied = Array.from({ length: totalRows }, () => new Map<number, boolean>());
+
+      return visibleHeaderGrid.flatMap((headerRow, rowIdx) => {
+        let col = 1;
+        return headerRow.map((cell) => {
+          // rowspan으로 점유된 열 건너뛰기
+          while (occupied[rowIdx]?.get(col)) col++;
+
+          const startCol = col;
+          const cs = cell.colspan || 1;
+          const rs = cell.rowspan || 1;
+
+          // 이 셀이 점유하는 영역을 후속 행에 마킹
+          if (rs > 1) {
+            for (let r = rowIdx + 1; r < rowIdx + rs && r < totalRows; r++) {
+              for (let c = startCol; c < startCol + cs; c++) {
+                occupied[r].set(c, true);
+              }
+            }
+          }
+          col += cs;
+
+          return (
+            <div
+              key={cell.id}
+              className="flex items-center justify-center border-r border-b border-gray-300 bg-gray-50 px-3 py-2 text-center font-semibold text-gray-800"
+              style={{
+                gridRow: rs > 1 ? `${rowIdx + 1} / span ${rs}` : rowIdx + 1,
+                gridColumn: cs > 1 ? `${startCol} / span ${cs}` : startCol,
+              }}
+              {...getGridCellAria('columnheader', cs, rs)}
+            >
+              {cell.label || <span className="text-sm text-gray-400 italic" />}
+            </div>
+          );
+        });
+      });
     }
 
     // 단일 행 헤더 (폴백)

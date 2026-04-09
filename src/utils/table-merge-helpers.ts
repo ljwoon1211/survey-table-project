@@ -335,19 +335,40 @@ export function recalculateColspansForVisibleColumns(
     return { ...row, cells: newCells };
   });
 
-  // 다단계 헤더 재계산
+  // 다단계 헤더 재계산 (rowspan으로 점유된 열 위치를 추적)
   let filteredHeaderGrid: HeaderCell[][] | undefined;
   if (headerGrid && headerGrid.length > 0) {
-    filteredHeaderGrid = headerGrid.map((headerRow) => {
+    const totalHeaderRows = headerGrid.length;
+    // occupied[row][col] = true이면 이전 행의 rowspan에 의해 점유됨
+    const occupied = Array.from({ length: totalHeaderRows }, () => new Set<number>());
+
+    filteredHeaderGrid = headerGrid.map((headerRow, rowIdx) => {
       const newRow: HeaderCell[] = [];
       let origColIdx = 0;
 
+      // 이전 행의 rowspan으로 점유된 열 건너뛰기
+      while (occupied[rowIdx]?.has(origColIdx)) origColIdx++;
+
       for (const cell of headerRow) {
+        // rowspan 점유된 열 건너뛰기
+        while (occupied[rowIdx]?.has(origColIdx)) origColIdx++;
+
         const cellColspan = cell.colspan || 1;
+        const cellRowspan = cell.rowspan || 1;
+
         // 이 헤더 셀이 커버하는 원본 열 범위에서 가시 열 수 카운트
         let visibleCount = 0;
         for (let j = 0; j < cellColspan && origColIdx + j < originalColumns.length; j++) {
           if (visibleColIndices.has(origColIdx + j)) visibleCount++;
+        }
+
+        // rowspan > 1이면 후속 행에 점유 마킹
+        if (cellRowspan > 1) {
+          for (let r = rowIdx + 1; r < rowIdx + cellRowspan && r < totalHeaderRows; r++) {
+            for (let c = origColIdx; c < origColIdx + cellColspan; c++) {
+              occupied[r].add(c);
+            }
+          }
         }
 
         if (visibleCount > 0) {
