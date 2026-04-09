@@ -80,19 +80,19 @@ const SelectorRow = React.memo(function SelectorRow({
 
       {/* 그룹 바 본체 — 클릭 시 모달 열기 */}
       <button
-        className="group flex flex-1 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-blue-50"
+        className="flex flex-1 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-gray-100"
         onClick={() => onSelect(groupId)}
       >
-        <ListChecks className="h-3.5 w-3.5 shrink-0 text-gray-400 group-hover:text-blue-500" />
-        <span className="text-sm font-medium text-gray-700 group-hover:text-blue-700">
+        <ListChecks className="h-3.5 w-3.5 shrink-0 text-gray-500" />
+        <span className="text-sm font-medium text-gray-700">
           {label || '항목 선택'}
         </span>
         {selectedCount > 0 && (
-          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-100 px-1.5 text-xs font-semibold text-blue-700">
+          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-gray-200 px-1.5 text-xs font-semibold text-gray-700">
             {selectedCount}
           </span>
         )}
-        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-300 transition-transform group-hover:translate-x-0.5 group-hover:text-blue-400" />
+        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-400" />
       </button>
     </div>
   );
