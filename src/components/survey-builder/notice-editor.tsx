@@ -65,6 +65,7 @@ export function NoticeEditor({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadAbortController = useRef<AbortController | null>(null);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
   const [, forceUpdate] = useState({});
 
   // 업로드된 이미지 URL 추적 (원본 URL로 저장)
@@ -209,18 +210,20 @@ export function NoticeEditor({
 
       // 업로드 (진행률 추적)
       const xhr = new XMLHttpRequest();
+      xhrRef.current = xhr;
 
-      // 진행률 업데이트
-      xhr.upload.addEventListener('progress', (e) => {
+      const handleProgress = (e: ProgressEvent) => {
         if (e.lengthComputable) {
           const percentComplete = (e.loaded / e.total) * 100;
           setUploadProgress(percentComplete);
         }
-      });
+      };
+
+      xhr.upload.addEventListener('progress', handleProgress);
 
       // Promise로 래핑
       const uploadPromise = new Promise<string>((resolve, reject) => {
-        xhr.addEventListener('load', () => {
+        const handleLoad = () => {
           if (xhr.status === 200) {
             const response = JSON.parse(xhr.responseText);
             resolve(response.url);
@@ -228,18 +231,19 @@ export function NoticeEditor({
             const errorResponse = JSON.parse(xhr.responseText);
             reject(new Error(errorResponse.error || '업로드에 실패했습니다.'));
           }
-        });
+        };
+        const handleError = () => reject(new Error('네트워크 오류가 발생했습니다.'));
+        const handleAbort = () => reject(new Error('업로드가 취소되었습니다.'));
 
-        xhr.addEventListener('error', () => {
-          reject(new Error('네트워크 오류가 발생했습니다.'));
-        });
-
-        xhr.addEventListener('abort', () => {
-          reject(new Error('업로드가 취소되었습니다.'));
-        });
+        xhr.addEventListener('load', handleLoad);
+        xhr.addEventListener('error', handleError);
+        xhr.addEventListener('abort', handleAbort);
 
         xhr.open('POST', '/api/upload/image');
         xhr.send(formData);
+      }).finally(() => {
+        xhr.upload.removeEventListener('progress', handleProgress);
+        xhrRef.current = null;
       });
 
       const imageUrl = await uploadPromise;
@@ -304,6 +308,16 @@ export function NoticeEditor({
     handleCancelUpload();
     setShowImageUpload(false);
   }, [handleCancelUpload]);
+
+  // 언마운트 시 진행 중인 업로드 중단
+  useEffect(() => {
+    return () => {
+      if (xhrRef.current) {
+        xhrRef.current.abort();
+        xhrRef.current = null;
+      }
+    };
+  }, []);
 
   // 초기 content에서 이미지 URL 추출 및 추적
   useEffect(() => {

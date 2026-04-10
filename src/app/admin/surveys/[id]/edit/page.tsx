@@ -208,23 +208,30 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
       return;
     }
 
+    let cancelled = false;
+
     // 500ms 후에 서버 검사 수행
     const timer = setTimeout(async () => {
       try {
         const isAvailable = await checkSlugAvailable(slugInput, surveyId);
+        if (cancelled) return;
         if (!isAvailable) {
           setSlugError('이미 사용 중인 URL입니다. 다른 URL을 입력해주세요.');
         } else {
           setSlugError('');
         }
       } catch (error) {
-        console.error('슬러그 중복 검사 실패:', error);
-        // 에러 발생 시 에러 메시지 표시하지 않음 (사용자 경험 고려)
+        if (!cancelled) {
+          console.error('슬러그 중복 검사 실패:', error);
+        }
       }
     }, 500); // 0.5초 대기
 
-    // cleanup: 타이핑이 계속되면 이전 타이머 취소
-    return () => clearTimeout(timer);
+    // cleanup: 타이핑이 계속되면 이전 타이머 취소 + 진행 중인 async 무시
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [slugInput, surveyId]);
 
   // 제목에서 자동 슬러그 생성

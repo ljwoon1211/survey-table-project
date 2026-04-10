@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { AlertCircle, Check, Copy, Download, FileJson, Upload } from 'lucide-react';
 
@@ -34,6 +34,15 @@ export function ImportExportLibraryModal({ open, onOpenChange }: ImportExportLib
   const [copied, setCopied] = useState(false);
   const [importSuccess, setImportSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const importTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      if (importTimerRef.current) clearTimeout(importTimerRef.current);
+    };
+  }, []);
 
   const handleExport = async () => {
     try {
@@ -48,7 +57,8 @@ export function ImportExportLibraryModal({ open, onOpenChange }: ImportExportLib
     try {
       await navigator.clipboard.writeText(exportData);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error('Failed to copy:', error);
     }
@@ -79,7 +89,8 @@ export function ImportExportLibraryModal({ open, onOpenChange }: ImportExportLib
       await importLibraryMutation.mutateAsync(importData);
       setImportSuccess(true);
       setImportData('');
-      setTimeout(() => {
+      if (importTimerRef.current) clearTimeout(importTimerRef.current);
+      importTimerRef.current = setTimeout(() => {
         setImportSuccess(false);
         onOpenChange(false);
       }, 1500);

@@ -139,12 +139,14 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
   // ── 행 일괄 생성 상태 ──
   const [bulkRowModalOpen, setBulkRowModalOpen] = useState(false);
   const [bulkRowToast, setBulkRowToast] = useState<{ count: number; visible: boolean } | null>(null);
+  const bulkRowToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleBulkGenerate = useCallback(
     (rows: Parameters<typeof addBulkRows>[0]) => {
       addBulkRows(rows);
       setBulkRowToast({ count: rows.length, visible: true });
-      setTimeout(() => setBulkRowToast(null), 2500);
+      if (bulkRowToastTimer.current) clearTimeout(bulkRowToastTimer.current);
+      bulkRowToastTimer.current = setTimeout(() => setBulkRowToast(null), 2500);
     },
     [addBulkRows],
   );
@@ -152,12 +154,14 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
   // ── 열 일괄 생성 상태 ──
   const [bulkColumnModalOpen, setBulkColumnModalOpen] = useState(false);
   const [bulkColumnToast, setBulkColumnToast] = useState<{ count: number; visible: boolean } | null>(null);
+  const bulkColumnToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleBulkColumnGenerate = useCallback(
     (columnDefs: BulkColumnDef[]) => {
       addBulkColumns(columnDefs);
       setBulkColumnToast({ count: columnDefs.length, visible: true });
-      setTimeout(() => setBulkColumnToast(null), 2500);
+      if (bulkColumnToastTimer.current) clearTimeout(bulkColumnToastTimer.current);
+      bulkColumnToastTimer.current = setTimeout(() => setBulkColumnToast(null), 2500);
     },
     [addBulkColumns],
   );
@@ -243,6 +247,8 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
   useEffect(() => {
     return () => {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (bulkRowToastTimer.current) clearTimeout(bulkRowToastTimer.current);
+      if (bulkColumnToastTimer.current) clearTimeout(bulkColumnToastTimer.current);
     };
   }, []);
 

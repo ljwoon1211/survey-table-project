@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   CheckSquare,
@@ -126,6 +126,11 @@ export function QuestionLibraryPanel({
   const [isAddingMultiple, setIsAddingMultiple] = useState(false);
   const [addingQuestionIds, setAddingQuestionIds] = useState<Set<string>>(new Set());
 
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
+  }, []);
+
   // 검색 쿼리 (enabled 옵션으로 검색어가 있을 때만 실행)
   const { data: searchResults = [] } = useSearchQuestions(searchQuery.trim());
 
@@ -186,6 +191,7 @@ export function QuestionLibraryPanel({
     setAddingQuestionIds((prev) => new Set(prev).add(savedQuestion.id));
     try {
       let questionToAdd: Question | null = await applyQuestion(savedQuestion.id);
+      if (!mountedRef.current) return;
       if (!questionToAdd) {
         setAddingQuestionIds((prev) => {
           const next = new Set(prev);
@@ -213,19 +219,23 @@ export function QuestionLibraryPanel({
       }
 
       // 선택 해제
-      setSelectedQuestions((prev) => {
-        const next = new Set(prev);
-        next.delete(savedQuestion.id);
-        return next;
-      });
+      if (mountedRef.current) {
+        setSelectedQuestions((prev) => {
+          const next = new Set(prev);
+          next.delete(savedQuestion.id);
+          return next;
+        });
+      }
     } catch (error) {
       console.error('질문 추가 실패:', error);
     } finally {
-      setAddingQuestionIds((prev) => {
-        const next = new Set(prev);
-        next.delete(savedQuestion.id);
-        return next;
-      });
+      if (mountedRef.current) {
+        setAddingQuestionIds((prev) => {
+          const next = new Set(prev);
+          next.delete(savedQuestion.id);
+          return next;
+        });
+      }
     }
   };
 
@@ -240,6 +250,7 @@ export function QuestionLibraryPanel({
     try {
       const questionIds = Array.from(selectedQuestions);
       const questions = await applyMultipleQuestions(questionIds);
+      if (!mountedRef.current) return;
 
       // 중복 방지를 위해 한 번만 추가
       if (questions && questions.length > 0) {
@@ -256,7 +267,9 @@ export function QuestionLibraryPanel({
     } catch (error) {
       console.error('일괄 질문 추가 실패:', error);
     } finally {
-      setIsAddingMultiple(false);
+      if (mountedRef.current) {
+        setIsAddingMultiple(false);
+      }
     }
   };
 

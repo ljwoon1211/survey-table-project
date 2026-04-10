@@ -395,7 +395,7 @@ export function SortableQuestionList({
   // 선택된 질문으로 스크롤 (활성 모드 컨테이너 내에서 검색)
   useEffect(() => {
     if (!selectedQuestionId) return;
-    requestAnimationFrame(() => {
+    const rafId = requestAnimationFrame(() => {
       const container = isTestMode ? testContainerRef.current : editContainerRef.current;
       const el = container?.querySelector(`[data-question-id="${selectedQuestionId}"]`)
         ?? document.querySelector(`[data-question-id="${selectedQuestionId}"]`);
@@ -403,6 +403,7 @@ export function SortableQuestionList({
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     });
+    return () => cancelAnimationFrame(rafId);
   }, [selectedQuestionId, isTestMode]);
 
   const sensors = useSensors(

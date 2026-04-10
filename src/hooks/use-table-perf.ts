@@ -11,6 +11,7 @@ interface PerfMetrics {
   timestamp: number;
 }
 
+const MAX_PERF_LOG_SIZE = 200;
 const perfLog: PerfMetrics[] = [];
 
 /**
@@ -29,7 +30,7 @@ export function useTablePerf(label: string, enabled = process.env.NODE_ENV === '
     const start = renderStart.current;
 
     // rAF: 브라우저가 실제 페인트 직전에 호출 → DOM 커밋 완료 시점
-    requestAnimationFrame(() => {
+    const rafId = requestAnimationFrame(() => {
       const duration = performance.now() - start;
       const domNodes = document.querySelectorAll('[data-grid-cell]').length;
 
@@ -40,12 +41,17 @@ export function useTablePerf(label: string, enabled = process.env.NODE_ENV === '
         timestamp: Date.now(),
       };
 
+      if (perfLog.length >= MAX_PERF_LOG_SIZE) {
+        perfLog.splice(0, perfLog.length - MAX_PERF_LOG_SIZE + 1);
+      }
       perfLog.push(metrics);
 
       console.log(
         `[TablePerf] ${label}: ${metrics.renderTime}ms | DOM nodes: ${metrics.domNodes}`,
       );
     });
+
+    return () => cancelAnimationFrame(rafId);
   });
 }
 

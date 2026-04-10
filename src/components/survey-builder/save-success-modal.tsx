@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { AlertCircle, Check, Copy, Globe, Lock, Pencil, RefreshCw } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
@@ -49,12 +49,20 @@ export const SaveSuccessModal = React.memo(function SaveSuccessModal({
 
   const [isEditingSlug, setIsEditingSlug] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   // 모달이 닫힐 때 내부 상태 리셋
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       setIsEditingSlug(false);
       setCopySuccess(false);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
     }
     onOpenChange(nextOpen);
   };
@@ -73,7 +81,8 @@ export const SaveSuccessModal = React.memo(function SaveSuccessModal({
 
     navigator.clipboard.writeText(url);
     setCopySuccess(true);
-    setTimeout(() => setCopySuccess(false), 2000);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopySuccess(false), 2000);
   };
 
   // 비공개 토큰 재생성

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   AlignCenter,
@@ -172,6 +172,11 @@ export function CellContentModal({
     return url;
   };
 
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
+  }, []);
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -278,8 +283,10 @@ export function CellContentModal({
     } catch (error) {
       console.error('셀 저장 실패:', error);
     } finally {
-      setIsSaving(false);
-      onClose();
+      if (mountedRef.current) {
+        setIsSaving(false);
+        onClose();
+      }
     }
   };
 
