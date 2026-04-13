@@ -529,6 +529,28 @@ export function useTableEditor({
     [notifyChange, commitColumns, commitRows],
   );
 
+  const moveRow = useCallback(
+    (rowIndex: number, direction: 'up' | 'down') => {
+      const rows = currentRowsRef.current;
+
+      if (direction === 'up' && rowIndex === 0) return;
+      if (direction === 'down' && rowIndex === rows.length - 1) return;
+
+      const targetIndex = direction === 'up' ? rowIndex - 1 : rowIndex + 1;
+
+      const updatedRows = [...rows];
+      [updatedRows[rowIndex], updatedRows[targetIndex]] = [
+        updatedRows[targetIndex],
+        updatedRows[rowIndex],
+      ];
+
+      const finalRows = recalculateHiddenCells(updatedRows);
+      commitRows(finalRows);
+      notifyChange(currentTitleRef.current, currentColumnsRef.current, finalRows);
+    },
+    [notifyChange, commitRows],
+  );
+
   const updateColumnLabel = useCallback(
     (columnIndex: number, label: string) => {
       const updatedColumns = currentColumnsRef.current.map((col, index) =>
@@ -1255,6 +1277,7 @@ export function useTableEditor({
       addColumn,
       deleteColumn,
       moveColumn,
+      moveRow,
       updateColumnLabel,
       updateColumnCode,
       handleColumnWidthChange,

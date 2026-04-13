@@ -98,6 +98,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
     addBulkColumns,
     addRow,
     addBulkRows,
+    moveRow,
     duplicateRow,
     deleteRow,
     updateRowLabel,
@@ -530,6 +531,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
                   dynamicRowConfigs={dynamicRowConfigs}
                   onSetDynamicGroupId={setDynamicGroupId}
                   onSetShowWhenDynamicGroupId={setShowWhenDynamicGroupId}
+                  onMoveRow={moveRow}
                   onDuplicateRow={duplicateRow}
                   onDeleteRow={deleteRow}
                   onSelectCell={handleSelectCell}

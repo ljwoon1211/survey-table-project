@@ -4,8 +4,10 @@ import React from 'react';
 
 import {
   Archive,
+  ArrowDown,
   ArrowLeft,
   ArrowRight,
+  ArrowUp,
   CheckSquare,
   Circle,
   Clipboard,
@@ -104,6 +106,7 @@ export interface EditorTableRowProps {
   dynamicRowConfigs: DynamicRowGroupConfig[];
   onSetDynamicGroupId: (rowId: string, groupId: string | undefined) => void;
   onSetShowWhenDynamicGroupId: (rowId: string, groupId: string | undefined) => void;
+  onMoveRow: (rowIndex: number, direction: 'up' | 'down') => void;
   onDuplicateRow: (rowIndex: number) => void;
   onDeleteRow: (rowIndex: number) => void;
   onSelectCell: (rowId: string, cellId: string) => void;
@@ -134,6 +137,7 @@ export const EditorTableRow = React.memo(function EditorTableRow({
   dynamicRowConfigs,
   onSetDynamicGroupId,
   onSetShowWhenDynamicGroupId,
+  onMoveRow,
   onDuplicateRow,
   onDeleteRow,
   onSelectCell,
@@ -270,6 +274,24 @@ export const EditorTableRow = React.memo(function EditorTableRow({
                       ))}
                     </>
                   )}
+                  <div className="my-1 border-t" />
+                  {/* 행 이동 */}
+                  <div className="flex gap-0.5 px-1">
+                    <button
+                      onClick={() => onMoveRow(rowIndex, 'up')}
+                      disabled={rowIndex === 0}
+                      className="flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-30"
+                    >
+                      <ArrowUp className="h-3 w-3" /> 위로
+                    </button>
+                    <button
+                      onClick={() => onMoveRow(rowIndex, 'down')}
+                      disabled={rowIndex === totalRowCount - 1}
+                      className="flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-30"
+                    >
+                      아래로 <ArrowDown className="h-3 w-3" />
+                    </button>
+                  </div>
                   <div className="my-1 border-t" />
                   <button
                     onClick={() => onDuplicateRow(rowIndex)}
