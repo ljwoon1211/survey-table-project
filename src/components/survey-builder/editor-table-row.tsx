@@ -106,7 +106,7 @@ export interface EditorTableRowProps {
   dynamicRowConfigs: DynamicRowGroupConfig[];
   onSetDynamicGroupId: (rowId: string, groupId: string | undefined) => void;
   onSetShowWhenDynamicGroupId: (rowId: string, groupId: string | undefined) => void;
-  onMoveRow: (rowIndex: number, direction: 'up' | 'down') => void;
+  onMoveRow: (rowIndex: number, targetIndex: number) => void;
   onDuplicateRow: (rowIndex: number) => void;
   onDeleteRow: (rowIndex: number) => void;
   onSelectCell: (rowId: string, cellId: string) => void;
@@ -205,7 +205,7 @@ export const EditorTableRow = React.memo(function EditorTableRow({
                   <Settings2 className="h-3 w-3" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="max-h-[60vh] w-48 overflow-y-auto p-1" side="right" align="start">
+              <PopoverContent className="max-h-[60vh] w-auto min-w-32 overflow-y-auto p-1" side="right" align="start">
                 <div className="space-y-0.5">
                   <div className="px-2 py-1.5">
                     <label className="mb-1 block text-[10px] font-medium text-gray-500">행 코드 (엑셀용)</label>
@@ -276,20 +276,33 @@ export const EditorTableRow = React.memo(function EditorTableRow({
                   )}
                   <div className="my-1 border-t" />
                   {/* 행 이동 */}
-                  <div className="flex gap-0.5 px-1">
+                  <div className="flex items-center justify-center gap-1 px-1">
                     <button
-                      onClick={() => onMoveRow(rowIndex, 'up')}
+                      onClick={() => onMoveRow(rowIndex, rowIndex - 1)}
                       disabled={rowIndex === 0}
-                      className="flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-30"
+                      className="rounded p-1 text-gray-600 hover:bg-gray-100 disabled:opacity-30"
                     >
-                      <ArrowUp className="h-3 w-3" /> 위로
+                      <ArrowUp className="h-3.5 w-3.5" />
                     </button>
+                    <input
+                      type="number"
+                      min={1}
+                      max={totalRowCount}
+                      defaultValue={rowIndex + 1}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          const target = parseInt((e.target as HTMLInputElement).value, 10) - 1;
+                          if (!isNaN(target)) onMoveRow(rowIndex, target);
+                        }
+                      }}
+                      className="h-5 w-8 rounded border text-center text-xs [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    />
                     <button
-                      onClick={() => onMoveRow(rowIndex, 'down')}
+                      onClick={() => onMoveRow(rowIndex, rowIndex + 1)}
                       disabled={rowIndex === totalRowCount - 1}
-                      className="flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 disabled:opacity-30"
+                      className="rounded p-1 text-gray-600 hover:bg-gray-100 disabled:opacity-30"
                     >
-                      아래로 <ArrowDown className="h-3 w-3" />
+                      <ArrowDown className="h-3.5 w-3.5" />
                     </button>
                   </div>
                   <div className="my-1 border-t" />

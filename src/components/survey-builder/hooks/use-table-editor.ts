@@ -530,19 +530,14 @@ export function useTableEditor({
   );
 
   const moveRow = useCallback(
-    (rowIndex: number, direction: 'up' | 'down') => {
+    (rowIndex: number, targetIndex: number) => {
       const rows = currentRowsRef.current;
 
-      if (direction === 'up' && rowIndex === 0) return;
-      if (direction === 'down' && rowIndex === rows.length - 1) return;
-
-      const targetIndex = direction === 'up' ? rowIndex - 1 : rowIndex + 1;
+      if (targetIndex < 0 || targetIndex >= rows.length || rowIndex === targetIndex) return;
 
       const updatedRows = [...rows];
-      [updatedRows[rowIndex], updatedRows[targetIndex]] = [
-        updatedRows[targetIndex],
-        updatedRows[rowIndex],
-      ];
+      const [removed] = updatedRows.splice(rowIndex, 1);
+      updatedRows.splice(targetIndex, 0, removed);
 
       const finalRows = recalculateHiddenCells(updatedRows);
       commitRows(finalRows);
