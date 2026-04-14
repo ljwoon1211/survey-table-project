@@ -16,7 +16,13 @@ function calculateNextOrder(
   if (groupId) {
     const siblingQuestions = questions.filter((q) => q.groupId === groupId);
     const siblingSubGroups = groups.filter((g) => g.parentGroupId === groupId);
-    return siblingQuestions.length + siblingSubGroups.length;
+    const maxQOrder = siblingQuestions.length > 0
+      ? Math.max(...siblingQuestions.map((q) => q.order))
+      : -1;
+    const maxGOrder = siblingSubGroups.length > 0
+      ? Math.max(...siblingSubGroups.map((g) => g.order))
+      : -1;
+    return Math.max(maxQOrder, maxGOrder) + 1;
   }
   return questions.length > 0 ? Math.max(...questions.map((q) => q.order), 0) + 1 : 1;
 }
