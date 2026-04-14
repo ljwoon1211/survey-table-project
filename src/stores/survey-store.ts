@@ -4,6 +4,32 @@ import { immer } from 'zustand/middleware/immer';
 
 import { buildFlatOrderedQuestions } from '@/lib/group-ordering';
 import { regenerateAfterDelete, regenerateAfterReorder } from '@/lib/spss/variable-generator';
+
+// ── 헬퍼 함수 ──
+
+/** 그룹 내 인터리브 자식 수를 고려한 다음 order 계산 */
+function calculateNextOrder(
+  groupId: string | undefined,
+  questions: Question[],
+  groups: QuestionGroup[],
+): number {
+  if (groupId) {
+    const siblingQuestions = questions.filter((q) => q.groupId === groupId);
+    const siblingSubGroups = groups.filter((g) => g.parentGroupId === groupId);
+    return siblingQuestions.length + siblingSubGroups.length;
+  }
+  return questions.length > 0 ? Math.max(...questions.map((q) => q.order), 0) + 1 : 1;
+}
+
+/** 전체 트리를 순회하여 Question.order를 전역 순번으로 재할당 */
+function recalculateGlobalOrder(questions: Question[], groups: QuestionGroup[]): void {
+  const flat = buildFlatOrderedQuestions(questions, groups);
+  const questionMap = new Map(questions.map((q) => [q.id, q]));
+  flat.forEach((fq, index) => {
+    const q = questionMap.get(fq.id);
+    if (q) q.order = index + 1;
+  });
+}
 import { generatePrivateToken, generateSlugFromTitle } from '@/lib/survey-url';
 import { generateId } from '@/lib/utils';
 import {
@@ -147,12 +173,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           }
 
           // 전역 Question.order 재계산
-          const flatQuestions = buildFlatOrderedQuestions(questions, groups);
-          const questionMap = new Map(questions.map((q) => [q.id, q]));
-          flatQuestions.forEach((fq, index) => {
-            const q = questionMap.get(fq.id);
-            if (q) q.order = index + 1;
-          });
+          recalculateGlobalOrder(questions, groups);
 
           state.isDirty = false;
           state.isSavedToDb = true;
@@ -367,15 +388,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           });
 
           // 2. 전체 트리 순회하여 전역 Question.order 재계산
-          const flatQuestions = buildFlatOrderedQuestions(
-            state.currentSurvey.questions,
-            groups,
-          );
-          const questionMap = new Map(state.currentSurvey.questions.map((q) => [q.id, q]));
-          flatQuestions.forEach((fq, index) => {
-            const q = questionMap.get(fq.id);
-            if (q) q.order = index + 1;
-          });
+          recalculateGlobalOrder(state.currentSurvey.questions, groups);
 
           state.currentSurvey.questions = regenerateAfterReorder(state.currentSurvey.questions);
 
@@ -405,24 +418,12 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
         const questions = get().currentSurvey.questions;
         const groups = get().currentSurvey.groups || [];
 
-        // 같은 그룹 내 인터리브 자식 수를 고려한 order 계산
-        // (그룹 내 질문 + 하위그룹의 총 개수 = 마지막 위치)
-        let newOrder: number;
-        if (groupId) {
-          const siblingQuestions = questions.filter((q) => q.groupId === groupId);
-          const siblingSubGroups = groups.filter((g) => g.parentGroupId === groupId);
-          newOrder = siblingQuestions.length + siblingSubGroups.length;
-        } else {
-          // 그룹 없는 질문: 전역 maxOrder + 1
-          newOrder = questions.length > 0 ? Math.max(...questions.map((q) => q.order), 0) + 1 : 1;
-        }
-
         const newQuestion: Question = {
           id: generateId(),
           type,
           title: getDefaultQuestionTitle(type),
           required: false,
-          order: newOrder,
+          order: calculateNextOrder(groupId, questions, groups),
           groupId,
           ...(needsOptions(type) && {
             options: [
@@ -446,15 +447,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
 
           // 그룹 내 추가 시 전역 order 재계산
           if (groupId) {
-            const flatQuestions = buildFlatOrderedQuestions(
-              state.currentSurvey.questions,
-              state.currentSurvey.groups || [],
-            );
-            const questionMap = new Map(state.currentSurvey.questions.map((q) => [q.id, q]));
-            flatQuestions.forEach((fq, index) => {
-              const q = questionMap.get(fq.id);
-              if (q) q.order = index + 1;
-            });
+            recalculateGlobalOrder(state.currentSurvey.questions, state.currentSurvey.groups || []);
           }
 
           state.currentSurvey.questions = regenerateAfterReorder(
@@ -478,19 +471,9 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
         const questions = get().currentSurvey.questions;
         const groups = get().currentSurvey.groups || [];
 
-        // 같은 그룹 내 인터리브 자식 수를 고려한 order 계산
-        let newOrder: number;
-        if (question.groupId) {
-          const siblingQuestions = questions.filter((q) => q.groupId === question.groupId);
-          const siblingSubGroups = groups.filter((g) => g.parentGroupId === question.groupId);
-          newOrder = siblingQuestions.length + siblingSubGroups.length;
-        } else {
-          newOrder = questions.length > 0 ? Math.max(...questions.map((q) => q.order), 0) + 1 : 1;
-        }
-
         const questionWithOrder = {
           ...question,
-          order: newOrder,
+          order: calculateNextOrder(question.groupId, questions, groups),
         };
 
         set((state) => {
@@ -500,15 +483,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
 
           // 그룹 내 추가 시 전역 order 재계산
           if (question.groupId) {
-            const flatQuestions = buildFlatOrderedQuestions(
-              state.currentSurvey.questions,
-              state.currentSurvey.groups || [],
-            );
-            const questionMap = new Map(state.currentSurvey.questions.map((q) => [q.id, q]));
-            flatQuestions.forEach((fq, index) => {
-              const q = questionMap.get(fq.id);
-              if (q) q.order = index + 1;
-            });
+            recalculateGlobalOrder(state.currentSurvey.questions, state.currentSurvey.groups || []);
           }
 
           state.currentSurvey.questions = regenerateAfterReorder(

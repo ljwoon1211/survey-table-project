@@ -468,6 +468,23 @@ export function SortableQuestionList({
     setOverId((over?.id as string) || null);
   }
 
+  // 서버에 질문 순서 변경 동기화
+  function syncReorderToServer() {
+    const state = useSurveyBuilderStore.getState();
+    const allQuestionIds = state.currentSurvey.questions
+      .slice()
+      .sort((a, b) => a.order - b.order)
+      .map((q) => q.id);
+    const savedIds = allQuestionIds.filter((id) => !state.questionChanges.added[id]);
+    if (surveyId && savedIds.length > 0) {
+      ensureSurvey().then(() =>
+        reorderQuestionsAction(savedIds).catch((error) => {
+          console.error('질문 순서 변경 실패:', error);
+        }),
+      );
+    }
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
 
@@ -480,8 +497,10 @@ export function SortableQuestionList({
       const overParent = findParentGroupId(overStr, questions, groups);
 
       // 같은 부모 그룹 내에서만 이동 허용
-      if (activeParent === overParent && activeParent !== null) {
-        // 인터리브된 자식 목록에서 arrayMove
+      if (activeParent !== overParent) return void (setActiveId(null), setOverId(null));
+
+      if (activeParent !== null) {
+        // 그룹 내 인터리브 이동
         const children = getInterleavedChildren(activeParent, questions, groups);
         const toDndId = (item: { kind: string; data: { id: string } }) =>
           item.kind === 'subgroup' ? toGroupDndId(item.data.id) : item.data.id;
@@ -491,60 +510,22 @@ export function SortableQuestionList({
 
         if (oldIndex !== -1 && newIndex !== -1) {
           const newOrder = arrayMove(children, oldIndex, newIndex);
-          const items = newOrder.map((c) => ({
+          reorderGroupChildren(activeParent, newOrder.map((c) => ({
             kind: c.kind as 'question' | 'subgroup',
             id: c.data.id,
-          }));
-
-          // 스토어 업데이트 (내부에서 전역 order 재계산)
-          reorderGroupChildren(activeParent, items);
-
-          // 서버 동기화 (질문 순서)
-          const state = useSurveyBuilderStore.getState();
-          const allQuestionIds = state.currentSurvey.questions
-            .slice()
-            .sort((a, b) => a.order - b.order)
-            .map((q) => q.id);
-          const added = state.questionChanges.added;
-          const savedIds = allQuestionIds.filter((id) => !added[id]);
-          if (surveyId && savedIds.length > 0) {
-            ensureSurvey().then(() =>
-              reorderQuestionsAction(savedIds).catch((error) => {
-                console.error('질문 순서 변경 실패:', error);
-              }),
-            );
-          }
+          })));
+          syncReorderToServer();
         }
-      } else if (activeParent === overParent && activeParent === null) {
-        // 그룹 없는 질문끼리 이동 (기존 동작 유지)
-        const ungrouped = questions
-          .filter((q) => !q.groupId)
-          .sort((a, b) => a.order - b.order);
+      } else {
+        // 그룹 없는 질문끼리 이동
+        const orderedQuestions = questions.slice().sort((a, b) => a.order - b.order);
+        const globalOld = orderedQuestions.findIndex((q) => q.id === activeStr);
+        const globalNew = orderedQuestions.findIndex((q) => q.id === overStr);
 
-        const oldIndex = ungrouped.findIndex((q) => q.id === activeStr);
-        const newIndex = ungrouped.findIndex((q) => q.id === overStr);
-
-        if (oldIndex !== -1 && newIndex !== -1) {
-          // 그룹 없는 질문 재정렬: 전체 질문 목록 재구성
-          const orderedQuestions = questions.slice().sort((a, b) => a.order - b.order);
-          const globalOld = orderedQuestions.findIndex((q) => q.id === activeStr);
-          const globalNew = orderedQuestions.findIndex((q) => q.id === overStr);
-
-          if (globalOld !== -1 && globalNew !== -1) {
-            const newOrderList = arrayMove(orderedQuestions, globalOld, globalNew);
-            const questionIds = newOrderList.map((q) => q.id);
-            reorderQuestions(questionIds);
-
-            const added = useSurveyBuilderStore.getState().questionChanges.added;
-            const savedIds = questionIds.filter((id) => !added[id]);
-            if (surveyId && savedIds.length > 0) {
-              ensureSurvey().then(() =>
-                reorderQuestionsAction(savedIds).catch((error) => {
-                  console.error('질문 순서 변경 실패:', error);
-                }),
-              );
-            }
-          }
+        if (globalOld !== -1 && globalNew !== -1) {
+          const questionIds = arrayMove(orderedQuestions, globalOld, globalNew).map((q) => q.id);
+          reorderQuestions(questionIds);
+          syncReorderToServer();
         }
       }
     }
@@ -736,6 +717,17 @@ export function SortableQuestionList({
     );
   };
 
+  // 하위그룹 내부 질문 렌더링 (공통)
+  const renderSubGroupQuestions = (subGroupId: string, renderCard: (q: Question) => React.ReactNode) => {
+    const subGroupQuestions = questionsByGroup[subGroupId] || [];
+    if (subGroupQuestions.length === 0) return null;
+    return (
+      <div className="space-y-4 pl-4">
+        {subGroupQuestions.sort((a, b) => a.order - b.order).map(renderCard)}
+      </div>
+    );
+  };
+
   // 그룹 내 인터리브된 자식 렌더링 헬퍼
   const renderInterleavedChildren = (
     groupId: string,
@@ -745,20 +737,12 @@ export function SortableQuestionList({
     const children = getInterleavedChildren(groupId, questions, groups);
     if (children.length === 0) return null;
 
-    // 편집 모드: 그룹별 SortableContext로 감싸기
-    const items = children.map((c) =>
-      c.kind === 'subgroup' ? toGroupDndId(c.data.id) : c.data.id,
-    );
-
     const content = (
       <div className="space-y-4 pl-4">
         {children.map((child) => {
-          if (child.kind === 'question') {
-            return renderCard(child.data);
-          }
-          const subGroup = child.data;
-          const subGroupQuestions = questionsByGroup[subGroup.id] || [];
+          if (child.kind === 'question') return renderCard(child.data);
 
+          const subGroup = child.data;
           if (isEditMode) {
             return (
               <SortableSubGroup
@@ -767,18 +751,10 @@ export function SortableQuestionList({
                 questionCount={getTotalQuestionCount(subGroup.id)}
                 subGroupCount={getTotalSubGroupCount(subGroup.id)}
               >
-                {subGroupQuestions.length > 0 && (
-                  <div className="space-y-4 pl-4">
-                    {subGroupQuestions
-                      .sort((a, b) => a.order - b.order)
-                      .map(renderCard)}
-                  </div>
-                )}
+                {renderSubGroupQuestions(subGroup.id, renderCard)}
               </SortableSubGroup>
             );
           }
-
-          // 테스트 모드: 드래그 없이 렌더링
           return (
             <div key={subGroup.id} className="ml-4 space-y-4">
               <GroupHeader
@@ -786,27 +762,58 @@ export function SortableQuestionList({
                 questionCount={getTotalQuestionCount(subGroup.id)}
                 subGroupCount={getTotalSubGroupCount(subGroup.id)}
               />
-              {!subGroup.collapsed && subGroupQuestions.length > 0 && (
-                <div className="space-y-4 pl-4">
-                  {subGroupQuestions
-                    .sort((a, b) => a.order - b.order)
-                    .map(renderCard)}
-                </div>
-              )}
+              {!subGroup.collapsed && renderSubGroupQuestions(subGroup.id, renderCard)}
             </div>
           );
         })}
       </div>
     );
 
-    if (isEditMode) {
+    if (!isEditMode) return content;
+
+    const items = children.map((c) =>
+      c.kind === 'subgroup' ? toGroupDndId(c.data.id) : c.data.id,
+    );
+    return (
+      <SortableContext items={items} strategy={verticalListSortingStrategy}>
+        {content}
+      </SortableContext>
+    );
+  };
+
+  // 드래그 오버레이 렌더링
+  const renderDragOverlay = (id: string) => {
+    if (isGroupDndId(id)) {
+      const gid = extractGroupId(id);
+      const group = groups.find((g) => g.id === gid);
+      if (!group) return null;
+      const qCount = (questionsByGroup[gid] || []).length;
       return (
-        <SortableContext items={items} strategy={verticalListSortingStrategy}>
-          {content}
-        </SortableContext>
+        <div className="rounded-lg border border-blue-200 bg-blue-50/90 p-3 opacity-95 shadow-lg">
+          <div className="flex items-center gap-2">
+            <GripVertical className="h-4 w-4 animate-pulse text-blue-600" />
+            <span className="font-medium text-blue-800">{group.name}</span>
+            <span className="text-sm text-blue-600">({qCount}개 질문)</span>
+          </div>
+        </div>
       );
     }
-    return content;
+    const question = questions.find((q) => q.id === id);
+    if (!question) return null;
+    return (
+      <div className="opacity-95">
+        <SortableQuestion
+          question={question}
+          index={questions.findIndex((q) => q.id === id)}
+          isSelected={false}
+          onSelect={noop}
+          onEdit={noop}
+          onDelete={noop}
+          onDuplicate={noop}
+          isDragOverlay
+        />
+      </div>
+    );
   };
 
   // 그룹 렌더 헬퍼
@@ -861,43 +868,7 @@ export function SortableQuestionList({
           </SortableContext>
 
           <DragOverlay>
-            {activeId ? (
-              (() => {
-                if (isGroupDndId(activeId)) {
-                  // 하위그룹 드래그 오버레이
-                  const groupId = extractGroupId(activeId);
-                  const group = groups.find((g) => g.id === groupId);
-                  if (!group) return null;
-                  const qCount = (questionsByGroup[groupId] || []).length;
-                  return (
-                    <div className="rounded-lg border border-blue-200 bg-blue-50/90 p-3 opacity-95 shadow-lg">
-                      <div className="flex items-center gap-2">
-                        <GripVertical className="h-4 w-4 animate-pulse text-blue-600" />
-                        <span className="font-medium text-blue-800">{group.name}</span>
-                        <span className="text-sm text-blue-600">({qCount}개 질문)</span>
-                      </div>
-                    </div>
-                  );
-                }
-                // 질문 드래그 오버레이
-                const question = questions.find((q) => q.id === activeId);
-                if (!question) return null;
-                return (
-                  <div className="opacity-95">
-                    <SortableQuestion
-                      question={question}
-                      index={questions.findIndex((q) => q.id === activeId)}
-                      isSelected={false}
-                      onSelect={noop}
-                      onEdit={noop}
-                      onDelete={noop}
-                      onDuplicate={noop}
-                      isDragOverlay
-                    />
-                  </div>
-                );
-              })()
-            ) : null}
+            {activeId && renderDragOverlay(activeId)}
           </DragOverlay>
         </DndContext>
       </div>
