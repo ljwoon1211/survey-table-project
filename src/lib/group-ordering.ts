@@ -59,16 +59,16 @@ export function getInterleavedChildren(
   const usedSlots = new Set<number>();
   for (const sg of directSubGroups) {
     const pos = Math.max(0, Math.min(sg.order, totalSize - 1));
-    // 충돌 시 다음 빈 슬롯 찾기
     let slot = pos;
     while (usedSlots.has(slot) && slot < totalSize) slot++;
     if (slot >= totalSize) {
-      // 뒤에서 빈 슬롯 찾기
       slot = 0;
-      while (usedSlots.has(slot)) slot++;
+      while (usedSlots.has(slot) && slot < totalSize) slot++;
     }
-    usedSlots.add(slot);
-    result[slot] = { kind: 'subgroup', data: sg };
+    if (slot < totalSize) {
+      usedSlots.add(slot);
+      result[slot] = { kind: 'subgroup', data: sg };
+    }
   }
 
   // 2. 질문을 남은 슬롯에 순서대로 채움

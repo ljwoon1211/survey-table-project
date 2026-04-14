@@ -153,28 +153,6 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
         set((state) => {
           state.currentSurvey = survey;
 
-          // 기존 데이터 order 정규화: 하위그룹 order를 질문 뒤로 재할당
-          // (기존: 질문과 하위그룹이 별도 order 공간 → 통합 order 공간으로 변환)
-          const groups = state.currentSurvey.groups || [];
-          const questions = state.currentSurvey.questions;
-          const parentGroupIds = new Set(
-            groups.filter((g) => !g.parentGroupId).map((g) => g.id),
-          );
-          for (const parentId of parentGroupIds) {
-            const childQuestions = questions.filter((q) => q.groupId === parentId);
-            const childSubGroups = groups.filter((g) => g.parentGroupId === parentId);
-            if (childSubGroups.length > 0) {
-              // 하위그룹 order를 질문 수 이후로 재할당 (기존 순서 보존)
-              const sortedSubGroups = childSubGroups.slice().sort((a, b) => a.order - b.order);
-              sortedSubGroups.forEach((sg, idx) => {
-                sg.order = childQuestions.length + idx;
-              });
-            }
-          }
-
-          // 전역 Question.order 재계산
-          recalculateGlobalOrder(questions, groups);
-
           state.isDirty = false;
           state.isSavedToDb = true;
           state.isModifiedSincePublish = false;
@@ -377,13 +355,14 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           const oldCodes = new Map(state.currentSurvey.questions.map((q) => [q.id, q.questionCode]));
           const groups = state.currentSurvey.groups || [];
 
-          // 1. 하위그룹에 인터리브 위치(order) 할당
+          // 1. 질문과 하위그룹 모두에 인터리브 위치(order) 할당
           items.forEach((item, index) => {
             if (item.kind === 'subgroup') {
               const group = groups.find((g) => g.id === item.id);
-              if (group) {
-                group.order = index;
-              }
+              if (group) group.order = index;
+            } else {
+              const question = state.currentSurvey.questions.find((q) => q.id === item.id);
+              if (question) question.order = index;
             }
           });
 
@@ -521,10 +500,17 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
       deleteQuestion: (questionId: string) =>
         set((state) => {
           const oldCodes = new Map(state.currentSurvey.questions.map((q) => [q.id, q.questionCode]));
+          const deletedQuestion = state.currentSurvey.questions.find((q) => q.id === questionId);
 
           state.currentSurvey.questions = state.currentSurvey.questions.filter(
             (q) => q.id !== questionId,
           );
+
+          // 그룹 내 삭제 시 전역 order 재계산 (인터리브 순서 유지)
+          if (deletedQuestion?.groupId) {
+            recalculateGlobalOrder(state.currentSurvey.questions, state.currentSurvey.groups || []);
+          }
+
           state.currentSurvey.questions = regenerateAfterDelete(
             state.currentSurvey.questions,
           );
