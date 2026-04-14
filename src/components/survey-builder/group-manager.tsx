@@ -474,50 +474,8 @@ export function GroupManager({ className }: GroupManagerProps) {
       return;
     }
 
-    // 소분류는 같은 대분류 내의 소분류끼리만 이동 가능
-    if (draggedGroup.parentGroupId && targetGroup.parentGroupId) {
-      // 같은 대분류 내의 소분류인지 확인
-      if (draggedGroup.parentGroupId === targetGroup.parentGroupId) {
-        // 같은 대분류 내의 소분류끼리 순서만 변경
-        const sameLevelGroups = groupsOrEmpty
-          .filter((g) => g.parentGroupId === draggedGroup.parentGroupId)
-          .sort((a, b) => a.order - b.order);
-
-        const oldIndex = sameLevelGroups.findIndex((g) => g.id === draggedGroup.id);
-        const newIndex = sameLevelGroups.findIndex((g) => g.id === targetGroup.id);
-
-        if (oldIndex !== -1 && newIndex !== -1) {
-          const newOrder = arrayMove(sameLevelGroups, oldIndex, newIndex);
-
-          // 각 그룹의 order를 업데이트
-          newOrder.forEach((group, index) => {
-            updateGroup(group.id, {
-              order: index,
-            });
-          });
-
-          // DB에 저장 (그룹 ID가 UUID인 경우에만)
-          if (surveyId && isUUID(surveyId)) {
-            try {
-              await ensureSurvey();
-              const { updateQuestionGroup } = await import('@/actions/question-group-actions');
-              await Promise.all(
-                newOrder
-                  .filter((group) => isUUID(group.id))
-                  .map((group, index) =>
-                    updateQuestionGroup(group.id, {
-                      order: index,
-                    }),
-                  ),
-              );
-            } catch (error) {
-              console.error('하위 그룹 순서 저장 실패:', error);
-            }
-          }
-          // 하위 그룹 순서 변경은 이미 updateQuestionGroup API로 저장됨
-        }
-      }
-      // 다른 대분류의 소분류로는 이동 불가 (아무것도 하지 않음)
+    // 소분류 순서는 질문 목록(SortableQuestionList)에서 인터리브 DnD로 관리
+    if (draggedGroup.parentGroupId || targetGroup.parentGroupId) {
       return;
     }
 
@@ -597,6 +555,7 @@ export function GroupManager({ className }: GroupManagerProps) {
                                     onToggleExpand={handleToggleExpand}
                                     onAddSubGroup={handleOpenCreateModal}
                                     totalSubGroupCount={getTotalSubGroupCount(subGroup.id)}
+                                    disableDrag
                                   />
                                 </div>
                               );

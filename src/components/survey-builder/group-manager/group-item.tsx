@@ -26,6 +26,7 @@ export interface SortableGroupItemProps {
   onToggleExpand: (groupId: string) => void;
   onAddSubGroup: (parentGroupId: string) => void;
   totalSubGroupCount?: number;
+  disableDrag?: boolean;
 }
 
 export function SortableGroupItem({
@@ -38,9 +39,11 @@ export function SortableGroupItem({
   onToggleExpand,
   onAddSubGroup,
   totalSubGroupCount = 0,
+  disableDrag = false,
 }: SortableGroupItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: group.id,
+    disabled: disableDrag,
   });
 
   const style = {
@@ -75,9 +78,12 @@ export function SortableGroupItem({
           )}
           {!hasSubGroups && <div className="w-4" />}
           <div
-            className="cursor-grab text-gray-400 hover:text-gray-600 active:cursor-grabbing"
-            {...attributes}
-            {...listeners}
+            className={disableDrag
+              ? 'text-gray-200'
+              : 'cursor-grab text-gray-400 hover:text-gray-600 active:cursor-grabbing'
+            }
+            {...(disableDrag ? {} : { ...attributes, ...listeners })}
+            title={disableDrag ? '질문 목록에서 드래그하여 순서 변경' : undefined}
           >
             <GripVertical className="h-4 w-4" />
           </div>
