@@ -291,6 +291,25 @@ function setCellValue(cell: ExcelJS.Cell, value: string | number | null | undefi
   cell.value = typeof value === 'string' ? stripInvalidXmlChars(value) : (value ?? null);
 }
 
+/**
+ * Excel 셀 문자열 제한(32,767자) 초과 시 여러 셀에 분할 기록.
+ * startCol부터 오른쪽으로 필요한 만큼 셀을 사용한다.
+ */
+const EXCEL_MAX_CELL_CHARS = 32767;
+function setCellValueChunked(row: ExcelJS.Row, startCol: number, value: string) {
+  if (value.length <= EXCEL_MAX_CELL_CHARS) {
+    setCellValue(row.getCell(startCol), value);
+    return;
+  }
+  let offset = 0;
+  let col = startCol;
+  while (offset < value.length) {
+    setCellValue(row.getCell(col), value.slice(offset, offset + EXCEL_MAX_CELL_CHARS));
+    offset += EXCEL_MAX_CELL_CHARS;
+    col++;
+  }
+}
+
 function sanitizeSheetName(name: string, existingNames: Set<string>): string {
   let safe = name.replace(/[\\/?*[\]]/g, '');
   if (safe.length > 31) safe = safe.slice(0, 28) + '...';
@@ -596,7 +615,7 @@ function applyHeaderStyle(ws: ExcelJS.Worksheet, colCount: number) {
 }
 
 function setupHiddenColumns(ws: ExcelJS.Worksheet, hiddenStartCol: number, count: number) {
-  const labels = ['__cell_ids__', '__question_id__', '__row_index__'];
+  const labels = ['__cell_ids__', '__cell_ids_2__', '__question_id__', '__row_index__'];
   for (let i = 0; i < count; i++) {
     setCellValue(ws.getRow(1).getCell(hiddenStartCol + i), labels[i]);
     setCellValue(ws.getRow(2).getCell(hiddenStartCol + i), labels[i]);
@@ -656,10 +675,10 @@ function writeSemiLongDataRows(
       ...semiRow.measurementValues,
     ]);
 
-    // 숨김 열
-    setCellValue(excelRow.getCell(hiddenStartCol), semiRow.cellIds.join(','));
-    setCellValue(excelRow.getCell(hiddenStartCol + 1), semiRow.questionId);
-    setCellValue(excelRow.getCell(hiddenStartCol + 2), semiRow.rowIndex);
+    // 숨김 열 (cellIds가 32767자 초과 시 2번째 셀에 이어서 기록)
+    setCellValueChunked(excelRow, hiddenStartCol, semiRow.cellIds.join(','));
+    setCellValue(excelRow.getCell(hiddenStartCol + 2), semiRow.questionId);
+    setCellValue(excelRow.getCell(hiddenStartCol + 3), semiRow.rowIndex);
 
     // 4) 색상밴드 (짝수 그룹만 파란 배경, 홀수는 기본 흰색 → fill 미설정)
     if (depth1Counter % 2 === 0) {
@@ -868,7 +887,7 @@ function buildWideTableSheet(
   applyHeaderStyle(ws, h1.length);
 
   const hiddenStartCol = h1.length + 1;
-  setupHiddenColumns(ws, hiddenStartCol, 2);
+  setupHiddenColumns(ws, hiddenStartCol, 3);
 
   for (const resp of responses) {
     const allResponses = resp.questionResponses;
@@ -900,8 +919,8 @@ function buildWideTableSheet(
     }
 
     const excelRow = addRow(ws, dataRow);
-    setCellValue(excelRow.getCell(hiddenStartCol), cellIdsRow.join(','));
-    setCellValue(excelRow.getCell(hiddenStartCol + 1), question.id);
+    setCellValueChunked(excelRow, hiddenStartCol, cellIdsRow.join(','));
+    setCellValue(excelRow.getCell(hiddenStartCol + 2), question.id);
 
     for (let c = 1; c < dataRow.length; c++) {
       if (dataRow[c] === UNEXPOSED_MARKER) excelRow.getCell(c + 1).font = UNEXPOSED_FONT;
@@ -940,7 +959,7 @@ function buildSemiLongSheet(
   applyHeaderStyle(ws, h1.length);
 
   const hiddenStartCol = h1.length + 1;
-  setupHiddenColumns(ws, hiddenStartCol, 3);
+  setupHiddenColumns(ws, hiddenStartCol, 4);
 
   const metaColCount = 2; // response_id, #
   const idColCount = classified.identifiers.length;
@@ -1074,9 +1093,6 @@ export async function generateCleaningExcelBlob(
   onProgress?: ProgressCallback,
 ): Promise<Blob> {
   const workbook = await generateCleaningWorkbook(survey, responses, onProgress);
-  // exceljs의 sharedStrings.xml 직렬화 버그 우회: inline string 사용
-  const buffer = await workbook.xlsx.writeBuffer({ useSharedStrings: false });
-  return new Blob([buffer], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  });
+  const buffer = await workbook.xlsx.writeBuffer();
+  return new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }
