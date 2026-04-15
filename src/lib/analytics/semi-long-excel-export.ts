@@ -278,7 +278,7 @@ function isNonDataDepth1(value: string): boolean {
  */
 function stripInvalidXmlChars(value: string): string {
   // eslint-disable-next-line no-control-regex
-  return value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+  return value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F\uFFFE\uFFFF]/g, '');
 }
 
 /** ws.addRow() 래퍼 — 문자열 값의 XML 무효 문자를 자동 제거 */
@@ -601,19 +601,16 @@ function setupHiddenColumns(ws: ExcelJS.Worksheet, hiddenStartCol: number, count
     setCellValue(ws.getRow(1).getCell(hiddenStartCol + i), labels[i]);
     setCellValue(ws.getRow(2).getCell(hiddenStartCol + i), labels[i]);
     setCellValue(ws.getRow(3).getCell(hiddenStartCol + i), labels[i]);
-    // NOTE: column.hidden은 Excel 복구 이슈가 해결된 후 재활성화
-    // ws.getColumn(hiddenStartCol + i).hidden = true;
+    ws.getColumn(hiddenStartCol + i).hidden = true;
   }
 }
 
-function applyAutoFilterAndFreeze(ws: ExcelJS.Worksheet, colCount: number, _freezeXSplit: number) {
-  // NOTE: autoFilter, views(freeze)는 Excel 복구 이슈가 해결된 후 재활성화
-  // const lastRow = ws.rowCount;
-  // if (lastRow > HEADER_ROW_COUNT) {
-  //   ws.autoFilter = { from: { row: HEADER_ROW_COUNT, column: 1 }, to: { row: lastRow, column: colCount } };
-  // }
-  // ws.views = [{ state: 'frozen', xSplit: freezeXSplit, ySplit: HEADER_ROW_COUNT }];
-  void colCount;
+function applyAutoFilterAndFreeze(ws: ExcelJS.Worksheet, colCount: number, freezeXSplit: number) {
+  const lastRow = ws.rowCount;
+  if (lastRow > HEADER_ROW_COUNT) {
+    ws.autoFilter = { from: { row: HEADER_ROW_COUNT, column: 1 }, to: { row: lastRow, column: colCount } };
+  }
+  ws.views = [{ state: 'frozen', xSplit: freezeXSplit, ySplit: HEADER_ROW_COUNT }];
 }
 
 /**
@@ -1077,7 +1074,8 @@ export async function generateCleaningExcelBlob(
   onProgress?: ProgressCallback,
 ): Promise<Blob> {
   const workbook = await generateCleaningWorkbook(survey, responses, onProgress);
-  const buffer = await workbook.xlsx.writeBuffer();
+  // useSharedStrings: false → inline string 사용. exceljs의 sharedStrings.xml 생성 버그 우회.
+  const buffer = await workbook.xlsx.writeBuffer({ useSharedStrings: false } as never);
   return new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
