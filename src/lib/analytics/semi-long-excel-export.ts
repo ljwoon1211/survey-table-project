@@ -271,6 +271,26 @@ function isNonDataDepth1(value: string): boolean {
   return value === '-' || value === NO_ANSWER_MARKER;
 }
 
+/**
+ * XML 1.0에서 허용하지 않는 제어 문자를 제거한다.
+ * exceljs가 sharedStrings.xml에 쓸 때 이 문자들이 포함되면 Excel이 파일을 손상으로 판단한다.
+ * 허용: \x09(탭), \x0A(LF), \x0D(CR), \x20 이상
+ */
+function stripInvalidXmlChars(value: string): string {
+  // eslint-disable-next-line no-control-regex
+  return value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+}
+
+/** ws.addRow() 래퍼 — 문자열 값의 XML 무효 문자를 자동 제거 */
+function addRow(ws: ExcelJS.Worksheet, values: (string | number | null | undefined)[]): ExcelJS.Row {
+  return ws.addRow(values.map((v) => (typeof v === 'string' ? stripInvalidXmlChars(v) : v)));
+}
+
+/** 셀에 문자열 값 설정 — XML 무효 문자 자동 제거 */
+function setCellValue(cell: ExcelJS.Cell, value: string | number | null | undefined) {
+  cell.value = typeof value === 'string' ? stripInvalidXmlChars(value) : (value ?? null);
+}
+
 function sanitizeSheetName(name: string, existingNames: Set<string>): string {
   let safe = name.replace(/[\\/?*[\]]/g, '');
   if (safe.length > 31) safe = safe.slice(0, 28) + '...';
@@ -578,20 +598,22 @@ function applyHeaderStyle(ws: ExcelJS.Worksheet, colCount: number) {
 function setupHiddenColumns(ws: ExcelJS.Worksheet, hiddenStartCol: number, count: number) {
   const labels = ['__cell_ids__', '__question_id__', '__row_index__'];
   for (let i = 0; i < count; i++) {
-    ws.getRow(1).getCell(hiddenStartCol + i).value = labels[i];
-    ws.getRow(2).getCell(hiddenStartCol + i).value = labels[i];
-    ws.getRow(3).getCell(hiddenStartCol + i).value = labels[i];
-    ws.getColumn(hiddenStartCol + i).hidden = true;
+    setCellValue(ws.getRow(1).getCell(hiddenStartCol + i), labels[i]);
+    setCellValue(ws.getRow(2).getCell(hiddenStartCol + i), labels[i]);
+    setCellValue(ws.getRow(3).getCell(hiddenStartCol + i), labels[i]);
+    // NOTE: column.hidden은 Excel 복구 이슈가 해결된 후 재활성화
+    // ws.getColumn(hiddenStartCol + i).hidden = true;
   }
 }
 
-function applyAutoFilterAndFreeze(ws: ExcelJS.Worksheet, colCount: number, freezeXSplit: number) {
-  const lastRow = ws.rowCount;
-  // autoFilter 범위는 헤더 행 ~ 마지막 데이터 행. 데이터 없으면 autoFilter 생략.
-  if (lastRow > HEADER_ROW_COUNT) {
-    ws.autoFilter = { from: { row: HEADER_ROW_COUNT, column: 1 }, to: { row: lastRow, column: colCount } };
-  }
-  ws.views = [{ state: 'frozen', xSplit: freezeXSplit, ySplit: HEADER_ROW_COUNT }];
+function applyAutoFilterAndFreeze(ws: ExcelJS.Worksheet, colCount: number, _freezeXSplit: number) {
+  // NOTE: autoFilter, views(freeze)는 Excel 복구 이슈가 해결된 후 재활성화
+  // const lastRow = ws.rowCount;
+  // if (lastRow > HEADER_ROW_COUNT) {
+  //   ws.autoFilter = { from: { row: HEADER_ROW_COUNT, column: 1 }, to: { row: lastRow, column: colCount } };
+  // }
+  // ws.views = [{ state: 'frozen', xSplit: freezeXSplit, ySplit: HEADER_ROW_COUNT }];
+  void colCount;
 }
 
 /**
@@ -630,7 +652,7 @@ function writeSemiLongDataRows(
     }
 
     // 3) 데이터 행 삽입
-    const excelRow = ws.addRow([
+    const excelRow = addRow(ws, [
       semiRow.responseId,
       semiRow.seqNum,
       ...semiRow.identifierValues,
@@ -638,9 +660,9 @@ function writeSemiLongDataRows(
     ]);
 
     // 숨김 열
-    excelRow.getCell(hiddenStartCol).value = semiRow.cellIds.join(',');
-    excelRow.getCell(hiddenStartCol + 1).value = semiRow.questionId;
-    excelRow.getCell(hiddenStartCol + 2).value = semiRow.rowIndex;
+    setCellValue(excelRow.getCell(hiddenStartCol), semiRow.cellIds.join(','));
+    setCellValue(excelRow.getCell(hiddenStartCol + 1), semiRow.questionId);
+    setCellValue(excelRow.getCell(hiddenStartCol + 2), semiRow.rowIndex);
 
     // 4) 색상밴드 (짝수 그룹만 파란 배경, 홀수는 기본 흰색 → fill 미설정)
     if (depth1Counter % 2 === 0) {
@@ -729,9 +751,9 @@ function buildIndexSheet(
   const ws = workbook.addWorksheet(name, { properties: { tabColor: TAB_COLOR_WIDE } });
 
   const headers = ['response_id', '시작 시간', '완료 시간', '소요 시간(초)', '상태', 'User Agent'];
-  ws.addRow(headers);
-  ws.addRow(headers);
-  ws.addRow(headers.map((_, i) => `V${i + 1}`));
+  addRow(ws, headers);
+  addRow(ws, headers);
+  addRow(ws, headers.map((_, i) => `V${i + 1}`));
   applyHeaderStyle(ws, headers.length);
 
   for (const resp of responses) {
@@ -742,7 +764,7 @@ function buildIndexSheet(
         ? Math.round((completedAt.getTime() - startedAt.getTime()) / 1000)
         : '';
 
-    ws.addRow([
+    addRow(ws, [
       resp.id,
       startedAt?.toLocaleString('ko-KR') ?? '',
       completedAt?.toLocaleString('ko-KR') ?? '',
@@ -779,9 +801,9 @@ function buildGeneralQuestionsSheet(
   const h1 = ['response_id', ...generalQuestions.map((q) => q.title)];
   const h2 = ['response_id', ...generalQuestions.map((q) => q.type)];
   const h3 = ['response_id', ...generalQuestions.map((q) => q.questionCode ?? q.id)];
-  ws.addRow(h1);
-  ws.addRow(h2);
-  ws.addRow(h3);
+  addRow(ws, h1);
+  addRow(ws, h2);
+  addRow(ws, h3);
   applyHeaderStyle(ws, h1.length);
 
   const allQuestions = survey.questions;
@@ -799,7 +821,7 @@ function buildGeneralQuestionsSheet(
       }
     }
 
-    const excelRow = ws.addRow(row);
+    const excelRow = addRow(ws, row);
     for (let c = 1; c < row.length; c++) {
       if (row[c] === UNEXPOSED_MARKER) {
         excelRow.getCell(c + 1).font = UNEXPOSED_FONT;
@@ -843,9 +865,9 @@ function buildWideTableSheet(
   const h1 = ['response_id', ...inputCells.map((ic) => ic.rowLabel)];
   const h2 = ['response_id', ...inputCells.map((ic) => columns[ic.colIdx]?.label ?? '')];
   const h3 = ['response_id', ...inputCells.map((ic) => ic.cell.cellCode ?? `r${ic.rowIdx}_c${ic.colIdx}`)];
-  ws.addRow(h1);
-  ws.addRow(h2);
-  ws.addRow(h3);
+  addRow(ws, h1);
+  addRow(ws, h2);
+  addRow(ws, h3);
   applyHeaderStyle(ws, h1.length);
 
   const hiddenStartCol = h1.length + 1;
@@ -880,9 +902,9 @@ function buildWideTableSheet(
       }
     }
 
-    const excelRow = ws.addRow(dataRow);
-    excelRow.getCell(hiddenStartCol).value = cellIdsRow.join(',');
-    excelRow.getCell(hiddenStartCol + 1).value = question.id;
+    const excelRow = addRow(ws, dataRow);
+    setCellValue(excelRow.getCell(hiddenStartCol), cellIdsRow.join(','));
+    setCellValue(excelRow.getCell(hiddenStartCol + 1), question.id);
 
     for (let c = 1; c < dataRow.length; c++) {
       if (dataRow[c] === UNEXPOSED_MARKER) excelRow.getCell(c + 1).font = UNEXPOSED_FONT;
@@ -915,9 +937,9 @@ function buildSemiLongSheet(
 
   const columns = question.tableColumns ?? [];
   const { h1, h2, h3 } = buildSemiLongHeaders(classified, columns);
-  ws.addRow(h1);
-  ws.addRow(h2);
-  ws.addRow(h3);
+  addRow(ws, h1);
+  addRow(ws, h2);
+  addRow(ws, h3);
   applyHeaderStyle(ws, h1.length);
 
   const hiddenStartCol = h1.length + 1;
