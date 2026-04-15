@@ -56,6 +56,7 @@ import { generateId } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { useSurveyUIStore } from '@/stores/ui-store';
 import { Question } from '@/types/survey';
+import { useShallow } from 'zustand/react/shallow';
 
 const questionTypes = [
   {
@@ -119,7 +120,6 @@ const questionTypes = [
 export default function CreateSurveyPage() {
   const router = useRouter();
   const {
-    currentSurvey,
     updateSurveyTitle,
     addQuestion,
     addPreparedQuestion,
@@ -127,7 +127,18 @@ export default function CreateSurveyPage() {
     updateSurveySlug,
     regeneratePrivateToken,
     resetSurvey,
-  } = useSurveyBuilderStore();
+  } = useSurveyBuilderStore(
+    useShallow((s) => ({
+      updateSurveyTitle: s.updateSurveyTitle,
+      addQuestion: s.addQuestion,
+      addPreparedQuestion: s.addPreparedQuestion,
+      updateSurveySettings: s.updateSurveySettings,
+      updateSurveySlug: s.updateSurveySlug,
+      regeneratePrivateToken: s.regeneratePrivateToken,
+      resetSurvey: s.resetSurvey,
+    })),
+  );
+  const currentSurvey = useSurveyBuilderStore((s) => s.currentSurvey);
 
   const { selectedQuestionId, isTestMode, selectQuestion, toggleTestMode } = useSurveyUIStore();
 

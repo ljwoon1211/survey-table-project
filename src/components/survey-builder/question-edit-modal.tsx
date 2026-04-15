@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   AlertTriangle,
@@ -356,18 +356,18 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
     }
   }, [isOpen, handleKeyDown]);
 
-  // Option helpers (setFormData를 바인딩)
-  const addOption = createAddOption(setFormData);
-  const updateOption = createUpdateOption(setFormData);
-  const removeOption = createRemoveOption(setFormData);
-  const handleOtherOptionToggle = createHandleOtherOptionToggle(setFormData);
-  const addSelectLevel = createAddSelectLevel(setFormData);
-  const updateSelectLevel = createUpdateSelectLevel(setFormData);
-  const removeSelectLevel = createRemoveSelectLevel(setFormData);
-  const addLevelOption = createAddLevelOption(setFormData);
-  const updateOptionWithParent = createUpdateOptionWithParent(setFormData);
-  const updateLevelOption = createUpdateLevelOption(setFormData);
-  const removeLevelOption = createRemoveLevelOption(setFormData);
+  // Option helpers (setFormData를 바인딩, useMemo로 안정화하여 자식 리렌더 방지)
+  const addOption = useMemo(() => createAddOption(setFormData), []);
+  const updateOption = useMemo(() => createUpdateOption(setFormData), []);
+  const removeOption = useMemo(() => createRemoveOption(setFormData), []);
+  const handleOtherOptionToggle = useMemo(() => createHandleOtherOptionToggle(setFormData), []);
+  const addSelectLevel = useMemo(() => createAddSelectLevel(setFormData), []);
+  const updateSelectLevel = useMemo(() => createUpdateSelectLevel(setFormData), []);
+  const removeSelectLevel = useMemo(() => createRemoveSelectLevel(setFormData), []);
+  const addLevelOption = useMemo(() => createAddLevelOption(setFormData), []);
+  const updateOptionWithParent = useMemo(() => createUpdateOptionWithParent(setFormData), []);
+  const updateLevelOption = useMemo(() => createUpdateLevelOption(setFormData), []);
+  const removeLevelOption = useMemo(() => createRemoveLevelOption(setFormData), []);
 
   if (!question) return null;
 

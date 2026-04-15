@@ -117,9 +117,13 @@ export function CellImageEditor({ imageUrl, onImageUrlChange }: CellImageEditorP
 
       xhr.upload.addEventListener('progress', handleProgress);
 
-      // Promise로 래핑
+      // 리스너 핸들러를 Promise 밖에서 정의 (cleanup에서 접근 가능하도록)
+      let handleLoad: () => void;
+      let handleError: () => void;
+      let handleAbort: () => void;
+
       const uploadPromise = new Promise<string>((resolve, reject) => {
-        const handleLoad = () => {
+        handleLoad = () => {
           if (xhr.status === 200) {
             const response = JSON.parse(xhr.responseText);
             resolve(response.url);
@@ -128,8 +132,8 @@ export function CellImageEditor({ imageUrl, onImageUrlChange }: CellImageEditorP
             reject(new Error(errorResponse.error || '업로드에 실패했습니다.'));
           }
         };
-        const handleError = () => reject(new Error('네트워크 오류가 발생했습니다.'));
-        const handleAbort = () => reject(new Error('업로드가 취소되었습니다.'));
+        handleError = () => reject(new Error('네트워크 오류가 발생했습니다.'));
+        handleAbort = () => reject(new Error('업로드가 취소되었습니다.'));
 
         xhr.addEventListener('load', handleLoad);
         xhr.addEventListener('error', handleError);
@@ -139,6 +143,9 @@ export function CellImageEditor({ imageUrl, onImageUrlChange }: CellImageEditorP
         xhr.send(formData);
       }).finally(() => {
         xhr.upload.removeEventListener('progress', handleProgress);
+        xhr.removeEventListener('load', handleLoad);
+        xhr.removeEventListener('error', handleError);
+        xhr.removeEventListener('abort', handleAbort);
         xhrRef.current = null;
       });
 

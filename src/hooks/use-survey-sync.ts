@@ -39,7 +39,8 @@ import {
 export function useSurveySync() {
   const [isPending, startTransition] = useTransition();
   const queryClient = useQueryClient();
-  const { resetSurvey, markClean } = useSurveyBuilderStore();
+  const resetSurvey = useSurveyBuilderStore((s) => s.resetSurvey);
+  const markClean = useSurveyBuilderStore((s) => s.markClean);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<Error | null>(null);
 
@@ -330,12 +331,12 @@ export function useResponseSync() {
  * 자동 저장 훅 (디바운스 적용)
  */
 export function useAutoSave(delay: number = 3000) {
-  const { currentSurvey } = useSurveyBuilderStore();
+  const currentSurveyId = useSurveyBuilderStore((s) => s.currentSurvey.id);
   const { saveSurvey } = useSurveySync();
 
   // 디바운스된 자동 저장
   const autoSave = useCallback(async () => {
-    if (!currentSurvey.id) return;
+    if (!currentSurveyId) return;
 
     try {
       await saveSurvey();
@@ -343,7 +344,7 @@ export function useAutoSave(delay: number = 3000) {
     } catch (error) {
       console.error('자동 저장 실패:', error);
     }
-  }, [currentSurvey.id, saveSurvey]);
+  }, [currentSurveyId, saveSurvey]);
 
   return { autoSave };
 }

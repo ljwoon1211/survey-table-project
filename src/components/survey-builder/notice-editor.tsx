@@ -67,6 +67,7 @@ export function NoticeEditor({
   const uploadAbortController = useRef<AbortController | null>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
   const [, forceUpdate] = useState({});
+  const rafRef = useRef<number | null>(null);
 
   // 업로드된 이미지 URL 추적 (원본 URL로 저장)
   const uploadedImageUrlsRef = useRef<Set<string>>(new Set());
@@ -114,6 +115,45 @@ export function NoticeEditor({
     e.stopPropagation();
   }, []);
 
+  const editorProps = useMemo(
+    () => ({
+      attributes: {
+        class: compact
+          ? 'prose prose-sm max-w-none focus:outline-none min-h-[80px] p-3 border border-gray-200 rounded-lg overflow-x-auto ' +
+            '[&_table]:border-collapse [&_table]:table-auto [&_table]:w-full [&_table]:my-2 [&_table]:border-2 [&_table]:border-gray-300 ' +
+            '[&_table_td]:min-w-[1em] [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-2 [&_table_td]:py-1 [&_table_td]:align-top [&_table_td]:box-border [&_table_td]:relative [&_table_td]:cursor-pointer [&_table_td]:overflow-hidden ' +
+            '[&_table_th]:min-w-[1em] [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-2 [&_table_th]:py-1 [&_table_th]:align-top [&_table_th]:box-border [&_table_th]:relative [&_table_th]:cursor-pointer [&_table_th]:overflow-hidden ' +
+            '[&_table_th]:font-normal [&_table_th]:text-left [&_table_th]:bg-transparent ' +
+            '[&_table_.selectedCell]:bg-blue-100 [&_table_.selectedCell]:border-2 [&_table_.selectedCell]:border-blue-500 ' +
+            '[&_table_.selected]:bg-blue-50 ' +
+            '[&_table:hover]:border-blue-500 ' +
+            '[&_table_p]:m-0 ' +
+            '[&_img]:inline-block [&_img]:!m-0 [&_img]:align-top'
+          : 'prose prose-sm max-w-none focus:outline-none min-h-[300px] p-6 bg-blue-50 border-2 border-blue-200 rounded-lg overflow-x-auto text-[14px] leading-[1.6] ' +
+            '[&_table]:border-collapse [&_table]:table-auto [&_table]:w-full [&_table]:min-w-full [&_table]:my-4 [&_table]:border-2 [&_table]:border-gray-300 ' +
+            '[&_table_td]:min-w-[1em] [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2 [&_table_td]:align-top [&_table_td]:box-border [&_table_td]:relative [&_table_td]:cursor-pointer [&_table_td]:overflow-hidden ' +
+            '[&_table_th]:min-w-[1em] [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-3 [&_table_th]:py-2 [&_table_th]:align-top [&_table_th]:box-border [&_table_th]:relative [&_table_th]:cursor-pointer [&_table_th]:overflow-hidden ' +
+            '[&_table_th]:font-normal [&_table_th]:text-left [&_table_th]:bg-transparent ' +
+            '[&_table_.selectedCell]:bg-blue-100 [&_table_.selectedCell]:border-2 [&_table_.selectedCell]:border-blue-500 ' +
+            '[&_table_.selected]:bg-blue-50 ' +
+            '[&_table:hover]:border-blue-500 ' +
+            '[&_table_p]:m-0 ' +
+            '[&_p]:min-h-[1.6em] ' +
+            '[&_img]:inline-block [&_img]:!m-0 [&_img]:align-top',
+      },
+      handleDOMEvents: {
+        mousedown: (_view: any, event: MouseEvent) => {
+          const target = event.target as HTMLElement;
+          if (target.tagName === 'TD' || target.tagName === 'TH') {
+            return false;
+          }
+          return false;
+        },
+      },
+    }),
+    [compact],
+  );
+
   const editor = useEditor({
     extensions,
     content: content || '',
@@ -146,45 +186,15 @@ export function NoticeEditor({
       onChange(editor.isEmpty ? '' : currentHtml);
     },
     onSelectionUpdate: () => {
-      // 선택이 변경될 때마다 컴포넌트 리렌더링
-      forceUpdate({});
+      // rAF로 throttle하여 프레임당 최대 1회만 리렌더 (드래그 선택 시 수십 회 → 1회)
+      if (rafRef.current === null) {
+        rafRef.current = requestAnimationFrame(() => {
+          rafRef.current = null;
+          forceUpdate({});
+        });
+      }
     },
-    editorProps: {
-      attributes: {
-        class: compact
-          ? 'prose prose-sm max-w-none focus:outline-none min-h-[80px] p-3 border border-gray-200 rounded-lg overflow-x-auto ' +
-            '[&_table]:border-collapse [&_table]:table-auto [&_table]:w-full [&_table]:my-2 [&_table]:border-2 [&_table]:border-gray-300 ' +
-            '[&_table_td]:min-w-[1em] [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-2 [&_table_td]:py-1 [&_table_td]:align-top [&_table_td]:box-border [&_table_td]:relative [&_table_td]:cursor-pointer [&_table_td]:overflow-hidden ' +
-            '[&_table_th]:min-w-[1em] [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-2 [&_table_th]:py-1 [&_table_th]:align-top [&_table_th]:box-border [&_table_th]:relative [&_table_th]:cursor-pointer [&_table_th]:overflow-hidden ' +
-            '[&_table_th]:font-normal [&_table_th]:text-left [&_table_th]:bg-transparent ' +
-            '[&_table_.selectedCell]:bg-blue-100 [&_table_.selectedCell]:border-2 [&_table_.selectedCell]:border-blue-500 ' +
-            '[&_table_.selected]:bg-blue-50 ' +
-            '[&_table:hover]:border-blue-500 ' +
-            '[&_table_p]:m-0 ' +
-            '[&_img]:inline-block [&_img]:!m-0 [&_img]:align-top'
-          : 'prose prose-sm max-w-none focus:outline-none min-h-[300px] p-6 bg-blue-50 border-2 border-blue-200 rounded-lg overflow-x-auto text-[14px] leading-[1.6] ' +
-            '[&_table]:border-collapse [&_table]:table-auto [&_table]:w-full [&_table]:min-w-full [&_table]:my-4 [&_table]:border-2 [&_table]:border-gray-300 ' +
-            '[&_table_td]:min-w-[1em] [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2 [&_table_td]:align-top [&_table_td]:box-border [&_table_td]:relative [&_table_td]:cursor-pointer [&_table_td]:overflow-hidden ' +
-            '[&_table_th]:min-w-[1em] [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-3 [&_table_th]:py-2 [&_table_th]:align-top [&_table_th]:box-border [&_table_th]:relative [&_table_th]:cursor-pointer [&_table_th]:overflow-hidden ' +
-            '[&_table_th]:font-normal [&_table_th]:text-left [&_table_th]:bg-transparent ' +
-            '[&_table_.selectedCell]:bg-blue-100 [&_table_.selectedCell]:border-2 [&_table_.selectedCell]:border-blue-500 ' +
-            '[&_table_.selected]:bg-blue-50 ' +
-            '[&_table:hover]:border-blue-500 ' +
-            '[&_table_p]:m-0 ' +
-            '[&_p]:min-h-[1.6em] ' +
-            '[&_img]:inline-block [&_img]:!m-0 [&_img]:align-top',
-      },
-      handleDOMEvents: {
-        mousedown: (view, event) => {
-          const target = event.target as HTMLElement;
-          // 테이블 셀을 클릭했을 때 셀 선택 모드 활성화
-          if (target.tagName === 'TD' || target.tagName === 'TH') {
-            return false; // 기본 동작 허용
-          }
-          return false;
-        },
-      },
-    },
+    editorProps,
   });
 
   // 이미지 업로드
@@ -221,9 +231,13 @@ export function NoticeEditor({
 
       xhr.upload.addEventListener('progress', handleProgress);
 
-      // Promise로 래핑
+      // 리스너 핸들러를 Promise 밖에서 정의 (cleanup에서 접근 가능하도록)
+      let handleLoad: () => void;
+      let handleError: () => void;
+      let handleAbort: () => void;
+
       const uploadPromise = new Promise<string>((resolve, reject) => {
-        const handleLoad = () => {
+        handleLoad = () => {
           if (xhr.status === 200) {
             const response = JSON.parse(xhr.responseText);
             resolve(response.url);
@@ -232,8 +246,8 @@ export function NoticeEditor({
             reject(new Error(errorResponse.error || '업로드에 실패했습니다.'));
           }
         };
-        const handleError = () => reject(new Error('네트워크 오류가 발생했습니다.'));
-        const handleAbort = () => reject(new Error('업로드가 취소되었습니다.'));
+        handleError = () => reject(new Error('네트워크 오류가 발생했습니다.'));
+        handleAbort = () => reject(new Error('업로드가 취소되었습니다.'));
 
         xhr.addEventListener('load', handleLoad);
         xhr.addEventListener('error', handleError);
@@ -243,6 +257,9 @@ export function NoticeEditor({
         xhr.send(formData);
       }).finally(() => {
         xhr.upload.removeEventListener('progress', handleProgress);
+        xhr.removeEventListener('load', handleLoad);
+        xhr.removeEventListener('error', handleError);
+        xhr.removeEventListener('abort', handleAbort);
         xhrRef.current = null;
       });
 
@@ -309,12 +326,16 @@ export function NoticeEditor({
     setShowImageUpload(false);
   }, [handleCancelUpload]);
 
-  // 언마운트 시 진행 중인 업로드 중단
+  // 언마운트 시 진행 중인 업로드 중단 + rAF 정리
   useEffect(() => {
     return () => {
       if (xhrRef.current) {
         xhrRef.current.abort();
         xhrRef.current = null;
+      }
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
       }
     };
   }, []);
