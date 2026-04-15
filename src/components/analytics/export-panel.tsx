@@ -14,6 +14,7 @@ interface ExportPanelProps {
   onExportFlatExcel?: () => Promise<Blob | null>;
   onExportCompactExcel?: () => Promise<Blob | null>;
   onExportSpssExcel?: () => Promise<Blob | null>;
+  onExportCleaningExcel?: () => Promise<Blob | null>;
   surveyTitle?: string;
 }
 
@@ -24,6 +25,7 @@ export function ExportPanel({
   onExportFlatExcel,
   onExportCompactExcel,
   onExportSpssExcel,
+  onExportCleaningExcel,
   surveyTitle = 'survey',
 }: ExportPanelProps) {
   const [isExporting, setIsExporting] = useState<
@@ -112,6 +114,7 @@ export function ExportPanel({
             surveyTitle={surveyTitle}
             onExportCompactExcel={onExportCompactExcel}
             onExportSpssExcel={onExportSpssExcel}
+            onExportCleaningExcel={onExportCleaningExcel}
           />
 
           <Button

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { BarChart3, Database, FileDown, FileSpreadsheet, FileText, Loader2, Table } from 'lucide-react';
+import { BarChart3, ClipboardCheck, Database, FileDown, FileSpreadsheet, FileText, Loader2, Table } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -37,6 +37,7 @@ interface Props {
   surveyTitle: string;
   onExportCompactExcel?: () => Promise<Blob | null>;
   onExportSpssExcel?: () => Promise<Blob | null>;
+  onExportCleaningExcel?: () => Promise<Blob | null>;
 }
 
 export function ExportDataModal({
@@ -44,6 +45,7 @@ export function ExportDataModal({
   surveyTitle,
   onExportCompactExcel,
   onExportSpssExcel,
+  onExportCleaningExcel,
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [exportingType, setExportingType] = useState<string | null>(null);
@@ -52,7 +54,11 @@ export function ExportDataModal({
     try {
       setExportingType(type);
 
-      if (type === 'compact' && onExportCompactExcel) {
+      if (type === 'cleaning' && onExportCleaningExcel) {
+        const blob = await onExportCleaningExcel();
+        if (!blob) { alert('내보낼 데이터가 없습니다.'); return; }
+        downloadBlob(blob, buildSafeFilename(surveyTitle, 'Cleaning', 'xlsx'));
+      } else if (type === 'compact' && onExportCompactExcel) {
         const blob = await onExportCompactExcel();
         if (!blob) { alert('내보낼 데이터가 없습니다.'); return; }
         downloadBlob(blob, buildSafeFilename(surveyTitle, 'Compact', 'xlsx'));
@@ -134,6 +140,18 @@ export function ExportDataModal({
             disabled={!!exportingType}
             onClick={() => handleExport('sav')}
           />
+
+          {/* 데이터 클리닝용 (Semi-Long) */}
+          {onExportCleaningExcel && (
+            <ExportCard
+              title="데이터 클리닝용 (Semi-Long)"
+              description="테이블 문항을 클리닝하기 쉬운 형태로 변환합니다. 대형 테이블의 행 계층을 식별자 열로 변환하고, 미노출/미응답을 구분합니다."
+              icon={<ClipboardCheck className="h-5 w-5 text-teal-600" />}
+              isLoading={exportingType === 'cleaning'}
+              disabled={!!exportingType}
+              onClick={() => handleExport('cleaning')}
+            />
+          )}
 
           {/* 3. 데이터 확인용 (Compact) */}
           {onExportCompactExcel && (

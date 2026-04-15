@@ -8,6 +8,7 @@ import { BarChart3, Filter, Grid3X3, List, Search, TrendingUp } from 'lucide-rea
 import type { SurveyResponse } from '@/db/schema';
 import { analyzeSurvey } from '@/lib/analytics/analyzer';
 import { generateCompactExcelBlob } from '@/lib/analytics/compact-excel-export';
+import { generateCleaningExcelBlob } from '@/lib/analytics/semi-long-excel-export';
 import { buildSpssExcelBlob } from '@/lib/analytics/spss-excel-export';
 import { type FilterState, applyFilter, createEmptyFilter } from '@/lib/analytics/filter';
 import { type ResponseData, generateFlatExcelBlob } from '@/lib/analytics/flat-excel-export';
@@ -125,6 +126,13 @@ export function AnalyticsDashboardClient({
     return buildSpssExcelBlob(survey.questions, submissions);
   }, [survey.questions, filteredResponses]);
 
+  // 데이터 클리닝용 Excel 내보내기 핸들러
+  const handleExportCleaningExcel = useCallback(async (): Promise<Blob | null> => {
+    const data = prepareExportData();
+    if (!data) return null;
+    return generateCleaningExcelBlob(data.surveyData, data.responseData);
+  }, [prepareExportData]);
+
   // 질문 검색 필터링
   const searchFilteredQuestions = analytics.questions.filter((q) =>
     q.questionTitle.toLowerCase().includes(searchTerm.toLowerCase()),
@@ -173,6 +181,7 @@ export function AnalyticsDashboardClient({
           onExportFlatExcel={handleExportFlatExcel}
           onExportCompactExcel={handleExportCompactExcel}
           onExportSpssExcel={handleExportSpssExcel}
+          onExportCleaningExcel={handleExportCleaningExcel}
         />
       </div>
 
