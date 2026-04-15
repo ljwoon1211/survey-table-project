@@ -62,7 +62,6 @@ const LIGHT_BLUE_FILL: ExcelJS.Fill = {
   pattern: 'solid',
   fgColor: { argb: 'FFDCE6F1' },
 };
-const NO_FILL: ExcelJS.Fill = { type: 'pattern', pattern: 'none' };
 
 const HEADER_FILL: ExcelJS.Fill = {
   type: 'pattern',
@@ -613,6 +612,24 @@ function writeSemiLongDataRows(
   const measureStartCol = metaColCount + idColCount + 1;
 
   for (const semiRow of dataRows) {
+    // 1) 응답자 경계 체크를 먼저 수행 → depth1Counter 리셋
+    if (prevResponseId && semiRow.responseId !== prevResponseId) {
+      // 이전 행에 굵은 하단 테두리
+      const prevExcelRow = ws.getRow(ws.rowCount);
+      for (let c = 1; c <= colCount; c++) {
+        prevExcelRow.getCell(c).border = THICK_BOTTOM_BORDER;
+      }
+      depth1Counter = 0;
+      prevDepth1 = '';
+    }
+
+    // 2) depth1 변경 감지 (리셋된 카운터 기준)
+    if (semiRow.depth1Value !== prevDepth1 && semiRow.depth1Value !== '' && !isNonDataDepth1(semiRow.depth1Value)) {
+      depth1Counter++;
+      prevDepth1 = semiRow.depth1Value;
+    }
+
+    // 3) 데이터 행 삽입
     const excelRow = ws.addRow([
       semiRow.responseId,
       semiRow.seqNum,
@@ -625,43 +642,16 @@ function writeSemiLongDataRows(
     excelRow.getCell(hiddenStartCol + 1).value = semiRow.questionId;
     excelRow.getCell(hiddenStartCol + 2).value = semiRow.rowIndex;
 
-    // 1뎁스 색상밴드
-    if (semiRow.depth1Value !== prevDepth1 && semiRow.depth1Value !== '' && !isNonDataDepth1(semiRow.depth1Value)) {
-      depth1Counter++;
-      prevDepth1 = semiRow.depth1Value;
-    }
-
+    // 4) 색상밴드 (짝수 그룹만 파란 배경, 홀수는 기본 흰색 → fill 미설정)
     if (depth1Counter % 2 === 0) {
       for (let c = 1; c <= colCount; c++) {
         excelRow.getCell(c).fill = LIGHT_BLUE_FILL;
       }
     }
 
-    // 응답자 경계 테두리
-    if (prevResponseId && semiRow.responseId !== prevResponseId) {
-      const prevExcelRow = ws.getRow(excelRow.number - 1);
-      for (let c = 1; c <= colCount; c++) {
-        prevExcelRow.getCell(c).border = {
-          ...prevExcelRow.getCell(c).border,
-          ...THICK_BOTTOM_BORDER,
-        };
-      }
-      depth1Counter = 0;
-      prevDepth1 = '';
-      if (semiRow.depth1Value !== '' && !isNonDataDepth1(semiRow.depth1Value)) {
-        depth1Counter = 1;
-        prevDepth1 = semiRow.depth1Value;
-      }
-      if (depth1Counter % 2 !== 0) {
-        for (let c = 1; c <= colCount; c++) {
-          excelRow.getCell(c).fill = NO_FILL;
-        }
-      }
-    }
-
     prevResponseId = semiRow.responseId;
 
-    // 미노출 셀 서식
+    // 5) 미노출 셀 서식
     if (semiRow.isUnexposed === 'question' || semiRow.isUnexposed === 'row') {
       for (let c = measureStartCol; c <= colCount; c++) {
         excelRow.getCell(c).font = UNEXPOSED_FONT;
@@ -677,10 +667,7 @@ function writeSemiLongDataRows(
   if (dataRows.length > 0) {
     const lastExcelRow = ws.getRow(HEADER_ROW_COUNT + dataRows.length);
     for (let c = 1; c <= colCount; c++) {
-      lastExcelRow.getCell(c).border = {
-        ...lastExcelRow.getCell(c).border,
-        ...THICK_BOTTOM_BORDER,
-      };
+      lastExcelRow.getCell(c).border = THICK_BOTTOM_BORDER;
     }
   }
 }
