@@ -587,7 +587,11 @@ function setupHiddenColumns(ws: ExcelJS.Worksheet, hiddenStartCol: number, count
 }
 
 function applyAutoFilterAndFreeze(ws: ExcelJS.Worksheet, colCount: number, freezeXSplit: number) {
-  ws.autoFilter = { from: { row: HEADER_ROW_COUNT, column: 1 }, to: { row: HEADER_ROW_COUNT, column: colCount } };
+  const lastRow = ws.rowCount;
+  // autoFilter 범위는 헤더 행 ~ 마지막 데이터 행. 데이터 없으면 autoFilter 생략.
+  if (lastRow > HEADER_ROW_COUNT) {
+    ws.autoFilter = { from: { row: HEADER_ROW_COUNT, column: 1 }, to: { row: lastRow, column: colCount } };
+  }
   ws.views = [{ state: 'frozen', xSplit: freezeXSplit, ySplit: HEADER_ROW_COUNT }];
 }
 
