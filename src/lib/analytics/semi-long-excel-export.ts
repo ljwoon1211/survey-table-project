@@ -1074,8 +1074,7 @@ export async function generateCleaningExcelBlob(
   onProgress?: ProgressCallback,
 ): Promise<Blob> {
   const workbook = await generateCleaningWorkbook(survey, responses, onProgress);
-  // useSharedStrings: false → inline string 사용. exceljs의 sharedStrings.xml 생성 버그 우회.
-  const buffer = await workbook.xlsx.writeBuffer({ useSharedStrings: false } as never);
+  const buffer = await workbook.xlsx.writeBuffer();
   return new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
