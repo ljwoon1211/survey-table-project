@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Tab, TabGroup, TabList, TabPanel, TabPanels, TextInput } from '@tremor/react';
 import { BarChart3, Filter, Grid3X3, List, Search, TrendingUp } from 'lucide-react';
@@ -222,14 +222,14 @@ export function AnalyticsDashboardClient({
               {searchFilteredQuestions.length > 0 ? (
                 <div className="space-y-6">
                   {searchFilteredQuestions.map((question, index) => (
-                    <div key={question.questionId}>
+                    <LazyRender key={question.questionId} height={250}>
                       <div className="mb-2 flex items-center gap-2">
                         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-sm font-medium text-blue-600">
                           {index + 1}
                         </span>
                       </div>
                       <QuestionAnalytics data={question} />
-                    </div>
+                    </LazyRender>
                   ))}
                 </div>
               ) : (
@@ -327,6 +327,37 @@ export function AnalyticsDashboardClient({
       </TabGroup>
     </div>
   );
+}
+
+/**
+ * 뷰포트에 진입할 때만 children을 렌더링하는 래퍼
+ */
+function LazyRender({ children, height = 200 }: { children: React.ReactNode; height?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  if (!visible) {
+    return <div ref={ref} style={{ minHeight: height }} className="rounded-lg bg-gray-50 animate-pulse" />;
+  }
+
+  return <div ref={ref}>{children}</div>;
 }
 
 /**
