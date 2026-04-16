@@ -300,6 +300,71 @@ function writeSemiLongDataRows(
 }
 
 // ============================================================
+// Empty Row Grouping (Excel Outline)
+// ============================================================
+
+/**
+ * 연속된 빈 행을 Excel Outline(그룹화)으로 접어둔다.
+ * - 빈 행: 모든 measurementValues가 null 또는 UNEXPOSED_MARKER
+ * - 같은 응답 내에서만 연속 그룹화 (응답 경계를 넘지 않음)
+ * - 연속 2행 이상일 때만 그룹화
+ */
+function applyEmptyRowGrouping(
+  ws: ExcelJS.Worksheet,
+  dataRows: SemiLongRow[],
+  rowOffset: number,
+) {
+  if (dataRows.length === 0) return;
+
+  const dataStartRow = HEADER_ROW_COUNT + rowOffset + 1;
+
+  // 각 행이 "빈 행"인지 판별
+  const isEmpty = (row: SemiLongRow): boolean =>
+    row.measurementValues.every((v) => v === null || v === UNEXPOSED_MARKER);
+
+  // 연속 빈 행 구간 수집 (응답 경계에서 끊기)
+  type Span = { start: number; end: number };
+  const spans: Span[] = [];
+  let spanStart = -1;
+
+  for (let i = 0; i < dataRows.length; i++) {
+    const row = dataRows[i];
+    const isEmptyRow = isEmpty(row);
+    const isResponseBoundary = i > 0 && dataRows[i].responseId !== dataRows[i - 1].responseId;
+
+    if (isResponseBoundary && spanStart !== -1) {
+      // 응답 경계 → 이전 구간 종결
+      if (i - 1 - spanStart >= 1) spans.push({ start: spanStart, end: i - 1 });
+      spanStart = isEmptyRow ? i : -1;
+    } else if (isEmptyRow) {
+      if (spanStart === -1) spanStart = i;
+    } else {
+      if (spanStart !== -1) {
+        if (i - 1 - spanStart >= 1) spans.push({ start: spanStart, end: i - 1 });
+        spanStart = -1;
+      }
+    }
+  }
+  // 마지막 구간 처리
+  if (spanStart !== -1 && dataRows.length - 1 - spanStart >= 1) {
+    spans.push({ start: spanStart, end: dataRows.length - 1 });
+  }
+
+  // Excel 행에 outlineLevel 적용
+  for (const span of spans) {
+    for (let i = span.start; i <= span.end; i++) {
+      const excelRow = ws.getRow(dataStartRow + i);
+      excelRow.outlineLevel = 1;
+      excelRow.hidden = true;
+    }
+  }
+
+  if (spans.length > 0) {
+    ws.properties.outlineLevelRow = 1;
+  }
+}
+
+// ============================================================
 // Checkbox Formula / Hidden / Validation
 // ============================================================
 
@@ -772,14 +837,19 @@ export function buildSemiLongSheet(
   dataRows: SemiLongRow[],
   sheetNames: Set<string>,
   sheetNameOverride?: string,
+  options?: { tabColor?: { argb: string }; titleSuffix?: string },
 ) {
   const sheetLabel = sheetNameOverride
     ?? (question.questionCode ?? question.title.slice(0, 30));
   const name = sanitizeSheetName(sheetLabel, sheetNames);
-  const ws = workbook.addWorksheet(name, { properties: { tabColor: TAB_COLOR_SEMI_LONG } });
+  const tabColor = options?.tabColor ?? TAB_COLOR_SEMI_LONG;
+  const ws = workbook.addWorksheet(name, { properties: { tabColor } });
   const ro = TITLE_ROW_OFFSET;
 
-  const titleRow = ws.addRow([question.title]);
+  const titleText = options?.titleSuffix
+    ? `${question.title} — ${options.titleSuffix}`
+    : question.title;
+  const titleRow = ws.addRow([titleText]);
   titleRow.font = { bold: true, size: 11 };
   titleRow.height = 28;
 
@@ -825,4 +895,5 @@ export function buildSemiLongSheet(
 
   applyAutoFilterAndFreeze(ws, h1.length, 2, ro);
   autoFitColumnWidths(ws);
+  applyEmptyRowGrouping(ws, dataRows, ro);
 }

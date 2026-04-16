@@ -115,3 +115,4 @@ export const NO_ANSWER_MARKER = '[전체 미응답]';
 
 export const TAB_COLOR_WIDE = { argb: 'FF70AD47' };
 export const TAB_COLOR_SEMI_LONG = { argb: 'FF4472C4' };
+export const TAB_COLOR_SEMI_LONG_DEPTH = { argb: 'FFED7D31' };

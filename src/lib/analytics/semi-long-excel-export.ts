@@ -15,6 +15,7 @@ import type { ResponseData } from './flat-excel-export';
 
 import type { ProgressCallback, SemiLongRow } from './cleaning-export-types';
 export type { ProgressCallback } from './cleaning-export-types';
+import { LARGE_TABLE_ROW_THRESHOLD, TAB_COLOR_SEMI_LONG_DEPTH } from './cleaning-export-types';
 
 import {
   buildSemiLongRows,
@@ -89,9 +90,119 @@ function interleaveByResponse(
   return result;
 }
 
+/** ① ~ ⑳, 21 이상은 (21) 형식 */
+function circledNumber(n: number): string {
+  if (n >= 1 && n <= 20) return String.fromCharCode(0x2460 + n - 1);
+  return `(${n})`;
+}
+
+/**
+ * SemiLongRow[]를 depth1Value별로 분리한다.
+ * - 출현 순서 보존, 동일 depth1이 비연속 출현하면 하나의 그룹으로 합침
+ * - non-data depth1 행([전체 미응답], [미노출] 등)은 모든 그룹에 복제
+ */
+function splitByDepth1(
+  dataRows: SemiLongRow[],
+): { depth1Value: string; rows: SemiLongRow[] }[] {
+  const isReplicateTarget = (d: string) => isNonDataDepth1(d) || d === '';
+
+  // 1) 고유 depth1 값 수집 (출현 순서, non-data 제외)
+  const depth1Order: string[] = [];
+  const depth1Set = new Set<string>();
+  for (const row of dataRows) {
+    if (!isReplicateTarget(row.depth1Value) && !depth1Set.has(row.depth1Value)) {
+      depth1Set.add(row.depth1Value);
+      depth1Order.push(row.depth1Value);
+    }
+  }
+
+  // 2) 그룹별 버킷 초기화
+  const buckets = new Map<string, SemiLongRow[]>();
+  for (const d of depth1Order) buckets.set(d, []);
+
+  // 3) 행 분배 — non-data 행은 모든 버킷에 복제
+  for (const row of dataRows) {
+    if (isReplicateTarget(row.depth1Value)) {
+      for (const bucket of buckets.values()) {
+        bucket.push(row);
+      }
+    } else {
+      buckets.get(row.depth1Value)?.push(row);
+    }
+  }
+
+  return depth1Order.map((d) => ({ depth1Value: d, rows: buckets.get(d)! }));
+}
+
+/**
+ * 대형 테이블의 depth-1 고유 값 수를 미리 계산한다 (progress 보정용).
+ */
+function countDepth1SplitSheets(question: Question): number {
+  const rows = question.tableRowsData ?? [];
+  if (rows.length <= LARGE_TABLE_ROW_THRESHOLD) return 1;
+
+  const cols = question.tableColumns ?? [];
+  const classified = classifyTableCells(rows, cols);
+
+  // shouldUseSemiLong이 false면 wide 시트 1개
+  if (!shouldUseSemiLong(rows, classified.measurements, classified.identifiers)) return 1;
+  if (classified.identifiers.length === 0) return 1;
+
+  const firstIdColIdx = classified.identifiers[0].colIndex;
+  const uniqueDepth1 = new Set<string>();
+  for (const row of rows) {
+    const cell = row.cells[firstIdColIdx];
+    if (cell) {
+      const val = cell.content ?? '';
+      if (val) uniqueDepth1.add(val);
+    }
+  }
+  return uniqueDepth1.size > 1 ? uniqueDepth1.size : 1;
+}
+
 // ============================================================
 // Workbook Generation
 // ============================================================
+
+/**
+ * semi-long 시트를 생성한다.
+ * 행이 100개 초과 + depth-1이 2개 이상이면 depth-1별 시트 분리 (주황 탭),
+ * 그렇지 않으면 단일 시트 (파랑 탭).
+ */
+function emitSemiLongSheets(
+  ctx: {
+    workbook: ExcelJS.Workbook;
+    sheetNames: Set<string>;
+    onProgress?: ProgressCallback;
+    currentSheet: number;
+    totalSheets: number;
+  },
+  question: Question,
+  classified: ReturnType<typeof classifyTableCells>,
+  expanded: ReturnType<typeof expandMeasurements>,
+  dataRows: SemiLongRow[],
+  baseLabel: string,
+  tableRowCount: number,
+): number {
+  const depth1Groups = splitByDepth1(dataRows);
+
+  if (tableRowCount > LARGE_TABLE_ROW_THRESHOLD && depth1Groups.length > 1) {
+    for (let i = 0; i < depth1Groups.length; i++) {
+      const { depth1Value, rows } = depth1Groups[i];
+      const label = `${baseLabel}-${circledNumber(i + 1)}${depth1Value}`;
+      ctx.onProgress?.(++ctx.currentSheet, ctx.totalSheets, label);
+      buildSemiLongSheet(ctx.workbook, question, classified, expanded, rows, ctx.sheetNames, label, {
+        tabColor: TAB_COLOR_SEMI_LONG_DEPTH,
+        titleSuffix: depth1Value,
+      });
+    }
+  } else {
+    ctx.onProgress?.(++ctx.currentSheet, ctx.totalSheets, baseLabel);
+    buildSemiLongSheet(ctx.workbook, question, classified, expanded, dataRows, ctx.sheetNames, baseLabel);
+  }
+
+  return ctx.currentSheet;
+}
 
 export async function generateCleaningWorkbook(
   survey: Survey,
@@ -107,55 +218,52 @@ export async function generateCleaningWorkbook(
     .sort((a, b) => a.order - b.order);
 
   const tableGroups = groupTableQuestions(tableQuestions);
-  const totalSheets = 2 + tableGroups.length;
-  let currentSheet = 0;
+
+  // progress 보정: depth-1 분리 대상은 시트 수가 늘어남
+  let totalSheets = 2; // 응답자목록 + 일반문항
+  for (const group of tableGroups) {
+    totalSheets += countDepth1SplitSheets(group.questions[0]);
+  }
+
+  const ctx = { workbook, sheetNames, onProgress, currentSheet: 0, totalSheets };
 
   // 1. 응답자목록
-  onProgress?.(++currentSheet, totalSheets, '응답자목록');
+  onProgress?.(++ctx.currentSheet, totalSheets, '응답자목록');
   buildIndexSheet(workbook, responses, sheetNames);
 
   // 2. 일반문항
-  onProgress?.(++currentSheet, totalSheets, '일반문항');
+  onProgress?.(++ctx.currentSheet, totalSheets, '일반문항');
   buildGeneralQuestionsSheet(workbook, survey, responses, sheetNames);
 
   // 3. 테이블 문항
   for (const group of tableGroups) {
-    onProgress?.(++currentSheet, totalSheets, group.label);
+    const firstQ = group.questions[0];
+    const rows = firstQ.tableRowsData ?? [];
+    const cols = firstQ.tableColumns ?? [];
+    const classified = classifyTableCells(rows, cols);
 
-    if (group.questions.length > 1) {
-      const firstQ = group.questions[0];
-      const classified = classifyTableCells(firstQ.tableRowsData ?? [], firstQ.tableColumns ?? []);
-
-      if (shouldUseSemiLong(firstQ.tableRowsData ?? [], classified.measurements, classified.identifiers)) {
-        const expanded = expandMeasurements(classified.measurements, firstQ.tableColumns ?? [], firstQ.tableRowsData ?? undefined);
-        const perQuestionRows = group.questions.map((q) => {
-          const qClassified = classifyTableCells(q.tableRowsData ?? [], q.tableColumns ?? []);
-          const qExpanded = expandMeasurements(qClassified.measurements, q.tableColumns ?? [], q.tableRowsData ?? undefined);
-          return buildSemiLongRows(q, responses, qClassified, qExpanded, survey.questions, allGroups);
-        });
-        const mergedRows = interleaveByResponse(perQuestionRows, responses);
-        buildSemiLongSheet(workbook, firstQ, classified, expanded, mergedRows, sheetNames, group.label);
-      } else {
-        for (const q of group.questions) {
-          buildWideTableSheet(workbook, q, responses, survey.questions, sheetNames, allGroups);
-        }
-      }
-    } else {
-      const q = group.questions[0];
-      const classified = classifyTableCells(q.tableRowsData ?? [], q.tableColumns ?? []);
-
-      if (shouldUseSemiLong(q.tableRowsData ?? [], classified.measurements, classified.identifiers)) {
-        const expanded = expandMeasurements(classified.measurements, q.tableColumns ?? [], q.tableRowsData ?? undefined);
-        const dataRows = buildSemiLongRows(q, responses, classified, expanded, survey.questions, allGroups);
-        const firstDepth1 = dataRows.find(
-          (r) => r.depth1Value && !isNonDataDepth1(r.depth1Value),
-        )?.depth1Value;
-        const depthSuffix = firstDepth1 ? `-${firstDepth1}` : '';
-        const sheetLabel = (q.questionCode ?? q.title.slice(0, 20)) + depthSuffix;
-        buildSemiLongSheet(workbook, q, classified, expanded, dataRows, sheetNames, sheetLabel);
-      } else {
+    if (!shouldUseSemiLong(rows, classified.measurements, classified.identifiers)) {
+      onProgress?.(++ctx.currentSheet, totalSheets, group.label);
+      for (const q of group.questions) {
         buildWideTableSheet(workbook, q, responses, survey.questions, sheetNames, allGroups);
       }
+      continue;
+    }
+
+    const expanded = expandMeasurements(classified.measurements, cols, rows.length > 0 ? rows : undefined);
+
+    if (group.questions.length > 1) {
+      const perQuestionRows = group.questions.map((q) => {
+        const qClassified = classifyTableCells(q.tableRowsData ?? [], q.tableColumns ?? []);
+        const qExpanded = expandMeasurements(qClassified.measurements, q.tableColumns ?? [], q.tableRowsData ?? undefined);
+        return buildSemiLongRows(q, responses, qClassified, qExpanded, survey.questions, allGroups);
+      });
+      const mergedRows = interleaveByResponse(perQuestionRows, responses);
+      emitSemiLongSheets(ctx, firstQ, classified, expanded, mergedRows, group.label, rows.length);
+    } else {
+      const dataRows = buildSemiLongRows(firstQ, responses, classified, expanded, survey.questions, allGroups);
+      const baseLabel = firstQ.questionCode ?? extractQuestionNumber(firstQ.title) ?? firstQ.title.slice(0, 20);
+      emitSemiLongSheets(ctx, firstQ, classified, expanded, dataRows, baseLabel, rows.length);
     }
   }
 
