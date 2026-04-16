@@ -10,6 +10,7 @@ import * as XLSX from 'xlsx';
 
 import { Question, Survey, TableCell } from '@/types/survey';
 
+import { isCellInputable } from './excel-export-utils';
 import type { ResponseData } from './flat-excel-export';
 
 /** 간결 열 정의 */
@@ -436,12 +437,6 @@ export function generateCompactExcelBlob(survey: Survey, responses: ResponseData
 // Helpers
 // ============================================================
 
-/**
- * 입력 가능한 셀 타입인지 확인
- */
-function isCellInputable(cell: TableCell): boolean {
-  return ['checkbox', 'radio', 'select', 'input'].includes(cell.type);
-}
 
 /**
  * 헤더 문자열 정리

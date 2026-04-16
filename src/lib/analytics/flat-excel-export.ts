@@ -18,6 +18,8 @@ import {
   TableRow,
 } from '@/types/survey';
 
+import { isCellInputable } from './excel-export-utils';
+
 // ============================================================
 // Types
 // ============================================================
@@ -509,12 +511,6 @@ export function generateFlatExcelBlob(survey: Survey, responses: ResponseData[])
 // Helpers
 // ============================================================
 
-/**
- * 입력 가능한 셀 타입인지 확인
- */
-function isCellInputable(cell: TableCell): boolean {
-  return ['checkbox', 'radio', 'select', 'input'].includes(cell.type);
-}
 
 /**
  * 헤더 문자열 정리
