@@ -355,7 +355,6 @@ function applyEmptyRowGrouping(
     for (let i = span.start; i <= span.end; i++) {
       const excelRow = ws.getRow(dataStartRow + i);
       excelRow.outlineLevel = 1;
-      excelRow.hidden = true;
     }
   }
 

@@ -15,7 +15,7 @@ import type { ResponseData } from './flat-excel-export';
 
 import type { ProgressCallback, SemiLongRow } from './cleaning-export-types';
 export type { ProgressCallback } from './cleaning-export-types';
-import { LARGE_TABLE_ROW_THRESHOLD, TAB_COLOR_SEMI_LONG_DEPTH } from './cleaning-export-types';
+import { DEPTH_SPLIT_ROW_THRESHOLD, TAB_COLOR_SEMI_LONG_DEPTH } from './cleaning-export-types';
 
 import {
   buildSemiLongRows,
@@ -90,12 +90,6 @@ function interleaveByResponse(
   return result;
 }
 
-/** ① ~ ⑳, 21 이상은 (21) 형식 */
-function circledNumber(n: number): string {
-  if (n >= 1 && n <= 20) return String.fromCharCode(0x2460 + n - 1);
-  return `(${n})`;
-}
-
 /**
  * SemiLongRow[]를 depth1Value별로 분리한다.
  * - 출현 순서 보존, 동일 depth1이 비연속 출현하면 하나의 그룹으로 합침
@@ -139,7 +133,7 @@ function splitByDepth1(
  */
 function countDepth1SplitSheets(question: Question): number {
   const rows = question.tableRowsData ?? [];
-  if (rows.length <= LARGE_TABLE_ROW_THRESHOLD) return 1;
+  if (rows.length <= DEPTH_SPLIT_ROW_THRESHOLD) return 1;
 
   const cols = question.tableColumns ?? [];
   const classified = classifyTableCells(rows, cols);
@@ -186,10 +180,10 @@ function emitSemiLongSheets(
 ): number {
   const depth1Groups = splitByDepth1(dataRows);
 
-  if (tableRowCount > LARGE_TABLE_ROW_THRESHOLD && depth1Groups.length > 1) {
+  if (tableRowCount > DEPTH_SPLIT_ROW_THRESHOLD && depth1Groups.length > 1) {
     for (let i = 0; i < depth1Groups.length; i++) {
       const { depth1Value, rows } = depth1Groups[i];
-      const label = `${baseLabel}-${circledNumber(i + 1)}${depth1Value}`;
+      const label = `${baseLabel}-${depth1Value}`;
       ctx.onProgress?.(++ctx.currentSheet, ctx.totalSheets, label);
       buildSemiLongSheet(ctx.workbook, question, classified, expanded, rows, ctx.sheetNames, label, {
         tabColor: TAB_COLOR_SEMI_LONG_DEPTH,

@@ -86,7 +86,7 @@ export const UNEXPOSED_FONT: Partial<ExcelJS.Font> = {
 };
 
 export const THICK_BOTTOM_BORDER: Partial<ExcelJS.Borders> = {
-  bottom: { style: 'thick', color: { argb: 'FF333333' } },
+  bottom: { style: 'thin', color: { argb: 'FF333333' } },
 };
 
 export const HEADER_BORDER: Partial<ExcelJS.Borders> = {
@@ -103,6 +103,7 @@ export const HEADER_BORDER: Partial<ExcelJS.Borders> = {
 export const SEMI_LONG_THRESHOLD_ROWS = 50;
 export const SEMI_LONG_THRESHOLD_MEASUREMENT_COLS = 20;
 export const LARGE_TABLE_ROW_THRESHOLD = 100;
+export const DEPTH_SPLIT_ROW_THRESHOLD = 300;
 export const HEADER_ROW_COUNT = 3;
 export const TITLE_ROW_OFFSET = 1;
 
