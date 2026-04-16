@@ -38,9 +38,25 @@ interface ClassifiedCells {
   measurements: { colIndex: number; cell: TableCell; label: string }[];
 }
 
+interface ExpandedColumn {
+  cell: TableCell;
+  colIndex: number;
+  columnKind: 'label' | 'binary' | 'other-text' | 'value';
+  checkboxOptionIndex: number | null;
+  optionValue?: string;
+  spssNumericCode?: number;
+  optionLabel?: string;
+  h1Label: string;
+  h2Label: string;
+  h3Label: string;
+  cellId: string;
+  visible: boolean;
+}
+
 interface SemiLongRow {
   responseId: string;
   seqNum: number;
+  rowLabel: string;
   identifierValues: string[];
   measurementValues: (string | number | null)[];
   depth1Value: string;
@@ -260,6 +276,44 @@ function formatGeneralQuestionValue(
 }
 
 // ============================================================
+// Expanded Cell Value Formatting (checkbox split)
+// ============================================================
+
+/**
+ * ExpandedColumn 기반으로 체크박스 셀의 개별 옵션 값을 생성한다.
+ * - binary: spssNumericCode(선택) / 0(미선택) / null(무응답)
+ * - other-text: 기타 텍스트 / null
+ * - label: null (수식으로 대체)
+ * - value: 기존 formatCellValueForCleaning() 위임
+ */
+function formatExpandedCellValue(
+  expandedCol: ExpandedColumn,
+  rawValue: unknown,
+): string | number | null {
+  switch (expandedCol.columnKind) {
+    case 'label':
+      return null; // 수식 셀 — writeSemiLongDataRows/applyCheckboxFormulas에서 처리
+
+    case 'binary': {
+      // 무응답
+      if (rawValue === undefined || rawValue === null || rawValue === '') return null;
+      const { selectedIds } = parseCheckboxRawValue(rawValue);
+      const isSelected = selectedIds.some((id) => id === expandedCol.optionValue);
+      return isSelected ? (expandedCol.spssNumericCode ?? (expandedCol.checkboxOptionIndex! + 1)) : 0;
+    }
+
+    case 'other-text': {
+      if (rawValue === undefined || rawValue === null || rawValue === '') return null;
+      const { otherText } = parseCheckboxRawValue(rawValue);
+      return otherText ?? null;
+    }
+
+    case 'value':
+      return formatCellValueForCleaning(expandedCol.cell, rawValue);
+  }
+}
+
+// ============================================================
 // Small Helpers
 // ============================================================
 
@@ -325,8 +379,8 @@ function sanitizeSheetName(name: string, existingNames: Set<string>): string {
 }
 
 function extractQuestionNumber(title: string): string | null {
-  const match = title.match(/^(Q[\d]+-[\d]+|Q[\d]+)/i);
-  return match ? match[1].toUpperCase() : null;
+  const match = title.match(/^(Q[\d]+[-_ ][\d]+(?:[-_ ][\d]+)*|Q[\d]+)/i);
+  return match ? match[1].toUpperCase().replace(/[-\s]/g, '_') : null;
 }
 
 /** 측정 셀의 h2 헤더 라벨 생성 (옵션 목록 표시) */
@@ -387,6 +441,147 @@ function classifyTableCells(
   }
 
   return { identifiers, measurements };
+}
+
+// ============================================================
+// Checkbox Column Expansion
+// ============================================================
+
+function expandMeasurements(
+  measurements: ClassifiedCells['measurements'],
+  columns: TableColumn[],
+): ExpandedColumn[] {
+  const result: ExpandedColumn[] = [];
+
+  for (const m of measurements) {
+    const { cell, colIndex, label } = m;
+    const colLabel = columns[colIndex]?.label ?? label;
+
+    if (cell.type === 'checkbox' && cell.checkboxOptions && cell.checkboxOptions.length > 0) {
+      const opts = cell.checkboxOptions;
+      const cellCode = cell.cellCode ?? `c${colIndex}`;
+
+      // 1) 보이는 라벨 합산 열
+      result.push({
+        cell,
+        colIndex,
+        columnKind: 'label',
+        checkboxOptionIndex: null,
+        h1Label: colLabel,
+        h2Label: opts.map((o: CheckboxOption) => o.label).join(' | '),
+        h3Label: cellCode,
+        cellId: cell.id,
+        visible: true,
+      });
+
+      // 2) 숨김 binary 열 (옵션별)
+      for (let i = 0; i < opts.length; i++) {
+        const opt = opts[i];
+        const code = opt.spssNumericCode ?? (i + 1);
+        result.push({
+          cell,
+          colIndex,
+          columnKind: 'binary',
+          checkboxOptionIndex: i,
+          optionValue: opt.value,
+          spssNumericCode: code,
+          optionLabel: opt.label,
+          h1Label: colLabel,
+          h2Label: opt.label,
+          h3Label: `${cellCode}_${opt.optionCode ?? String(i + 1)}`,
+          cellId: cell.id,
+          visible: false,
+        });
+      }
+
+      // 3) 숨김 기타 텍스트 열 (hasOther 옵션이 있으면)
+      if (opts.some((o: CheckboxOption) => o.hasOther)) {
+        result.push({
+          cell,
+          colIndex,
+          columnKind: 'other-text',
+          checkboxOptionIndex: null,
+          h1Label: colLabel,
+          h2Label: '기타 입력',
+          h3Label: `${cellCode}_etc`,
+          cellId: cell.id,
+          visible: false,
+        });
+      }
+    } else {
+      // 비체크박스 셀: 기존과 동일
+      result.push({
+        cell,
+        colIndex,
+        columnKind: 'value',
+        checkboxOptionIndex: null,
+        h1Label: colLabel,
+        h2Label: getMeasurementH2Label(cell, colLabel),
+        h3Label: cell.cellCode ?? `c${colIndex}`,
+        cellId: cell.id,
+        visible: true,
+      });
+    }
+  }
+
+  return result;
+}
+
+/** 일반문항 checkbox 질문을 ExpandedColumn 유사 구조로 확장 */
+function expandGeneralCheckboxQuestion(
+  question: Question,
+): { label: ExpandedColumn; binaries: ExpandedColumn[]; otherText?: ExpandedColumn } | null {
+  if (question.type !== 'checkbox' || !question.options || question.options.length === 0) {
+    return null;
+  }
+
+  const opts = question.options;
+  const qCode = question.questionCode ?? question.id;
+  const dummyCell = { id: question.id, type: 'checkbox' as const, content: '' };
+
+  const label: ExpandedColumn = {
+    cell: dummyCell as TableCell,
+    colIndex: -1,
+    columnKind: 'label',
+    checkboxOptionIndex: null,
+    h1Label: question.title,
+    h2Label: opts.map((o) => o.label).join(' | '),
+    h3Label: qCode,
+    cellId: question.id,
+    visible: true,
+  };
+
+  const binaries: ExpandedColumn[] = opts.map((opt, i) => ({
+    cell: dummyCell as TableCell,
+    colIndex: -1,
+    columnKind: 'binary' as const,
+    checkboxOptionIndex: i,
+    optionValue: opt.value,
+    spssNumericCode: Number(opt.spssNumericCode) || (i + 1),
+    optionLabel: opt.label,
+    h1Label: question.title,
+    h2Label: opt.label,
+    h3Label: `${qCode}_${opt.optionCode ?? String(i + 1)}`,
+    cellId: question.id,
+    visible: false,
+  }));
+
+  const hasOther = question.allowOtherOption || opts.some((o) => o.hasOther);
+  const otherText: ExpandedColumn | undefined = hasOther
+    ? {
+        cell: dummyCell as TableCell,
+        colIndex: -1,
+        columnKind: 'other-text',
+        checkboxOptionIndex: null,
+        h1Label: question.title,
+        h2Label: '기타 입력',
+        h3Label: `${qCode}_etc`,
+        cellId: question.id,
+        visible: false,
+      }
+    : undefined;
+
+  return { label, binaries, otherText };
 }
 
 function shouldUseSemiLong(
@@ -461,6 +656,7 @@ function buildSemiLongRows(
   question: Question,
   responses: ResponseData[],
   classified: ClassifiedCells,
+  expandedColumns: ExpandedColumn[],
   allQuestions: Question[],
   allGroups?: QuestionGroup[],
 ): SemiLongRow[] {
@@ -469,11 +665,16 @@ function buildSemiLongRows(
   const result: SemiLongRow[] = [];
 
   const identifierColIndices = classified.identifiers.map((id) => id.colIndex);
-  const measurementColIndices = classified.measurements.map((m) => m.colIndex);
 
-  // 원본 행 인덱스 O(1) 조회용 Map
-  const rowIndexMap = new Map<TableRow, number>();
-  for (let i = 0; i < allRows.length; i++) rowIndexMap.set(allRows[i], i);
+  // 원본 측정 셀 colIndex → 열 미노출 판단용 (확장 전 기준)
+  const uniqueMeasurementColIndices = [...new Set(expandedColumns.map((ec) => ec.colIndex))];
+
+  /** ExpandedColumn 기반 cellId 키 생성 */
+  function buildCellIdKey(ec: ExpandedColumn, cellId: string): string {
+    if (ec.columnKind === 'binary') return `${cellId}:${ec.optionValue}`;
+    if (ec.columnKind === 'other-text') return `${cellId}:etc`;
+    return cellId;
+  }
 
   for (const resp of responses) {
     const allResponses = resp.questionResponses;
@@ -484,12 +685,13 @@ function buildSemiLongRows(
       result.push({
         responseId: resp.id,
         seqNum: 0,
+        rowLabel: '',
         identifierValues: classified.identifiers.map(() => ''),
-        measurementValues: classified.measurements.map(() => UNEXPOSED_MARKER),
+        measurementValues: expandedColumns.map(() => UNEXPOSED_MARKER),
         depth1Value: '',
         questionId: question.id,
         rowIndex: -1,
-        cellIds: measurementColIndices.map((ci) => allRows[0]?.cells[ci]?.id ?? ''),
+        cellIds: expandedColumns.map((ec) => buildCellIdKey(ec, allRows[0]?.cells[ec.colIndex]?.id ?? '')),
         isUnexposed: 'question',
         unexposedColumns: new Set(),
       });
@@ -498,12 +700,19 @@ function buildSemiLongRows(
 
     const rows = getVisibleRows(allRows, tableResponse, question.dynamicRowConfigs);
 
-    // 열 수준 미노출 (응답자별 1회)
-    const unexposedColumnIndices = new Set<number>();
-    for (let mi = 0; mi < measurementColIndices.length; mi++) {
-      const column = columns[measurementColIndices[mi]];
+    // 열 수준 미노출 (원본 colIndex 기준)
+    const unexposedOrigColIndices = new Set<number>();
+    for (const ci of uniqueMeasurementColIndices) {
+      const column = columns[ci];
       if (column && !shouldDisplayColumn(column, allResponses, allQuestions)) {
-        unexposedColumnIndices.add(mi);
+        unexposedOrigColIndices.add(ci);
+      }
+    }
+    // expandedColumns 인덱스 기준으로 변환
+    const unexposedExpandedIndices = new Set<number>();
+    for (let ei = 0; ei < expandedColumns.length; ei++) {
+      if (unexposedOrigColIndices.has(expandedColumns[ei].colIndex)) {
+        unexposedExpandedIndices.add(ei);
       }
     }
 
@@ -512,12 +721,13 @@ function buildSemiLongRows(
       result.push({
         responseId: resp.id,
         seqNum: 0,
+        rowLabel: NO_ANSWER_MARKER,
         identifierValues: [NO_ANSWER_MARKER, ...classified.identifiers.slice(1).map(() => '')],
-        measurementValues: classified.measurements.map(() => null),
+        measurementValues: expandedColumns.map(() => null),
         depth1Value: NO_ANSWER_MARKER,
         questionId: question.id,
         rowIndex: -1,
-        cellIds: measurementColIndices.map((ci) => allRows[0]?.cells[ci]?.id ?? ''),
+        cellIds: expandedColumns.map((ec) => buildCellIdKey(ec, allRows[0]?.cells[ec.colIndex]?.id ?? '')),
         isUnexposed: false,
         unexposedColumns: new Set(),
       });
@@ -525,7 +735,6 @@ function buildSemiLongRows(
     }
 
     // rowspan tracker는 원본 allRows 기준으로 추적해야 정확함.
-    // 필터된 rows에서 추적하면 동적 행 제거 시 remaining 카운트가 어긋남.
     const rowspanTracker = new Map<number, { value: string; remaining: number }>();
     const visibleRowSet = new Set(rows);
     let seqNum = 0;
@@ -533,7 +742,6 @@ function buildSemiLongRows(
 
     for (let origRi = 0; origRi < allRows.length; origRi++) {
       const row = allRows[origRi];
-      // 원본 순서대로 rowspan을 추적하되, 비가시 행은 식별자만 소비하고 출력 건너뜀
       const identifierValues = extractIdentifierValues(allRows, origRi, identifierColIndices, rowspanTracker);
       if (!visibleRowSet.has(row)) continue;
 
@@ -547,16 +755,19 @@ function buildSemiLongRows(
       }
       seqNum++;
 
+      const currentRowLabel = row.label || `행${originalRowIndex + 1}`;
+
       if (!isRowExposed) {
         result.push({
           responseId: resp.id,
           seqNum,
+          rowLabel: currentRowLabel,
           identifierValues,
-          measurementValues: classified.measurements.map(() => UNEXPOSED_MARKER),
+          measurementValues: expandedColumns.map(() => UNEXPOSED_MARKER),
           depth1Value,
           questionId: question.id,
           rowIndex: originalRowIndex,
-          cellIds: measurementColIndices.map((ci) => row.cells[ci]?.id ?? ''),
+          cellIds: expandedColumns.map((ec) => buildCellIdKey(ec, row.cells[ec.colIndex]?.id ?? '')),
           isUnexposed: 'row',
           unexposedColumns: new Set(),
         });
@@ -566,22 +777,24 @@ function buildSemiLongRows(
       const measurementValues: (string | number | null)[] = [];
       const cellIds: string[] = [];
 
-      for (let mi = 0; mi < measurementColIndices.length; mi++) {
-        const cell = row.cells[measurementColIndices[mi]];
-        cellIds.push(cell?.id ?? '');
+      for (let ei = 0; ei < expandedColumns.length; ei++) {
+        const ec = expandedColumns[ei];
+        const cell = row.cells[ec.colIndex];
+        cellIds.push(buildCellIdKey(ec, cell?.id ?? ''));
 
-        if (unexposedColumnIndices.has(mi)) {
+        if (unexposedExpandedIndices.has(ei)) {
           measurementValues.push(UNEXPOSED_MARKER);
         } else if (!cell) {
           measurementValues.push(null);
         } else {
-          measurementValues.push(formatCellValueForCleaning(cell, tableResponse[cell.id]));
+          measurementValues.push(formatExpandedCellValue(ec, tableResponse[cell.id]));
         }
       }
 
       result.push({
         responseId: resp.id,
         seqNum,
+        rowLabel: currentRowLabel,
         identifierValues,
         measurementValues,
         depth1Value,
@@ -589,7 +802,7 @@ function buildSemiLongRows(
         rowIndex: originalRowIndex,
         cellIds,
         isUnexposed: false,
-        unexposedColumns: unexposedColumnIndices,
+        unexposedColumns: unexposedExpandedIndices,
       });
     }
   }
@@ -632,6 +845,73 @@ function applyAutoFilterAndFreeze(ws: ExcelJS.Worksheet, colCount: number, freez
   ws.views = [{ state: 'frozen', xSplit: freezeXSplit, ySplit: HEADER_ROW_COUNT }];
 }
 
+/** 헤더 row 1~3의 특정 열을 세로 병합하여 한 번만 표시 */
+function mergeHeaderCells(ws: ExcelJS.Worksheet, col: number): void {
+  ws.mergeCells(1, col, HEADER_ROW_COUNT, col);
+  ws.getRow(1).getCell(col).alignment = { vertical: 'middle', horizontal: 'center' };
+}
+
+/** 텍스트의 표시 너비를 추정 (CJK 문자 1.8배) */
+function getTextWidth(value: unknown): number {
+  if (value === null || value === undefined) return 0;
+  const str = String(value);
+  let width = 0;
+  for (const char of str) {
+    const code = char.codePointAt(0) ?? 0;
+    if (
+      (code >= 0x1100 && code <= 0x11FF) ||
+      (code >= 0x3000 && code <= 0x9FFF) ||
+      (code >= 0xAC00 && code <= 0xD7AF) ||
+      (code >= 0xF900 && code <= 0xFAFF) ||
+      (code >= 0xFF00 && code <= 0xFFEF)
+    ) {
+      width += 1.8;
+    } else {
+      width += 1;
+    }
+  }
+  return width;
+}
+
+const AUTO_FIT_MIN_WIDTH = 4;
+const AUTO_FIT_MAX_WIDTH = 50;
+const AUTO_FIT_PADDING = 2;
+const AUTO_FIT_SAMPLE_ROWS = 200;
+
+/** 헤더 + 데이터 샘플링하여 열 너비 자동 조절 */
+function autoFitColumnWidths(ws: ExcelJS.Worksheet): void {
+  const colCount = ws.columnCount;
+  const maxWidths = new Array<number>(colCount).fill(0);
+
+  for (let r = 1; r <= Math.min(HEADER_ROW_COUNT, ws.rowCount); r++) {
+    const row = ws.getRow(r);
+    for (let c = 1; c <= colCount; c++) {
+      if (!ws.getColumn(c).hidden) {
+        maxWidths[c - 1] = Math.max(maxWidths[c - 1], getTextWidth(row.getCell(c).value));
+      }
+    }
+  }
+
+  const dataEnd = Math.min(ws.rowCount, HEADER_ROW_COUNT + AUTO_FIT_SAMPLE_ROWS);
+  for (let r = HEADER_ROW_COUNT + 1; r <= dataEnd; r++) {
+    const row = ws.getRow(r);
+    for (let c = 1; c <= colCount; c++) {
+      if (!ws.getColumn(c).hidden) {
+        maxWidths[c - 1] = Math.max(maxWidths[c - 1], getTextWidth(row.getCell(c).value));
+      }
+    }
+  }
+
+  for (let c = 1; c <= colCount; c++) {
+    if (!ws.getColumn(c).hidden) {
+      ws.getColumn(c).width = Math.min(
+        AUTO_FIT_MAX_WIDTH,
+        Math.max(AUTO_FIT_MIN_WIDTH, maxWidths[c - 1] + AUTO_FIT_PADDING),
+      );
+    }
+  }
+}
+
 /**
  * Semi-Long 데이터 행을 워크시트에 렌더링한다.
  * buildSemiLongTableSheet과 buildMergedSemiLongSheet 공통 로직.
@@ -667,10 +947,10 @@ function writeSemiLongDataRows(
       prevDepth1 = semiRow.depth1Value;
     }
 
-    // 3) 데이터 행 삽입
+    // 3) 데이터 행 삽입 — B열은 행 라벨 (seqNum 대신)
     const excelRow = addRow(ws, [
       semiRow.responseId,
-      semiRow.seqNum,
+      semiRow.rowLabel || semiRow.seqNum,
       ...semiRow.identifierValues,
       ...semiRow.measurementValues,
     ]);
@@ -699,6 +979,9 @@ function writeSemiLongDataRows(
         excelRow.getCell(measureStartCol + mi).font = UNEXPOSED_FONT;
       }
     }
+
+    // 6) 전체 행이 미노출/미응답이면 AutoFilter로 필터링 가능하도록 표시만 남김
+    //    row.hidden은 AutoFilter와 충돌하여 Ctrl+Shift+9 해제 불가 → 사용하지 않음
   }
 
   // 마지막 행 하단 테두리
@@ -710,48 +993,173 @@ function writeSemiLongDataRows(
   }
 }
 
-/** Semi-Long 시트의 3행 헤더를 생성한다. */
+// ============================================================
+// Checkbox Formula / Hidden / Validation
+// ============================================================
+
+/**
+ * label 열에 TEXTJOIN 수식을 삽입한다.
+ * 미노출 행(이미 텍스트 값이 들어간 행)은 건너뛴다.
+ */
+function applyCheckboxFormulas(
+  ws: ExcelJS.Worksheet,
+  expandedColumns: ExpandedColumn[],
+  startCol: number,
+  dataRows: SemiLongRow[],
+) {
+  // label 열과 대응 binary 열의 Excel 열 번호를 매핑
+  interface LabelGroup {
+    labelExcelCol: number;
+    binaryExcelCols: number[];
+    binaryLabels: string[];
+    otherTextExcelCol?: number;
+  }
+
+  const groups: LabelGroup[] = [];
+  let currentGroup: LabelGroup | null = null;
+
+  for (let i = 0; i < expandedColumns.length; i++) {
+    const ec = expandedColumns[i];
+    const excelCol = startCol + i;
+
+    if (ec.columnKind === 'label') {
+      currentGroup = { labelExcelCol: excelCol, binaryExcelCols: [], binaryLabels: [] };
+      groups.push(currentGroup);
+    } else if (ec.columnKind === 'binary' && currentGroup) {
+      currentGroup.binaryExcelCols.push(excelCol);
+      currentGroup.binaryLabels.push(ec.optionLabel ?? '');
+    } else if (ec.columnKind === 'other-text' && currentGroup) {
+      currentGroup.otherTextExcelCol = excelCol;
+    } else {
+      currentGroup = null;
+    }
+  }
+
+  if (groups.length === 0) return;
+
+  // 각 데이터 행에 수식 삽입
+  for (let ri = 0; ri < dataRows.length; ri++) {
+    const semiRow = dataRows[ri];
+    // Semi-Long: 행 전체 미노출/미응답 요약은 수식 건너뛰기
+    if (semiRow.isUnexposed) continue;
+    if (isNonDataDepth1(semiRow.depth1Value)) continue;
+
+    const excelRowNum = HEADER_ROW_COUNT + 1 + ri;
+
+    for (const group of groups) {
+      // Wide 시트에서 부분 미노출: label 셀에 이미 [미노출]이 들어가 있으면 건너뛰기
+      const labelCell = ws.getRow(excelRowNum).getCell(group.labelExcelCol);
+      if (labelCell.value === UNEXPOSED_MARKER) continue;
+
+      // TEXTJOIN 없이 모든 Excel 버전 호환 수식:
+      // 각 선택 항목에 ", " 접두사를 붙여 연결 → MID로 앞의 ", " 제거
+      // 예: MID(IF(...)&IF(...)&..., 3, 9999)
+      const ifParts = group.binaryExcelCols.map((col, idx) => {
+        const colLetter = getExcelColumnLetter(col);
+        const label = group.binaryLabels[idx].replace(/"/g, '""');
+        return `IF(IFERROR(${colLetter}${excelRowNum}>0,FALSE),", ${label}","")`;
+      });
+
+      if (group.otherTextExcelCol) {
+        const otherCol = getExcelColumnLetter(group.otherTextExcelCol);
+        ifParts.push(`IF(IFERROR(LEN(${otherCol}${excelRowNum})>0,FALSE),", 기타: "&${otherCol}${excelRowNum},"")`);
+      }
+
+      const concat = ifParts.join('&');
+      const formula = `MID(${concat},3,9999)`;
+      labelCell.value = { formula, date1904: false } as ExcelJS.CellFormulaValue;
+    }
+  }
+}
+
+/** Excel 열 번호(1-based)를 열 문자(A, B, ..., AA, AB, ...)로 변환 */
+function getExcelColumnLetter(colNum: number): string {
+  let result = '';
+  let n = colNum;
+  while (n > 0) {
+    n--;
+    result = String.fromCharCode(65 + (n % 26)) + result;
+    n = Math.floor(n / 26);
+  }
+  return result;
+}
+
+/**
+ * 숨김 열 설정 + binary 열에 데이터 유효성 검사(드롭다운) 적용
+ */
+function applyHiddenAndValidation(
+  ws: ExcelJS.Worksheet,
+  expandedColumns: ExpandedColumn[],
+  startCol: number,
+  dataRowCount: number,
+) {
+  for (let i = 0; i < expandedColumns.length; i++) {
+    const ec = expandedColumns[i];
+    const excelCol = startCol + i;
+
+    // 숨김 열 처리
+    if (!ec.visible) {
+      ws.getColumn(excelCol).hidden = true;
+    }
+
+    // binary 열에 데이터 유효성 검사
+    if (ec.columnKind === 'binary') {
+      const code = ec.spssNumericCode ?? (ec.checkboxOptionIndex! + 1);
+      for (let r = HEADER_ROW_COUNT + 1; r <= HEADER_ROW_COUNT + dataRowCount; r++) {
+        ws.getRow(r).getCell(excelCol).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: [`"0,${code}"`],
+        };
+      }
+    }
+  }
+}
+
+/**
+ * h1 헤더에서 같은 원본 셀의 연속 열(label+binary+other-text)을 병합한다.
+ */
+function mergeExpandedH1Headers(
+  ws: ExcelJS.Worksheet,
+  expandedColumns: ExpandedColumn[],
+  startCol: number,
+) {
+  if (expandedColumns.length === 0) return;
+
+  let mergeStart = startCol;
+  let prevCellId: string | null = expandedColumns[0].cellId;
+
+  for (let i = 1; i <= expandedColumns.length; i++) {
+    const currentCellId = i < expandedColumns.length ? expandedColumns[i].cellId : null;
+    if (currentCellId !== prevCellId) {
+      const mergeEnd = startCol + i - 1;
+      if (mergeEnd > mergeStart) {
+        ws.mergeCells(1, mergeStart, 1, mergeEnd);
+        ws.getRow(1).getCell(mergeStart).alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+      }
+      mergeStart = startCol + i;
+      prevCellId = currentCellId;
+    }
+  }
+}
+
+/** Semi-Long 시트의 3행 헤더를 생성한다. (ExpandedColumn 기반) */
 function buildSemiLongHeaders(
   classified: ClassifiedCells,
-  columns: TableColumn[],
+  expandedColumns: ExpandedColumn[],
 ): { h1: string[]; h2: string[]; h3: string[] } {
-  const metaCols = ['response_id', '#'];
+  const metaCols = ['response_id', '행 라벨'];
   const idLabels = classified.identifiers.map((id) => id.label);
-  const measureLabels = classified.measurements.map((m) => m.label);
 
-  const h1 = [...metaCols, ...idLabels, ...measureLabels];
-
-  const h2 = [
-    ...metaCols,
-    ...idLabels,
-    ...classified.measurements.map((m) =>
-      getMeasurementH2Label(m.cell, columns[m.colIndex]?.label ?? ''),
-    ),
-  ];
-
+  const h1 = [...metaCols, ...idLabels, ...expandedColumns.map((ec) => ec.h1Label)];
+  const h2 = [...metaCols, ...idLabels, ...expandedColumns.map((ec) => ec.h2Label)];
   const h3 = [
     ...metaCols,
     ...classified.identifiers.map((_, i) => `id_${i + 1}`),
-    ...classified.measurements.map((m) => m.cell.cellCode ?? `c${m.colIndex}`),
+    ...expandedColumns.map((ec) => ec.h3Label),
   ];
 
   return { h1, h2, h3 };
-}
-
-function setSemiLongColumnWidths(
-  ws: ExcelJS.Worksheet,
-  metaColCount: number,
-  idColCount: number,
-  measureColCount: number,
-) {
-  ws.getColumn(1).width = 24; // response_id
-  ws.getColumn(2).width = 6;  // #
-  for (let i = 0; i < idColCount; i++) {
-    ws.getColumn(metaColCount + 1 + i).width = 14;
-  }
-  for (let i = 0; i < measureColCount; i++) {
-    ws.getColumn(metaColCount + idColCount + 1 + i).width = 12;
-  }
 }
 
 // ============================================================
@@ -766,11 +1174,14 @@ function buildIndexSheet(
   const name = sanitizeSheetName('응답자목록', sheetNames);
   const ws = workbook.addWorksheet(name, { properties: { tabColor: TAB_COLOR_WIDE } });
 
-  const headers = ['response_id', '시작 시간', '완료 시간', '소요 시간(초)', '상태', 'User Agent'];
-  addRow(ws, headers);
-  addRow(ws, headers);
-  addRow(ws, headers.map((_, i) => `V${i + 1}`));
-  applyHeaderStyle(ws, headers.length);
+  const h1 = ['response_id', '시작 시간', '완료 시간', '소요 시간(초)', '상태', 'User Agent'];
+  const h2 = ['response_id', 'datetime', 'datetime', 'number(초)', 'enum', 'string'];
+  const h3 = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6'];
+  addRow(ws, h1);
+  addRow(ws, h2);
+  addRow(ws, h3);
+  applyHeaderStyle(ws, h1.length);
+  mergeHeaderCells(ws, 1);
 
   for (const resp of responses) {
     const startedAt = resp.startedAt ? new Date(resp.startedAt) : null;
@@ -790,13 +1201,8 @@ function buildIndexSheet(
     ]);
   }
 
-  applyAutoFilterAndFreeze(ws, headers.length, 1);
-  ws.getColumn(1).width = 24;
-  ws.getColumn(2).width = 20;
-  ws.getColumn(3).width = 20;
-  ws.getColumn(4).width = 14;
-  ws.getColumn(5).width = 10;
-  ws.getColumn(6).width = 40;
+  applyAutoFilterAndFreeze(ws, h1.length, 1);
+  autoFitColumnWidths(ws);
 }
 
 function buildGeneralQuestionsSheet(
@@ -814,13 +1220,36 @@ function buildGeneralQuestionsSheet(
   const name = sanitizeSheetName('일반문항', sheetNames);
   const ws = workbook.addWorksheet(name, { properties: { tabColor: TAB_COLOR_WIDE } });
 
-  const h1 = ['response_id', ...generalQuestions.map((q) => q.title)];
-  const h2 = ['response_id', ...generalQuestions.map((q) => q.type)];
-  const h3 = ['response_id', ...generalQuestions.map((q) => q.questionCode ?? q.id)];
+  // 체크박스 질문 확장 구조 준비
+  interface GeneralCol {
+    question: Question;
+    expanded: ExpandedColumn | null; // null = 비체크박스 질문
+  }
+
+  const generalCols: GeneralCol[] = [];
+  for (const q of generalQuestions) {
+    const cbExpanded = expandGeneralCheckboxQuestion(q);
+    if (cbExpanded) {
+      generalCols.push({ question: q, expanded: cbExpanded.label });
+      for (const bin of cbExpanded.binaries) {
+        generalCols.push({ question: q, expanded: bin });
+      }
+      if (cbExpanded.otherText) {
+        generalCols.push({ question: q, expanded: cbExpanded.otherText });
+      }
+    } else {
+      generalCols.push({ question: q, expanded: null });
+    }
+  }
+
+  const h1 = ['response_id', ...generalCols.map((gc) => gc.expanded?.h1Label ?? gc.question.title)];
+  const h2 = ['response_id', ...generalCols.map((gc) => gc.expanded?.h2Label ?? gc.question.type)];
+  const h3 = ['response_id', ...generalCols.map((gc) => gc.expanded?.h3Label ?? (gc.question.questionCode ?? gc.question.id))];
   addRow(ws, h1);
   addRow(ws, h2);
   addRow(ws, h3);
   applyHeaderStyle(ws, h1.length);
+  mergeHeaderCells(ws, 1);
 
   const allQuestions = survey.questions;
   const allGroups = survey.groups;
@@ -829,9 +1258,12 @@ function buildGeneralQuestionsSheet(
     const allResponses = resp.questionResponses;
     const row: (string | number | null)[] = [resp.id];
 
-    for (const q of generalQuestions) {
+    for (const gc of generalCols) {
+      const q = gc.question;
       if (!shouldDisplayQuestion(q, allResponses, allQuestions, allGroups)) {
         row.push(UNEXPOSED_MARKER);
+      } else if (gc.expanded) {
+        row.push(formatExpandedCellValue(gc.expanded, allResponses[q.id]));
       } else {
         row.push(formatGeneralQuestionValue(q, allResponses[q.id]));
       }
@@ -845,9 +1277,50 @@ function buildGeneralQuestionsSheet(
     }
   }
 
+  // 체크박스 수식/숨김/드롭다운 적용
+  const hasCheckbox = generalCols.some((gc) => gc.expanded);
+  if (hasCheckbox) {
+    const allExpanded: ExpandedColumn[] = generalCols.map((gc) => {
+      if (gc.expanded) return gc.expanded;
+      // 비체크박스: 더미 value 타입
+      return {
+        cell: { id: gc.question.id, type: 'text' as const, content: '' } as TableCell,
+        colIndex: -1, columnKind: 'value' as const, checkboxOptionIndex: null,
+        h1Label: gc.question.title, h2Label: gc.question.type,
+        h3Label: gc.question.questionCode ?? gc.question.id,
+        cellId: gc.question.id, visible: true,
+      };
+    });
+
+    const measureStartCol = 2; // response_id 다음
+    // label 셀 값이 [미노출]이면 수식 건너뜀
+    const dummyRows: SemiLongRow[] = responses.map(() => ({
+      responseId: '', seqNum: 0, rowLabel: '', identifierValues: [], measurementValues: [],
+      depth1Value: '', questionId: '', rowIndex: -1, cellIds: [],
+      isUnexposed: false, unexposedColumns: new Set<number>(),
+    }));
+    applyCheckboxFormulas(ws, allExpanded, measureStartCol, dummyRows);
+    applyHiddenAndValidation(ws, allExpanded, measureStartCol, responses.length);
+
+    // h1 병합: 같은 질문의 연속 열
+    let mergeStart = measureStartCol;
+    let prevQId: string | null | undefined = generalCols[0]?.question.id;
+    for (let i = 1; i <= generalCols.length; i++) {
+      const currQId = i < generalCols.length ? generalCols[i].question.id : null;
+      if (currQId !== prevQId) {
+        const mergeEnd = measureStartCol + i - 1;
+        if (mergeEnd > mergeStart) {
+          ws.mergeCells(1, mergeStart, 1, mergeEnd);
+          ws.getRow(1).getCell(mergeStart).alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        }
+        mergeStart = measureStartCol + i;
+        prevQId = currQId;
+      }
+    }
+  }
+
   applyAutoFilterAndFreeze(ws, h1.length, 1);
-  ws.getColumn(1).width = 24;
-  for (let i = 2; i <= h1.length; i++) ws.getColumn(i).width = 16;
+  autoFitColumnWidths(ws);
 }
 
 function buildWideTableSheet(
@@ -861,30 +1334,91 @@ function buildWideTableSheet(
   const rows = question.tableRowsData ?? [];
   const columns = question.tableColumns ?? [];
 
-  const sheetLabel = question.questionCode
-    ? `${question.questionCode}_${question.title}`.slice(0, 50)
-    : question.title.slice(0, 50);
+  const sheetLabel = question.questionCode ?? question.title.slice(0, 30);
   const name = sanitizeSheetName(sheetLabel, sheetNames);
   const ws = workbook.addWorksheet(name, { properties: { tabColor: TAB_COLOR_WIDE } });
 
-  const inputCells: { rowIdx: number; colIdx: number; cell: TableCell; rowLabel: string }[] = [];
+  // inputCells 수집 → 체크박스 확장 적용
+  interface WideExpandedCol {
+    rowIdx: number;
+    colIdx: number;
+    cell: TableCell;
+    rowLabel: string;
+    expanded: ExpandedColumn;
+  }
+
+  const wideCols: WideExpandedCol[] = [];
   for (let ri = 0; ri < rows.length; ri++) {
     for (let ci = 0; ci < rows[ri].cells.length; ci++) {
       const cell = rows[ri].cells[ci];
       if (cell.isHidden || cell._isContinuation) continue;
-      if (isCellInputable(cell)) {
-        inputCells.push({ rowIdx: ri, colIdx: ci, cell, rowLabel: rows[ri].label || `행${ri + 1}` });
+      if (!isCellInputable(cell)) continue;
+
+      const rowLabel = rows[ri].label || `행${ri + 1}`;
+      const colLabel = columns[ci]?.label ?? '';
+      const cellCode = cell.cellCode ?? `r${ri}_c${ci}`;
+
+      if (cell.type === 'checkbox' && cell.checkboxOptions && cell.checkboxOptions.length > 0) {
+        const opts = cell.checkboxOptions;
+        // label 열
+        wideCols.push({
+          rowIdx: ri, colIdx: ci, cell, rowLabel,
+          expanded: {
+            cell, colIndex: ci, columnKind: 'label', checkboxOptionIndex: null,
+            h1Label: rowLabel, h2Label: opts.map((o: CheckboxOption) => o.label).join(' | '),
+            h3Label: cellCode, cellId: cell.id, visible: true,
+          },
+        });
+        // binary 열
+        for (let oi = 0; oi < opts.length; oi++) {
+          const opt = opts[oi];
+          wideCols.push({
+            rowIdx: ri, colIdx: ci, cell, rowLabel,
+            expanded: {
+              cell, colIndex: ci, columnKind: 'binary', checkboxOptionIndex: oi,
+              optionValue: opt.value,
+              spssNumericCode: opt.spssNumericCode ?? (oi + 1),
+              optionLabel: opt.label,
+              h1Label: rowLabel, h2Label: opt.label,
+              h3Label: `${cellCode}_${opt.optionCode ?? String(oi + 1)}`,
+              cellId: cell.id, visible: false,
+            },
+          });
+        }
+        // other-text 열
+        if (opts.some((o: CheckboxOption) => o.hasOther)) {
+          wideCols.push({
+            rowIdx: ri, colIdx: ci, cell, rowLabel,
+            expanded: {
+              cell, colIndex: ci, columnKind: 'other-text', checkboxOptionIndex: null,
+              h1Label: rowLabel, h2Label: '기타 입력',
+              h3Label: `${cellCode}_etc`, cellId: cell.id, visible: false,
+            },
+          });
+        }
+      } else {
+        wideCols.push({
+          rowIdx: ri, colIdx: ci, cell, rowLabel,
+          expanded: {
+            cell, colIndex: ci, columnKind: 'value', checkboxOptionIndex: null,
+            h1Label: rowLabel, h2Label: colLabel,
+            h3Label: cellCode, cellId: cell.id, visible: true,
+          },
+        });
       }
     }
   }
 
-  const h1 = ['response_id', ...inputCells.map((ic) => ic.rowLabel)];
-  const h2 = ['response_id', ...inputCells.map((ic) => columns[ic.colIdx]?.label ?? '')];
-  const h3 = ['response_id', ...inputCells.map((ic) => ic.cell.cellCode ?? `r${ic.rowIdx}_c${ic.colIdx}`)];
+  const expandedList = wideCols.map((wc) => wc.expanded);
+
+  const h1 = ['response_id', ...expandedList.map((ec) => ec.h1Label)];
+  const h2 = ['response_id', ...expandedList.map((ec) => ec.h2Label)];
+  const h3 = ['response_id', ...expandedList.map((ec) => ec.h3Label)];
   addRow(ws, h1);
   addRow(ws, h2);
   addRow(ws, h3);
   applyHeaderStyle(ws, h1.length);
+  mergeHeaderCells(ws, 1);
 
   const hiddenStartCol = h1.length + 1;
   setupHiddenColumns(ws, hiddenStartCol, 3);
@@ -909,12 +1443,22 @@ function buildWideTableSheet(
     const dataRow: (string | number | null)[] = [resp.id];
     const cellIdsRow: string[] = [];
 
-    for (const ic of inputCells) {
-      cellIdsRow.push(ic.cell.id);
-      if (!isExposed || unexposedRowIndices.has(ic.rowIdx) || unexposedColIndices.has(ic.colIdx)) {
+    for (const wc of wideCols) {
+      const ec = wc.expanded;
+      const isUnexposed = !isExposed || unexposedRowIndices.has(wc.rowIdx) || unexposedColIndices.has(wc.colIdx);
+
+      if (ec.columnKind === 'binary') {
+        cellIdsRow.push(`${wc.cell.id}:${ec.optionValue}`);
+      } else if (ec.columnKind === 'other-text') {
+        cellIdsRow.push(`${wc.cell.id}:etc`);
+      } else {
+        cellIdsRow.push(wc.cell.id);
+      }
+
+      if (isUnexposed) {
         dataRow.push(UNEXPOSED_MARKER);
       } else {
-        dataRow.push(formatCellValueForCleaning(ic.cell, tableResponse[ic.cell.id]));
+        dataRow.push(formatExpandedCellValue(ec, tableResponse[wc.cell.id]));
       }
     }
 
@@ -927,9 +1471,19 @@ function buildWideTableSheet(
     }
   }
 
+  // 체크박스 수식/숨김/드롭다운 적용 — label 셀 값이 [미노출]이면 수식 건너뜀
+  const measureStartCol = 2; // response_id 다음부터
+  const dummyRows: SemiLongRow[] = responses.map(() => ({
+    responseId: '', seqNum: 0, rowLabel: '', identifierValues: [], measurementValues: [],
+    depth1Value: '', questionId: '', rowIndex: -1, cellIds: [],
+    isUnexposed: false, unexposedColumns: new Set<number>(),
+  }));
+  applyCheckboxFormulas(ws, expandedList, measureStartCol, dummyRows);
+  applyHiddenAndValidation(ws, expandedList, measureStartCol, responses.length);
+  mergeExpandedH1Headers(ws, expandedList, measureStartCol);
+
   applyAutoFilterAndFreeze(ws, h1.length, 1);
-  ws.getColumn(1).width = 24;
-  for (let i = 2; i <= h1.length; i++) ws.getColumn(i).width = 12;
+  autoFitColumnWidths(ws);
 }
 
 /**
@@ -940,35 +1494,40 @@ function buildSemiLongSheet(
   workbook: ExcelJS.Workbook,
   question: Question,
   classified: ClassifiedCells,
+  expandedColumns: ExpandedColumn[],
   dataRows: SemiLongRow[],
   sheetNames: Set<string>,
   sheetNameOverride?: string,
 ) {
   const sheetLabel = sheetNameOverride
-    ?? (question.questionCode
-      ? `${question.questionCode}_${question.title}`.slice(0, 50)
-      : question.title.slice(0, 50));
+    ?? (question.questionCode ?? question.title.slice(0, 30));
   const name = sanitizeSheetName(sheetLabel, sheetNames);
   const ws = workbook.addWorksheet(name, { properties: { tabColor: TAB_COLOR_SEMI_LONG } });
 
-  const columns = question.tableColumns ?? [];
-  const { h1, h2, h3 } = buildSemiLongHeaders(classified, columns);
+  const { h1, h2, h3 } = buildSemiLongHeaders(classified, expandedColumns);
   addRow(ws, h1);
   addRow(ws, h2);
   addRow(ws, h3);
   applyHeaderStyle(ws, h1.length);
+  mergeHeaderCells(ws, 1); // response_id
+  mergeHeaderCells(ws, 2); // #
 
   const hiddenStartCol = h1.length + 1;
   setupHiddenColumns(ws, hiddenStartCol, 4);
 
   const metaColCount = 2; // response_id, #
   const idColCount = classified.identifiers.length;
-  const measureColCount = classified.measurements.length;
+  const measureStartCol = metaColCount + idColCount + 1;
 
   writeSemiLongDataRows(ws, dataRows, h1.length, metaColCount, idColCount, hiddenStartCol);
 
-  applyAutoFilterAndFreeze(ws, h1.length, metaColCount + idColCount);
-  setSemiLongColumnWidths(ws, metaColCount, idColCount, measureColCount);
+  // 체크박스 수식/숨김/드롭다운 적용
+  applyCheckboxFormulas(ws, expandedColumns, measureStartCol, dataRows);
+  applyHiddenAndValidation(ws, expandedColumns, measureStartCol, dataRows.length);
+  mergeExpandedH1Headers(ws, expandedColumns, measureStartCol);
+
+  applyAutoFilterAndFreeze(ws, h1.length, 2);
+  autoFitColumnWidths(ws);
 }
 
 // ============================================================
@@ -995,7 +1554,7 @@ function groupTableQuestions(questions: Question[]): { label: string; questions:
     const qs = groups.get(key)!;
     const label = qs.length > 1
       ? `${key}_통합`
-      : (qs[0].questionCode ?? key) + '_' + qs[0].title.replace(/^Q[\d]+-?[\d]*\.?\s*/, '').slice(0, 30);
+      : qs[0].questionCode ?? key;
     return { label, questions: qs };
   });
 }
@@ -1064,20 +1623,28 @@ export async function generateCleaningWorkbook(
           buildWideTableSheet(workbook, q, responses, survey.questions, sheetNames, allGroups);
         }
       } else {
+        const expanded = expandMeasurements(classified.measurements, firstQ.tableColumns ?? []);
         const perQuestionRows = group.questions.map((q) => {
           const qClassified = classifyTableCells(q.tableRowsData ?? [], q.tableColumns ?? []);
-          return buildSemiLongRows(q, responses, qClassified, survey.questions, allGroups);
+          const qExpanded = expandMeasurements(qClassified.measurements, q.tableColumns ?? []);
+          return buildSemiLongRows(q, responses, qClassified, qExpanded, survey.questions, allGroups);
         });
         const mergedRows = interleaveByResponse(perQuestionRows, responses);
-        buildSemiLongSheet(workbook, firstQ, classified, mergedRows, sheetNames, group.label);
+        buildSemiLongSheet(workbook, firstQ, classified, expanded, mergedRows, sheetNames, group.label);
       }
     } else {
       const q = group.questions[0];
       const classified = classifyTableCells(q.tableRowsData ?? [], q.tableColumns ?? []);
 
       if (shouldUseSemiLong(q.tableRowsData ?? [], classified.measurements, classified.identifiers)) {
-        const dataRows = buildSemiLongRows(q, responses, classified, survey.questions, allGroups);
-        buildSemiLongSheet(workbook, q, classified, dataRows, sheetNames);
+        const expanded = expandMeasurements(classified.measurements, q.tableColumns ?? []);
+        const dataRows = buildSemiLongRows(q, responses, classified, expanded, survey.questions, allGroups);
+        const firstDepth1 = dataRows.find(
+          (r) => r.depth1Value && !isNonDataDepth1(r.depth1Value),
+        )?.depth1Value;
+        const depthSuffix = firstDepth1 ? `-${firstDepth1}` : '';
+        const sheetLabel = (q.questionCode ?? q.title.slice(0, 20)) + depthSuffix;
+        buildSemiLongSheet(workbook, q, classified, expanded, dataRows, sheetNames, sheetLabel);
       } else {
         buildWideTableSheet(workbook, q, responses, survey.questions, sheetNames, allGroups);
       }
