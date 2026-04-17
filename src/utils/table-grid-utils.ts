@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 
 import { cn } from '@/lib/utils';
-import type { TableColumn } from '@/types/survey';
+import type { TableColumn, TableRow } from '@/types/survey';
 
 // ── grid-template-columns 생성 ──
 
@@ -93,6 +93,66 @@ export function getGridContainerStyle(
     width: `${totalWidth}px`,
     minWidth: `${totalWidth}px`,
   };
+}
+
+// ── Sticky 좌측 열 판정 ──
+
+// 좌측 sticky 대상 셀 타입: 정적 셀 + radio (사용자 요구: "인터랙티브(radio 제외)가 아닌 경우")
+const STICKY_ELIGIBLE_CELL_TYPES = new Set(['text', 'image', 'video', 'radio']);
+const MIN_COLUMNS_FOR_STICKY = 4;
+
+export interface StickyLeftInfo {
+  stickyColCount: number;
+  leftOffsets: number[];
+}
+
+/**
+ * 좌측부터 연속된 정적(text/image/video) 셀로만 이루어진 열의 개수를 계산한다.
+ * 인터랙티브 셀(radio/checkbox/select/input)이 나오면 경계. colspan으로 경계를 가로지르는 셀도 경계로 간주.
+ *
+ * 가드:
+ * - 열이 MIN_COLUMNS_FOR_STICKY 미만이면 비활성 (가로 스크롤이 없거나 적음)
+ * - 전체 열이 sticky 대상이 되어 가로 스크롤 의미가 없어지면 비활성
+ */
+export function computeStickyLeftColumns(
+  visibleColumns: TableColumn[],
+  visibleRows: TableRow[],
+): StickyLeftInfo {
+  const leftOffsets: number[] = [];
+  let acc = 0;
+  for (const col of visibleColumns) {
+    leftOffsets.push(acc);
+    acc += col.width || 150;
+  }
+
+  if (visibleColumns.length < MIN_COLUMNS_FOR_STICKY) {
+    return { stickyColCount: 0, leftOffsets };
+  }
+
+  let stickyColCount = 0;
+  for (let colIdx = 0; colIdx < visibleColumns.length; colIdx++) {
+    let ok = true;
+    for (const row of visibleRows) {
+      const cell = row.cells[colIdx];
+      if (!cell) continue;
+      // colspan으로 점유돼 숨겨진 셀은 건너뜀 (colspan 자체는 경계 위반 아님 — 각 열 독립 판정)
+      if (cell.isHidden) continue;
+      if (cell._isContinuation) continue;
+      if (!STICKY_ELIGIBLE_CELL_TYPES.has(cell.type)) {
+        ok = false;
+        break;
+      }
+    }
+    if (!ok) break;
+    stickyColCount++;
+  }
+
+  // 가로 스크롤 의미가 남지 않으면 비활성
+  if (stickyColCount > visibleColumns.length - 2) {
+    return { stickyColCount: 0, leftOffsets };
+  }
+
+  return { stickyColCount, leftOffsets };
 }
 
 // ── 행 hover/완료 상태 클래스 ──

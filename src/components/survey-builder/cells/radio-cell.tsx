@@ -63,22 +63,23 @@ export const RadioCell = React.memo(function RadioCell({
   return (
     <div className="space-y-2">
       {cell.content && cell.content.trim() && (
-        <div className="mb-3 text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
+        <div className="mb-3 text-sm font-medium whitespace-pre-wrap [overflow-wrap:anywhere] text-gray-700">
           {cell.content}
         </div>
       )}
 
       {cell.radioOptions.map((option) => {
+        const optionKey = option.value ?? option.id;
         const isSelected = (() => {
           if (typeof cellResponse === 'object' && cellResponse !== null && 'optionId' in (cellResponse as Record<string, unknown>)) {
-            return (cellResponse as { optionId: string }).optionId === option.id;
+            return (cellResponse as { optionId: string }).optionId === optionKey;
           }
-          return cellResponse === option.id;
+          return cellResponse === optionKey;
         })();
 
         const otherValue =
           typeof cellResponse === 'object' &&
-          (cellResponse as { optionId: string; otherValue?: string })?.optionId === option.id
+          (cellResponse as { optionId: string; otherValue?: string })?.optionId === optionKey
             ? (cellResponse as { otherValue?: string }).otherValue || ''
             : '';
 
@@ -90,7 +91,7 @@ export const RadioCell = React.memo(function RadioCell({
                 id={`${cell.id}-${option.id}`}
                 checked={isSelected}
                 onChange={() => {}}
-                onClick={() => handleRadioChange(option.id)}
+                onClick={() => handleRadioChange(optionKey)}
                 className="cursor-pointer border-gray-300 text-blue-600 focus:ring-blue-500"
               />
               <label
@@ -100,12 +101,12 @@ export const RadioCell = React.memo(function RadioCell({
                 {option.label}
               </label>
             </div>
-            {option.id === 'other-option' && isSelected && (
+            {optionKey === 'other-option' && isSelected && (
               <div className="ml-6">
                 <Input
                   placeholder="기타 내용 입력..."
                   value={otherValue}
-                  onChange={(e) => handleOtherInput(option.id, e.target.value)}
+                  onChange={(e) => handleOtherInput(optionKey, e.target.value)}
                   className="h-8 text-xs"
                 />
               </div>

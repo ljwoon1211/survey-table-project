@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@layer base {
+  body {
+    word-break: keep-all;
+    overflow-wrap: break-word;
+    letter-spacing: 0.01em;
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #1c1c1e;
@@ -223,7 +231,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: "WantedSans Variable", "WantedSans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: var(--font-geist-mono);
 }
 
@@ -440,6 +448,15 @@ body {
 /* Apple 스타일 스무스 스크롤 */
 html {
   scroll-behavior: smooth;
+}
+
+/* 인쇄 시 테이블 sticky 해제 — 종이에서는 의미 없음 */
+@media print {
+  [data-grid-cell],
+  [role="columnheader"] {
+    position: static !important;
+    box-shadow: none !important;
+  }
 }
 
 /* 포커스 링 스타일 */

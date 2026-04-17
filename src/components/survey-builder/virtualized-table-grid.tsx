@@ -21,7 +21,10 @@ import type { TableCell, TableColumn, TableRow } from '@/types/survey';
 import {
   getAlignmentClasses,
   getGridCellAria,
+  type StickyLeftInfo,
 } from '@/utils/table-grid-utils';
+
+const STICKY_BODY_Z = 10;
 
 import { InteractiveCell } from './cells';
 
@@ -41,6 +44,7 @@ interface VirtualizedRowProps {
   onChange?: (value: Record<string, any>) => void;
   sentinelRef: (el: HTMLElement | null) => void;
   measureRef: (el: HTMLElement | null) => void;
+  stickyInfo?: StickyLeftInfo;
 }
 
 const VirtualizedRow = React.memo(
@@ -57,7 +61,9 @@ const VirtualizedRow = React.memo(
     onChange,
     sentinelRef,
     measureRef,
+    stickyInfo,
   }: VirtualizedRowProps) {
+    const stickyCount = stickyInfo?.stickyColCount ?? 0;
     return (
       <>
         {row.cells.map((cell, cellIndex) => {
@@ -68,26 +74,43 @@ const VirtualizedRow = React.memo(
           const cs = cell.colspan || 1;
           const isFirstVisibleCell =
             cellIndex === 0 || row.cells.slice(0, cellIndex).every((c) => c.isHidden);
+          const isSticky = cellIndex < stickyCount;
+          const isLastSticky = isSticky && cellIndex === stickyCount - 1;
+          // 좌측 sticky 정적 셀은 placeholder 대신 항상 실제 콘텐츠 렌더
+          const renderContent = visible || isSticky;
+
+          const style: React.CSSProperties = {
+            gridRow: rs > 1 ? `${gridRow} / span ${rs}` : gridRow,
+            gridColumn: cs > 1 ? `${col} / span ${cs}` : col,
+          };
+          if (isSticky && stickyInfo) {
+            style.position = 'sticky';
+            style.left = stickyInfo.leftOffsets[cellIndex];
+            style.zIndex = STICKY_BODY_Z;
+            if (isLastSticky) {
+              style.boxShadow = '2px 0 4px rgba(0,0,0,0.06)';
+            }
+          }
 
           return (
             <div
               key={cell.id}
               ref={isFirstVisibleCell ? sentinelRef : undefined}
               className={cn(
-                'min-w-0 border-r border-b border-gray-300 p-2 transition-colors duration-200',
-                completed ? 'bg-green-50/40' : 'bg-white',
+                'min-w-0 border-r border-b border-gray-300 p-2 transition-colors duration-200 [overflow-wrap:anywhere]',
+                isSticky
+                  ? (completed ? 'bg-green-50' : 'bg-white')
+                  : (completed ? 'bg-green-50/40' : 'bg-white'),
                 getAlignmentClasses(cell.horizontalAlign, cell.verticalAlign),
               )}
-              style={{
-                gridRow: rs > 1 ? `${gridRow} / span ${rs}` : gridRow,
-                gridColumn: cs > 1 ? `${col} / span ${cs}` : col,
-              }}
+              style={style}
               data-row-id={row.id}
               data-grid-cell
               {...getGridCellAria('gridcell', cs, rs)}
             >
-              {visible ? (
-                <div ref={isFirstVisibleCell ? measureRef : undefined}>
+              {renderContent ? (
+                // visible=true일 때만 measureRef를 달아 정확한 높이 측정 (sticky 상시 렌더가 cache를 오염시키지 않도록)
+                <div ref={isFirstVisibleCell && visible ? measureRef : undefined}>
                   <InteractiveCell
                     cell={cell}
                     questionId={questionId}
@@ -111,14 +134,15 @@ const VirtualizedRow = React.memo(
       </>
     );
   },
-  // 커스텀 비교: visible, completed, row 변경 시에만 리렌더
+  // 커스텀 비교: visible, completed, row, stickyInfo 변경 시에만 리렌더
   (prev, next) =>
     prev.visible === next.visible &&
     prev.completed === next.completed &&
     prev.row === next.row &&
     prev.gridRow === next.gridRow &&
     prev.cachedHeight === next.cachedHeight &&
-    prev.value === next.value,
+    prev.value === next.value &&
+    prev.stickyInfo === next.stickyInfo,
 );
 
 // ── Props ──
@@ -136,6 +160,7 @@ interface VirtualizedTableGridProps {
   renderHeaderCells?: () => React.ReactNode;
   gridTemplateCols: string;
   totalWidth: number;
+  stickyInfo?: StickyLeftInfo;
 }
 
 // ── 메인 컴포넌트 ──
@@ -153,6 +178,7 @@ export const VirtualizedTableGrid = React.memo(function VirtualizedTableGrid({
   renderHeaderCells,
   gridTemplateCols,
   totalWidth,
+  stickyInfo,
 }: VirtualizedTableGridProps) {
   useTablePerf(`VirtualizedTable(${displayRows.length}×${visibleColumns.length})`);
 
@@ -168,7 +194,7 @@ export const VirtualizedTableGrid = React.memo(function VirtualizedTableGrid({
   return (
     <div
       role="grid"
-      className="mx-auto overflow-hidden rounded-md border-t border-l border-r border-gray-300 bg-white text-sm"
+      className="mx-auto rounded-md border-t border-l border-r border-gray-300 bg-white text-sm"
       style={{
         display: 'grid',
         gridTemplateColumns: gridTemplateCols,
@@ -194,6 +220,7 @@ export const VirtualizedTableGrid = React.memo(function VirtualizedTableGrid({
           onChange={onChange}
           sentinelRef={sentinelRef(rowIdx)}
           measureRef={heightCache.measureRef(row.id)}
+          stickyInfo={stickyInfo}
         />
       ))}
 

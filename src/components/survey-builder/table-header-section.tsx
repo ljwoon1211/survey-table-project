@@ -87,7 +87,7 @@ const ColumnHeader = React.memo(function ColumnHeader({
 
   return (
     <div
-      className="relative min-w-0 border-r border-b border-gray-300 bg-gray-50 p-2"
+      className="relative min-w-0 border-r border-b border-gray-300 bg-gray-50 p-2 [overflow-wrap:anywhere]"
       style={getGridSpanStyle(headerColspan)}
     >
       <div className="space-y-1">

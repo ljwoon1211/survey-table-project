@@ -44,7 +44,7 @@ const EditorCellContent = React.memo(function EditorCellContent({ cell }: { cell
 
   const textContent = hasText ? (
     <div
-      className={`mb-2 w-full text-sm break-words whitespace-pre-wrap ${cell.type === 'text' ? '' : 'font-medium text-gray-700'}`}
+      className={`mb-2 w-full text-sm whitespace-pre-wrap [overflow-wrap:anywhere] ${cell.type === 'text' ? '' : 'font-medium text-gray-700'}`}
     >
       {cell.content}
     </div>

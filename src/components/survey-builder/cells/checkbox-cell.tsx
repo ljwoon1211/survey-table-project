@@ -21,12 +21,12 @@ export const CheckboxCell = React.memo(function CheckboxCell({
     minSelections !== undefined && minSelections > 0 && currentCount < minSelections;
 
   const canSelect = useCallback(
-    (optionId: string) => {
+    (optionKey: string) => {
       const isChecked = cellResponseArray.some((item) => {
         if (typeof item === 'object' && item !== null && 'optionId' in item) {
-          return (item as { optionId: string }).optionId === optionId;
+          return (item as { optionId: string }).optionId === optionKey;
         }
-        return item === optionId;
+        return item === optionKey;
       });
       return isChecked || !isMaxReached;
     },
@@ -87,17 +87,18 @@ export const CheckboxCell = React.memo(function CheckboxCell({
   return (
     <div className="space-y-2">
       {cell.content && cell.content.trim() && (
-        <div className="mb-3 text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
+        <div className="mb-3 text-sm font-medium whitespace-pre-wrap [overflow-wrap:anywhere] text-gray-700">
           {cell.content}
         </div>
       )}
 
       {cell.checkboxOptions.map((option) => {
+        const optionKey = option.value ?? option.id;
         const isChecked = cellResponseArray.some((item) => {
           if (typeof item === 'object' && item !== null && 'optionId' in item) {
-            return (item as { optionId: string }).optionId === option.id;
+            return (item as { optionId: string }).optionId === optionKey;
           }
-          return item === option.id;
+          return item === optionKey;
         });
 
         const otherValue =
@@ -107,11 +108,11 @@ export const CheckboxCell = React.memo(function CheckboxCell({
                 typeof item === 'object' &&
                 item !== null &&
                 'optionId' in item &&
-                (item as { optionId: string }).optionId === option.id,
+                (item as { optionId: string }).optionId === optionKey,
             ) as { optionId: string; otherValue?: string } | undefined
           )?.otherValue || '';
 
-        const disabled = !canSelect(option.id);
+        const disabled = !canSelect(optionKey);
 
         return (
           <div key={option.id} className="space-y-1">
@@ -121,7 +122,7 @@ export const CheckboxCell = React.memo(function CheckboxCell({
                 id={`${cell.id}-${option.id}`}
                 checked={isChecked}
                 disabled={disabled}
-                onChange={(e) => handleCheckboxChange(option.id, e.target.checked)}
+                onChange={(e) => handleCheckboxChange(optionKey, e.target.checked)}
                 className={`rounded border-gray-300 text-blue-600 focus:ring-blue-500 ${
                   disabled ? 'cursor-not-allowed opacity-50' : ''
                 }`}
@@ -135,12 +136,12 @@ export const CheckboxCell = React.memo(function CheckboxCell({
                 {option.label}
               </label>
             </div>
-            {option.id === 'other-option' && isChecked && (
+            {optionKey === 'other-option' && isChecked && (
               <div className="ml-6">
                 <Input
                   placeholder="기타 내용 입력..."
                   value={otherValue}
-                  onChange={(e) => handleOtherInput(option.id, e.target.value)}
+                  onChange={(e) => handleOtherInput(optionKey, e.target.value)}
                   className="h-8 text-xs"
                 />
               </div>

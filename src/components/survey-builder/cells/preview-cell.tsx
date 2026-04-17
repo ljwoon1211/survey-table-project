@@ -18,7 +18,7 @@ export const PreviewCell = React.memo(function PreviewCell({ cell }: { cell: Tab
       return cell.checkboxOptions && cell.checkboxOptions.length > 0 ? (
         <div className="space-y-2">
           {cell.content && cell.content.trim() && (
-            <div className="mb-3 text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
+            <div className="mb-3 text-sm font-medium whitespace-pre-wrap [overflow-wrap:anywhere] text-gray-700">
               {cell.content}
             </div>
           )}
@@ -39,7 +39,7 @@ export const PreviewCell = React.memo(function PreviewCell({ cell }: { cell: Tab
       return cell.radioOptions && cell.radioOptions.length > 0 ? (
         <div className="space-y-2">
           {cell.content && cell.content.trim() && (
-            <div className="mb-3 text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
+            <div className="mb-3 text-sm font-medium whitespace-pre-wrap [overflow-wrap:anywhere] text-gray-700">
               {cell.content}
             </div>
           )}
@@ -65,7 +65,7 @@ export const PreviewCell = React.memo(function PreviewCell({ cell }: { cell: Tab
       return cell.selectOptions && cell.selectOptions.length > 0 ? (
         <div className="flex flex-col space-y-2">
           {cell.content && cell.content.trim() && (
-            <div className="text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
+            <div className="text-sm font-medium whitespace-pre-wrap [overflow-wrap:anywhere] text-gray-700">
               {cell.content}
             </div>
           )}
@@ -148,7 +148,7 @@ export const PreviewCell = React.memo(function PreviewCell({ cell }: { cell: Tab
       return (
         <div className="flex flex-col space-y-2">
           {cell.content && cell.content.trim() && (
-            <div className="text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
+            <div className="text-sm font-medium whitespace-pre-wrap [overflow-wrap:anywhere] text-gray-700">
               {cell.content}
             </div>
           )}
@@ -169,7 +169,7 @@ export const PreviewCell = React.memo(function PreviewCell({ cell }: { cell: Tab
 
     default:
       return cell.content ? (
-        <div className="text-sm leading-relaxed break-words whitespace-pre-wrap">
+        <div className="text-sm leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">
           {cell.content}
         </div>
       ) : (

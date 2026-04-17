@@ -13,7 +13,7 @@ export const TextCell = React.memo(function TextCell({
   }
 
   return (
-    <div className="text-base leading-relaxed break-words whitespace-pre-wrap">
+    <div className="text-base leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">
       {cell.content}
     </div>
   );

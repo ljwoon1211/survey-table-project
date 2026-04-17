@@ -22,7 +22,7 @@ export const InputCell = React.memo(function InputCell({
   return (
     <div className="flex w-full flex-col space-y-1.5">
       {cell.content && cell.content.trim() && (
-        <div className="mb-2 text-sm font-medium break-words whitespace-pre-wrap text-gray-700">
+        <div className="mb-2 text-sm font-medium whitespace-pre-wrap [overflow-wrap:anywhere] text-gray-700">
           {cell.content}
         </div>
       )}
