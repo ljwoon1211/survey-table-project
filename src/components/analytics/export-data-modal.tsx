@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { XLSM_MIME, type CleaningExportOptions } from '@/lib/analytics/cleaning-export-types';
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = window.URL.createObjectURL(blob);
@@ -37,7 +38,7 @@ interface Props {
   surveyTitle: string;
   onExportCompactExcel?: () => Promise<Blob | null>;
   onExportSpssExcel?: () => Promise<Blob | null>;
-  onExportCleaningExcel?: () => Promise<Blob | null>;
+  onExportCleaningExcel?: (options: CleaningExportOptions) => Promise<Blob | null>;
 }
 
 export function ExportDataModal({
@@ -49,15 +50,19 @@ export function ExportDataModal({
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [exportingType, setExportingType] = useState<string | null>(null);
+  const [includeMacroSync, setIncludeMacroSync] = useState(true);
 
   const handleExport = async (type: string) => {
     try {
       setExportingType(type);
 
       if (type === 'cleaning' && onExportCleaningExcel) {
-        const blob = await onExportCleaningExcel();
+        const blob = await onExportCleaningExcel({ includeMacroSync });
         if (!blob) { alert('내보낼 데이터가 없습니다.'); return; }
-        downloadBlob(blob, buildSafeFilename(surveyTitle, 'Cleaning', 'xlsx'));
+        // 매크로 템플릿이 주입된 경우 .xlsm, 아니면 .xlsx
+        // MIME 타입은 대소문자 구분 없음이 표준 — 브라우저가 Blob.type을 소문자로 정규화함
+        const cleaningExt = blob.type.toLowerCase() === XLSM_MIME.toLowerCase() ? 'xlsm' : 'xlsx';
+        downloadBlob(blob, buildSafeFilename(surveyTitle, 'Cleaning', cleaningExt));
       } else if (type === 'compact' && onExportCompactExcel) {
         const blob = await onExportCompactExcel();
         if (!blob) { alert('내보낼 데이터가 없습니다.'); return; }
@@ -143,14 +148,33 @@ export function ExportDataModal({
 
           {/* 데이터 클리닝용 (Semi-Long) */}
           {onExportCleaningExcel && (
-            <ExportCard
-              title="데이터 클리닝용 (Semi-Long)"
-              description="테이블 문항을 클리닝하기 쉬운 형태로 변환합니다. 대형 테이블의 행 계층을 식별자 열로 변환하고, 미노출/미응답을 구분합니다."
-              icon={<ClipboardCheck className="h-5 w-5 text-teal-600" />}
-              isLoading={exportingType === 'cleaning'}
-              disabled={!!exportingType}
-              onClick={() => handleExport('cleaning')}
-            />
+            <div className="space-y-2">
+              <ExportCard
+                title="데이터 클리닝용 (Semi-Long)"
+                description="테이블 문항을 클리닝하기 쉬운 형태로 변환합니다. 시트 간 필터 연동 활성화 시 .xlsm(매크로 포함) — 어느 시트에서 filter를 걸어도 VBA가 response_id를 모든 시트에 전파합니다. 수식이 없어 대용량에서도 빠름."
+                icon={<ClipboardCheck className="h-5 w-5 text-teal-600" />}
+                isLoading={exportingType === 'cleaning'}
+                disabled={!!exportingType}
+                onClick={() => handleExport('cleaning')}
+              />
+              <label className="flex items-start gap-2 rounded-md border border-dashed bg-slate-50 px-4 py-2 pl-16 text-xs text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={includeMacroSync}
+                  onChange={(e) => setIncludeMacroSync(e.target.checked)}
+                  disabled={!!exportingType}
+                  className="mt-0.5 h-3.5 w-3.5 cursor-pointer"
+                />
+                <span>
+                  <span className="font-semibold">시트 간 필터 연동 (VBA 매크로)</span>
+                  <span className="ml-1 text-slate-500">
+                    — 한 시트에서 autofilter를 걸면 VBA가 보이는 <code className="rounded bg-slate-200 px-1">response_id</code> 집합을 모든 시트에 전파합니다.
+                    체크 시 <code className="mx-1 rounded bg-slate-200 px-1">.xlsm</code>로 내보냄 (Excel에서 매크로 허용 필요).
+                    무거운 수식을 사용하지 않아 대용량에서도 빠르게 열립니다.
+                  </span>
+                </span>
+              </label>
+            </div>
           )}
 
           {/* 3. 데이터 확인용 (Compact) */}
