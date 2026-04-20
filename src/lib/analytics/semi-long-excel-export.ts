@@ -13,9 +13,13 @@ import type { Question, Survey } from '@/types/survey';
 
 import type { ResponseData } from './flat-excel-export';
 
-import type { ProgressCallback, SemiLongRow } from './cleaning-export-types';
-export type { ProgressCallback } from './cleaning-export-types';
-import { DEPTH_SPLIT_ROW_THRESHOLD, TAB_COLOR_SEMI_LONG_DEPTH } from './cleaning-export-types';
+import type { CleaningExportOptions, ProgressCallback, SemiLongRow } from './cleaning-export-types';
+import {
+  DEPTH_SPLIT_ROW_THRESHOLD,
+  TAB_COLOR_SEMI_LONG_DEPTH,
+  XLSM_MIME,
+  XLSX_MIME,
+} from './cleaning-export-types';
 
 import {
   buildSemiLongRows,
@@ -31,6 +35,8 @@ import {
   buildSemiLongSheet,
   buildWideTableSheet,
 } from './cleaning-export-sheet';
+
+import { fetchMacroTemplate, injectVbaProject } from './macro-injection';
 
 // ============================================================
 // Helpers
@@ -185,14 +191,16 @@ function emitSemiLongSheets(
       const { depth1Value, rows } = depth1Groups[i];
       const label = `${baseLabel}-${depth1Value}`;
       ctx.onProgress?.(++ctx.currentSheet, ctx.totalSheets, label);
-      buildSemiLongSheet(ctx.workbook, question, classified, expanded, rows, ctx.sheetNames, label, {
-        tabColor: TAB_COLOR_SEMI_LONG_DEPTH,
-        titleSuffix: depth1Value,
-      });
+      buildSemiLongSheet(
+        ctx.workbook, question, classified, expanded, rows, ctx.sheetNames, label,
+        { tabColor: TAB_COLOR_SEMI_LONG_DEPTH, titleSuffix: depth1Value },
+      );
     }
   } else {
     ctx.onProgress?.(++ctx.currentSheet, ctx.totalSheets, baseLabel);
-    buildSemiLongSheet(ctx.workbook, question, classified, expanded, dataRows, ctx.sheetNames, baseLabel);
+    buildSemiLongSheet(
+      ctx.workbook, question, classified, expanded, dataRows, ctx.sheetNames, baseLabel,
+    );
   }
 
   return ctx.currentSheet;
@@ -204,6 +212,7 @@ export async function generateCleaningWorkbook(
   onProgress?: ProgressCallback,
 ): Promise<ExcelJS.Workbook> {
   const workbook = new ExcelJS.Workbook();
+
   const sheetNames = new Set<string>();
   const allGroups = survey.groups;
 
@@ -219,7 +228,13 @@ export async function generateCleaningWorkbook(
     totalSheets += countDepth1SplitSheets(group.questions[0]);
   }
 
-  const ctx = { workbook, sheetNames, onProgress, currentSheet: 0, totalSheets };
+  const ctx = {
+    workbook,
+    sheetNames,
+    onProgress,
+    currentSheet: 0,
+    totalSheets,
+  };
 
   // 1. 응답자목록
   onProgress?.(++ctx.currentSheet, totalSheets, '응답자목록');
@@ -268,8 +283,23 @@ export async function generateCleaningExcelBlob(
   survey: Survey,
   responses: ResponseData[],
   onProgress?: ProgressCallback,
+  options?: CleaningExportOptions,
 ): Promise<Blob> {
+  const wantsMacro = options?.includeMacroSync !== false;
+  const templateBuffer = wantsMacro ? await fetchMacroTemplate() : undefined;
+
   const workbook = await generateCleaningWorkbook(survey, responses, onProgress);
-  const buffer = await workbook.xlsx.writeBuffer();
-  return new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const xlsxBuffer = (await workbook.xlsx.writeBuffer()) as ArrayBuffer;
+
+  if (!templateBuffer) {
+    return new Blob([new Uint8Array(xlsxBuffer)], { type: XLSX_MIME });
+  }
+
+  try {
+    const xlsmBuffer = await injectVbaProject(xlsxBuffer, templateBuffer);
+    return new Blob([new Uint8Array(xlsmBuffer)], { type: XLSM_MIME });
+  } catch (e) {
+    console.warn('[macro] VBA 주입 실패 — xlsx로 폴백합니다:', e);
+    return new Blob([new Uint8Array(xlsxBuffer)], { type: XLSX_MIME });
+  }
 }

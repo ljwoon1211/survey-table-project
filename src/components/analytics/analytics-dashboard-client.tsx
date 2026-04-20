@@ -1,13 +1,23 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { Tab, TabGroup, TabList, TabPanel, TabPanels, TextInput } from '@tremor/react';
-import { BarChart3, Filter, Grid3X3, List, Search, TrendingUp } from 'lucide-react';
+import {
+  BarChart3,
+  ChevronDown,
+  ChevronUp,
+  List,
+  Search,
+  TrendingUp,
+} from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
 
 import type { SurveyResponse } from '@/db/schema';
 import { analyzeSurvey } from '@/lib/analytics/analyzer';
 import { generateCompactExcelBlob } from '@/lib/analytics/compact-excel-export';
+import type { CleaningExportOptions } from '@/lib/analytics/cleaning-export-types';
 import { generateCleaningExcelBlob } from '@/lib/analytics/semi-long-excel-export';
 import { buildSpssExcelBlob } from '@/lib/analytics/spss-excel-export';
 import { type FilterState, applyFilter, createEmptyFilter } from '@/lib/analytics/filter';
@@ -52,6 +62,7 @@ export function AnalyticsDashboardClient({
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<FilterState>(createEmptyFilter());
   const [selectedVersionId, setSelectedVersionId] = useState<string | ''>('');
+  const [openQuestionIds, setOpenQuestionIds] = useState<Set<string>>(new Set());
 
   // 버전 필터링
   const versionFilteredResponses = useMemo(() => {
@@ -127,15 +138,39 @@ export function AnalyticsDashboardClient({
   }, [survey.questions, filteredResponses]);
 
   // 데이터 클리닝용 Excel 내보내기 핸들러
-  const handleExportCleaningExcel = useCallback(async (): Promise<Blob | null> => {
+  const handleExportCleaningExcel = useCallback(async (options: CleaningExportOptions): Promise<Blob | null> => {
     const data = prepareExportData();
     if (!data) return null;
-    return generateCleaningExcelBlob(data.surveyData, data.responseData);
+    return generateCleaningExcelBlob(data.surveyData, data.responseData, undefined, options);
   }, [prepareExportData]);
 
   // 질문 검색 필터링
-  const searchFilteredQuestions = analytics.questions.filter((q) =>
-    q.questionTitle.toLowerCase().includes(searchTerm.toLowerCase()),
+  const searchFilteredQuestions = useMemo(
+    () =>
+      analytics.questions.filter((q) =>
+        q.questionTitle.toLowerCase().includes(searchTerm.toLowerCase()),
+      ),
+    [analytics.questions, searchTerm],
+  );
+
+  const toggleQuestion = useCallback((id: string) => {
+    setOpenQuestionIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const expandAll = useCallback(() => {
+    setOpenQuestionIds(new Set(searchFilteredQuestions.map((q) => q.questionId)));
+  }, [searchFilteredQuestions]);
+
+  const collapseAll = useCallback(() => setOpenQuestionIds(new Set()), []);
+
+  const openCount = useMemo(
+    () => searchFilteredQuestions.filter((q) => openQuestionIds.has(q.questionId)).length,
+    [searchFilteredQuestions, openQuestionIds],
   );
 
   const hasActiveFilter = filter.groups.length > 0;
@@ -210,26 +245,40 @@ export function AnalyticsDashboardClient({
           {/* 질문별 분석 탭 */}
           <TabPanel>
             <div className="mt-6 space-y-6">
-              {/* 검색 */}
-              <TextInput
-                icon={Search}
-                placeholder="질문 검색..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+              {/* 검색 + 일괄 토글 */}
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="flex-1">
+                  <TextInput
+                    icon={Search}
+                    placeholder="질문 검색..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={expandAll}>
+                    모두 펼치기
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={collapseAll}>
+                    모두 접기
+                  </Button>
+                  <span className="whitespace-nowrap text-xs text-gray-500">
+                    펼침 {openCount}/{searchFilteredQuestions.length}
+                  </span>
+                </div>
+              </div>
 
               {/* 질문 목록 */}
               {searchFilteredQuestions.length > 0 ? (
-                <div className="space-y-6">
+                <div className="space-y-3">
                   {searchFilteredQuestions.map((question, index) => (
-                    <LazyRender key={question.questionId} height={250}>
-                      <div className="mb-2 flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-sm font-medium text-blue-600">
-                          {index + 1}
-                        </span>
-                      </div>
-                      <QuestionAnalytics data={question} />
-                    </LazyRender>
+                    <CollapsibleQuestionCard
+                      key={question.questionId}
+                      index={index}
+                      question={question}
+                      isOpen={openQuestionIds.has(question.questionId)}
+                      onToggle={() => toggleQuestion(question.questionId)}
+                    />
                   ))}
                 </div>
               ) : (
@@ -330,34 +379,50 @@ export function AnalyticsDashboardClient({
 }
 
 /**
- * 뷰포트에 진입할 때만 children을 렌더링하는 래퍼
+ * 질문 카드 - 토글이 true일 때만 QuestionAnalytics를 실제 렌더링
  */
-function LazyRender({ children, height = 200 }: { children: React.ReactNode; height?: number }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisible(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '200px' },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  if (!visible) {
-    return <div ref={ref} style={{ minHeight: height }} className="rounded-lg bg-gray-50 animate-pulse" />;
-  }
-
-  return <div ref={ref}>{children}</div>;
+function CollapsibleQuestionCard({
+  index,
+  question,
+  isOpen,
+  onToggle,
+}: {
+  index: number;
+  question: import('@/lib/analytics/types').AnalyticsResult;
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50"
+        aria-expanded={isOpen}
+      >
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-medium text-blue-600">
+          {index + 1}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">
+          {question.questionTitle}
+        </span>
+        <QuestionTypeBadge type={question.type} />
+        <span className="shrink-0 whitespace-nowrap text-xs text-gray-500">
+          {question.totalResponses}명
+        </span>
+        {isOpen ? (
+          <ChevronUp className="h-4 w-4 shrink-0 text-gray-400" />
+        ) : (
+          <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
+        )}
+      </button>
+      {isOpen && (
+        <div className="border-t border-gray-100 p-2">
+          <QuestionAnalytics data={question} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 /**

@@ -5,6 +5,8 @@ import { useState } from 'react';
 import { Button, Card } from '@tremor/react';
 import { Download, FileJson, FileSpreadsheet, Loader2 } from 'lucide-react';
 
+import type { CleaningExportOptions } from '@/lib/analytics/cleaning-export-types';
+
 import { ExportDataModal } from './export-data-modal';
 
 interface ExportPanelProps {
@@ -14,7 +16,7 @@ interface ExportPanelProps {
   onExportFlatExcel?: () => Promise<Blob | null>;
   onExportCompactExcel?: () => Promise<Blob | null>;
   onExportSpssExcel?: () => Promise<Blob | null>;
-  onExportCleaningExcel?: () => Promise<Blob | null>;
+  onExportCleaningExcel?: (options: CleaningExportOptions) => Promise<Blob | null>;
   surveyTitle?: string;
 }
 
