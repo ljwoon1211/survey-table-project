@@ -144,3 +144,141 @@ export function findParentGroupId(
   const question = questions.find((q) => q.id === dndId);
   return question?.groupId ?? null;
 }
+
+// ── 응답 페이지 렌더 스텝 구성 ──
+
+export type StepItem = {
+  question: Question;
+  // 이 질문의 바로 위에 새 하위그룹이 시작되면 그 이름 (소제목 표시용)
+  subgroupName: string | null;
+};
+
+export type RenderStep =
+  | {
+      kind: 'group';
+      rootGroupId: string | null;
+      rootGroupName: string | null;
+      items: StepItem[];
+    }
+  | {
+      kind: 'table';
+      rootGroupId: string | null;
+      rootGroupName: string | null;
+      subgroupName: string | null;
+      question: Question;
+    };
+
+/**
+ * 최상위 그룹(또는 ungrouped)의 질문들을 인터리브 순서로 flatten하고,
+ * 각 질문에 "이 질문부터 시작되는 하위그룹 이름"을 부여한다.
+ */
+function flattenRootScope(
+  rootGroupId: string | null,
+  questions: Question[],
+  groups: QuestionGroup[],
+): StepItem[] {
+  const result: StepItem[] = [];
+
+  const walk = (groupId: string | null, pendingSubgroupName: string | null) => {
+    const children = getInterleavedChildren(groupId, questions, groups);
+    let subName = pendingSubgroupName;
+    for (const child of children) {
+      if (child.kind === 'question') {
+        result.push({ question: child.data, subgroupName: subName });
+        subName = null;
+      } else {
+        walk(child.data.id, child.data.name);
+        subName = null;
+      }
+    }
+  };
+
+  if (rootGroupId === null) {
+    // ungrouped: 그룹 없는 질문만 order 순
+    const ungrouped = questions
+      .filter((q) => !q.groupId)
+      .sort((a, b) => a.order - b.order);
+    for (const q of ungrouped) {
+      result.push({ question: q, subgroupName: null });
+    }
+  } else {
+    walk(rootGroupId, null);
+  }
+
+  return result;
+}
+
+/**
+ * flatten된 StepItem 목록을 "연속 비테이블 구간" + "테이블 단독"으로 분할한다.
+ */
+function splitByTable(
+  items: StepItem[],
+  rootGroupId: string | null,
+  rootGroupName: string | null,
+): RenderStep[] {
+  const steps: RenderStep[] = [];
+  let buffer: StepItem[] = [];
+
+  const flushBuffer = () => {
+    if (buffer.length === 0) return;
+    steps.push({
+      kind: 'group',
+      rootGroupId,
+      rootGroupName,
+      items: buffer,
+    });
+    buffer = [];
+  };
+
+  for (const item of items) {
+    if (item.question.type === 'table') {
+      flushBuffer();
+      steps.push({
+        kind: 'table',
+        rootGroupId,
+        rootGroupName,
+        subgroupName: item.subgroupName,
+        question: item.question,
+      });
+    } else {
+      buffer.push(item);
+    }
+  }
+  flushBuffer();
+
+  return steps;
+}
+
+/**
+ * 전체 설문을 "상위그룹 단위 + 테이블 분리" 렌더 스텝 배열로 변환한다.
+ *
+ * 규칙:
+ * 1. 최상위(root) 그룹을 order 순으로 순회
+ * 2. 각 최상위 그룹의 질문을 인터리브 순서로 flatten (하위그룹 경계는 무시하되, 각
+ *    하위그룹의 첫 질문에 subgroupName을 기록하여 소제목으로 쓸 수 있게 한다)
+ * 3. 연속된 비테이블 질문은 하나의 group step, 테이블 질문은 각각 단독 table step
+ * 4. 그룹 없는 질문(ungrouped)도 동일 규칙 적용하여 마지막에 추가
+ */
+export function buildRenderSteps(
+  questions: Question[],
+  groups: QuestionGroup[],
+): RenderStep[] {
+  const steps: RenderStep[] = [];
+
+  const topLevelGroups = groups
+    .filter((g) => !g.parentGroupId)
+    .sort((a, b) => a.order - b.order);
+
+  for (const rootGroup of topLevelGroups) {
+    const items = flattenRootScope(rootGroup.id, questions, groups);
+    if (items.length === 0) continue;
+    steps.push(...splitByTable(items, rootGroup.id, rootGroup.name));
+  }
+
+  const ungroupedItems = flattenRootScope(null, questions, groups);
+  if (ungroupedItems.length > 0) {
+    steps.push(...splitByTable(ungroupedItems, null, null));
+  }
+
+  return steps;
+}

@@ -31,7 +31,7 @@ export function NoticeRenderer({
     <div className="space-y-4">
       {/* Rich Text Content Display */}
       <div
-        className="prose prose-sm max-w-none overflow-x-auto rounded-lg border-2 border-blue-200 bg-blue-50 p-6 [&_img]:inline-block [&_img]:align-top [&_p]:min-h-[1.6em] [&_table]:my-4 [&_table]:w-full [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border-2 [&_table]:border-gray-300 [&_table_p]:m-0 [&_table_td]:box-border [&_table_td]:overflow-hidden [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2 [&_table_td]:align-top [&_table_th]:box-border [&_table_th]:overflow-hidden [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:bg-transparent [&_table_th]:px-3 [&_table_th]:py-2 [&_table_th]:align-top [&_table_th]:font-normal"
+        className="prose prose-sm max-w-none overflow-x-auto rounded-lg border border-blue-100 bg-blue-50/40 p-6 [&_img]:inline-block [&_img]:align-top [&_p]:min-h-[1.6em] [&_table]:my-4 [&_table]:w-full [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-300 [&_table_p]:m-0 [&_table_td]:box-border [&_table_td]:overflow-hidden [&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-3 [&_table_td]:py-2 [&_table_td]:align-top [&_table_th]:box-border [&_table_th]:overflow-hidden [&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:bg-transparent [&_table_th]:px-3 [&_table_th]:py-2 [&_table_th]:align-top [&_table_th]:font-normal"
         dangerouslySetInnerHTML={{ __html: convertHtmlImageUrlsToProxy(content) }}
         style={{
           // TipTap 스타일 재정의
@@ -43,7 +43,7 @@ export function NoticeRenderer({
 
       {/* Acknowledgment Checkbox */}
       {requiresAcknowledgment && (
-        <div className="flex items-start space-x-3 rounded-lg border-2 border-blue-300 bg-white p-4">
+        <div className="flex items-start space-x-3 rounded-lg border border-gray-200 bg-white p-4">
           <input
             type="radio"
             id="acknowledgment-check"

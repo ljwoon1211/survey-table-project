@@ -18,20 +18,42 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 import { useMultiLineDetection } from '@/hooks/use-line-count-detection';
 import { useMediaQuery } from '@/hooks/use-media-query';
+import {
+  buildRenderSteps,
+  RenderStep,
+  StepItem,
+} from '@/lib/group-ordering';
 import { parsesurveyIdentifier } from '@/lib/survey-url';
 import { isEmptyHtml } from '@/lib/utils';
 
 import { useSurveyResponseStore } from '@/stores/survey-response-store';
 import { useShallow } from 'zustand/react/shallow';
-import { Question, Survey } from '@/types/survey';
+import { Question, QuestionGroup, Survey } from '@/types/survey';
 import {
-  getNextQuestionIndex,
+  getBranchRuleForResponse,
   shouldDisplayDynamicGroup,
   shouldDisplayQuestion,
   shouldDisplayRow,
 } from '@/utils/branch-logic';
 
 type ResponsesMap = Record<string, unknown>;
+
+// step 내에서 표시 가능한 질문만 추린 뒤 step-like 객체로 반환
+function getDisplayableItemsOfStep(
+  step: RenderStep,
+  responses: ResponsesMap,
+  allQuestions: Question[],
+  allGroups: QuestionGroup[],
+): Question[] {
+  if (step.kind === 'table') {
+    return shouldDisplayQuestion(step.question, responses, allQuestions, allGroups)
+      ? [step.question]
+      : [];
+  }
+  return step.items
+    .filter((i) => shouldDisplayQuestion(i.question, responses, allQuestions, allGroups))
+    .map((i) => i.question);
+}
 
 export default function SurveyResponsePage() {
   const params = useParams();
@@ -55,13 +77,17 @@ export default function SurveyResponsePage() {
   const [loadedSurvey, setLoadedSurvey] = useState<Survey | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [responses, setResponses] = useState<ResponsesMap>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
-  const [questionHistory, setQuestionHistory] = useState<number[]>([]);
+  const [stepHistory, setStepHistory] = useState<number[]>([]);
   const [responseStarted, setResponseStarted] = useState(false);
   const [versionId, setVersionId] = useState<string | null>(null);
+  // 제출 시도 후 하이라이트할 질문 ID 집합
+  const [highlightQuestionIds, setHighlightQuestionIds] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   // iOS 키보드 감지 (#7) — 키보드 올라오면 고정 하단바 숨김
   const [keyboardOpen, setKeyboardOpen] = useState(false);
@@ -80,7 +106,6 @@ export default function SurveyResponsePage() {
       setLoadError(null);
 
       try {
-        // URL 식별자 타입 판별
         const { type, value } = parsesurveyIdentifier(identifier);
 
         let surveyId: string | null = null;
@@ -107,7 +132,6 @@ export default function SurveyResponsePage() {
           return;
         }
 
-        // 배포 버전 스냅샷 우선, 미배포 시 기존 방식 fallback
         const result = await getSurveyForResponse(surveyId);
 
         if (!result) {
@@ -147,250 +171,235 @@ export default function SurveyResponsePage() {
   // 현재 설문의 질문들
   const questions = useMemo(() => loadedSurvey?.questions || [], [loadedSurvey]);
   const groups = useMemo(() => loadedSurvey?.groups || [], [loadedSurvey]);
-  const currentQuestion = questions[currentQuestionIndex];
-  const visibleQuestions = useMemo(() => {
-    return questions.filter((q) => shouldDisplayQuestion(q, responses, questions, groups));
-  }, [questions, responses, groups]);
+
+  // 상위그룹 단위 + 테이블 분리 렌더 스텝
+  const steps = useMemo<RenderStep[]>(
+    () => buildRenderSteps(questions, groups),
+    [questions, groups],
+  );
+
+  // step 내 표시 가능한 질문이 하나라도 있는 step만 유지
+  const visibleSteps = useMemo<RenderStep[]>(
+    () =>
+      steps.filter(
+        (s) => getDisplayableItemsOfStep(s, responses, questions, groups).length > 0,
+      ),
+    [steps, responses, questions, groups],
+  );
+
+  const currentStep: RenderStep | undefined = steps[currentStepIndex];
+
+  // 현재 step 내 표시 가능한 질문들
+  const currentStepQuestions = useMemo<Question[]>(
+    () =>
+      currentStep
+        ? getDisplayableItemsOfStep(currentStep, responses, questions, groups)
+        : [],
+    [currentStep, responses, questions, groups],
+  );
+
+  // 전역으로 표시되는 모든 질문 (노출 로깅용)
+  const visibleQuestions = useMemo(
+    () => questions.filter((q) => shouldDisplayQuestion(q, responses, questions, groups)),
+    [questions, responses, groups],
+  );
 
   // 모바일 화면 감지 (matchMedia — resize 루프 방지)
   const isMobile = useMediaQuery('(max-width: 767px)');
 
-  // 질문 타이틀 줄 수 감지 (pretext 기반 — DOM 비의존, 리렌더 0회)
-  const titleHasMultipleLines = useMultiLineDetection(isMobile, currentQuestion?.title);
+  // 테이블 step 단일 질문의 타이틀 줄 수 감지 (group step에선 사용 안 함)
+  const currentTableQuestion =
+    currentStep?.kind === 'table' ? currentStep.question : null;
+  const titleHasMultipleLines = useMultiLineDetection(
+    isMobile,
+    currentTableQuestion?.title,
+  );
 
-  const currentVisibleNumber = useMemo(() => {
-    if (!currentQuestion) return 0;
-    const idx = visibleQuestions.findIndex((q) => q.id === currentQuestion.id);
+  // 진행도 — step 기반
+  const currentVisibleStepNumber = useMemo(() => {
+    if (!currentStep) return 0;
+    const idx = visibleSteps.findIndex((s) => s === currentStep);
     return idx === -1 ? 0 : idx + 1;
-  }, [currentQuestion, visibleQuestions]);
+  }, [currentStep, visibleSteps]);
 
-  const totalVisibleCount = visibleQuestions.length;
+  const totalVisibleStepCount = visibleSteps.length;
 
-  // 필수 미응답 하이라이트 상태 (제출 시도 후)
-  const [showRequiredHighlight, setShowRequiredHighlight] = useState(false);
-
-  const findNextDisplayableIndex = useCallback(
+  const findNextDisplayableStepIndex = useCallback(
     (startIndex: number): number => {
-      if (questions.length === 0) return -1;
+      if (steps.length === 0) return -1;
       if (startIndex < 0) return -1;
 
-      for (let i = startIndex; i < questions.length; i += 1) {
-        const q = questions[i];
-        if (!q) continue;
-        if (shouldDisplayQuestion(q, responses, questions, groups)) {
+      for (let i = startIndex; i < steps.length; i += 1) {
+        const s = steps[i];
+        if (!s) continue;
+        if (getDisplayableItemsOfStep(s, responses, questions, groups).length > 0) {
           return i;
         }
       }
 
       return -1;
     },
-    [questions, responses, groups],
+    [steps, responses, questions, groups],
   );
 
-  // 현재 인덱스가 표시 조건을 만족하지 않으면, 다음 표시 가능한 질문으로 자동 이동
+  // 현재 step이 전부 숨겨지면 다음 표시 가능 step으로 자동 이동
   useEffect(() => {
     if (!loadedSurvey) return;
-    if (!currentQuestion) return;
+    if (!currentStep) return;
 
-    const isDisplayable = shouldDisplayQuestion(currentQuestion, responses, questions, groups);
-    if (isDisplayable) return;
+    if (currentStepQuestions.length > 0) return;
 
-    const nextDisplayable = findNextDisplayableIndex(currentQuestionIndex + 1);
+    const nextDisplayable = findNextDisplayableStepIndex(currentStepIndex + 1);
     if (nextDisplayable !== -1) {
-      setCurrentQuestionIndex(nextDisplayable);
+      setCurrentStepIndex(nextDisplayable);
     }
-    // 표시 가능한 질문이 더 없으면, 제출/완료 흐름은 사용자가 "다음"을 통해 진행하도록 둠
-    // (자동 제출은 예기치 않은 동작이 될 수 있어 보수적으로 처리)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadedSurvey, currentQuestionIndex, questions, responses]);
+  }, [loadedSurvey, currentStepIndex, currentStepQuestions.length]);
 
-  const hasPreviousDisplayable = useMemo(() => {
-    // 히스토리에 질문이 하나라도 있으면 이전 버튼 활성화
-    // 히스토리에 있는 질문은 사용자가 실제로 방문했던 질문이므로
-    // 표시 조건과 관계없이 접근 가능
-    const hasHistory = questionHistory.length > 0;
-    return hasHistory;
-  }, [questionHistory]);
+  const hasPreviousDisplayable = stepHistory.length > 0;
 
-  const isLastVisibleStep = useMemo(() => {
-    if (!currentQuestion) return false;
-    const currentResponse = responses[currentQuestion.id];
-    const nextIndex = getNextQuestionIndex(questions, currentQuestionIndex, currentResponse);
-    if (nextIndex === -1) return true;
-    return findNextDisplayableIndex(nextIndex) === -1;
-  }, [currentQuestion, currentQuestionIndex, findNextDisplayableIndex, questions, responses]);
+  const isQuestionRequired = (question: Question) => question.required;
 
-  const handleResponse = useCallback((questionId: string, value: unknown) => {
-    setResponses((prev) => ({ ...prev, [questionId]: value }));
-    setPendingResponse(questionId, value);
-  }, [setPendingResponse]);
+  const isQuestionAnswered = useCallback(
+    (question: Question) => {
+      const response = responses[question.id];
+      if (response === undefined || response === null) return false;
 
-  const currentQuestionId = currentQuestion?.id;
-  const currentQuestionOnChange = useCallback(
-    (value: unknown) => {
-      if (currentQuestionId) handleResponse(currentQuestionId, value);
+      switch (question.type) {
+        case 'notice':
+          if (!question.requiresAcknowledgment) return true;
+          if (
+            response &&
+            typeof response === 'object' &&
+            'agreed' in (response as Record<string, unknown>)
+          )
+            return (response as { agreed: boolean }).agreed;
+          return response === true;
+        case 'text':
+        case 'textarea':
+          return typeof response === 'string' && response.trim().length > 0;
+        case 'radio':
+        case 'select':
+          return response !== null && response !== undefined && response !== '';
+        case 'checkbox':
+          if (!Array.isArray(response) || response.length === 0) return false;
+          if (question.minSelections !== undefined && question.minSelections > 0) {
+            return response.length >= question.minSelections;
+          }
+          return true;
+        case 'multiselect':
+          return Array.isArray(response) && response.length > 0;
+        case 'table':
+          return (
+            typeof response === 'object' &&
+            response !== null &&
+            Object.keys(response as Record<string, unknown>).length > 0
+          );
+        default:
+          return true;
+      }
     },
-    [handleResponse, currentQuestionId],
+    [responses],
   );
 
-  const isQuestionRequired = (question: Question) => {
-    return question.required;
-  };
+  // 다음 step 결정 (step 내 분기 규칙 평가)
+  const resolveNextStepIndex = useCallback((): number => {
+    if (!currentStep) return -1;
 
-  const isQuestionAnswered = (question: Question) => {
-    const response = responses[question.id];
-    if (!response) return false;
-
-    switch (question.type) {
-      case 'notice':
-        if (!question.requiresAcknowledgment) return true;
-        if (response && typeof response === 'object' && 'agreed' in response) return (response as { agreed: boolean }).agreed;
-        return response === true;
-      case 'text':
-      case 'textarea':
-        return typeof response === 'string' && response.trim().length > 0;
-      case 'radio':
-      case 'select':
-        return response !== null && response !== undefined && response !== '';
-      case 'checkbox':
-        if (!Array.isArray(response) || response.length === 0) return false;
-        if (question.minSelections !== undefined && question.minSelections > 0) {
-          return response.length >= question.minSelections;
-        }
-        return true;
-      case 'multiselect':
-        return Array.isArray(response) && response.length > 0;
-      case 'table':
-        return (
-          typeof response === 'object' &&
-          response !== null &&
-          Object.keys(response as Record<string, unknown>).length > 0
-        );
-      default:
-        return true;
+    // step 내 각 질문의 분기 규칙 검사: end 또는 goto
+    for (const q of currentStepQuestions) {
+      const rule = getBranchRuleForResponse(q, responses[q.id]);
+      if (!rule) continue;
+      if (rule.action === 'end') return -1;
+      if (rule.action === 'goto' && rule.targetQuestionId) {
+        const targetIdx = steps.findIndex((s) => {
+          if (s.kind === 'table') return s.question.id === rule.targetQuestionId;
+          return s.items.some((it) => it.question.id === rule.targetQuestionId);
+        });
+        if (targetIdx !== -1) return targetIdx;
+      }
     }
-  };
 
-  // 응답 완료 카운트 (피드백)
+    return findNextDisplayableStepIndex(currentStepIndex + 1);
+  }, [currentStep, currentStepQuestions, responses, steps, currentStepIndex, findNextDisplayableStepIndex]);
+
+  const isLastVisibleStep = useMemo(() => {
+    if (!currentStep) return false;
+    return resolveNextStepIndex() === -1;
+  }, [currentStep, resolveNextStepIndex]);
+
+  // 응답 완료 카운트 (피드백) — 전체 표시 질문 기준
   const answeredCount = useMemo(
     () => visibleQuestions.filter((q) => isQuestionAnswered(q)).length,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [visibleQuestions, responses],
+    [visibleQuestions, isQuestionAnswered],
   );
   const requiredRemaining = useMemo(
     () => visibleQuestions.filter((q) => q.required && !isQuestionAnswered(q)).length,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [visibleQuestions, responses],
+    [visibleQuestions, isQuestionAnswered],
   );
 
   const canProceed = () => {
-    if (!currentQuestion) return false;
-    return !isQuestionRequired(currentQuestion) || isQuestionAnswered(currentQuestion);
+    if (!currentStep) return false;
+    // step 내 표시되는 필수 질문 전부가 답변되어야 함
+    return currentStepQuestions.every(
+      (q) => !isQuestionRequired(q) || isQuestionAnswered(q),
+    );
   };
 
-  const handleNext = () => {
-    const currentResponse = responses[currentQuestion.id];
-    const nextIndex = getNextQuestionIndex(questions, currentQuestionIndex, currentResponse);
+  const handleResponse = useCallback(
+    (questionId: string, value: unknown) => {
+      setResponses((prev) => ({ ...prev, [questionId]: value }));
+      setPendingResponse(questionId, value);
+      // 응답이 들어오면 해당 질문의 하이라이트 제거
+      setHighlightQuestionIds((prev) => {
+        if (!prev.has(questionId)) return prev;
+        const next = new Set(prev);
+        next.delete(questionId);
+        return next;
+      });
+    },
+    [setPendingResponse],
+  );
 
-    // 현재 질문 인덱스를 히스토리에 추가
-    setQuestionHistory((prev) => {
-      const newHistory = [...prev, currentQuestionIndex];
-      return newHistory;
-    });
-
-    if (nextIndex === -1) {
-      // 마지막 질문 — 제출 확인: 버튼이 이미 "제출"로 표시되므로 진행 (#19)
-      handleSubmit();
-      return;
-    } else if (nextIndex < questions.length) {
-      const nextDisplayable = findNextDisplayableIndex(nextIndex);
-      if (nextDisplayable === -1) {
-        // 다음 표시 가능한 질문이 없으면 제출
-        handleSubmit();
-        return;
-      }
-      // 다음 질문으로 이동
-      setCurrentQuestionIndex(nextDisplayable);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
-
-  const handlePrevious = () => {
-    if (questionHistory.length === 0) return;
-
-    // 히스토리에서 마지막 항목을 가져옴 (이전 질문 인덱스)
-    const lastIndex = questionHistory.length - 1;
-    const previousQuestionIndex = questionHistory[lastIndex];
-
-    if (previousQuestionIndex !== undefined && questions[previousQuestionIndex]) {
-      // 이전 질문으로 이동
-      setCurrentQuestionIndex(previousQuestionIndex);
-      // 현재 질문 인덱스를 히스토리에서 제거
-      setQuestionHistory((prev) => prev.slice(0, lastIndex));
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  };
-
-  // 브라우저 뒤로가기 → 이전 질문 이동 (#24)
-  const hasResponses = Object.keys(responses).length > 0;
-  useEffect(() => {
-    if (!loadedSurvey || isCompleted) return;
-
-    window.history.pushState({ questionIndex: currentQuestionIndex }, '');
-
-    const handlePopState = () => {
-      if (questionHistory.length > 0) {
-        handlePrevious();
-      }
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadedSurvey, currentQuestionIndex, isCompleted]);
-
-  // 페이지 이탈 시 경고 (#29)
-  useEffect(() => {
-    if (!hasResponses || isCompleted) return;
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-    };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [hasResponses, isCompleted]);
-
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     setIsSubmitting(true);
 
     try {
       const unansweredRequired = questions.filter((q) => {
-        // 표시되지 않는 질문은 필수 여부를 강제하지 않음
         if (!shouldDisplayQuestion(q, responses, questions, groups)) return false;
         return isQuestionRequired(q) && !isQuestionAnswered(q);
       });
 
       if (unansweredRequired.length > 0) {
-        // 세그먼트에 필수 미응답 하이라이트 (#4 Step 4)
-        setShowRequiredHighlight(true);
-        // 첫 번째 미응답 필수 질문으로 이동
-        const firstUnanswered = unansweredRequired[0];
-        const targetIdx = questions.findIndex((q) => q.id === firstUnanswered.id);
-        if (targetIdx !== -1 && targetIdx !== currentQuestionIndex) {
-          setCurrentQuestionIndex(targetIdx);
+        // 미응답 필수 질문을 전부 하이라이트
+        const highlight = new Set(unansweredRequired.map((q) => q.id));
+        setHighlightQuestionIds(highlight);
+
+        // 첫 번째 미응답 필수 질문이 속한 step으로 이동
+        const firstId = unansweredRequired[0].id;
+        const targetIdx = steps.findIndex((s) => {
+          if (s.kind === 'table') return s.question.id === firstId;
+          return s.items.some((it) => it.question.id === firstId);
+        });
+        if (targetIdx !== -1 && targetIdx !== currentStepIndex) {
+          setCurrentStepIndex(targetIdx);
           window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          // 이미 해당 step이면 카드로 스크롤
+          const el = document.querySelector<HTMLElement>(
+            `[data-question-id="${firstId}"]`,
+          );
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
         setIsSubmitting(false);
         return;
       }
-      // 제출 성공 시 하이라이트 해제
-      setShowRequiredHighlight(false);
 
-      // 서버에 응답 및 노출 데이터 저장
+      setHighlightQuestionIds(new Set());
+
       if (currentResponseId) {
-        // 1. 노출된 질문 ID 수집
         const exposedQuestionIds = visibleQuestions.map((q) => q.id);
 
-        // 2. 노출된 테이블 행 ID 수집 (displayCondition + 동적 행 선택 반영)
         const exposedRowIds = visibleQuestions
           .filter((q) => q.type === 'table' && q.tableRowsData)
           .flatMap((q) => {
@@ -400,12 +409,16 @@ export default function SurveyResponsePage() {
             );
             const enabledGroupIds = new Set(
               (q.dynamicRowConfigs ?? [])
-                .filter((g) => g.enabled && shouldDisplayDynamicGroup(g, responses as Record<string, unknown>, questions))
+                .filter(
+                  (g) =>
+                    g.enabled &&
+                    shouldDisplayDynamicGroup(g, responses as Record<string, unknown>, questions),
+                )
                 .map((g) => g.groupId),
             );
-            const hasDynamic = enabledGroupIds.size > 0 && q.tableRowsData!.some((r) => r.dynamicGroupId);
+            const hasDynamic =
+              enabledGroupIds.size > 0 && q.tableRowsData!.some((r) => r.dynamicGroupId);
 
-            // 그룹별 선택 여부
             const groupsWithSelections = new Set<string>();
             if (hasDynamic) {
               for (const row of q.tableRowsData!) {
@@ -417,12 +430,16 @@ export default function SurveyResponsePage() {
 
             return q.tableRowsData!
               .filter((row) => {
-                if (!shouldDisplayRow(row, responses as Record<string, unknown>, questions)) return false;
+                if (!shouldDisplayRow(row, responses as Record<string, unknown>, questions))
+                  return false;
                 if (hasDynamic) {
                   if (row.dynamicGroupId && enabledGroupIds.has(row.dynamicGroupId)) {
                     return selectedDynamicIds.has(row.id);
                   }
-                  if (row.showWhenDynamicGroupId && enabledGroupIds.has(row.showWhenDynamicGroupId)) {
+                  if (
+                    row.showWhenDynamicGroupId &&
+                    enabledGroupIds.has(row.showWhenDynamicGroupId)
+                  ) {
                     return groupsWithSelections.has(row.showWhenDynamicGroupId);
                   }
                 }
@@ -431,8 +448,6 @@ export default function SurveyResponsePage() {
               .map((row) => row.id);
           });
 
-        console.log('Impression Logging:', { exposedQuestionIds, exposedRowIds });
-
         await completeResponse(currentResponseId, {
           questionResponses: responses,
           exposedQuestionIds,
@@ -440,7 +455,6 @@ export default function SurveyResponsePage() {
         });
       }
 
-      // 현재는 클라이언트에서만 완료 처리
       resetResponseState();
       setIsCompleted(true);
     } catch (error) {
@@ -449,14 +463,70 @@ export default function SurveyResponsePage() {
     } finally {
       setIsSubmitting(false);
     }
+  }, [
+    currentResponseId,
+    currentStepIndex,
+    groups,
+    isQuestionAnswered,
+    questions,
+    resetResponseState,
+    responses,
+    steps,
+    visibleQuestions,
+  ]);
+
+  const handleNext = () => {
+    const nextIndex = resolveNextStepIndex();
+
+    setStepHistory((prev) => [...prev, currentStepIndex]);
+
+    if (nextIndex === -1) {
+      handleSubmit();
+      return;
+    }
+
+    setCurrentStepIndex(nextIndex);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // 현재 질문의 그룹명 조회
-  const currentGroupName = useMemo(() => {
-    if (!currentQuestion?.groupId) return null;
-    const group = groups.find((g) => g.id === currentQuestion.groupId);
-    return group?.name || null;
-  }, [currentQuestion?.groupId, groups]);
+  const handlePrevious = useCallback(() => {
+    if (stepHistory.length === 0) return;
+    const lastIndex = stepHistory.length - 1;
+    const previousStepIndex = stepHistory[lastIndex];
+    if (previousStepIndex !== undefined && steps[previousStepIndex]) {
+      setCurrentStepIndex(previousStepIndex);
+      setStepHistory((prev) => prev.slice(0, lastIndex));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [stepHistory, steps]);
+
+  // 브라우저 뒤로가기 → 이전 step 이동
+  const hasResponses = Object.keys(responses).length > 0;
+  useEffect(() => {
+    if (!loadedSurvey || isCompleted) return;
+
+    window.history.pushState({ stepIndex: currentStepIndex }, '');
+
+    const handlePopState = () => {
+      if (stepHistory.length > 0) {
+        handlePrevious();
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedSurvey, currentStepIndex, isCompleted]);
+
+  // 페이지 이탈 시 경고
+  useEffect(() => {
+    if (!hasResponses || isCompleted) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hasResponses, isCompleted]);
 
   // 로딩 중
   if (isLoading) {
@@ -502,8 +572,7 @@ export default function SurveyResponsePage() {
     );
   }
 
-  // 질문이 없는 경우
-  if (questions.length === 0) {
+  if (questions.length === 0 || steps.length === 0 || !currentStep) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <Card className="mx-auto max-w-md">
@@ -545,9 +614,9 @@ export default function SurveyResponsePage() {
     );
   }
 
-  // 현재 질문이 테이블 타입인지 확인
-  const isTableQuestion = currentQuestion?.type === 'table';
-  const containerMaxWidth = isTableQuestion ? 'max-w-7xl' : 'max-w-4xl';
+  const isTableStep = currentStep.kind === 'table';
+  const containerMaxWidth = isTableStep ? 'max-w-7xl' : 'max-w-4xl';
+  const showRequiredHighlight = highlightQuestionIds.size > 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -562,23 +631,28 @@ export default function SurveyResponsePage() {
               )}
             </div>
             <div className="hidden self-start text-sm text-gray-500 md:block md:self-auto">
-              {currentVisibleNumber || 1} / {Math.max(totalVisibleCount, 1)}
-              <span className="ml-2 text-xs text-gray-400">(전체 {questions.length}개)</span>
+              {currentVisibleStepNumber || 1} / {Math.max(totalVisibleStepCount, 1)}
+              <span className="ml-2 text-xs text-gray-400">(전체 {questions.length}개 질문)</span>
             </div>
           </div>
 
-          {/* 연속형 프로그레스바 — 데스크톱/모바일 동일 디자인 */}
+          {/* 연속형 프로그레스바 */}
           <div className="mt-3">
             <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
               <div
                 className="absolute inset-y-0 left-0 rounded-full bg-blue-500 transition-all duration-500"
-                style={{ width: `${(currentVisibleNumber / Math.max(totalVisibleCount, 1)) * 100}%` }}
+                style={{
+                  width: `${
+                    (currentVisibleStepNumber / Math.max(totalVisibleStepCount, 1)) * 100
+                  }%`,
+                }}
               />
             </div>
-            {/* 모바일: 요약 텍스트 */}
             {isMobile && (
               <div className="mt-1.5 flex items-center justify-between text-[11px] text-gray-400">
-                <span>{answeredCount}/{totalVisibleCount} 응답 완료</span>
+                <span>
+                  {answeredCount}/{visibleQuestions.length} 응답 완료
+                </span>
                 {requiredRemaining > 0 && (
                   <span className={showRequiredHighlight ? 'font-medium text-orange-500' : ''}>
                     필수 {requiredRemaining}개 남음
@@ -591,76 +665,32 @@ export default function SurveyResponsePage() {
       </div>
 
       {/* 메인 콘텐츠 */}
-      <div className={`${containerMaxWidth} mx-auto px-4 py-6 transition-all duration-300 md:px-6 md:py-8 ${isMobile && !keyboardOpen ? 'pb-28' : ''}`}>
-        {/* 모바일: 제목/설명을 카드 밖으로 분리 */}
-        {isMobile && (
-          <div className="mb-4 space-y-2.5">
-            {currentGroupName && (
-              <span className="inline-block rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
-                {currentGroupName}
-              </span>
-            )}
-            <h2
-              className={`${
-                titleHasMultipleLines ? 'text-base' : 'text-lg'
-              } leading-[1.6] font-bold break-keep text-gray-900`}
-            >
-              {currentQuestion.title}
-              {isQuestionRequired(currentQuestion) && (
-                <span className="ml-1 align-top text-sm text-red-500" aria-label="필수 질문">*</span>
-              )}
-            </h2>
-            {!isEmptyHtml(currentQuestion.description) && (
-              <div
-                className="prose prose-sm max-h-[40vh] max-w-none overflow-auto leading-relaxed text-[13px] text-gray-500 [&_p]:min-h-[1.5em] [&_p]:leading-relaxed [&_table]:my-2 [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-200 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:px-3 [&_table_td]:py-1.5 [&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:bg-gray-50 [&_table_th]:px-3 [&_table_th]:py-1.5 [&_table_th]:font-semibold"
-                style={{ WebkitOverflowScrolling: 'touch' }}
-                dangerouslySetInnerHTML={{ __html: currentQuestion.description! }}
-              />
-            )}
-          </div>
+      <div
+        className={`${containerMaxWidth} mx-auto px-4 py-6 transition-all duration-300 md:px-6 md:py-8 ${
+          isMobile && !keyboardOpen ? 'pb-28' : ''
+        }`}
+      >
+        {currentStep.kind === 'table' ? (
+          <TableStepView
+            step={currentStep}
+            isMobile={isMobile}
+            titleHasMultipleLines={titleHasMultipleLines}
+            currentStepNumber={currentVisibleStepNumber}
+            responses={responses}
+            questions={questions}
+            onResponse={handleResponse}
+            highlightQuestionIds={highlightQuestionIds}
+          />
+        ) : (
+          <GroupStepView
+            step={currentStep}
+            responses={responses}
+            questions={questions}
+            groups={groups}
+            onResponse={handleResponse}
+            highlightQuestionIds={highlightQuestionIds}
+          />
         )}
-
-        <Card key={currentQuestion.id} className="animate-in fade-in duration-200">
-          {/* 데스크톱: 기존 카드 안에 제목+설명 유지 */}
-          {!isMobile && (
-            <CardHeader className="pb-4">
-              <div className="flex items-start gap-4">
-                <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-600 shadow-sm">
-                  {currentVisibleNumber || 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <CardTitle className="text-2xl leading-relaxed font-semibold break-keep text-gray-900">
-                    {currentQuestion.title}
-                    {isQuestionRequired(currentQuestion) && (
-                      <span className="ml-1.5 align-top text-sm text-red-500" aria-label="필수 질문">
-                        *
-                      </span>
-                    )}
-                  </CardTitle>
-                  {!isEmptyHtml(currentQuestion.description) && (
-                    <div
-                      className="prose prose-base mt-3 max-h-[60vh] max-w-none overflow-auto text-base text-gray-600 [&_p]:min-h-[1.6em] [&_table]:my-2 [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-200 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:px-4 [&_table_td]:py-2 [&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:bg-gray-50 [&_table_th]:px-4 [&_table_th]:py-2 [&_table_th]:font-semibold"
-                      style={{ WebkitOverflowScrolling: 'touch' }}
-                      dangerouslySetInnerHTML={{ __html: currentQuestion.description! }}
-                    />
-                  )}
-                </div>
-              </div>
-            </CardHeader>
-          )}
-
-          <CardContent className={`${isMobile ? 'p-4' : ''} ${isTableQuestion ? '' : 'md:px-16'}`}>
-            <div className="space-y-4">
-              <QuestionInput
-                question={currentQuestion}
-                value={responses[currentQuestion.id]}
-                onChange={currentQuestionOnChange}
-                allResponses={responses as Record<string, unknown>}
-                allQuestions={questions}
-              />
-            </div>
-          </CardContent>
-        </Card>
 
         {/* 데스크톱 네비게이션 */}
         <div className="mt-8 hidden items-center justify-between md:flex">
@@ -670,8 +700,8 @@ export default function SurveyResponsePage() {
           </Button>
 
           <div className="text-sm text-gray-500">
-            {isQuestionRequired(currentQuestion) && !isQuestionAnswered(currentQuestion) && (
-              <span className="text-red-500">* 필수 질문입니다</span>
+            {!canProceed() && (
+              <span className="text-red-500">* 필수 질문에 답변해주세요</span>
             )}
           </div>
 
@@ -688,8 +718,8 @@ export default function SurveyResponsePage() {
         </div>
       </div>
 
-      {/* 모바일 고정 하단 네비게이션 (#4: 테이블 질문은 MobileTableStepper가 자체 네비게이션 보유 → 숨김) */}
-      {isMobile && !keyboardOpen && (
+      {/* 모바일 고정 하단 네비게이션 — 테이블 step은 MobileTableStepper가 자체 네비 보유 → 숨김 */}
+      {isMobile && !keyboardOpen && !isTableStep && (
         <div
           className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.05)] md:hidden"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
@@ -706,9 +736,9 @@ export default function SurveyResponsePage() {
 
             <div className="flex flex-col items-center">
               <span className="text-sm font-medium text-gray-900">
-                {currentVisibleNumber || 1} / {Math.max(totalVisibleCount, 1)}
+                {currentVisibleStepNumber || 1} / {Math.max(totalVisibleStepCount, 1)}
               </span>
-              {isQuestionRequired(currentQuestion) && !isQuestionAnswered(currentQuestion) && (
+              {!canProceed() && (
                 <span className="text-[11px] text-red-500">필수 질문</span>
               )}
             </div>
@@ -734,7 +764,287 @@ export default function SurveyResponsePage() {
           </div>
         </div>
       )}
+
+      {/* 모바일: 테이블 step은 MobileTableStepper 자체 네비가 있어서 제출 전용 고정 바만 필요 시 노출 */}
+      {isMobile && !keyboardOpen && isTableStep && isLastVisibleStep && (
+        <div
+          className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.05)] md:hidden"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        >
+          <div className="flex items-center justify-end px-4 py-3">
+            <button
+              onClick={handleNext}
+              disabled={!canProceed() || isSubmitting}
+              className="flex items-center gap-1 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.98] disabled:pointer-events-none disabled:bg-gray-200 disabled:text-gray-400"
+            >
+              {isSubmitting ? '제출 중...' : '제출'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
+// ── 서브 컴포넌트 ──
+
+function TableStepView({
+  step,
+  isMobile,
+  titleHasMultipleLines,
+  currentStepNumber,
+  responses,
+  questions,
+  onResponse,
+  highlightQuestionIds,
+}: {
+  step: Extract<RenderStep, { kind: 'table' }>;
+  isMobile: boolean;
+  titleHasMultipleLines: boolean;
+  currentStepNumber: number;
+  responses: ResponsesMap;
+  questions: Question[];
+  onResponse: (questionId: string, value: unknown) => void;
+  highlightQuestionIds: Set<string>;
+}) {
+  const q = step.question;
+  const isHighlighted = highlightQuestionIds.has(q.id);
+  const onChange = useCallback((value: unknown) => onResponse(q.id, value), [onResponse, q.id]);
+
+  return (
+    <>
+      {/* 모바일: 제목/설명을 카드 밖으로 분리 */}
+      {isMobile && (
+        <div className="mb-4 space-y-2.5" data-question-id={q.id}>
+          {(step.rootGroupName || step.subgroupName) && (
+            <div className="flex flex-wrap items-center gap-2">
+              {step.rootGroupName && (
+                <span className="inline-block rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+                  {step.rootGroupName}
+                </span>
+              )}
+              {step.subgroupName && step.subgroupName !== step.rootGroupName && (
+                <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
+                  {step.subgroupName}
+                </span>
+              )}
+            </div>
+          )}
+          <h2
+            className={`${
+              titleHasMultipleLines ? 'text-base' : 'text-lg'
+            } leading-[1.6] font-bold break-keep text-gray-900`}
+          >
+            {q.title}
+            {q.required && (
+              <span className="ml-1 align-top text-sm text-red-500" aria-label="필수 질문">
+                *
+              </span>
+            )}
+          </h2>
+          {!isEmptyHtml(q.description) && (
+            <div
+              className="prose prose-sm max-h-[40vh] max-w-none overflow-auto leading-relaxed text-[13px] text-gray-500 [&_p]:min-h-[1.5em] [&_p]:leading-relaxed [&_table]:my-2 [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-200 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:px-3 [&_table_td]:py-1.5 [&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:bg-gray-50 [&_table_th]:px-3 [&_table_th]:py-1.5 [&_table_th]:font-semibold"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+              dangerouslySetInnerHTML={{ __html: q.description! }}
+            />
+          )}
+        </div>
+      )}
+
+      <Card
+        key={q.id}
+        className={`animate-in fade-in duration-200 ${
+          isHighlighted ? 'border-red-300 ring-2 ring-red-100' : ''
+        }`}
+        data-question-id={q.id}
+      >
+        {!isMobile && (
+          <CardHeader className="pb-4">
+            {(step.rootGroupName || step.subgroupName) && (
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                {step.rootGroupName && (
+                  <span className="inline-block rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+                    {step.rootGroupName}
+                  </span>
+                )}
+                {step.subgroupName && step.subgroupName !== step.rootGroupName && (
+                  <span className="inline-block rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
+                    {step.subgroupName}
+                  </span>
+                )}
+              </div>
+            )}
+            <div className="flex items-start gap-4">
+              <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-600 shadow-sm">
+                {currentStepNumber || 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <CardTitle className="text-2xl leading-relaxed font-semibold break-keep text-gray-900">
+                  {q.title}
+                  {q.required && (
+                    <span className="ml-1.5 align-top text-sm text-red-500" aria-label="필수 질문">
+                      *
+                    </span>
+                  )}
+                </CardTitle>
+                {!isEmptyHtml(q.description) && (
+                  <div
+                    className="prose prose-base mt-3 max-h-[60vh] max-w-none overflow-auto text-base text-gray-600 [&_p]:min-h-[1.6em] [&_table]:my-2 [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-200 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:px-4 [&_table_td]:py-2 [&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:bg-gray-50 [&_table_th]:px-4 [&_table_th]:py-2 [&_table_th]:font-semibold"
+                    style={{ WebkitOverflowScrolling: 'touch' }}
+                    dangerouslySetInnerHTML={{ __html: q.description! }}
+                  />
+                )}
+              </div>
+            </div>
+          </CardHeader>
+        )}
+
+        <CardContent className={isMobile ? 'p-4' : ''}>
+          <div className="space-y-4">
+            <QuestionInput
+              question={q}
+              value={responses[q.id]}
+              onChange={onChange}
+              allResponses={responses as Record<string, unknown>}
+              allQuestions={questions}
+            />
+          </div>
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
+function GroupStepView({
+  step,
+  responses,
+  questions,
+  groups,
+  onResponse,
+  highlightQuestionIds,
+}: {
+  step: Extract<RenderStep, { kind: 'group' }>;
+  responses: ResponsesMap;
+  questions: Question[];
+  groups: QuestionGroup[];
+  onResponse: (questionId: string, value: unknown) => void;
+  highlightQuestionIds: Set<string>;
+}) {
+  // 표시 가능한 items만 필터 (원래 subgroupName 유지)
+  const visibleItems: StepItem[] = useMemo(
+    () =>
+      step.items.filter((it) =>
+        shouldDisplayQuestion(it.question, responses, questions, groups),
+      ),
+    [step.items, responses, questions, groups],
+  );
+
+  return (
+    <Card className="animate-in fade-in duration-200">
+      <CardHeader className="pb-6">
+        {step.rootGroupName && (
+          <span className="inline-block w-fit rounded-md bg-blue-50 px-3.5 py-2 text-base font-semibold tracking-wide text-blue-700">
+            {step.rootGroupName}
+          </span>
+        )}
+      </CardHeader>
+      <CardContent className="md:px-8">
+        <div className="divide-y divide-gray-100">
+          {visibleItems.map((item, idx) => (
+            <GroupStepItem
+              key={item.question.id}
+              item={item}
+              itemIndex={idx + 1}
+              showSubgroupHeading={
+                !!item.subgroupName && item.subgroupName !== step.rootGroupName
+              }
+              responses={responses}
+              questions={questions}
+              onResponse={onResponse}
+              isHighlighted={highlightQuestionIds.has(item.question.id)}
+            />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function GroupStepItem({
+  item,
+  itemIndex,
+  showSubgroupHeading,
+  responses,
+  questions,
+  onResponse,
+  isHighlighted,
+}: {
+  item: StepItem;
+  itemIndex: number;
+  showSubgroupHeading: boolean;
+  responses: ResponsesMap;
+  questions: Question[];
+  onResponse: (questionId: string, value: unknown) => void;
+  isHighlighted: boolean;
+}) {
+  const q = item.question;
+  const onChange = useCallback(
+    (value: unknown) => onResponse(q.id, value),
+    [onResponse, q.id],
+  );
+
+  return (
+    <div className="py-5 first:pt-0 last:pb-0">
+      {showSubgroupHeading && (
+        <h3 className="mb-3 text-xs font-semibold tracking-[0.12em] text-gray-500 uppercase">
+          {item.subgroupName}
+        </h3>
+      )}
+      <div
+        data-question-id={q.id}
+        className={`space-y-2 ${
+          isHighlighted ? '-mx-3 rounded-md bg-red-50/40 p-3 ring-1 ring-red-200' : ''
+        }`}
+      >
+        <div className="flex items-start gap-2.5">
+          <span
+            className={`mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${
+              isHighlighted ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'
+            }`}
+          >
+            {itemIndex}
+          </span>
+          <label
+            htmlFor={`q-${q.id}`}
+            className={`text-base leading-snug font-semibold break-keep md:text-lg ${
+              isHighlighted ? 'text-red-700' : 'text-gray-900'
+            }`}
+          >
+            {q.title}
+            {q.required && (
+              <span className="ml-1 text-red-500" aria-label="필수 질문">
+                *
+              </span>
+            )}
+          </label>
+        </div>
+        {!isEmptyHtml(q.description) && (
+          <div
+            className="prose prose-sm ml-3 max-w-none text-xs text-gray-500 [&_p]:min-h-[1.3em] [&_table]:my-1.5 [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-200 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:px-2.5 [&_table_td]:py-1 [&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:bg-gray-50 [&_table_th]:px-2.5 [&_table_th]:py-1 [&_table_th]:font-semibold"
+            dangerouslySetInnerHTML={{ __html: q.description! }}
+          />
+        )}
+        <div id={`q-${q.id}`} className="mt-2 ml-3">
+          <QuestionInput
+            question={q}
+            value={responses[q.id]}
+            onChange={onChange}
+            allResponses={responses as Record<string, unknown>}
+            allQuestions={questions}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
