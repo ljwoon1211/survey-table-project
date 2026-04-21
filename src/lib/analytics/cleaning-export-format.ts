@@ -22,7 +22,7 @@ import {
 } from '@/utils/branch-logic';
 
 import { isCellInputable } from './excel-export-utils';
-import type { ResponseData } from './flat-excel-export';
+import type { ResponseData } from './response-data';
 
 import type {
   ClassifiedCells,

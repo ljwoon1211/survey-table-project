@@ -6,9 +6,6 @@ import * as XLSX from 'xlsx';
 import { db } from '@/db';
 import { surveyResponses, surveys } from '@/db/schema';
 import {
-  generateExcelWorkbook,
-  generateRawDataCombinedWorkbook,
-  generateRawDataIndividualWorkbook,
   generateSummaryWorkbook,
   generateVariableMapWorkbook,
 } from '@/lib/excel-transformer';
@@ -19,8 +16,11 @@ import { generateAllCellCodes } from '@/utils/table-cell-code-generator';
 // Vercel serverless 최대 실행시간 30초 (기본 10초)
 export const maxDuration = 30;
 
-const ALLOWED_EXPORT_TYPES = ['raw-all', 'raw-individual', 'summary', 'map', 'sav'] as const;
+const ALLOWED_EXPORT_TYPES = ['summary', 'map', 'sav'] as const;
 type ExportType = (typeof ALLOWED_EXPORT_TYPES)[number];
+
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const MAX_EXPORT_RESPONSES = 10000;
 
 export async function GET(
   request: NextRequest,
@@ -28,21 +28,16 @@ export async function GET(
 ) {
   try {
     const { surveyId } = await params;
-    const searchParams = request.nextUrl.searchParams;
-    const type = searchParams.get('type') as ExportType | null;
-    const include = searchParams.get('include') || '';
+    const type = request.nextUrl.searchParams.get('type') as ExportType | null;
 
-    // type 파라미터 화이트리스트 검증
-    if (type && !ALLOWED_EXPORT_TYPES.includes(type as ExportType)) {
+    if (!type || !ALLOWED_EXPORT_TYPES.includes(type)) {
       return NextResponse.json({ error: '지원하지 않는 내보내기 형식입니다.' }, { status: 400 });
     }
 
     // 1. 설문 데이터 조회
     const surveyData = await db.query.surveys.findFirst({
       where: eq(surveys.id, surveyId),
-      with: {
-        questions: true,
-      },
+      with: { questions: true },
     });
 
     if (!surveyData) {
@@ -56,19 +51,15 @@ export async function GET(
           q.questionCode ?? undefined, q.title, q.tableColumns as any, q.tableRowsData as any,
         );
       }
-      // 일반 질문 옵션 코드 복원
       if ((q as any).options && ['radio', 'checkbox', 'select', 'multiselect'].includes(q.type)) {
         (q as any).options = generateAllOptionCodes((q as any).options);
       }
     }
 
     // 2. 응답 데이터 조회 (Variable Map은 응답 불필요 → 스킵)
-    const needsResponses = type !== 'map';
     let responses: typeof surveyResponses.$inferSelect[] = [];
 
-    if (needsResponses) {
-      // 대용량 응답 사전 체크
-      const MAX_EXPORT_RESPONSES = 10000;
+    if (type !== 'map') {
       const [{ total }] = await db
         .select({ total: count() })
         .from(surveyResponses)
@@ -87,70 +78,47 @@ export async function GET(
       });
     }
 
-    // 3. 엑셀 워크북 생성
-    let workbook: XLSX.WorkBook;
-    let filenamePrefix = 'Export';
+    const dateSlice = new Date().toISOString().slice(0, 10);
+    const safeTitle = encodeURIComponent(surveyData.title);
 
-    // Type에 따른 분기 처리
-    if (type === 'raw-all') {
-      workbook = generateRawDataCombinedWorkbook(
-        surveyData as unknown as Survey,
-        responses as unknown as SurveySubmission[],
-      );
-      filenamePrefix = 'RawData_Combined';
-    } else if (type === 'raw-individual') {
-      workbook = generateRawDataIndividualWorkbook(
-        surveyData as unknown as Survey,
-        responses as unknown as SurveySubmission[],
-      );
-      filenamePrefix = 'RawData_Individual';
-    } else if (type === 'summary') {
-      workbook = generateSummaryWorkbook(
-        surveyData as unknown as Survey,
-        responses as unknown as SurveySubmission[],
-      );
-      filenamePrefix = 'Summary';
-    } else if (type === 'map') {
-      workbook = generateVariableMapWorkbook(surveyData as unknown as Survey);
-      filenamePrefix = 'VariableMap';
-    } else if (type === 'sav') {
-      // SPSS .sav 네이티브 파일 생성 (별도 return)
+    // 3. SPSS .sav는 별도 바이너리 응답
+    if (type === 'sav') {
       const { generateSavBuffer } = await import('@/lib/spss/sav-builder');
       const savBuffer = await generateSavBuffer(
         surveyData.questions as unknown as Question[],
         responses as unknown as SurveySubmission[],
       );
-      const savFilename = `${encodeURIComponent(surveyData.title)}_SPSS_${new Date().toISOString().slice(0, 10)}.sav`;
       return new NextResponse(new Uint8Array(savBuffer), {
         headers: {
-          'Content-Disposition': `attachment; filename="${savFilename}"`,
+          'Content-Disposition': `attachment; filename="${safeTitle}_SPSS_${dateSlice}.sav"`,
           'Content-Type': 'application/octet-stream',
         },
       });
-    } else {
-      // Legacy support (include param)
-      const options = {
-        includeRawData: include.includes('raw'),
-        includeSummary: include.includes('summary'),
-        includeVariableMap: include.includes('map'),
-        includeVerbatim: include.includes('verbatim'),
-      };
-      workbook = generateExcelWorkbook(
+    }
+
+    // 4. xlsx 계열 분기
+    let workbook: XLSX.WorkBook;
+    let filenamePrefix: string;
+
+    if (type === 'summary') {
+      workbook = generateSummaryWorkbook(
         surveyData as unknown as Survey,
         responses as unknown as SurveySubmission[],
-        options,
       );
+      filenamePrefix = 'Summary';
+    } else {
+      // type === 'map'
+      workbook = generateVariableMapWorkbook(surveyData as unknown as Survey);
+      filenamePrefix = 'VariableMap';
     }
 
     const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
-
-    // 4. 응답 생성
-    const filename = `${encodeURIComponent(surveyData.title)}_${filenamePrefix}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    const filename = `${safeTitle}_${filenamePrefix}_${dateSlice}.xlsx`;
 
     return new NextResponse(buffer, {
       headers: {
         'Content-Disposition': `attachment; filename="${filename}"`,
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Type': XLSX_MIME,
       },
     });
   } catch (error) {

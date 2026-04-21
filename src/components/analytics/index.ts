@@ -16,6 +16,5 @@ export { CrossTabPanel } from './cross-tab';
 
 // Components
 export { QuestionAnalytics } from './question-analytics';
-export { SurveyAnalyticsDashboard } from './survey-analytics-dashboard';
 export { AnalyticsDashboardClient } from './analytics-dashboard-client';
 export { ExportPanel } from './export-panel';

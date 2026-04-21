@@ -11,7 +11,7 @@ import ExcelJS from 'exceljs';
 
 import type { Question, Survey } from '@/types/survey';
 
-import type { ResponseData } from './flat-excel-export';
+import type { ResponseData } from './response-data';
 
 import type { CleaningExportOptions, ProgressCallback, SemiLongRow } from './cleaning-export-types';
 import {

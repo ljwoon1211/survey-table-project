@@ -1,9 +1,15 @@
-import * as XLSX from 'xlsx';
-
+/**
+ * SPSS 공용 열/데이터 정의 빌더
+ *
+ * 현재 소비자:
+ *  - `@/lib/spss/sav-builder` — .sav 네이티브 내보내기
+ *  - `@/lib/excel-transformer` — 서버 엑셀 워크북 (Summary/Map 등)
+ *
+ * 과거 엑셀 Blob/워크북/코딩북 헬퍼는 UI에서 제거됨에 따라 함께 삭제되었다.
+ */
 import type { Question, SurveySubmission } from '@/types/survey';
 
-import { transformCheckbox, transformSingleChoice, transformTableCell, transformText } from '@/lib/spss/data-transformer';
-import { generateFullSyntax } from '@/lib/spss/spss-syntax-generator';
+import { transformSingleChoice, transformTableCell, transformText } from '@/lib/spss/data-transformer';
 import { getOtherOptionCode } from '@/utils/option-code-generator';
 import { buildTableCellVarName } from '@/utils/table-cell-code-generator';
 
@@ -20,14 +26,6 @@ export interface SPSSExportColumn {
   // 셀 단위 SPSS 오버라이드
   cellSpssVarType?: 'Numeric' | 'String' | 'Date' | 'DateTime';
   cellSpssMeasure?: 'Nominal' | 'Ordinal' | 'Continuous';
-}
-
-export interface CodingBookEntry {
-  spssVarName: string;
-  questionId: string;
-  questionTitle: string;
-  type: string;
-  valueLabels: string;
 }
 
 /**
@@ -297,193 +295,5 @@ export function buildDataRows(
           return rawValue != null ? String(rawValue) : null;
       }
     });
-  });
-}
-
-/**
- * 코딩북(변수 매핑) 데이터를 생성한다.
- */
-export function buildCodingBook(
-  columns: SPSSExportColumn[],
-  questions: Question[],
-): CodingBookEntry[] {
-  const questionMap = new Map(questions.map((q) => [q.id, q]));
-
-  return columns.map((col) => {
-    const question = questionMap.get(col.questionId);
-
-    if (col.type === 'notice-agree') {
-      return {
-        spssVarName: col.spssVarName,
-        questionId: col.questionId,
-        questionTitle: `${col.questionText} - 동의 여부`,
-        type: 'notice',
-        valueLabels: '동의=확인함, 빈값=미확인',
-      };
-    }
-
-    if (col.type === 'notice-date') {
-      return {
-        spssVarName: col.spssVarName,
-        questionId: col.questionId,
-        questionTitle: `${col.questionText} - 동의 일시`,
-        type: 'notice',
-        valueLabels: '(MM DD YYYY 형식)',
-      };
-    }
-
-    if (col.type === 'single' && question?.options) {
-      const valueLabels = question.options
-        .map((o, i) => `${o.spssNumericCode ?? i + 1}=${o.label}`)
-        .join(', ');
-      return {
-        spssVarName: col.spssVarName,
-        questionId: col.questionId,
-        questionTitle: col.questionText,
-        type: question.type,
-        valueLabels,
-      };
-    }
-
-    if (col.type === 'checkbox-item') {
-      const opt = question?.options?.[col.optionIndex ?? 0];
-      const code = opt?.spssNumericCode ?? (col.optionIndex ?? 0) + 1;
-      return {
-        spssVarName: col.spssVarName,
-        questionId: col.questionId,
-        questionTitle: `${col.questionText} - ${col.optionLabel}`,
-        type: 'checkbox',
-        valueLabels: `${code}=선택, 빈값=미선택`,
-      };
-    }
-
-    if (col.type === 'other-text') {
-      return {
-        spssVarName: col.spssVarName,
-        questionId: col.questionId,
-        questionTitle: `${col.questionText} - 기타 입력`,
-        type: '기타 텍스트',
-        valueLabels: '(기타 입력 텍스트)',
-      };
-    }
-
-    if (col.type === 'table-cell') {
-      return {
-        spssVarName: col.spssVarName,
-        questionId: col.questionId,
-        questionTitle: `${col.questionText} - ${col.optionLabel}`,
-        type: `table (${col.tableCellType || 'input'})`,
-        valueLabels: col.tableCellType === 'input' ? '(텍스트)' : col.optionLabel,
-      };
-    }
-
-    return {
-      spssVarName: col.spssVarName,
-      questionId: col.questionId,
-      questionTitle: col.questionText,
-      type: question?.type ?? col.type,
-      valueLabels: '(텍스트)',
-    };
-  });
-}
-
-/**
- * SPSS 호환 엑셀 워크북을 생성한다.
- *
- * 시트 구성:
- * 1. "데이터" — 3행 헤더(질문텍스트, 옵션라벨, 변수명) + 응답 데이터
- * 2. "코딩북" — 변수명, 질문 제목, 타입, 값 라벨
- * 3. "SPSS Syntax" — .sps 신택스 텍스트
- */
-export function buildSpssWorkbook(
-  questions: Question[],
-  submissions: SurveySubmission[],
-): XLSX.WorkBook {
-  const columns = generateSPSSColumns(questions);
-  const dataRows = buildDataRows(columns, questions, submissions);
-  const codingBook = buildCodingBook(columns, questions);
-
-  const wb = XLSX.utils.book_new();
-
-  // ── 시트 1: 데이터 ──
-  const headerRow1 = columns.map((col) => col.questionText);
-  const headerRow2 = columns.map((col) => col.optionLabel);
-  const headerRow3 = columns.map((col) => col.spssVarName);
-
-  const aoa: (string | number | null)[][] = [headerRow1, headerRow2, headerRow3, ...dataRows];
-  const dataSheet = XLSX.utils.aoa_to_sheet(aoa);
-
-  // 질문 텍스트 행 병합 (동일 질문 텍스트가 연속되면 병합)
-  const merges: XLSX.Range[] = [];
-  let mergeStart = 0;
-  for (let i = 1; i <= columns.length; i++) {
-    if (i < columns.length && columns[i].questionText === columns[mergeStart].questionText && columns[i].questionId === columns[mergeStart].questionId) {
-      continue;
-    }
-    if (i - mergeStart > 1) {
-      merges.push({ s: { r: 0, c: mergeStart }, e: { r: 0, c: i - 1 } });
-    }
-    mergeStart = i;
-  }
-  if (merges.length > 0) {
-    dataSheet['!merges'] = merges;
-  }
-
-  // 숫자 타입 셀에 숫자 형식 적용 (SPSS가 숫자로 인식하도록)
-  for (let r = 0; r < dataRows.length; r++) {
-    for (let c = 0; c < columns.length; c++) {
-      const val = dataRows[r][c];
-      if (typeof val === 'number') {
-        const cellRef = XLSX.utils.encode_cell({ r: r + 3, c });
-        if (dataSheet[cellRef]) {
-          dataSheet[cellRef].t = 'n';
-        }
-      }
-    }
-  }
-
-  // 열 너비 설정
-  dataSheet['!cols'] = columns.map((col) => ({
-    wch: Math.max(col.spssVarName.length, 12),
-  }));
-
-  XLSX.utils.book_append_sheet(wb, dataSheet, '데이터');
-
-  // ── 시트 2: 코딩북 ──
-  const codingAoa: (string | number)[][] = [
-    ['SPSS 변수명', '질문 ID', '질문 제목', '타입', '값 라벨'],
-    ...codingBook.map((entry) => [
-      entry.spssVarName,
-      entry.questionId,
-      entry.questionTitle,
-      entry.type,
-      entry.valueLabels,
-    ]),
-  ];
-  const codingSheet = XLSX.utils.aoa_to_sheet(codingAoa);
-  codingSheet['!cols'] = [{ wch: 20 }, { wch: 38 }, { wch: 40 }, { wch: 12 }, { wch: 50 }];
-  XLSX.utils.book_append_sheet(wb, codingSheet, '코딩북');
-
-  // ── 시트 3: SPSS Syntax ──
-  const syntaxText = generateFullSyntax(questions);
-  const syntaxLines = syntaxText.split('\n').map((line) => [line]);
-  const syntaxSheet = XLSX.utils.aoa_to_sheet(syntaxLines);
-  syntaxSheet['!cols'] = [{ wch: 80 }];
-  XLSX.utils.book_append_sheet(wb, syntaxSheet, 'SPSS Syntax');
-
-  return wb;
-}
-
-/**
- * SPSS 호환 엑셀 파일을 Blob으로 변환한다.
- */
-export function buildSpssExcelBlob(
-  questions: Question[],
-  submissions: SurveySubmission[],
-): Blob {
-  const wb = buildSpssWorkbook(questions, submissions);
-  const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
-  return new Blob([buf], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
 }

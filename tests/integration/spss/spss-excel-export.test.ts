@@ -5,9 +5,7 @@ import type { Question, SurveySubmission } from '@/types/survey';
 import {
   generateSPSSColumns,
   buildDataRows,
-  buildCodingBook,
   type SPSSExportColumn,
-  type CodingBookEntry,
 } from '@/lib/analytics/spss-excel-export';
 
 function makeQuestion(
@@ -164,34 +162,3 @@ describe('buildDataRows', () => {
   });
 });
 
-describe('buildCodingBook', () => {
-  it('코딩북 엔트리를 생성한다', () => {
-    const columns = generateSPSSColumns(sampleQuestions);
-    const book = buildCodingBook(columns, sampleQuestions);
-    expect(book.length).toBeGreaterThan(0);
-  });
-
-  it('단일선택의 값 라벨에 모든 옵션을 포함한다', () => {
-    const columns = generateSPSSColumns([sampleQuestions[0]]);
-    const book = buildCodingBook(columns, [sampleQuestions[0]]);
-    const entry = book.find((e) => e.spssVarName === 'Q1');
-    expect(entry).toBeDefined();
-    expect(entry!.valueLabels).toContain('남성');
-    expect(entry!.valueLabels).toContain('여성');
-  });
-
-  it('복수선택은 각 하위 변수별 엔트리를 생성한다', () => {
-    const columns = generateSPSSColumns([sampleQuestions[1]]);
-    const book = buildCodingBook(columns, [sampleQuestions[1]]);
-    const entries = book.filter((e) => e.spssVarName.startsWith('Q2M'));
-    expect(entries).toHaveLength(3);
-    expect(entries[0].questionTitle).toContain('제제목');
-  });
-
-  it('텍스트 질문의 값 라벨에 "(텍스트)"를 표시한다', () => {
-    const columns = generateSPSSColumns([sampleQuestions[2]]);
-    const book = buildCodingBook(columns, [sampleQuestions[2]]);
-    const entry = book.find((e) => e.spssVarName === 'Q3');
-    expect(entry!.valueLabels).toContain('텍스트');
-  });
-});

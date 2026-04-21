@@ -16,12 +16,10 @@ import { Button } from '@/components/ui/button';
 
 import type { SurveyResponse } from '@/db/schema';
 import { analyzeSurvey } from '@/lib/analytics/analyzer';
-import { generateCompactExcelBlob } from '@/lib/analytics/compact-excel-export';
 import type { CleaningExportOptions } from '@/lib/analytics/cleaning-export-types';
 import { generateCleaningExcelBlob } from '@/lib/analytics/semi-long-excel-export';
-import { buildSpssExcelBlob } from '@/lib/analytics/spss-excel-export';
 import { type FilterState, applyFilter, createEmptyFilter } from '@/lib/analytics/filter';
-import { type ResponseData, generateFlatExcelBlob } from '@/lib/analytics/flat-excel-export';
+import type { ResponseData } from '@/lib/analytics/response-data';
 import type { SurveyAnalytics } from '@/lib/analytics/types';
 import type { Question, Survey } from '@/types/survey';
 
@@ -105,38 +103,6 @@ export function AnalyticsDashboardClient({
     return { surveyData, responseData };
   }, [survey, filteredResponses]);
 
-  // Flat Excel 내보내기 핸들러 (통계 분석용)
-  const handleExportFlatExcel = useCallback(async (): Promise<Blob | null> => {
-    const data = prepareExportData();
-    if (!data) return null;
-    return generateFlatExcelBlob(data.surveyData, data.responseData);
-  }, [prepareExportData]);
-
-  // Compact Excel 내보내기 핸들러 (데이터 확인용)
-  const handleExportCompactExcel = useCallback(async (): Promise<Blob | null> => {
-    const data = prepareExportData();
-    if (!data) return null;
-    return generateCompactExcelBlob(data.surveyData, data.responseData);
-  }, [prepareExportData]);
-
-  // SPSS 호환 Excel 내보내기 핸들러
-  const handleExportSpssExcel = useCallback(async (): Promise<Blob | null> => {
-    if (filteredResponses.length === 0) return null;
-
-    const submissions = filteredResponses.map((r) => ({
-      id: r.id,
-      surveyId: r.surveyId,
-      questionResponses: (r.questionResponses as Record<string, unknown>) || {},
-      isCompleted: r.isCompleted ?? true,
-      startedAt: r.createdAt || new Date(),
-      completedAt: r.completedAt || undefined,
-      currentGroupOrder: 0,
-      updatedAt: r.createdAt || new Date(),
-    }));
-
-    return buildSpssExcelBlob(survey.questions, submissions);
-  }, [survey.questions, filteredResponses]);
-
   // 데이터 클리닝용 Excel 내보내기 핸들러
   const handleExportCleaningExcel = useCallback(async (options: CleaningExportOptions): Promise<Blob | null> => {
     const data = prepareExportData();
@@ -213,9 +179,6 @@ export function AnalyticsDashboardClient({
           surveyTitle={analytics.surveyTitle}
           onExportJson={onExportJson}
           onExportCsv={onExportCsv}
-          onExportFlatExcel={handleExportFlatExcel}
-          onExportCompactExcel={handleExportCompactExcel}
-          onExportSpssExcel={handleExportSpssExcel}
           onExportCleaningExcel={handleExportCleaningExcel}
         />
       </div>

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { BarChart3, ClipboardCheck, Database, FileDown, FileSpreadsheet, FileText, Loader2, Table } from 'lucide-react';
+import { BarChart3, ClipboardCheck, FileDown, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -15,39 +15,15 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { XLSM_MIME, type CleaningExportOptions } from '@/lib/analytics/cleaning-export-types';
-
-function downloadBlob(blob: Blob, filename: string) {
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  window.URL.revokeObjectURL(url);
-  document.body.removeChild(a);
-}
-
-function buildSafeFilename(title: string, suffix: string, ext: string): string {
-  const safeName = title.replace(/[^a-zA-Z0-9가-힣\s]/g, '').slice(0, 50);
-  const timestamp = new Date().toISOString().split('T')[0];
-  return `${safeName}_${suffix}_${timestamp}.${ext}`;
-}
+import { buildSafeFilename, downloadBlob } from '@/lib/analytics/export-download';
 
 interface Props {
   surveyId: string;
   surveyTitle: string;
-  onExportCompactExcel?: () => Promise<Blob | null>;
-  onExportSpssExcel?: () => Promise<Blob | null>;
   onExportCleaningExcel?: (options: CleaningExportOptions) => Promise<Blob | null>;
 }
 
-export function ExportDataModal({
-  surveyId,
-  surveyTitle,
-  onExportCompactExcel,
-  onExportSpssExcel,
-  onExportCleaningExcel,
-}: Props) {
+export function ExportDataModal({ surveyId, surveyTitle, onExportCleaningExcel }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [exportingType, setExportingType] = useState<string | null>(null);
   const [includeMacroSync, setIncludeMacroSync] = useState(true);
@@ -63,14 +39,6 @@ export function ExportDataModal({
         // MIME 타입은 대소문자 구분 없음이 표준 — 브라우저가 Blob.type을 소문자로 정규화함
         const cleaningExt = blob.type.toLowerCase() === XLSM_MIME.toLowerCase() ? 'xlsm' : 'xlsx';
         downloadBlob(blob, buildSafeFilename(surveyTitle, 'Cleaning', cleaningExt));
-      } else if (type === 'compact' && onExportCompactExcel) {
-        const blob = await onExportCompactExcel();
-        if (!blob) { alert('내보낼 데이터가 없습니다.'); return; }
-        downloadBlob(blob, buildSafeFilename(surveyTitle, 'Compact', 'xlsx'));
-      } else if (type === 'spss' && onExportSpssExcel) {
-        const blob = await onExportSpssExcel();
-        if (!blob) { alert('내보낼 데이터가 없습니다.'); return; }
-        downloadBlob(blob, buildSafeFilename(surveyTitle, 'SPSS', 'xlsx'));
       } else {
         // Server-side API Export
         const response = await fetch(`/api/surveys/${surveyId}/export?type=${type}`);
@@ -114,43 +82,11 @@ export function ExportDataModal({
         </DialogHeader>
 
         <div className="grid grid-cols-1 gap-4 py-4">
-          {/* 1. 통계 분석용 (Legacy/Flat) */}
-          <ExportCard
-            title="통계 분석용 (Legacy)"
-            description="모든 응답을 하나의 시트에 모읍니다. SPSS/SAS 등 통계 패키지 분석이나 피벗 테이블 생성에 최적화된 형식입니다."
-            icon={<Table className="h-5 w-5 text-blue-600" />}
-            isLoading={exportingType === 'raw-all'}
-            disabled={!!exportingType}
-            onClick={() => handleExport('raw-all')}
-          />
-
-          {/* 2. SPSS 호환 형식 */}
-          {onExportSpssExcel && (
-            <ExportCard
-              title="SPSS 호환 형식"
-              description="복수응답을 옵션별 독립 변수로 분리하고, 값을 숫자 코딩한 SPSS 통계 분석용 형식입니다. 코딩북 시트가 포함됩니다."
-              icon={<Database className="h-5 w-5 text-purple-600" />}
-              isLoading={exportingType === 'spss'}
-              disabled={!!exportingType}
-              onClick={() => handleExport('spss')}
-            />
-          )}
-
-          {/* SPSS .sav 네이티브 파일 */}
-          <ExportCard
-            title="SPSS .sav 파일"
-            description="SPSS에서 바로 열 수 있는 네이티브 파일입니다. 변수 라벨, 값 라벨, 측정 수준이 포함됩니다."
-            icon={<FileDown className="h-5 w-5 text-red-600" />}
-            isLoading={exportingType === 'sav'}
-            disabled={!!exportingType}
-            onClick={() => handleExport('sav')}
-          />
-
-          {/* 데이터 클리닝용 (Semi-Long) */}
+          {/* 1. 통계분석용 (Semi-Long / Cleaning) */}
           {onExportCleaningExcel && (
             <div className="space-y-2">
               <ExportCard
-                title="데이터 클리닝용 (Semi-Long)"
+                title="통계분석용"
                 description="테이블 문항을 클리닝하기 쉬운 형태로 변환합니다. 시트 간 필터 연동 활성화 시 .xlsm(매크로 포함) — 어느 시트에서 filter를 걸어도 VBA가 response_id를 모든 시트에 전파합니다. 수식이 없어 대용량에서도 빠름."
                 icon={<ClipboardCheck className="h-5 w-5 text-teal-600" />}
                 isLoading={exportingType === 'cleaning'}
@@ -177,29 +113,17 @@ export function ExportDataModal({
             </div>
           )}
 
-          {/* 3. 데이터 확인용 (Compact) */}
-          {onExportCompactExcel && (
-            <ExportCard
-              title="데이터 확인용 (Compact)"
-              description="사람이 보기 편한 간결한 형식입니다. 불필요한 코드를 줄이고 가독성을 높였습니다."
-              icon={<FileSpreadsheet className="h-5 w-5 text-indigo-600" />}
-              isLoading={exportingType === 'compact'}
-              disabled={!!exportingType}
-              onClick={() => handleExport('compact')}
-            />
-          )}
-
-          {/* 3. 응답별 상세 보기 (Individual) */}
+          {/* 2. SPSS .sav 네이티브 파일 */}
           <ExportCard
-            title="응답별 상세 보기 (Individual)"
-            description="응답자별로 시트를 나누어 상세 내용을 확인합니다. 설문지와 동일한 형태로 시각화되어 가독성이 좋습니다."
-            icon={<FileSpreadsheet className="h-5 w-5 text-green-600" />}
-            isLoading={exportingType === 'raw-individual'}
+            title="SPSS .sav 파일"
+            description="SPSS에서 바로 열 수 있는 네이티브 파일입니다. 변수 라벨, 값 라벨, 측정 수준이 포함됩니다."
+            icon={<FileDown className="h-5 w-5 text-red-600" />}
+            isLoading={exportingType === 'sav'}
             disabled={!!exportingType}
-            onClick={() => handleExport('raw-individual')}
+            onClick={() => handleExport('sav')}
           />
 
-          {/* 4. 요약 리포트 (Summary) */}
+          {/* 3. 요약 리포트 (Summary) */}
           <ExportCard
             title="요약 리포트 (Summary)"
             description="문항별 응답 빈도와 비율(%)이 계산된 요약 리포트입니다."
@@ -209,7 +133,7 @@ export function ExportDataModal({
             onClick={() => handleExport('summary')}
           />
 
-          {/* 5. 코딩북 (Variable Map) */}
+          {/* 4. 코딩북 (Variable Map) */}
           <ExportCard
             title="코딩북 (Variable Map)"
             description="설문 문항 ID, 라벨, 보기 값 등에 대한 변수 정의서입니다."

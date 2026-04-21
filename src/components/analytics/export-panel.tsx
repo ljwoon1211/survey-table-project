@@ -6,35 +6,35 @@ import { Button, Card } from '@tremor/react';
 import { Download, FileJson, FileSpreadsheet, Loader2 } from 'lucide-react';
 
 import type { CleaningExportOptions } from '@/lib/analytics/cleaning-export-types';
+import { buildSafeFilename, downloadText } from '@/lib/analytics/export-download';
 
 import { ExportDataModal } from './export-data-modal';
+
+type TextFormat = 'json' | 'csv';
 
 interface ExportPanelProps {
   surveyId: string;
   onExportJson: () => Promise<string>;
   onExportCsv: () => Promise<string>;
-  onExportFlatExcel?: () => Promise<Blob | null>;
-  onExportCompactExcel?: () => Promise<Blob | null>;
-  onExportSpssExcel?: () => Promise<Blob | null>;
   onExportCleaningExcel?: (options: CleaningExportOptions) => Promise<Blob | null>;
   surveyTitle?: string;
 }
+
+const MIME_BY_FORMAT: Record<TextFormat, string> = {
+  json: 'application/json',
+  csv: 'text/csv;charset=utf-8;',
+};
 
 export function ExportPanel({
   surveyId,
   onExportJson,
   onExportCsv,
-  onExportFlatExcel,
-  onExportCompactExcel,
-  onExportSpssExcel,
   onExportCleaningExcel,
   surveyTitle = 'survey',
 }: ExportPanelProps) {
-  const [isExporting, setIsExporting] = useState<
-    'json' | 'csv' | 'flat-excel' | 'compact-excel' | null
-  >(null);
+  const [isExporting, setIsExporting] = useState<TextFormat | null>(null);
 
-  const handleExport = async (format: 'json' | 'csv') => {
+  const handleExport = async (format: TextFormat) => {
     setIsExporting(format);
     try {
       const data = format === 'json' ? await onExportJson() : await onExportCsv();
@@ -44,59 +44,10 @@ export function ExportPanel({
         return;
       }
 
-      const blob = new Blob([data], {
-        type: format === 'json' ? 'application/json' : 'text/csv;charset=utf-8;',
-      });
-
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-
-      // 파일명에서 특수문자 제거
-      const safeName = surveyTitle.replace(/[^a-zA-Z0-9가-힣\s]/g, '').slice(0, 50);
-      const timestamp = new Date().toISOString().split('T')[0];
-      link.download = `${safeName}_응답_${timestamp}.${format}`;
-
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      downloadText(data, buildSafeFilename(surveyTitle, '응답', format), MIME_BY_FORMAT[format]);
     } catch (error) {
       console.error('Export error:', error);
       alert('내보내기 중 오류가 발생했습니다.');
-    } finally {
-      setIsExporting(null);
-    }
-  };
-
-  const handleExportFlatExcel = async () => {
-    if (!onExportFlatExcel) return;
-
-    setIsExporting('flat-excel');
-    try {
-      const blob = await onExportFlatExcel();
-
-      if (!blob) {
-        alert('내보낼 데이터가 없습니다.');
-        return;
-      }
-
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-
-      // 파일명에서 특수문자 제거
-      const safeName = surveyTitle.replace(/[^a-zA-Z0-9가-힣\s]/g, '').slice(0, 50);
-      const timestamp = new Date().toISOString().split('T')[0];
-      link.download = `${safeName}_Flat_${timestamp}.xlsx`;
-
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Flat Excel export error:', error);
-      alert('Flat 엑셀 내보내기 중 오류가 발생했습니다.');
     } finally {
       setIsExporting(null);
     }
@@ -114,8 +65,6 @@ export function ExportPanel({
           <ExportDataModal
             surveyId={surveyId}
             surveyTitle={surveyTitle}
-            onExportCompactExcel={onExportCompactExcel}
-            onExportSpssExcel={onExportSpssExcel}
             onExportCleaningExcel={onExportCleaningExcel}
           />
 
