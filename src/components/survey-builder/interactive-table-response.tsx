@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ChevronDown, ChevronLeft, ChevronRight, FileText, ListChecks } from 'lucide-react';
 
@@ -43,6 +43,176 @@ const HEADER_CELL_BASE_CLASS =
 // 헤더 가로 스크롤 컨테이너: 스크롤바 숨김 + 프린트 시 overflow 해제
 const HEADER_SCROLL_CLASS =
   'overflow-x-auto overflow-y-hidden px-4 md:px-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden print:overflow-visible';
+
+// ── 가로 스크롤 컨트롤 (버튼 + 진행도 막대) ──
+//
+// sticky 헤더 셀 위에 별도 행으로 배치되어 페이지 어디서든 조작 가능.
+// 진행도 막대는 현재 가시 범위 시각화, 버튼은 클릭 시 일정 step 스크롤.
+// 리렌더 최소화를 위해 scrollLeft 변화는 상태 대신 DOM을 직접 수정한다.
+
+const SCROLL_BUTTON_STEP = 400;
+
+const SCROLL_STEP_BUTTON_CLASS =
+  'flex h-5 w-5 shrink-0 items-center justify-center rounded border border-gray-300 bg-white text-gray-600 shadow-sm transition-all hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-gray-300 disabled:hover:bg-white';
+
+function ScrollStepButton({
+  direction,
+  disabled,
+  onClick,
+}: {
+  direction: 'left' | 'right';
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const Icon = direction === 'left' ? ChevronLeft : ChevronRight;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={SCROLL_STEP_BUTTON_CLASS}
+      aria-label={direction === 'left' ? '왼쪽으로 스크롤' : '오른쪽으로 스크롤'}
+    >
+      <Icon className="h-3 w-3" />
+    </button>
+  );
+}
+
+function TableScrollControls({
+  scrollRef,
+  canScrollLeft,
+  canScrollRight,
+}: {
+  scrollRef: React.RefObject<HTMLElement | null>;
+  canScrollLeft: boolean;
+  canScrollRight: boolean;
+}) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const thumbRef = useRef<HTMLDivElement>(null);
+  const [needsScroll, setNeedsScroll] = useState(false);
+
+  // 현재 가시 범위를 썸 위치·크기로 시각화 (DOM 직접 조작으로 리렌더 0)
+  // 의존성에 needsScroll 포함 → false→true 전환 시점에 재실행되어
+  // 갓 마운트된 썸에 초기 style을 즉시 반영한다.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const update = () => {
+      const { scrollLeft, scrollWidth, clientWidth } = el;
+      const active = scrollWidth - clientWidth > 1;
+      setNeedsScroll((prev) => (prev === active ? prev : active));
+      if (!active) return;
+      const thumb = thumbRef.current;
+      if (!thumb) return;
+      thumb.style.width = `${(clientWidth / scrollWidth) * 100}%`;
+      thumb.style.left = `${(scrollLeft / scrollWidth) * 100}%`;
+    };
+
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      el.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [scrollRef, needsScroll]);
+
+  const scrollByStep = useCallback(
+    (delta: number) => {
+      const el = scrollRef.current;
+      if (!el) return;
+      el.scrollTo({ left: el.scrollLeft + delta, behavior: 'smooth' });
+    },
+    [scrollRef],
+  );
+
+  // 트랙 클릭 → 클릭 지점이 썸 중앙이 되도록 스무스 점프
+  const handleTrackClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (e.target !== e.currentTarget) return; // 썸 드래그 이벤트 분리
+      const el = scrollRef.current;
+      const track = trackRef.current;
+      if (!el || !track) return;
+      const rect = track.getBoundingClientRect();
+      const ratio = (e.clientX - rect.left) / rect.width;
+      el.scrollTo({
+        left: ratio * el.scrollWidth - el.clientWidth / 2,
+        behavior: 'smooth',
+      });
+    },
+    [scrollRef],
+  );
+
+  // 썸 드래그 → 트랙 대비 이동 비율로 scrollLeft 직접 갱신 (RAF throttle)
+  const handleThumbMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const el = scrollRef.current;
+      const track = trackRef.current;
+      if (!el || !track) return;
+
+      const startX = e.clientX;
+      const startScrollLeft = el.scrollLeft;
+      const ratio = el.scrollWidth / track.getBoundingClientRect().width;
+      const prevUserSelect = document.body.style.userSelect;
+      document.body.style.userSelect = 'none';
+
+      let pendingX = startX;
+      let rafId = 0;
+      const apply = () => {
+        rafId = 0;
+        el.scrollLeft = startScrollLeft + (pendingX - startX) * ratio;
+      };
+
+      const onMove = (ev: MouseEvent) => {
+        pendingX = ev.clientX;
+        if (!rafId) rafId = requestAnimationFrame(apply);
+      };
+      const onUp = () => {
+        if (rafId) cancelAnimationFrame(rafId);
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.body.style.userSelect = prevUserSelect;
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    },
+    [scrollRef],
+  );
+
+  if (!needsScroll) return null;
+
+  return (
+    <div className="flex items-center gap-2 bg-white px-2 py-1 print:hidden">
+      <ScrollStepButton
+        direction="left"
+        disabled={!canScrollLeft}
+        onClick={() => scrollByStep(-SCROLL_BUTTON_STEP)}
+      />
+      <div
+        ref={trackRef}
+        role="scrollbar"
+        aria-orientation="horizontal"
+        aria-label="가로 스크롤"
+        onClick={handleTrackClick}
+        className="relative h-1.5 flex-1 cursor-pointer rounded-full bg-gray-200"
+      >
+        <div
+          ref={thumbRef}
+          onMouseDown={handleThumbMouseDown}
+          className="absolute inset-y-0 cursor-grab rounded-full bg-gray-400 transition-colors hover:bg-gray-500 active:cursor-grabbing active:bg-gray-600"
+        />
+      </div>
+      <ScrollStepButton
+        direction="right"
+        disabled={!canScrollRight}
+        onClick={() => scrollByStep(SCROLL_BUTTON_STEP)}
+      />
+    </div>
+  );
+}
 
 // ── 셀렉터 행 (동적 행 선택 버튼) ──
 
@@ -558,18 +728,6 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     );
   }
 
-  // ── 스크롤 함수 ──
-  const scrollTable = useCallback((direction: 'left' | 'right') => {
-    if (tableContainerRef.current) {
-      const scrollAmount = 300;
-      const currentScroll = tableContainerRef.current.scrollLeft;
-      tableContainerRef.current.scrollTo({
-        left: direction === 'right' ? currentScroll + scrollAmount : currentScroll - scrollAmount,
-        behavior: 'smooth',
-      });
-    }
-  }, []);
-
   // 헤더 셀 렌더링 (다단계/단일 폴백 공용 — 파일 상단 HeaderCells 참고)
   const renderHeaderCells = useCallback(
     () => (
@@ -636,44 +794,10 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
   // ── 가상화 여부 판단 ──
   const shouldVirtualize = displayRows.length >= VIRTUALIZATION_THRESHOLD;
 
-  // ── 데스크톱 Grid 뷰 (30행 미만 — 기존 코드) ──
+  // ── 데스크톱 Grid 뷰 ──
   const renderTableView = () => (
-    <div className="group relative">
-      {/* 스크롤 버튼 */}
-      {canScrollLeft && (
-        <button
-          onClick={() => scrollTable('left')}
-          className="absolute top-1/2 left-2 z-30 -translate-y-1/2 rounded-full border border-gray-300 bg-white/95 p-2.5 text-gray-700 shadow-lg transition-all hover:bg-gray-50 hover:text-blue-600 active:scale-95"
-          aria-label="왼쪽으로 스크롤"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </button>
-      )}
-      {canScrollRight && (
-        <button
-          onClick={() => scrollTable('right')}
-          className="absolute top-1/2 right-2 z-30 -translate-y-1/2 animate-pulse rounded-full border border-gray-300 bg-white/95 p-2.5 text-gray-700 shadow-lg transition-all hover:animate-none hover:bg-gray-50 hover:text-blue-600 active:scale-95"
-          aria-label="오른쪽으로 스크롤"
-        >
-          <ChevronRight className="h-5 w-5" />
-        </button>
-      )}
-
-      {/* 모바일 스크롤 그림자 */}
-      {canScrollRight && (
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-20 w-8 bg-gradient-to-l from-black/5 to-transparent md:hidden" />
-      )}
-      {canScrollLeft && (
-        <div className="pointer-events-none absolute inset-y-0 left-0 z-20 w-8 bg-gradient-to-r from-black/5 to-transparent md:hidden" />
-      )}
-
-      {/* 모바일 안내 텍스트 */}
-      <div className="mb-2 flex items-center justify-end gap-1 px-1 text-xs text-gray-500 md:hidden">
-        <span className="animate-pulse">좌우로 스크롤하여 응답해주세요</span>
-        <ChevronRight className="h-3 w-3" />
-      </div>
-
-      {/* 외부 grid 래퍼 — ARIA 의미(스크롤 버튼은 grid 외부 시각 보조 요소) */}
+    <div className="relative">
+      {/* 외부 grid 래퍼 — ARIA 의미 */}
       <div
         role="grid"
         aria-rowcount={headerRowCount + displayRows.length}
@@ -682,14 +806,35 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
         {/* 헤더: 페이지 스크롤 기준 sticky 래퍼 + 별도 가로 스크롤 컨테이너 */}
         {!hideColumnLabels && (
           <div className="sticky top-0 z-30 -mx-4 bg-white md:mx-0 print:static print:z-auto">
-            <div ref={headerScrollRef} className={HEADER_SCROLL_CLASS}>
-              <div
-                role="rowgroup"
-                className="mx-auto rounded-t-md border-t border-l border-r border-gray-300 bg-gray-50 text-sm"
-                style={gridContainerStyle}
-              >
-                {renderHeaderCells()}
+            {/* 가로 스크롤 컨트롤 (버튼 + 진행도) — sticky 영역이라 항상 조작 가능 */}
+            <TableScrollControls
+              scrollRef={tableContainerRef}
+              canScrollLeft={canScrollLeft}
+              canScrollRight={canScrollRight}
+            />
+            <div className="relative">
+              <div ref={headerScrollRef} className={HEADER_SCROLL_CLASS}>
+                <div
+                  role="rowgroup"
+                  className="mx-auto rounded-t-md border-t border-l border-r border-gray-300 bg-gray-50 text-sm"
+                  style={gridContainerStyle}
+                >
+                  {renderHeaderCells()}
+                </div>
               </div>
+              {/* 우측 페이드 — 오른쪽에 아직 열이 더 있다는 시각 힌트 */}
+              {canScrollRight && (
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-gray-50 via-gray-50/60 to-transparent print:hidden"
+                />
+              )}
+              {canScrollLeft && (
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-gray-50/80 to-transparent print:hidden"
+                />
+              )}
             </div>
           </div>
         )}
@@ -756,7 +901,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
             <CardTitle className="text-lg font-medium">{tableTitle}</CardTitle>
           </CardHeader>
         )}
-        <CardContent className={cn(isMobileView ? 'p-3 sm:p-4' : 'p-0 sm:p-6')}>
+        <CardContent className={cn(isMobileView ? 'p-3 sm:p-4' : 'p-0 sm:px-6 sm:pb-6')}>
           <div className="w-full">
             {isMobileView ? (
               <MobileTableStepper
