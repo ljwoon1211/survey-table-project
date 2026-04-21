@@ -157,10 +157,11 @@ interface VirtualizedTableGridProps {
   value?: Record<string, any>;
   onChange?: (value: Record<string, any>) => void;
   renderSelectorRows?: () => React.ReactNode;
-  renderHeaderCells?: () => React.ReactNode;
   gridTemplateCols: string;
   totalWidth: number;
   stickyInfo?: StickyLeftInfo;
+  // 컨테이너가 내부 세로 스크롤 영역일 때 IntersectionObserver root로 사용 (미지정 시 뷰포트)
+  scrollRootRef?: React.RefObject<HTMLElement | null>;
 }
 
 // ── 메인 컴포넌트 ──
@@ -175,10 +176,10 @@ export const VirtualizedTableGrid = React.memo(function VirtualizedTableGrid({
   value,
   onChange,
   renderSelectorRows,
-  renderHeaderCells,
   gridTemplateCols,
   totalWidth,
   stickyInfo,
+  scrollRootRef,
 }: VirtualizedTableGridProps) {
   useTablePerf(`VirtualizedTable(${displayRows.length}×${visibleColumns.length})`);
 
@@ -189,12 +190,12 @@ export const VirtualizedTableGrid = React.memo(function VirtualizedTableGrid({
 
   const estimatedHeights = useRowHeights({ displayRows, columnWidths });
   const heightCache = useCellHeightCache(displayRows, columnWidths);
-  const { isVisible, sentinelRef } = useRowVisibility(displayRows);
+  const { isVisible, sentinelRef } = useRowVisibility(displayRows, scrollRootRef);
 
   return (
     <div
-      role="grid"
-      className="mx-auto rounded-md border-t border-l border-r border-gray-300 bg-white text-sm"
+      role="rowgroup"
+      className="mx-auto rounded-b-md border-l border-r border-gray-300 bg-white text-sm"
       style={{
         display: 'grid',
         gridTemplateColumns: gridTemplateCols,
@@ -202,8 +203,6 @@ export const VirtualizedTableGrid = React.memo(function VirtualizedTableGrid({
         width: totalWidth ? `${totalWidth}px` : '100%',
       }}
     >
-      {renderHeaderCells?.()}
-
       {displayRows.map((row, rowIdx) => (
         <VirtualizedRow
           key={row.id}

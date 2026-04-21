@@ -1,13 +1,15 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 
 import { ChevronDown, ChevronLeft, ChevronRight, FileText, ListChecks } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useDynamicRowLayout } from '@/hooks/use-dynamic-row-layout';
 import { useDynamicRowState } from '@/hooks/use-dynamic-row-state';
+import { useHorizontalScrollIndicators } from '@/hooks/use-horizontal-scroll-indicators';
 import { useMobileView } from '@/hooks/use-media-query';
+import { useScrollLeftSync } from '@/hooks/use-scroll-left-sync';
 import { useTablePerf } from '@/hooks/use-table-perf';
 import { cn } from '@/lib/utils';
 import { DynamicRowGroupConfig, HeaderCell, Question, TableColumn, TableRow } from '@/types/survey';
@@ -18,7 +20,7 @@ import {
   computeStickyLeftColumns,
   getAlignmentClasses,
   getGridCellAria,
-  getGridSpanStyle,
+  getHeaderCellStickyStyle,
   type StickyLeftInfo,
 } from '@/utils/table-grid-utils';
 import {
@@ -32,10 +34,15 @@ import { MobileTableStepper } from './mobile-table-stepper';
 import { VirtualizedTableGrid } from './virtualized-table-grid';
 
 const VIRTUALIZATION_THRESHOLD = 100;
-const HEADER_ROW_MIN_HEIGHT = 40; // sticky 다단계 헤더의 depth별 누적 top 오프셋 기준
-const STICKY_HEADER_Z = 20;
+const HEADER_ROW_MIN_HEIGHT = 40;
 const STICKY_BODY_Z = 10;
-const STICKY_CORNER_Z = 30;
+
+const HEADER_CELL_BASE_CLASS =
+  'flex min-w-0 items-center justify-center border-r border-b border-gray-300 bg-gray-50 px-3 py-2 text-center font-semibold text-gray-800 [overflow-wrap:anywhere]';
+
+// 헤더 가로 스크롤 컨테이너: 스크롤바 숨김 + 프린트 시 overflow 해제
+const HEADER_SCROLL_CLASS =
+  'overflow-x-auto overflow-y-hidden px-4 md:px-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden print:overflow-visible';
 
 // ── 셀렉터 행 (동적 행 선택 버튼) ──
 
@@ -110,6 +117,114 @@ const SelectorRow = React.memo(function SelectorRow({
     </div>
   );
 });
+
+// ── 헤더 셀 렌더링 (다단계 + 단일 폴백) ──
+
+interface HeaderCellsProps {
+  visibleHeaderGrid?: HeaderCell[][];
+  visibleColumns: TableColumn[];
+  hideColumnLabels: boolean;
+  /** sticky 비활성화 시 undefined (헬퍼도 전원 OFF) */
+  stickyInfo?: StickyLeftInfo;
+}
+
+function HeaderCells({
+  visibleHeaderGrid,
+  visibleColumns,
+  hideColumnLabels,
+  stickyInfo,
+}: HeaderCellsProps): React.ReactNode {
+  if (hideColumnLabels) return null;
+
+  const minHeight = stickyInfo ? HEADER_ROW_MIN_HEIGHT : undefined;
+
+  // 다단계 헤더 — occupied로 rowspan 점유 추적
+  if (visibleHeaderGrid && visibleHeaderGrid.length > 0) {
+    const totalRows = visibleHeaderGrid.length;
+    const occupied = Array.from({ length: totalRows }, () => new Map<number, boolean>());
+
+    return visibleHeaderGrid.flatMap((headerRow, rowIdx) => {
+      let col = 1;
+      return headerRow.map((cell) => {
+        while (occupied[rowIdx]?.get(col)) col++;
+
+        const startCol = col;
+        const cs = cell.colspan || 1;
+        const rs = cell.rowspan || 1;
+
+        if (rs > 1) {
+          for (let r = rowIdx + 1; r < rowIdx + rs && r < totalRows; r++) {
+            for (let c = startCol; c < startCol + cs; c++) {
+              occupied[r].set(c, true);
+            }
+          }
+        }
+        col += cs;
+
+        const style: React.CSSProperties = {
+          gridRow: rs > 1 ? `${rowIdx + 1} / span ${rs}` : rowIdx + 1,
+          gridColumn: cs > 1 ? `${startCol} / span ${cs}` : startCol,
+          minHeight,
+          ...getHeaderCellStickyStyle(startCol, cs, stickyInfo),
+        };
+
+        return (
+          <div
+            key={cell.id}
+            className={HEADER_CELL_BASE_CLASS}
+            style={style}
+            {...getGridCellAria('columnheader', cs, rs)}
+          >
+            {cell.label || <span className="text-sm text-gray-400 italic" />}
+          </div>
+        );
+      });
+    });
+  }
+
+  // 단일 행 헤더 (폴백) — 명시적 grid-column으로 column 위치 보장
+  return visibleColumns.map((column, colIdx) => {
+    const startCol = colIdx + 1;
+    const cs = column.colspan || 1;
+
+    if (column.isHeaderHidden) {
+      // 헤더 grid 배경이 bg-gray-50 연속이므로 빈 셀 불필요.
+      // 좌측 sticky 영역만 sticky-left 유지를 위해 빈 셀 배치.
+      const stickyStyle = getHeaderCellStickyStyle(startCol, cs, stickyInfo);
+      if (!stickyStyle) return null;
+      return (
+        <div
+          key={column.id}
+          aria-hidden="true"
+          className="border-r border-b border-gray-300 bg-gray-50"
+          style={{
+            gridRow: 1,
+            gridColumn: cs > 1 ? `${startCol} / span ${cs}` : startCol,
+            minHeight,
+            ...stickyStyle,
+          }}
+        />
+      );
+    }
+
+    const style: React.CSSProperties = {
+      gridColumn: cs > 1 ? `${startCol} / span ${cs}` : startCol,
+      minHeight,
+      ...getHeaderCellStickyStyle(startCol, cs, stickyInfo),
+    };
+
+    return (
+      <div
+        key={column.id}
+        className={HEADER_CELL_BASE_CLASS}
+        style={style}
+        {...getGridCellAria('columnheader', cs)}
+      >
+        {column.label || <span className="text-sm text-gray-400 italic" />}
+      </div>
+    );
+  });
+}
 
 // ── 공통: 행의 셀들을 CSS Grid 셀로 렌더 ──
 
@@ -243,10 +358,9 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
   });
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
+  const headerScrollRef = useRef<HTMLDivElement>(null);
   useTablePerf(`InteractiveTable(${rows.length}×${columns.length})`);
   const isMobileView = useMobileView();
-  const [showLeftShadow, setShowLeftShadow] = useState(false);
-  const [showRightShadow, setShowRightShadow] = useState(false);
 
   // displayCondition에서 참조하는 질문 ID만 추출 → 관련 응답만 의존
   const relevantResponseKeys = useMemo(() => {
@@ -335,34 +449,17 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [columnFilteredRows, relevantResponsesJson, allQuestions, hasDynamicRows, selectedRowIds, groupConfigMap]);
 
-  // 스크롤 인디케이터
-  const checkScrollState = useCallback(() => {
-    if (tableContainerRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current;
-      setShowLeftShadow(scrollLeft > 10);
-      setShowRightShadow(scrollLeft < scrollWidth - clientWidth - 10);
-    }
-  }, []);
+  // 가로 스크롤 인디케이터 (좌/우 섀도우·버튼 표시 여부)
+  const { canScrollLeft, canScrollRight } = useHorizontalScrollIndicators(
+    tableContainerRef,
+    {
+      disabled: isMobileView,
+      deps: [visibleColumns.length, visibleRows.length],
+    },
+  );
 
-  useEffect(() => {
-    if (isMobileView) return; // 모바일에서는 스크롤 리스너 불필요
-    const container = tableContainerRef.current;
-    if (!container) return;
-    checkScrollState();
-    container.addEventListener('scroll', checkScrollState);
-    window.addEventListener('resize', checkScrollState);
-    return () => {
-      container.removeEventListener('scroll', checkScrollState);
-      window.removeEventListener('resize', checkScrollState);
-    };
-  }, [checkScrollState, isMobileView]);
-
-  useEffect(() => {
-    if (isMobileView) return;
-    checkScrollState();
-    const timeoutId = setTimeout(checkScrollState, 100);
-    return () => clearTimeout(timeoutId);
-  }, [visibleColumns.length, visibleRows.length, checkScrollState, isMobileView]);
+  // 헤더-바디 scrollLeft 상호 동기화 (각각 별도 가로 스크롤 컨테이너)
+  useScrollLeftSync(headerScrollRef, tableContainerRef, isMobileView);
 
   // Grid 관련 계산
   const totalWidth = useMemo(() => calcTotalWidth(visibleColumns), [visibleColumns]);
@@ -387,10 +484,9 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     return hidden.size > 0 ? hidden : undefined;
   }, [dynamicRowConfigs, allResponses, allQuestions]);
 
-  // 3) 동적 행 레이아웃 — selectorAnchors, displayRows, gridMap
+  // 3) 동적 행 레이아웃 — displayRows, gridMap
   const {
     displayRows,
-    selectorAnchors,
     rowGridMap,
     selectorGridMap,
     groupSelectedCountMap,
@@ -440,52 +536,13 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     return (stickyInfo.leftOffsets[idx] ?? 0) + (visibleColumns[idx]?.width || 150);
   }, [stickyInfo, visibleColumns]);
 
-  const stickyEnabled = !!stickyInfo;
-
-  // 다단계 헤더 각 depth의 실제 높이 측정 → sticky top 오프셋 정확히 계산
-  const headerRowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
-  const [headerRowHeights, setHeaderRowHeights] = useState<number[]>([]);
-  const registerHeaderRow = useCallback((rowIdx: number, el: HTMLDivElement | null) => {
-    if (el) headerRowRefs.current.set(rowIdx, el);
-    else headerRowRefs.current.delete(rowIdx);
-  }, []);
-
-  useEffect(() => {
-    if (!stickyEnabled) return;
-    const rowCount = visibleHeaderGrid?.length || 0;
-    if (rowCount <= 1) return;
-
-    const updateHeights = () => {
-      const next: number[] = [];
-      for (let i = 0; i < rowCount; i++) {
-        const el = headerRowRefs.current.get(i);
-        next.push(el?.offsetHeight ?? HEADER_ROW_MIN_HEIGHT);
-      }
-      setHeaderRowHeights((prev) =>
-        prev.length === next.length && prev.every((v, i) => v === next[i]) ? prev : next,
-      );
-    };
-
-    const observers: ResizeObserver[] = [];
-    headerRowRefs.current.forEach((el) => {
-      const o = new ResizeObserver(updateHeights);
-      o.observe(el);
-      observers.push(o);
-    });
-    updateHeights();
-    return () => observers.forEach((o) => o.disconnect());
-  }, [stickyEnabled, visibleHeaderGrid]);
-
-  const headerTopOffsets = useMemo(() => {
-    const rowCount = visibleHeaderGrid?.length || 1;
-    const offsets: number[] = [];
-    let acc = 0;
-    for (let i = 0; i < rowCount; i++) {
-      offsets.push(acc);
-      acc += headerRowHeights[i] ?? HEADER_ROW_MIN_HEIGHT;
-    }
-    return offsets;
-  }, [headerRowHeights, visibleHeaderGrid]);
+  // 헤더/바디 grid 컨테이너 공용 스타일 (가로 폭·템플릿 동일하게 정렬)
+  const gridContainerStyle = useMemo<React.CSSProperties>(() => ({
+    display: 'grid',
+    gridTemplateColumns: gridTemplateCols,
+    minWidth: totalWidth ? `${totalWidth}px` : '100%',
+    width: totalWidth ? `${totalWidth}px` : '100%',
+  }), [gridTemplateCols, totalWidth]);
 
   // ── 빈 테이블 ──
   if (columns.length === 0 || rows.length === 0) {
@@ -513,144 +570,18 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     }
   }, []);
 
-  // ── 헤더 셀 렌더링 ──
-  const renderHeaderCells = () => {
-    if (hideColumnLabels) return null;
-
-    const stickyCount = stickyInfo?.stickyColCount ?? 0;
-
-    if (visibleHeaderGrid && visibleHeaderGrid.length > 0) {
-      // rowspan으로 점유된 열 위치를 추적하여 명시적 gridRow/gridColumn 배치
-      // occupied[row][col] = true이면 이전 행의 rowspan에 의해 점유됨
-      const totalRows = visibleHeaderGrid.length;
-      const occupied = Array.from({ length: totalRows }, () => new Map<number, boolean>());
-
-      // 각 depth의 "rowspan=1인 첫 렌더 셀"에 ref를 붙여 높이 측정
-      const rowRefAssigned = new Set<number>();
-
-      return visibleHeaderGrid.flatMap((headerRow, rowIdx) => {
-        let col = 1;
-        return headerRow.map((cell) => {
-          // rowspan으로 점유된 열 건너뛰기
-          while (occupied[rowIdx]?.get(col)) col++;
-
-          const startCol = col;
-          const cs = cell.colspan || 1;
-          const rs = cell.rowspan || 1;
-
-          // 이 셀이 점유하는 영역을 후속 행에 마킹
-          if (rs > 1) {
-            for (let r = rowIdx + 1; r < rowIdx + rs && r < totalRows; r++) {
-              for (let c = startCol; c < startCol + cs; c++) {
-                occupied[r].set(c, true);
-              }
-            }
-          }
-          col += cs;
-
-          // 좌측 sticky 영역에 포함되는 경우 (시작 열 <= stickyCount)
-          const isLeftSticky = stickyEnabled && startCol <= stickyCount;
-          const isLastStickyCol = isLeftSticky && startCol + cs - 1 === stickyCount;
-
-          // 이 depth에 대한 높이 측정용 ref 후보 (rowspan=1인 첫 셀)
-          const shouldAssignRef = stickyEnabled && rs === 1 && !rowRefAssigned.has(rowIdx);
-          if (shouldAssignRef) rowRefAssigned.add(rowIdx);
-
-          const style: React.CSSProperties = {
-            gridRow: rs > 1 ? `${rowIdx + 1} / span ${rs}` : rowIdx + 1,
-            gridColumn: cs > 1 ? `${startCol} / span ${cs}` : startCol,
-          };
-          if (stickyEnabled) {
-            style.position = 'sticky';
-            style.top = headerTopOffsets[rowIdx] ?? 0;
-            if (isLeftSticky && stickyInfo) {
-              style.left = stickyInfo.leftOffsets[startCol - 1];
-              style.zIndex = STICKY_CORNER_Z;
-              if (isLastStickyCol) {
-                style.boxShadow = '2px 0 4px rgba(0,0,0,0.06)';
-              }
-            } else {
-              style.zIndex = STICKY_HEADER_Z;
-            }
-          }
-
-          return (
-            <div
-              key={cell.id}
-              ref={shouldAssignRef ? (el) => registerHeaderRow(rowIdx, el) : undefined}
-              className="flex min-w-0 items-center justify-center border-r border-b border-gray-300 bg-gray-50 px-3 py-2 text-center font-semibold text-gray-800 [overflow-wrap:anywhere]"
-              style={{
-                ...style,
-                minHeight: stickyEnabled ? HEADER_ROW_MIN_HEIGHT : undefined,
-              }}
-              {...getGridCellAria('columnheader', cs, rs)}
-            >
-              {cell.label || <span className="text-sm text-gray-400 italic" />}
-            </div>
-          );
-        });
-      });
-    }
-
-    // 단일 행 헤더 (폴백)
-    return visibleColumns.map((column, colIdx) => {
-      if (column.isHeaderHidden) {
-        // sticky 활성화 시에도 헤더 배경 연속성 유지 (빈 셀 자리에 배경만 채움)
-        if (!stickyEnabled) return null;
-        const startCol = colIdx + 1;
-        const isLeftSticky = startCol <= stickyCount;
-        const style: React.CSSProperties = {
-          gridRow: 1,
-          gridColumn: startCol,
-          position: 'sticky',
-          top: 0,
-          minHeight: HEADER_ROW_MIN_HEIGHT,
-          zIndex: isLeftSticky ? STICKY_CORNER_Z : STICKY_HEADER_Z,
-        };
-        if (isLeftSticky && stickyInfo) {
-          style.left = stickyInfo.leftOffsets[colIdx];
-        }
-        return (
-          <div
-            key={column.id}
-            aria-hidden="true"
-            className="border-r border-b border-gray-300 bg-gray-50"
-            style={style}
-          />
-        );
-      }
-      const headerColspan = column.colspan || 1;
-      const startCol = colIdx + 1;
-      const isLeftSticky = stickyEnabled && startCol <= stickyCount;
-      const isLastStickyCol = isLeftSticky && startCol + headerColspan - 1 === stickyCount;
-
-      const style: React.CSSProperties = { ...(getGridSpanStyle(headerColspan) || {}) };
-      if (stickyEnabled) {
-        style.position = 'sticky';
-        style.top = 0;
-        style.minHeight = HEADER_ROW_MIN_HEIGHT;
-        if (isLeftSticky && stickyInfo) {
-          style.left = stickyInfo.leftOffsets[colIdx];
-          style.zIndex = STICKY_CORNER_Z;
-          if (isLastStickyCol) {
-            style.boxShadow = '2px 0 4px rgba(0,0,0,0.06)';
-          }
-        } else {
-          style.zIndex = STICKY_HEADER_Z;
-        }
-      }
-      return (
-        <div
-          key={column.id}
-          className="flex min-w-0 items-center justify-center border-r border-b border-gray-300 bg-gray-50 px-3 py-2 text-center font-semibold text-gray-800 [overflow-wrap:anywhere]"
-          style={style}
-          {...getGridCellAria('columnheader', headerColspan)}
-        >
-          {column.label || <span className="text-sm text-gray-400 italic" />}
-        </div>
-      );
-    });
-  };
+  // 헤더 셀 렌더링 (다단계/단일 폴백 공용 — 파일 상단 HeaderCells 참고)
+  const renderHeaderCells = useCallback(
+    () => (
+      <HeaderCells
+        visibleHeaderGrid={visibleHeaderGrid}
+        visibleColumns={visibleColumns}
+        hideColumnLabels={hideColumnLabels}
+        stickyInfo={stickyInfo}
+      />
+    ),
+    [visibleHeaderGrid, visibleColumns, hideColumnLabels, stickyInfo],
+  );
 
   // 4) 셀렉터 행 + 펼친 그룹 행 렌더링 (가상화/비가상화 공용)
   const renderSelectorRows = useCallback(
@@ -709,7 +640,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
   const renderTableView = () => (
     <div className="group relative">
       {/* 스크롤 버튼 */}
-      {showLeftShadow && (
+      {canScrollLeft && (
         <button
           onClick={() => scrollTable('left')}
           className="absolute top-1/2 left-2 z-30 -translate-y-1/2 rounded-full border border-gray-300 bg-white/95 p-2.5 text-gray-700 shadow-lg transition-all hover:bg-gray-50 hover:text-blue-600 active:scale-95"
@@ -718,7 +649,7 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
           <ChevronLeft className="h-5 w-5" />
         </button>
       )}
-      {showRightShadow && (
+      {canScrollRight && (
         <button
           onClick={() => scrollTable('right')}
           className="absolute top-1/2 right-2 z-30 -translate-y-1/2 animate-pulse rounded-full border border-gray-300 bg-white/95 p-2.5 text-gray-700 shadow-lg transition-all hover:animate-none hover:bg-gray-50 hover:text-blue-600 active:scale-95"
@@ -729,10 +660,10 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
       )}
 
       {/* 모바일 스크롤 그림자 */}
-      {showRightShadow && (
+      {canScrollRight && (
         <div className="pointer-events-none absolute inset-y-0 right-0 z-20 w-8 bg-gradient-to-l from-black/5 to-transparent md:hidden" />
       )}
-      {showLeftShadow && (
+      {canScrollLeft && (
         <div className="pointer-events-none absolute inset-y-0 left-0 z-20 w-8 bg-gradient-to-r from-black/5 to-transparent md:hidden" />
       )}
 
@@ -742,61 +673,77 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
         <ChevronRight className="h-3 w-3" />
       </div>
 
+      {/* 외부 grid 래퍼 — ARIA 의미(스크롤 버튼은 grid 외부 시각 보조 요소) */}
       <div
-        ref={tableContainerRef}
-        // overflow-y-clip으로 세로 축 'auto 승격'을 차단 → sticky는 페이지 스크롤 기준 유지
-        className="-mx-4 overflow-x-auto overflow-y-clip px-4 pb-4 md:mx-0 md:px-0"
-        style={{ WebkitOverflowScrolling: 'touch' }}
+        role="grid"
+        aria-rowcount={headerRowCount + displayRows.length}
+        aria-colcount={visibleColumns.length}
       >
-        {shouldVirtualize ? (
-          /* 가상화: 동일한 Grid 구조, 뷰포트 밖 셀만 빈 div */
-          <VirtualizedTableGrid
-            questionId={questionId}
-            displayRows={displayRows}
-            visibleColumns={visibleColumns}
-            rowCompletionMap={rowCompletionMap}
-            rowGridMap={rowGridMap}
-            isTestMode={isTestMode}
-            value={value}
-            onChange={onChange}
-            gridTemplateCols={gridTemplateCols}
-            totalWidth={totalWidth}
-            renderHeaderCells={renderHeaderCells}
-            renderSelectorRows={renderSelectorRows}
-            stickyInfo={stickyInfo}
-          />
-        ) : (
-          /* 기존: CSS Grid 테이블 */
-          <div
-            role="grid"
-            className="mx-auto rounded-md border-t border-l border-r border-gray-300 bg-white text-sm"
-            style={{
-              display: 'grid',
-              gridTemplateColumns: gridTemplateCols,
-              minWidth: totalWidth ? `${totalWidth}px` : '100%',
-              width: totalWidth ? `${totalWidth}px` : '100%',
-            }}
-          >
-            {/* 헤더 */}
-            {renderHeaderCells()}
-
-            {/* 바디 — 명시적 grid-row 배치 */}
-            {displayRows.map((row) => (
-              <React.Fragment key={row.id}>
-                {renderRowCells({
-                  row,
-                  gridRow: rowGridMap.get(row.id),
-                  completed: rowCompletionMap.get(row.id) ?? false,
-                  questionId, isTestMode, value, onChange,
-                  stickyInfo,
-                })}
-              </React.Fragment>
-            ))}
-
-            {/* 셀렉터 행들 — 명시적 grid-row 배치 */}
-            {renderSelectorRows()}
+        {/* 헤더: 페이지 스크롤 기준 sticky 래퍼 + 별도 가로 스크롤 컨테이너 */}
+        {!hideColumnLabels && (
+          <div className="sticky top-0 z-30 -mx-4 bg-white md:mx-0 print:static print:z-auto">
+            <div ref={headerScrollRef} className={HEADER_SCROLL_CLASS}>
+              <div
+                role="rowgroup"
+                className="mx-auto rounded-t-md border-t border-l border-r border-gray-300 bg-gray-50 text-sm"
+                style={gridContainerStyle}
+              >
+                {renderHeaderCells()}
+              </div>
+            </div>
           </div>
         )}
+
+        {/* 바디: 가로 스크롤 전용, 세로는 페이지 자연 흐름 */}
+        <div
+          ref={tableContainerRef}
+          className="-mx-4 overflow-x-auto px-4 pb-4 md:mx-0 md:px-0 print:overflow-visible"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
+          {shouldVirtualize ? (
+            /* 가상화: 바디만 렌더 */
+            <VirtualizedTableGrid
+              questionId={questionId}
+              displayRows={displayRows}
+              visibleColumns={visibleColumns}
+              rowCompletionMap={rowCompletionMap}
+              rowGridMap={rowGridMap}
+              isTestMode={isTestMode}
+              value={value}
+              onChange={onChange}
+              gridTemplateCols={gridTemplateCols}
+              totalWidth={totalWidth}
+              renderSelectorRows={renderSelectorRows}
+              stickyInfo={stickyInfo}
+            />
+          ) : (
+            /* 바디 전용 grid */
+            <div
+              role="rowgroup"
+              className={cn(
+                'mx-auto rounded-b-md border-l border-r border-gray-300 bg-white text-sm',
+                hideColumnLabels && 'rounded-t-md border-t',
+              )}
+              style={gridContainerStyle}
+            >
+              {/* 바디 — 명시적 grid-row 배치 */}
+              {displayRows.map((row) => (
+                <React.Fragment key={row.id}>
+                  {renderRowCells({
+                    row,
+                    gridRow: rowGridMap.get(row.id),
+                    completed: rowCompletionMap.get(row.id) ?? false,
+                    questionId, isTestMode, value, onChange,
+                    stickyInfo,
+                  })}
+                </React.Fragment>
+              ))}
+
+              {/* 셀렉터 행들 — 명시적 grid-row 배치 */}
+              {renderSelectorRows()}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

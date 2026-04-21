@@ -155,6 +155,53 @@ export function computeStickyLeftColumns(
   return { stickyColCount, leftOffsets };
 }
 
+// ── 헤더 셀 sticky 스타일 ──
+//
+// 좌측 sticky 영역에 들어가는 헤더 셀에 left sticky + z-index + 경계 그림자를
+// 부여한다. 페이지 기준 sticky 헤더 래퍼 내부에서 동작하므로 top은 적용하지 않는다.
+
+const STICKY_CORNER_Z = 30;
+
+/** 좌측 sticky 영역에 속하는 헤더 셀인지 판정 */
+export function isHeaderCellInStickyLeft(
+  startCol: number,
+  stickyColCount: number,
+): boolean {
+  return startCol <= stickyColCount;
+}
+
+/** 좌측 sticky 영역의 **마지막** 열을 차지하는 셀인지 (경계 그림자용) */
+export function isHeaderCellAtStickyBoundary(
+  startCol: number,
+  colspan: number,
+  stickyColCount: number,
+): boolean {
+  return startCol + colspan - 1 === stickyColCount;
+}
+
+/**
+ * 헤더 셀의 sticky 스타일을 생성한다 (left sticky 전용).
+ * - 좌측 sticky 영역 바깥이면 undefined 반환
+ * - 마지막 sticky 열이면 우측에 경계 그림자 적용
+ */
+export function getHeaderCellStickyStyle(
+  startCol: number,
+  colspan: number,
+  stickyInfo: StickyLeftInfo | undefined,
+): CSSProperties | undefined {
+  if (!stickyInfo || stickyInfo.stickyColCount === 0) return undefined;
+  if (!isHeaderCellInStickyLeft(startCol, stickyInfo.stickyColCount)) return undefined;
+  const style: CSSProperties = {
+    position: 'sticky',
+    left: stickyInfo.leftOffsets[startCol - 1],
+    zIndex: STICKY_CORNER_Z,
+  };
+  if (isHeaderCellAtStickyBoundary(startCol, colspan, stickyInfo.stickyColCount)) {
+    style.boxShadow = '2px 0 4px rgba(0,0,0,0.06)';
+  }
+  return style;
+}
+
 // ── 행 hover/완료 상태 클래스 ──
 
 export function getRowCellClasses(completed: boolean): string {

@@ -6,7 +6,7 @@
  * - 포커스된 행은 절대 언마운트 안 함
  * - rowspan 병합 범위 확장
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 
 import type { TableRow } from '@/types/survey';
 
@@ -54,7 +54,10 @@ function expandWithMergedRanges(set: Set<number>, ranges: MergedRange[]): void {
   }
 }
 
-export function useRowVisibility(displayRows: TableRow[]): RowVisibilityResult {
+export function useRowVisibility(
+  displayRows: TableRow[],
+  scrollRootRef?: RefObject<HTMLElement | null>,
+): RowVisibilityResult {
   const rowCount = displayRows.length;
 
   if (typeof IntersectionObserver === 'undefined') {
@@ -75,6 +78,9 @@ export function useRowVisibility(displayRows: TableRow[]): RowVisibilityResult {
   const sentinelsRef = useRef(new Map<number, HTMLElement>());
 
   useEffect(() => {
+    // 스크롤 루트: 지정되면 해당 요소(내부 스크롤 컨테이너), 없으면 뷰포트
+    const root = scrollRootRef?.current ?? null;
+
     // 로드 IO: 1500px 마진으로 진입 감지
     loadObserverRef.current = new IntersectionObserver(
       (entries) => {
@@ -94,7 +100,7 @@ export function useRowVisibility(displayRows: TableRow[]): RowVisibilityResult {
           return next;
         });
       },
-      { rootMargin: LOAD_MARGIN },
+      { root, rootMargin: LOAD_MARGIN },
     );
 
     // 언로드 IO: 500행+ 에서만 활성화 (그 미만은 never-unload → 깜빡임 0)
@@ -119,7 +125,7 @@ export function useRowVisibility(displayRows: TableRow[]): RowVisibilityResult {
             return next;
           });
         },
-        { rootMargin: UNLOAD_MARGIN },
+        { root, rootMargin: UNLOAD_MARGIN },
       );
     }
 
