@@ -50,6 +50,7 @@ function resolveVarType(col: SPSSExportColumn, question: Question | undefined): 
     case 'checkbox-item':
     case 'notice-agree':
     case 'ranking-rank':
+    case 'radio-group':
       return VariableType.Numeric;
 
     case 'text':
@@ -92,6 +93,11 @@ function resolveMeasure(col: SPSSExportColumn, question: Question | undefined): 
     return VariableMeasure.Ordinal;
   }
 
+  // radio-group (Likert 등 매트릭스 단일선택) 디폴트 Ordinal — Continuous로 보고 싶으면 셀에서 명시
+  if (col.type === 'radio-group') {
+    return VariableMeasure.Ordinal;
+  }
+
   return VariableMeasure.Nominal;
 }
 
@@ -115,6 +121,10 @@ function buildLabel(col: SPSSExportColumn): string {
     case 'ranking-other':
       return `${col.questionText} - ${col.rankIndex}순위 기타 입력`;
     case 'table-cell':
+      return col.optionLabel
+        ? `${col.questionText} - ${col.optionLabel}`
+        : col.questionText;
+    case 'radio-group':
       return col.optionLabel
         ? `${col.questionText} - ${col.optionLabel}`
         : col.questionText;
@@ -148,6 +158,15 @@ function buildValueLabels(
 
     case 'notice-agree':
       return [{ value: 1, label: '동의' }];
+
+    case 'radio-group': {
+      // radio-group: generateSPSSColumns가 미리 계산한 valueLabels를 그대로 사용
+      if (!col.radioGroupValueLabels) return undefined;
+      return Object.entries(col.radioGroupValueLabels).map(([value, label]) => ({
+        value: Number(value),
+        label,
+      }));
+    }
 
     case 'table-cell': {
       if (col.tableCellType === 'input') return undefined;

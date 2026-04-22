@@ -7,7 +7,7 @@
  *
  * 과거 엑셀 Blob/워크북/코딩북 헬퍼는 UI에서 제거됨에 따라 함께 삭제되었다.
  */
-import type { Question, SurveySubmission } from '@/types/survey';
+import type { Question, SurveySubmission, TableCell, TableRow } from '@/types/survey';
 
 import {
   transformRanking,
@@ -24,7 +24,7 @@ export interface SPSSExportColumn {
   questionText: string;
   optionLabel: string;
   questionId: string;
-  type: 'single' | 'checkbox-item' | 'text' | 'multiselect' | 'table-cell' | 'other-text' | 'notice-agree' | 'notice-date' | 'ranking-rank' | 'ranking-other';
+  type: 'single' | 'checkbox-item' | 'text' | 'multiselect' | 'table-cell' | 'other-text' | 'notice-agree' | 'notice-date' | 'ranking-rank' | 'ranking-other' | 'radio-group';
   optionIndex?: number;
   optionValue?: string;
   tableCellId?: string;
@@ -34,6 +34,13 @@ export interface SPSSExportColumn {
   // 셀 단위 SPSS 오버라이드
   cellSpssVarType?: 'Numeric' | 'String' | 'Date' | 'DateTime';
   cellSpssMeasure?: 'Nominal' | 'Ordinal' | 'Continuous';
+  // === 'radio-group' 전용: 같은 radioGroupName 셀들을 변수 1개로 합산 ===
+  // 그룹명 (디버깅/식별용)
+  radioGroupName?: string;
+  // 멤버 셀 id → 응답 시 기록할 숫자값 (옵션의 spssNumericCode 또는 위치 인덱스 폴백)
+  radioGroupCellValueMap?: Record<string, number>;
+  // 숫자값 → SPSS VALUE LABEL 라벨 (옵션 라벨 우선, 없으면 행/열 라벨 폴백)
+  radioGroupValueLabels?: Record<number, string>;
 }
 
 /**
@@ -139,11 +146,18 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
         }
       }
     } else if (q.type === 'table' && q.tableRowsData && q.tableColumns) {
+      // === Phase 5: radioGroup 사전 스캔 ===
+      // 같은 radioGroupName 셀들을 묶어 변수 1개로 export.
+      // 그룹 방향 자동 감지: 같은 행이면 열 단위 응답, 같은 열이면 행 단위 응답.
+      const groupedCellIds = collectAndEmitRadioGroupColumns(q, columns);
+
       // 테이블 질문: 입력 가능한 셀마다 개별 열 생성
       for (const tRow of q.tableRowsData) {
         for (let colIdx = 0; colIdx < q.tableColumns.length; colIdx++) {
           const cell = tRow.cells[colIdx];
           if (!cell) continue;
+          // radioGroup 그룹에 속한 셀은 스킵 (그룹 변수로 이미 emit됨)
+          if (groupedCellIds.has(cell.id)) continue;
           // 입력 불가능한 셀(text, image, video)은 건너뛰기
           if (!['checkbox', 'radio', 'select', 'input'].includes(cell.type)) continue;
           // 셀코드가 의도적으로 비어있으면 내보내기에서 제외 (표시용 셀)
@@ -206,6 +220,116 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
   }
 
   return columns;
+}
+
+/**
+ * Phase 5: 같은 radioGroupName 셀들을 묶어 변수 1개로 export.
+ *
+ * - 셀 안 라디오 옵션이 정확히 1개인 셀만 그룹화 대상 (옵션 여러 개 라디오는 기존 방식)
+ * - 그룹 멤버 ≥ 2 일 때만 그룹 변수 생성 (1개면 일반 셀로 둠)
+ * - 방향 자동 감지: 모두 같은 행이면 'row' (열 단위 응답), 모두 같은 열이면 'column' (행 단위 응답)
+ * - 변수명: row 그룹 → questionCode_rowCode / column 그룹 → questionCode_columnCode
+ *
+ * 반환: 그룹에 emit된 셀 id의 Set (호출자가 본 순회에서 스킵)
+ */
+function collectAndEmitRadioGroupColumns(
+  q: Question,
+  columns: SPSSExportColumn[],
+): Set<string> {
+  const groupedCellIds = new Set<string>();
+  if (!q.tableRowsData || !q.tableColumns || !q.questionCode) return groupedCellIds;
+
+  type GroupCellInfo = { cell: TableCell; row: TableRow; rowIdx: number; colIdx: number };
+  const radioGroups = new Map<string, GroupCellInfo[]>();
+
+  for (let rowIdx = 0; rowIdx < q.tableRowsData.length; rowIdx++) {
+    const tRow = q.tableRowsData[rowIdx];
+    for (let colIdx = 0; colIdx < q.tableColumns.length; colIdx++) {
+      const cell = tRow.cells[colIdx];
+      if (!cell) continue;
+      if (cell.isHidden) continue;
+      if (cell.type !== 'radio') continue;
+      if (!cell.radioGroupName) continue;
+      // 셀 안 옵션이 정확히 1개인 라디오만 그룹화 대상 (P6)
+      if (!cell.radioOptions || cell.radioOptions.length !== 1) continue;
+
+      const list = radioGroups.get(cell.radioGroupName) ?? [];
+      list.push({ cell, row: tRow, rowIdx, colIdx });
+      radioGroups.set(cell.radioGroupName, list);
+    }
+  }
+
+  for (const [groupName, members] of radioGroups) {
+    if (members.length < 2) continue; // 멤버 1개면 일반 셀로 (P2)
+
+    const rowSet = new Set(members.map((m) => m.rowIdx));
+    const colSet = new Set(members.map((m) => m.colIdx));
+    const orientation: 'row' | 'column' | 'mixed' =
+      rowSet.size === 1 && colSet.size > 1 ? 'row'
+        : colSet.size === 1 && rowSet.size > 1 ? 'column'
+          : 'mixed';
+
+    const cellValueMap: Record<string, number> = {};
+    const valueLabels: Record<number, string> = {};
+    let groupVarName: string;
+    let groupLabel: string;
+
+    if (orientation === 'row') {
+      // 같은 행 → 열 단위 응답: rowCode 기반 변수명, 옵션 라벨(폴백: 열 라벨)을 값 라벨로
+      const { row, rowIdx } = members[0];
+      const rowCode = row.rowCode || `r${rowIdx + 1}`;
+      groupVarName = `${q.questionCode}_${rowCode}`;
+      groupLabel = row.label || groupName;
+
+      members.forEach((m, idx) => {
+        const opt = m.cell.radioOptions![0];
+        const value = opt.spssNumericCode ?? (idx + 1);
+        cellValueMap[m.cell.id] = value;
+        valueLabels[value] = opt.label || q.tableColumns![m.colIdx].label;
+      });
+    } else if (orientation === 'column') {
+      // 같은 열 → 행 단위 응답: columnCode 기반 변수명, 옵션 라벨(폴백: 행 라벨)을 값 라벨로
+      const { colIdx } = members[0];
+      const col = q.tableColumns[colIdx];
+      const colCode = col.columnCode || `c${colIdx + 1}`;
+      groupVarName = `${q.questionCode}_${colCode}`;
+      groupLabel = col.label || groupName;
+
+      members.forEach((m, idx) => {
+        const opt = m.cell.radioOptions![0];
+        const value = opt.spssNumericCode ?? (idx + 1);
+        cellValueMap[m.cell.id] = value;
+        valueLabels[value] = opt.label || m.row.label;
+      });
+    } else {
+      // mixed (드뭄, 비정형 그룹): 그룹명 기반 변수명, 셀별 라벨 폴백
+      const sanitized = groupName.replace(/[^a-zA-Z0-9_]/g, '_');
+      groupVarName = `${q.questionCode}_${sanitized}`;
+      groupLabel = groupName;
+
+      members.forEach((m, idx) => {
+        const opt = m.cell.radioOptions![0];
+        const value = opt.spssNumericCode ?? (idx + 1);
+        cellValueMap[m.cell.id] = value;
+        valueLabels[value] = opt.label || `${m.row.label} - ${q.tableColumns![m.colIdx].label}`;
+      });
+    }
+
+    columns.push({
+      spssVarName: groupVarName,
+      questionText: q.title,
+      optionLabel: groupLabel,
+      questionId: q.id,
+      type: 'radio-group',
+      radioGroupName: groupName,
+      radioGroupCellValueMap: cellValueMap,
+      radioGroupValueLabels: valueLabels,
+    });
+
+    members.forEach((m) => groupedCellIds.add(m.cell.id));
+  }
+
+  return groupedCellIds;
 }
 
 /**
@@ -318,6 +442,24 @@ export function buildDataRows(
           }
 
           return transformTableCell(col.tableCellType || 'input', cellVal);
+        }
+
+        case 'radio-group': {
+          // rawValue는 테이블 응답 객체: { cellId: value, ... }
+          // 그룹 멤버 셀 중 응답이 있는 셀을 찾고, 그 셀의 매핑된 숫자값 반환.
+          // 정책 P1: 다중체크 발생 시 마지막으로 발견된 셀의 값 채택 (Object.keys 순회 순서).
+          if (!rawValue || typeof rawValue !== 'object') return null;
+          if (!col.radioGroupCellValueMap) return null;
+          const tableAnswer = rawValue as Record<string, unknown>;
+          let chosen: number | null = null;
+          for (const [cellId, expectedValue] of Object.entries(col.radioGroupCellValueMap)) {
+            const cellResponse = tableAnswer[cellId];
+            if (cellResponse == null || cellResponse === '') continue;
+            // radio 셀 응답: optionId 문자열 또는 { optionId, otherValue, hasOther }
+            // 옵션 1개짜리 셀이므로 응답이 truthy하면 선택된 것으로 간주.
+            chosen = expectedValue;
+          }
+          return chosen;
         }
 
         case 'ranking-rank':
