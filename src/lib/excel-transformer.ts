@@ -3,6 +3,11 @@ import * as XLSX from 'xlsx';
 import { isCellInputable } from '@/lib/analytics/excel-export-utils';
 import { Survey, SurveySubmission } from '@/types/survey';
 import { getOtherOptionCode } from '@/utils/option-code-generator';
+import { resolveRankingOptions } from '@/utils/ranking-source';
+import {
+  buildTableCellVarName,
+  resolveRankVarName,
+} from '@/utils/table-cell-code-generator';
 
 /**
  * Summary 워크북 생성
@@ -70,6 +75,31 @@ function generateSummaryData(survey: Survey, responses: SurveySubmission[]) {
               '응답 수': count,
               '비율(%)': (totalResponses > 0 ? (count / totalResponses) * 100 : 0).toFixed(1) + '%',
             });
+
+            // ranking 셀(Case 3): 옵션별 가중치 총점 + 응답 수 추가
+            if (cell.type === 'ranking' && cell.rankingOptions && cell.rankingOptions.length > 0) {
+              const N = Math.max(1, cell.rankingConfig?.positions ?? 3);
+              cell.rankingOptions.forEach((opt) => {
+                let totalScore = 0;
+                let optCount = 0;
+                responses.forEach((r) => {
+                  const ans = (r.questionResponses as any)?.[q.id];
+                  const cellVal = ans && ans[cell.id];
+                  if (!Array.isArray(cellVal)) return;
+                  const entry = cellVal.find((a: any) => a?.optionValue === opt.value);
+                  if (entry && typeof entry.rank === 'number' && entry.rank >= 1 && entry.rank <= N) {
+                    totalScore += N - entry.rank + 1;
+                    optCount++;
+                  }
+                });
+                summary.push({
+                  구분: `      · ${opt.label} (총점 ${totalScore})`,
+                  '응답 수': optCount,
+                  '비율(%)':
+                    (totalResponses > 0 ? (optCount / totalResponses) * 100 : 0).toFixed(1) + '%',
+                });
+              });
+            }
           });
         });
       } else if (q.type === 'multiselect' && q.selectLevels) {
@@ -93,10 +123,11 @@ function generateSummaryData(survey: Survey, responses: SurveySubmission[]) {
             });
           });
         });
-      } else if (q.type === 'ranking' && q.rankingConfig?.optionsSource !== 'table' && q.options) {
-        // 순위형: 옵션별 총점(가중치) + 선택 횟수
+      } else if (q.type === 'ranking') {
+        // Case 1/2 공통 — resolveRankingOptions 로 옵션 통합
+        const resolved = resolveRankingOptions(q);
         const N = Math.max(1, q.rankingConfig?.positions ?? 3);
-        q.options.forEach((opt) => {
+        resolved.forEach((opt) => {
           let totalScore = 0;
           let count = 0;
           responses.forEach((r) => {
@@ -186,21 +217,26 @@ function generateVariableMap(survey: Survey) {
         }
       }
 
-      if (q.type === 'ranking' && q.rankingConfig?.optionsSource !== 'table' && q.options) {
+      if (q.type === 'ranking') {
+        // Case 1/2 공통: 변수명 동일, 값 라벨은 resolveRankingOptions 로 통합
+        const resolved = resolveRankingOptions(q);
+        const rankingValueLabels = resolved.length > 0
+          ? resolved.map((o, i) => `${o.spssNumericCode ?? i + 1}=${o.label}`).join(', ')
+          : '(옵션 없음)';
         const N = Math.max(1, q.rankingConfig?.positions ?? 3);
         for (let k = 1; k <= N; k++) {
           mapData.push({
             '질문 ID': '',
             '타입': `Ranking (${k}순위)`,
-            'SPSS 변수명': `${q.questionCode}_R${k}`,
+            'SPSS 변수명': `${q.questionCode}_rk${k}`,
             '질문 제목': `  ${k}순위`,
-            '값 라벨': valueLabels,
+            '값 라벨': rankingValueLabels,
           });
           if (q.allowOtherOption) {
             mapData.push({
               '질문 ID': '',
               '타입': 'Ranking Other',
-              'SPSS 변수명': `${q.questionCode}_R${k}_etc`,
+              'SPSS 변수명': `${q.questionCode}_rk${k}_etc`,
               '질문 제목': `  ${k}순위 기타 입력`,
               '값 라벨': '(기타 텍스트)',
             });
@@ -215,6 +251,42 @@ function generateVariableMap(survey: Survey) {
             if (!cell || !isCellInputable(cell)) return;
             // 셀코드가 의도적으로 비어있으면 내보내기에서 제외 (표시용 셀)
             if (cell.isCustomCellCode === true && !cell.cellCode) return;
+
+            // ranking 셀(Case 3): positions 만큼 _rk{k} / _rk{k}_etc 변수 행을 따로 생성
+            if (cell.type === 'ranking') {
+              const baseVarName = cell.cellCode
+                || buildTableCellVarName(q, row, colIndex, q.tableColumns!, q.tableRowsData!);
+              const opts = cell.rankingOptions ?? [];
+              const rankingValueLabels = opts.length > 0
+                ? opts.map((o, i) => `${o.spssNumericCode ?? i + 1}=${o.label}`).join(', ')
+                : '';
+              const positions = Math.max(1, cell.rankingConfig?.positions ?? 3);
+              for (let k = 1; k <= positions; k++) {
+                const rankVar = resolveRankVarName(
+                  baseVarName,
+                  cell.rankSuffixPattern,
+                  cell.rankVarNames,
+                  k,
+                );
+                mapData.push({
+                  '질문 ID': '',
+                  '타입': `Table (ranking ${k}순위)`,
+                  'SPSS 변수명': rankVar,
+                  '질문 제목': `  ${row.label} - ${col.label} (${k}순위)`,
+                  '값 라벨': rankingValueLabels || '(순위형 옵션 없음)',
+                });
+                if (cell.allowOtherOption) {
+                  mapData.push({
+                    '질문 ID': '',
+                    '타입': `Table (ranking ${k}순위 기타)`,
+                    'SPSS 변수명': `${rankVar}_etc`,
+                    '질문 제목': `  ${row.label} - ${col.label} - ${k}순위 기타 입력`,
+                    '값 라벨': '(기타 텍스트)',
+                  });
+                }
+              }
+              return;
+            }
 
             const varName = cell.cellCode || cell.exportLabel
               || `${q.questionCode}_${row.rowCode || row.label}_${col.columnCode || col.label}`;

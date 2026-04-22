@@ -7,5 +7,11 @@ import type { TableCell } from '@/types/survey';
 
 /** 사용자 입력이 가능한 셀 타입인지 판별 */
 export function isCellInputable(cell: TableCell): boolean {
-  return cell.type === 'checkbox' || cell.type === 'radio' || cell.type === 'select' || cell.type === 'input';
+  return (
+    cell.type === 'checkbox'
+    || cell.type === 'radio'
+    || cell.type === 'select'
+    || cell.type === 'input'
+    || cell.type === 'ranking'
+  );
 }

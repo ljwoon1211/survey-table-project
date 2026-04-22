@@ -1,16 +1,20 @@
 import type { Question, TableCell, TableColumn, TableRow } from '@/types/survey';
 
 import { generateAllOptionCodes } from './option-code-generator';
+import { sanitizeSpssVarName } from './spss-var-name';
 
-/** 입력 가능한 셀 타입 (SPSS 변수 생성 대상) */
-export const INTERACTIVE_CELL_TYPES = new Set(['checkbox', 'radio', 'select', 'input']);
-
-/** ranking 셀의 SPSS 변수 접미사 기본 템플릿 (Case 1 standalone 과 통일) */
-export const DEFAULT_RANK_SUFFIX_PATTERN = '_R{k}';
+/** 입력 가능한 셀 타입 (SPSS 변수 생성 대상 — ranking_opt 는 Case 2 옵션 소스로 숫자코드/변수타입 설정 필요) */
+export const INTERACTIVE_CELL_TYPES = new Set(['checkbox', 'radio', 'select', 'input', 'ranking_opt']);
 
 /**
- * ranking 셀의 SPSS 변수명을 생성한다.
- * 예: baseVarName='Q1_r01_c01', pattern='_R{k}', rank=2 → 'Q1_r01_c01_R2'
+ * ranking 셀(Case 3) + 질문 레벨 ranking(Case 1) 의 SPSS 변수 접미사 기본 템플릿.
+ * SPSS 변수명은 대소문자 미구분이므로 소문자 'rk' 사용.
+ */
+export const DEFAULT_RANK_SUFFIX_PATTERN = '_rk{k}';
+
+/**
+ * ranking 셀의 SPSS 변수명을 생성한다 (접미사 패턴 기반 자동 생성).
+ * 예: baseVarName='Q1_r01_c01', pattern='_rk{k}', rank=2 → 'Q1_r01_c01_rk2'
  * pattern 에 '{k}' 가 없으면 자동으로 뒤에 붙여 중복 변수명을 방지한다.
  */
 export function buildRankVarName(
@@ -22,6 +26,25 @@ export function buildRankVarName(
   const template = raw.includes('{k}') ? raw : `${raw}{k}`;
   const suffix = template.replace(/\{k\}/g, String(rank));
   return `${baseVarName}${suffix}`;
+}
+
+/**
+ * ranking 셀의 특정 rank 에 대한 SPSS 변수명을 결정한다.
+ * 우선순위: rankVarNames[rank-1] 수동 오버라이드 > 패턴 기반 자동 생성.
+ * 오버라이드 값은 SPSS 변수명 규격(영문/숫자/언더스코어, 최대 64자)에 맞게 sanitize.
+ */
+export function resolveRankVarName(
+  baseVarName: string,
+  pattern: string | undefined,
+  overrides: string[] | undefined,
+  rank: number,
+): string {
+  const override = overrides?.[rank - 1];
+  if (typeof override === 'string') {
+    const trimmed = override.trim();
+    if (trimmed.length > 0) return sanitizeSpssVarName(trimmed);
+  }
+  return buildRankVarName(baseVarName, pattern, rank);
 }
 
 /** 셀이 자동생성 대상인지 판별 (모든 타입, hidden만 제외) */
@@ -304,5 +327,7 @@ export function regenerateCellCodeForPaste(
     isCustomCellCode: false,
     exportLabel: generateExportLabel(questionTitle, columnLabel, rowLabel),
     isCustomExportLabel: false,
+    // ranking 셀: 순위별 수동 변수명은 원본 셀 전용이므로 새 셀에서 제거 → 자동 생성 폴백
+    rankVarNames: undefined,
   };
 }

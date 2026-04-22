@@ -5,6 +5,7 @@ import { flushSync } from 'react-dom';
 
 import { Input } from '@/components/ui/input';
 
+import { CellOptionsContainer } from './cell-options-container';
 import type { InteractiveCellProps } from './types';
 
 /** 라디오 셀 (인터랙티브) */
@@ -62,13 +63,7 @@ export const RadioCell = React.memo(function RadioCell({
   }
 
   return (
-    <div className="space-y-2">
-      {cell.content && cell.content.trim() && (
-        <div className="mb-3 text-sm font-medium whitespace-pre-wrap [overflow-wrap:anywhere] text-gray-700">
-          {cell.content}
-        </div>
-      )}
-
+    <CellOptionsContainer cell={cell}>
       {cell.radioOptions.map((option) => {
         const optionKey = option.value ?? option.id;
         const isSelected = (() => {
@@ -116,6 +111,6 @@ export const RadioCell = React.memo(function RadioCell({
           </div>
         );
       })}
-    </div>
+    </CellOptionsContainer>
   );
 });

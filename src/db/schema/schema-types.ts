@@ -106,6 +106,7 @@ export interface TableCell {
   radioGroupName?: string;
   selectOptions?: QuestionOption[];
   allowOtherOption?: boolean;
+  optionsColumns?: number;
   placeholder?: string;
   inputMaxLength?: number;
   minSelections?: number;
@@ -224,6 +225,7 @@ export interface QuestionData {
   videoUrl?: string;
   order: number;
   allowOtherOption?: boolean;
+  optionsColumns?: number;
   minSelections?: number;
   maxSelections?: number;
   noticeContent?: string;

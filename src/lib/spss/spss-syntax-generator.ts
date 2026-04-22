@@ -1,7 +1,8 @@
 import type { Question, QuestionOption, TableCell, TableRow } from '@/types/survey';
 
 import { getOtherOptionCode } from '@/utils/option-code-generator';
-import { buildRankVarName, buildTableCellVarName } from '@/utils/table-cell-code-generator';
+import { resolveRankingOptions } from '@/utils/ranking-source';
+import { buildTableCellVarName, resolveRankVarName } from '@/utils/table-cell-code-generator';
 
 /** SPSS 문자열 리터럴에서 작은따옴표를 이스케이프한다. */
 function esc(str: string): string {
@@ -14,6 +15,7 @@ interface TableRankingCellInfo {
   colIdx: number;
   baseVarName: string;
   suffixPattern: string | undefined;
+  varNameOverrides: string[] | undefined;
   rowLabel: string;
   colLabel: string;
   positions: number;
@@ -41,6 +43,7 @@ function collectTableRankingCells(q: Question): TableRankingCellInfo[] {
         colIdx,
         baseVarName,
         suffixPattern: cell.rankSuffixPattern,
+        varNameOverrides: cell.rankVarNames,
         rowLabel: row.label,
         colLabel: q.tableColumns[colIdx].label,
         positions: Math.max(1, cell.rankingConfig?.positions ?? 3),
@@ -79,19 +82,20 @@ export function generateVariableLabels(questions: Question[]): string {
       if (q.allowOtherOption) {
         lines.push(`  ${q.questionCode}_${getOtherOptionCode(q.options)}_etc '${esc(q.title)} - 기타 입력'`);
       }
-    } else if (q.type === 'ranking' && q.rankingConfig?.optionsSource !== 'table') {
+    } else if (q.type === 'ranking') {
+      // Case 1/2 공통 — 변수명 규칙 동일, Case 2 라벨 소스는 generateValueLabels 에서 다름
       const positions = Math.max(1, q.rankingConfig?.positions ?? 3);
       for (let k = 1; k <= positions; k++) {
-        lines.push(`  ${q.questionCode}_R${k} '${esc(q.title)} (${k}순위)'`);
+        lines.push(`  ${q.questionCode}_rk${k} '${esc(q.title)} (${k}순위)'`);
         if (q.allowOtherOption) {
-          lines.push(`  ${q.questionCode}_R${k}_etc '${esc(q.title)} - ${k}순위 기타 입력'`);
+          lines.push(`  ${q.questionCode}_rk${k}_etc '${esc(q.title)} - ${k}순위 기타 입력'`);
         }
       }
     } else if (q.type === 'table') {
       // table 질문의 Case 3 ranking 셀에 대한 변수 라벨
       for (const info of collectTableRankingCells(q)) {
         for (let k = 1; k <= info.positions; k++) {
-          const rankVar = buildRankVarName(info.baseVarName, info.suffixPattern, k);
+          const rankVar = resolveRankVarName(info.baseVarName, info.suffixPattern, info.varNameOverrides, k);
           lines.push(
             `  ${rankVar} '${esc(q.title)} - ${esc(info.rowLabel)} > ${esc(info.colLabel)} (${k}순위)'`,
           );
@@ -129,6 +133,25 @@ export function generateValueLabels(questions: Question[]): string {
       continue;
     }
 
+    // ranking: Case 1 + Case 2 공통 처리 — options 직접 사용 대신 resolveRankingOptions
+    if (q.type === 'ranking' && q.questionCode) {
+      const resolved = resolveRankingOptions(q);
+      if (resolved.length === 0) continue;
+      const positions = Math.max(1, q.rankingConfig?.positions ?? 3);
+      const valuePairs = resolved
+        .map((opt, idx) => {
+          const code = opt.spssNumericCode ?? idx + 1;
+          return `${code} '${esc(opt.label)}'`;
+        })
+        .join(' ');
+      const varNames = Array.from(
+        { length: positions },
+        (_, k) => `${q.questionCode}_rk${k + 1}`,
+      ).join(' ');
+      entries.push(`  ${varNames} ${valuePairs}`);
+      continue;
+    }
+
     if (!q.questionCode || !q.options || q.options.length === 0) continue;
 
     if (q.type === 'radio' || q.type === 'select') {
@@ -139,17 +162,6 @@ export function generateValueLabels(questions: Question[]): string {
         })
         .join(' ');
       entries.push(`  ${q.questionCode} ${valuePairs}`);
-    } else if (q.type === 'ranking' && q.rankingConfig?.optionsSource !== 'table') {
-      const positions = Math.max(1, q.rankingConfig?.positions ?? 3);
-      const valuePairs = q.options
-        .map((opt, idx) => {
-          const code = opt.spssNumericCode ?? idx + 1;
-          return `${code} '${esc(opt.label)}'`;
-        })
-        .join(' ');
-      // 모든 _R{k} 변수에 동일한 value set 공유
-      const varNames = Array.from({ length: positions }, (_, k) => `${q.questionCode}_R${k + 1}`).join(' ');
-      entries.push(`  ${varNames} ${valuePairs}`);
     } else if (q.type === 'checkbox') {
       for (let i = 0; i < q.options.length; i++) {
         const opt = q.options[i];
@@ -172,7 +184,7 @@ export function generateValueLabels(questions: Question[]): string {
         .join(' ');
       const varNames = Array.from(
         { length: info.positions },
-        (_, k) => buildRankVarName(info.baseVarName, info.suffixPattern, k + 1),
+        (_, k) => resolveRankVarName(info.baseVarName, info.suffixPattern, info.varNameOverrides, k + 1),
       ).join(' ');
       entries.push(`  ${varNames} ${valuePairs}`);
     }
@@ -216,19 +228,20 @@ export function generateVariableLevel(questions: Question[]): string {
       if (q.allowOtherOption) {
         scale.push(`${q.questionCode}_${getOtherOptionCode(q.options)}_etc`);
       }
-    } else if (q.type === 'ranking' && q.rankingConfig?.optionsSource !== 'table') {
+    } else if (q.type === 'ranking') {
+      // Case 1/2 공통 변수 레벨
       const positions = Math.max(1, q.rankingConfig?.positions ?? 3);
       for (let k = 1; k <= positions; k++) {
-        ordinal.push(`${q.questionCode}_R${k}`);
+        ordinal.push(`${q.questionCode}_rk${k}`);
         if (q.allowOtherOption) {
-          scale.push(`${q.questionCode}_R${k}_etc`);
+          scale.push(`${q.questionCode}_rk${k}_etc`);
         }
       }
     } else if (q.type === 'table') {
-      // table 질문의 Case 3 ranking 셀: _R{k} → ORDINAL, _R{k}_etc → SCALE (접미사 셀별 설정 반영)
+      // table 질문의 Case 3 ranking 셀: _rk{k} → ORDINAL, _rk{k}_etc → SCALE (접미사 셀별 설정 반영)
       for (const info of collectTableRankingCells(q)) {
         for (let k = 1; k <= info.positions; k++) {
-          const rankVar = buildRankVarName(info.baseVarName, info.suffixPattern, k);
+          const rankVar = resolveRankVarName(info.baseVarName, info.suffixPattern, info.varNameOverrides, k);
           ordinal.push(rankVar);
           if (info.allowOther) {
             scale.push(`${rankVar}_etc`);

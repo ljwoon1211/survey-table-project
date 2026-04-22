@@ -9,6 +9,7 @@ import { ImageCell } from './image-cell';
 import { InputCell } from './input-cell';
 import { RadioCell } from './radio-cell';
 import { RankingCell } from './ranking-cell';
+import { RankingOptCell } from './ranking-opt-cell';
 import { SelectCell } from './select-cell';
 import { TextCell } from './text-cell';
 import type { InteractiveCellProps } from './types';
@@ -38,6 +39,8 @@ const CellRouter = React.memo(function CellRouter({
       return <VideoCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} />;
     case 'ranking':
       return <RankingCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} />;
+    case 'ranking_opt':
+      return <RankingOptCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} />;
     case 'text':
     default:
       return <TextCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} />;

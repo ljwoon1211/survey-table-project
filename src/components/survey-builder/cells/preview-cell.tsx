@@ -7,6 +7,7 @@ import { Image, Video } from 'lucide-react';
 import type { TableCell } from '@/types/survey';
 
 import { getYouTubeEmbedUrl } from '../table-cell-renderers';
+import { CellOptionsContainer } from './cell-options-container';
 import { ImageCell } from './image-cell';
 
 /** 미리보기용 셀 컨텐츠 (읽기 전용) */
@@ -15,34 +16,39 @@ export const PreviewCell = React.memo(function PreviewCell({ cell }: { cell: Tab
 
   switch (cell.type) {
     case 'checkbox':
-      return cell.checkboxOptions && cell.checkboxOptions.length > 0 ? (
-        <div className="space-y-2">
-          {cell.content && cell.content.trim() && (
-            <div className="mb-3 text-sm font-medium whitespace-pre-wrap [overflow-wrap:anywhere] text-gray-700">
-              {cell.content}
-            </div>
-          )}
+      if (!cell.checkboxOptions || cell.checkboxOptions.length === 0) {
+        return (
+          <div className="flex items-center gap-2 text-gray-500">
+            <span className="text-sm">체크박스 없음</span>
+          </div>
+        );
+      }
+      return (
+        <CellOptionsContainer cell={cell}>
           {cell.checkboxOptions.map((option) => (
             <div key={option.id} className="flex items-center gap-2">
-              <input type="checkbox" checked={option.checked || false} readOnly className="rounded" />
+              <input
+                type="checkbox"
+                checked={option.checked || false}
+                readOnly
+                className="rounded"
+              />
               <span className="text-sm">{option.label}</span>
             </div>
           ))}
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 text-gray-500">
-          <span className="text-sm">체크박스 없음</span>
-        </div>
+        </CellOptionsContainer>
       );
 
     case 'radio':
-      return cell.radioOptions && cell.radioOptions.length > 0 ? (
-        <div className="space-y-2">
-          {cell.content && cell.content.trim() && (
-            <div className="mb-3 text-sm font-medium whitespace-pre-wrap [overflow-wrap:anywhere] text-gray-700">
-              {cell.content}
-            </div>
-          )}
+      if (!cell.radioOptions || cell.radioOptions.length === 0) {
+        return (
+          <div className="flex items-center gap-2 text-gray-500">
+            <span className="text-sm">라디오 버튼 없음</span>
+          </div>
+        );
+      }
+      return (
+        <CellOptionsContainer cell={cell}>
           {cell.radioOptions.map((option) => (
             <div key={option.id} className="flex items-center gap-2">
               <input
@@ -54,11 +60,7 @@ export const PreviewCell = React.memo(function PreviewCell({ cell }: { cell: Tab
               <span className="text-sm">{option.label}</span>
             </div>
           ))}
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 text-gray-500">
-          <span className="text-sm">라디오 버튼 없음</span>
-        </div>
+        </CellOptionsContainer>
       );
 
     case 'select':
@@ -164,6 +166,37 @@ export const PreviewCell = React.memo(function PreviewCell({ cell }: { cell: Tab
               최대 {cell.inputMaxLength}자
             </div>
           )}
+        </div>
+      );
+
+    case 'ranking_opt':
+      // 랭킹 옵션 소스 셀 — 읽기 전용으로 이미지 + 라벨 표시
+      return (
+        <div className="flex flex-col gap-1">
+          <span className="inline-flex w-fit items-center rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+            순위 옵션
+          </span>
+          {cell.imageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={cell.imageUrl}
+              alt={cell.rankingLabel || cell.content || '순위 옵션'}
+              className="h-16 w-full rounded object-cover"
+            />
+          )}
+          {(cell.rankingLabel || cell.content) && (
+            <div className="text-sm whitespace-pre-wrap text-gray-800 [overflow-wrap:anywhere]">
+              {cell.rankingLabel || cell.content}
+            </div>
+          )}
+        </div>
+      );
+
+    case 'ranking':
+      // 셀 내부 랭킹 (rk) — 프리뷰에서는 간단히 안내만
+      return (
+        <div className="text-xs text-gray-500">
+          (순위형 셀 · {cell.rankingOptions?.length ?? 0}개 옵션 · {cell.rankingConfig?.positions ?? 3}순위)
         </div>
       );
 

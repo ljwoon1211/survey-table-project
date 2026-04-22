@@ -38,6 +38,7 @@ import { BranchRuleEditor } from './branch-rule-editor';
 import { DynamicTableEditor } from './dynamic-table-editor';
 import { NoticeEditor } from './notice-editor';
 import { NoticeRenderer } from './notice-renderer';
+import { OptionsLayoutSelector } from './options-layout-selector';
 import { RankingConfigEditorForQuestion } from './ranking-config-editor';
 import { SpssVariableEditor } from './spss-variable-editor';
 import { TablePreview } from './table-preview';
@@ -104,7 +105,13 @@ export function QuestionBasicTab({
   updateLevelOption,
   removeLevelOption,
 }: QuestionBasicTabProps) {
-  const needsOptions = ['radio', 'checkbox', 'select', 'ranking'].includes(question.type);
+  // ranking + optionsSource='table' (자체 테이블 내장) 이면 수동 옵션 UI 숨김
+  const isRankingTableSource =
+    question.type === 'ranking' && formData.rankingConfig?.optionsSource === 'table';
+  const needsOptions =
+    ['radio', 'checkbox', 'select', 'ranking'].includes(question.type) && !isRankingTableSource;
+  // 자체 내장 테이블 편집기 노출 조건: table 타입 자체 OR ranking + optionsSource='table'
+  const showTableEditor = question.type === 'table' || isRankingTableSource;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -398,6 +405,11 @@ export function QuestionBasicTab({
         )}
       </div>
 
+      {/* 순위형(ranking) 설정 — 선택 옵션 블록 위로 배치해 항상 먼저 보이도록 */}
+      {question.type === 'ranking' && (
+        <RankingConfigEditorForQuestion formData={formData} setFormData={setFormData} />
+      )}
+
       {/* 옵션 설정 (radio, checkbox, select) */}
       {needsOptions && (
         <div className="space-y-4">
@@ -449,6 +461,16 @@ export function QuestionBasicTab({
           </div>
           {validationErrors.options && (
             <p className="text-sm text-red-500">{validationErrors.options}</p>
+          )}
+
+          {/* 응답 페이지에서 옵션 배치 방식 (select 는 드롭다운이라 의미 없어 숨김) */}
+          {question.type !== 'select' && (
+            <OptionsLayoutSelector
+              value={formData.optionsColumns}
+              onChange={(next) =>
+                setFormData((prev) => ({ ...prev, optionsColumns: next }))
+              }
+            />
           )}
 
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleOptionDragEnd}>
@@ -579,11 +601,6 @@ export function QuestionBasicTab({
               </p>
             )}
         </div>
-      )}
-
-      {/* 순위형(ranking) 설정 */}
-      {question.type === 'ranking' && (
-        <RankingConfigEditorForQuestion formData={formData} setFormData={setFormData} />
       )}
 
       {/* 다단계 Select 설정 */}
@@ -865,12 +882,16 @@ export function QuestionBasicTab({
       )}
 
       {/* 테이블 설정 */}
-      {question.type === 'table' && (
+      {showTableEditor && (
         <div className="space-y-6">
-          <Label className="text-lg font-medium">테이블 설정</Label>
+          <Label className="text-lg font-medium">
+            {isRankingTableSource ? '순위 옵션 테이블' : '테이블 설정'}
+          </Label>
 
           <div className="rounded bg-blue-50 p-2 text-xs text-blue-600">
-            💡 테이블 질문은 매트리스(고정 행) 패턴으로 자동 설정됩니다. 엑셀 내보내기 시 각 셀의 코드가 열 이름에 반영됩니다.
+            {isRankingTableSource
+              ? '💡 이 랭킹 질문 안에 표시될 설명 테이블입니다. 옵션으로 쓸 셀은 편집 모달의 "순위 옵션" 탭으로 저장하세요.'
+              : '💡 테이블 질문은 매트리스(고정 행) 패턴으로 자동 설정됩니다. 엑셀 내보내기 시 각 셀의 코드가 열 이름에 반영됩니다.'}
           </div>
 
           <DynamicTableEditor

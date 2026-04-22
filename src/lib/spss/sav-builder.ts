@@ -11,9 +11,21 @@ import {
   VariableType,
 } from 'sav-writer';
 
-import type { Question, SurveySubmission } from '@/types/survey';
+import type { Question, QuestionOption, SurveySubmission } from '@/types/survey';
 
 import { buildDataRows, generateSPSSColumns, SPSSExportColumn } from '@/lib/analytics/spss-excel-export';
+import { sanitizeSpssVarName } from '@/utils/spss-var-name';
+
+/** QuestionOption[] → SPSS value labels 배열. spssNumericCode 가 없으면 1-based 인덱스 사용. */
+function optionsToValueLabels(
+  opts: QuestionOption[] | undefined,
+): Array<{ value: string | number; label: string }> | undefined {
+  if (!opts || opts.length === 0) return undefined;
+  return opts.map((opt, i) => ({
+    value: opt.spssNumericCode ?? i + 1,
+    label: opt.label,
+  }));
+}
 
 // ── 상수 ──
 
@@ -160,13 +172,11 @@ function buildValueLabels(
 ): Array<{ label: string; value: string | number }> | undefined {
   switch (col.type) {
     case 'single':
-    case 'ranking-rank': {
-      if (!question?.options) return undefined;
-      return question.options.map((opt, i) => ({
-        value: opt.spssNumericCode ?? i + 1,
-        label: opt.label,
-      }));
-    }
+      return optionsToValueLabels(question?.options);
+
+    case 'ranking-rank':
+      // col.cellOptions 에 Case 1 (question.options) 또는 Case 2 (소스 테이블 ranking_opt) 주입됨
+      return optionsToValueLabels(col.cellOptions ?? question?.options);
 
     case 'checkbox-item': {
       const code = question?.options?.[col.optionIndex ?? 0]?.spssNumericCode
@@ -197,24 +207,16 @@ function buildValueLabels(
       }
 
       // radio/select: 셀의 옵션들
-      const cellOpts = findTableCellOptions(question, col.tableCellId, col.tableCellType || '');
-      if (!cellOpts || cellOpts.length === 0) return undefined;
-      return cellOpts.map((opt, i) => ({
-        value: opt.spssNumericCode ?? i + 1,
-        label: opt.label,
-      }));
+      return optionsToValueLabels(
+        findTableCellOptions(question, col.tableCellId, col.tableCellType || ''),
+      );
     }
 
-    case 'table-cell-ranking': {
-      // 셀의 rankingOptions 에서 value labels 구성 (컬럼 메타에 이미 담겨있음 → 폴백으로 findTableCellOptions)
-      const opts = col.cellOptions
-        ?? findTableCellOptions(question, col.tableCellId, 'ranking');
-      if (!opts || opts.length === 0) return undefined;
-      return opts.map((opt, i) => ({
-        value: opt.spssNumericCode ?? i + 1,
-        label: opt.label,
-      }));
-    }
+    case 'table-cell-ranking':
+      // 셀의 rankingOptions 에서 value labels 구성 (컬럼 메타 우선, 폴백 findTableCellOptions)
+      return optionsToValueLabels(
+        col.cellOptions ?? findTableCellOptions(question, col.tableCellId, 'ranking'),
+      );
 
     default:
       return undefined;
@@ -243,29 +245,7 @@ function findTableCellOptions(
   return undefined;
 }
 
-// ── SPSS 변수명 sanitize ──
-
-/**
- * SPSS 변수명 규격에 맞게 정리
- * - 영문/숫자/언더스코어만 허용
- * - 영문자 또는 @로 시작해야 함
- * - 최대 64자
- */
-function sanitizeSpssVarName(name: string): string {
-  // 비 ASCII 문자(한국어 등)를 제거하고, 허용되지 않는 문자를 언더스코어로 대체
-  let sanitized = name.replace(/[^a-zA-Z0-9_@$.#]/g, '_');
-  // 연속 언더스코어 정리
-  sanitized = sanitized.replace(/_+/g, '_').replace(/^_|_$/g, '');
-  // 숫자로 시작하면 V 접두사 추가
-  if (/^[0-9]/.test(sanitized)) {
-    sanitized = `V${sanitized}`;
-  }
-  // 빈 문자열 방지
-  if (!sanitized) {
-    sanitized = 'VAR';
-  }
-  return sanitized.slice(0, 64);
-}
+// ── SPSS 변수명 sanitize: '@/utils/spss-var-name' 에서 import ──
 
 // ── Short name 생성 ──
 

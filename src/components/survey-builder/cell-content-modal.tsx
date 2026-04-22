@@ -15,6 +15,7 @@ import {
   Image,
   ListOrdered,
   PenLine,
+  Tag,
   Type,
   Video,
   X,
@@ -60,8 +61,9 @@ import { useShallow } from 'zustand/react/shallow';
 
 import { CellChoiceEditor } from './cell-choice-editor';
 import { CellImageEditor } from './cell-image-editor';
-import { RankingConfigEditor } from './ranking-config-editor';
-import { RankingOptionsEditor } from './ranking-options-editor';
+import { OptionsLayoutSelector } from './options-layout-selector';
+import { RankingCellTab } from './ranking-cell-tab';
+import { RankingOptCellTab } from './ranking-opt-cell-tab';
 
 interface CellContentModalProps {
   isOpen: boolean;
@@ -93,15 +95,20 @@ export function CellContentModal({
   const questions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
   const ensureSurvey = useEnsureSurveyInDb();
   const [isSaving, setIsSaving] = useState(false);
-  // ranking_opt(Case 2 옵션 소스)는 Phase C 에서 별도 에디터 도입 예정 → 현재는 text 로 폴백.
-  // ranking(Case 3)은 이 모달의 8번째 탭으로 편집.
-  const narrowCellType = (
-    t: TableCell['type'] | undefined,
-  ): 'text' | 'image' | 'video' | 'checkbox' | 'radio' | 'select' | 'input' | 'ranking' =>
-    !t || t === 'ranking_opt' ? 'text' : t;
-  const [contentType, setContentType] = useState<
-    'text' | 'image' | 'video' | 'checkbox' | 'radio' | 'select' | 'input' | 'ranking'
-  >(narrowCellType(cell.type));
+  // ranking(Case 3) 은 8번째 탭, ranking_opt(Case 2 옵션 소스) 는 9번째 탭으로 편집.
+  type ContentType =
+    | 'text'
+    | 'image'
+    | 'video'
+    | 'checkbox'
+    | 'radio'
+    | 'select'
+    | 'input'
+    | 'ranking'
+    | 'ranking_opt';
+  const narrowCellType = (t: TableCell['type'] | undefined): ContentType =>
+    !t ? 'text' : t;
+  const [contentType, setContentType] = useState<ContentType>(narrowCellType(cell.type));
   const [textContent, setTextContent] = useState(cell.content || '');
   const [imageUrl, setImageUrl] = useState(cell.imageUrl || '');
   const [videoUrl, setVideoUrl] = useState(cell.videoUrl || '');
@@ -113,6 +120,9 @@ export function CellContentModal({
   const [radioGroupName, setRadioGroupName] = useState(cell.radioGroupName || '');
   const [selectOptions, setSelectOptions] = useState<QuestionOption[]>(cell.selectOptions || []);
   const [allowOtherOption, setAllowOtherOption] = useState(cell.allowOtherOption || false);
+  const [cellOptionsColumns, setCellOptionsColumns] = useState<number | undefined>(
+    cell.optionsColumns,
+  );
   const [inputPlaceholder, setInputPlaceholder] = useState(cell.placeholder || '');
   const [inputMaxLength, setInputMaxLength] = useState<number | ''>(cell.inputMaxLength || '');
   const [minSelections, setMinSelections] = useState<number | undefined>(cell.minSelections);
@@ -122,6 +132,13 @@ export function CellContentModal({
   const [rankingOptions, setRankingOptions] = useState<QuestionOption[]>(cell.rankingOptions || []);
   const [rankingConfig, setRankingConfig] = useState<RankingConfig | undefined>(cell.rankingConfig);
   const [rankSuffixPattern, setRankSuffixPattern] = useState<string>(cell.rankSuffixPattern || '');
+  const [rankVarNames, setRankVarNames] = useState<string[]>(cell.rankVarNames || []);
+
+  // 순위형 옵션 소스 셀(Case 2, ranking_opt) 전용 state
+  const [rankingLabel, setRankingLabel] = useState<string>(cell.rankingLabel || '');
+  const [cellSpssNumericCode, setCellSpssNumericCode] = useState<number | ''>(
+    cell.spssNumericCode ?? '',
+  );
 
   // 정렬 관련 state
   const [horizontalAlign, setHorizontalAlign] = useState<'left' | 'center' | 'right'>(
@@ -164,6 +181,7 @@ export function CellContentModal({
       setRadioGroupName(cell.radioGroupName || '');
       setSelectOptions(cell.selectOptions || []);
       setAllowOtherOption(cell.allowOtherOption || false);
+      setCellOptionsColumns(cell.optionsColumns);
       setInputPlaceholder(cell.placeholder || '');
       setInputMaxLength(cell.inputMaxLength || '');
       setMinSelections(cell.minSelections);
@@ -171,6 +189,9 @@ export function CellContentModal({
       setRankingOptions(cell.rankingOptions || []);
       setRankingConfig(cell.rankingConfig);
       setRankSuffixPattern(cell.rankSuffixPattern || '');
+      setRankVarNames(cell.rankVarNames || []);
+      setRankingLabel(cell.rankingLabel || '');
+      setCellSpssNumericCode(cell.spssNumericCode ?? '');
       setIsMergeEnabled(
         (cell.rowspan && cell.rowspan > 1) || (cell.colspan && cell.colspan > 1) || false,
       );
@@ -203,6 +224,25 @@ export function CellContentModal({
   }, []);
 
   const handleSave = async () => {
+    // 빌더 validator: ranking 셀은 옵션이 최소 1개 이상이어야 함.
+    if (contentType === 'ranking' && rankingOptions.length === 0) {
+      alert('순위형 셀은 최소 1개 이상의 옵션이 필요합니다.');
+      return;
+    }
+    // ranking_opt 셀은 content/rankingLabel/imageUrl/videoUrl 중 하나 이상 필요.
+    if (contentType === 'ranking_opt') {
+      const hasContent = !!(
+        textContent.trim()
+        || rankingLabel.trim()
+        || imageUrl.trim()
+        || videoUrl.trim()
+      );
+      if (!hasContent) {
+        alert('순위 옵션 소스 셀은 텍스트/라벨/이미지/비디오 중 하나 이상을 설정해야 합니다.');
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       const updatedCell: TableCell = {
@@ -219,6 +259,9 @@ export function CellContentModal({
         allowOtherOption: ['checkbox', 'radio', 'select', 'ranking'].includes(contentType)
           ? allowOtherOption
           : undefined,
+        optionsColumns: ['checkbox', 'radio', 'ranking'].includes(contentType)
+          ? cellOptionsColumns
+          : undefined,
         placeholder: contentType === 'input' ? inputPlaceholder : undefined,
         inputMaxLength:
           contentType === 'input' && typeof inputMaxLength === 'number'
@@ -233,6 +276,23 @@ export function CellContentModal({
         rankSuffixPattern:
           contentType === 'ranking' && rankSuffixPattern.trim().length > 0
             ? rankSuffixPattern.trim()
+            : undefined,
+        // rankVarNames: positions 초과분은 잘라내고, 모두 빈 문자열이면 배열 자체 제거.
+        rankVarNames: (() => {
+          if (contentType !== 'ranking') return undefined;
+          const positions = Math.max(1, rankingConfig?.positions ?? 3);
+          const trimmed = rankVarNames.slice(0, positions).map((n) => n.trim());
+          return trimmed.some((n) => n.length > 0) ? trimmed : undefined;
+        })(),
+        // 순위형 옵션 소스 셀 (Case 2)
+        rankingLabel:
+          contentType === 'ranking_opt' && rankingLabel.trim().length > 0
+            ? rankingLabel.trim()
+            : undefined,
+        // ranking_opt 전용 spssNumericCode (Case 2 SPSS 재-export 안정성)
+        spssNumericCode:
+          contentType === 'ranking_opt' && typeof cellSpssNumericCode === 'number'
+            ? cellSpssNumericCode
             : undefined,
         // 셀 병합 속성 추가
         rowspan: isMergeEnabled && typeof rowspan === 'number' && rowspan > 1 ? rowspan : undefined,
@@ -289,19 +349,21 @@ export function CellContentModal({
                 imageUrl: question.imageUrl,
                 videoUrl: question.videoUrl,
                 allowOtherOption: question.allowOtherOption,
+                optionsColumns: question.optionsColumns,
                 noticeContent: question.noticeContent,
                 requiresAcknowledgment: question.requiresAcknowledgment,
                 tableValidationRules: question.tableValidationRules,
                 displayCondition: question.displayCondition,
               });
 
-              // 반환된 UUID로 로컬 스토어의 질문 ID 업데이트
+              // 반환된 UUID로 로컬 스토어의 질문 ID 업데이트 + Case 2 참조 동기화
               if (createdQuestion?.id) {
+                const newId = createdQuestion.id;
                 useSurveyBuilderStore.setState((state) => ({
                   currentSurvey: {
                     ...state.currentSurvey,
                     questions: state.currentSurvey.questions.map((q) =>
-                      q.id === currentQuestionId ? { ...q, id: createdQuestion.id } : q,
+                      q.id === currentQuestionId ? { ...q, id: newId } : q,
                     ),
                   },
                 }));
@@ -509,15 +571,7 @@ export function CellContentModal({
         <Tabs
           value={contentType}
           onValueChange={(value) => {
-            const newType = value as
-              | 'text'
-              | 'image'
-              | 'video'
-              | 'checkbox'
-              | 'radio'
-              | 'select'
-              | 'input'
-              | 'ranking';
+            const newType = value as ContentType;
             setContentType(newType);
             // 셀 타입 변경 시 SPSS 필드 자동 처리
             if (INTERACTIVE_CELL_TYPES.has(newType)) {
@@ -560,7 +614,7 @@ export function CellContentModal({
             }
           }}
         >
-          <TabsList className="grid w-full grid-cols-8">
+          <TabsList className="grid w-full grid-cols-9">
             <TabsTrigger value="text" className="flex items-center gap-2">
               <Type className="h-4 w-4" />
               텍스트
@@ -592,6 +646,10 @@ export function CellContentModal({
             <TabsTrigger value="ranking" className="flex items-center gap-2">
               <ListOrdered className="h-4 w-4" />
               순위형
+            </TabsTrigger>
+            <TabsTrigger value="ranking_opt" className="flex items-center gap-2">
+              <Tag className="h-4 w-4" />
+              순위 옵션
             </TabsTrigger>
           </TabsList>
 
@@ -756,6 +814,10 @@ export function CellContentModal({
 
           {/* 체크박스 탭 */}
           <TabsContent value="checkbox" className="space-y-4">
+            <OptionsLayoutSelector
+              value={cellOptionsColumns}
+              onChange={setCellOptionsColumns}
+            />
             <CellChoiceEditor
               cellType="checkbox"
               textContent={textContent}
@@ -780,6 +842,10 @@ export function CellContentModal({
 
           {/* 라디오 버튼 탭 */}
           <TabsContent value="radio" className="space-y-4">
+            <OptionsLayoutSelector
+              value={cellOptionsColumns}
+              onChange={setCellOptionsColumns}
+            />
             <CellChoiceEditor
               cellType="radio"
               textContent={textContent}
@@ -828,76 +894,33 @@ export function CellContentModal({
 
           {/* 순위형(ranking) 탭 — Case 3 */}
           <TabsContent value="ranking" className="space-y-4">
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
-              <div className="flex items-start gap-2">
-                <ListOrdered className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600" />
-                <div>
-                  <p className="text-sm font-medium text-blue-900">순위형 셀 (Case 3)</p>
-                  <p className="mt-1 text-xs text-blue-700">
-                    셀 내부에 자체 옵션 리스트와 순위 설정을 가진 독립 랭킹 입력입니다. 응답은
-                    {' '}<code className="rounded bg-white px-1">_Rank1, _Rank2, ...</code>{' '}
-                    변수로 내보내기됩니다.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <RankingOptionsEditor options={rankingOptions} onChange={setRankingOptions} />
-
-            <div className="flex items-center justify-between gap-4 rounded-md border border-gray-200 p-3">
-              <div className="space-y-0.5">
-                <Label className="text-sm font-medium">기타 옵션 허용</Label>
-                <p className="text-xs text-gray-500">
-                  ON: 순위 드롭다운에 &quot;기타 (직접 입력)&quot; 옵션과 텍스트 필드가 표시됩니다.
-                </p>
-              </div>
-              <Switch
-                checked={allowOtherOption}
-                onCheckedChange={setAllowOtherOption}
-              />
-            </div>
-
-            <RankingConfigEditor
-              value={rankingConfig}
-              onChange={setRankingConfig}
-              optionsCount={rankingOptions.length}
+            <OptionsLayoutSelector
+              value={cellOptionsColumns}
+              onChange={setCellOptionsColumns}
             />
+            <RankingCellTab
+              cellCode={cellCode}
+              rankingOptions={rankingOptions}
+              onRankingOptionsChange={setRankingOptions}
+              rankingConfig={rankingConfig}
+              onRankingConfigChange={setRankingConfig}
+              allowOtherOption={allowOtherOption}
+              onAllowOtherOptionChange={setAllowOtherOption}
+              rankSuffixPattern={rankSuffixPattern}
+              onRankSuffixPatternChange={setRankSuffixPattern}
+              rankVarNames={rankVarNames}
+              onRankVarNamesChange={setRankVarNames}
+            />
+          </TabsContent>
 
-            {/* SPSS 변수 접미사 패턴 */}
-            <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
-              <Label htmlFor="rank-suffix-pattern" className="text-sm font-medium">
-                SPSS 변수 접미사 패턴
-              </Label>
-              <Input
-                id="rank-suffix-pattern"
-                value={rankSuffixPattern}
-                onChange={(e) => setRankSuffixPattern(e.target.value)}
-                placeholder="_R{k}"
-                className="font-mono text-sm"
-              />
-              <div className="space-y-1 text-xs text-gray-500">
-                <p>
-                  <code className="rounded bg-white px-1">{'{k}'}</code> 자리에 순위 번호(1, 2, 3…)가 채워집니다.
-                  비워두면 기본값 <code className="rounded bg-white px-1">_R{'{k}'}</code> 적용.
-                </p>
-                <p>
-                  예: 셀코드가 <code className="rounded bg-white px-1">{cellCode || 'Q1_r1_c1'}</code>,
-                  패턴이 <code className="rounded bg-white px-1">{rankSuffixPattern || '_R{k}'}</code> 이면
-                  {' '}<code className="rounded bg-white px-1">
-                    {`${cellCode || 'Q1_r1_c1'}${(rankSuffixPattern || '_R{k}').replace(/\{k\}/g, '1')}`}
-                  </code>,
-                  {' '}<code className="rounded bg-white px-1">
-                    {`${cellCode || 'Q1_r1_c1'}${(rankSuffixPattern || '_R{k}').replace(/\{k\}/g, '2')}`}
-                  </code>{' '}…
-                </p>
-                {rankSuffixPattern.trim().length > 0 && !rankSuffixPattern.includes('{k}') && (
-                  <p className="text-amber-600">
-                    ⚠ <code className="rounded bg-white px-1">{'{k}'}</code> 없이 저장하면 자동으로
-                    뒤에 붙어 중복 변수명을 방지합니다.
-                  </p>
-                )}
-              </div>
-            </div>
+          {/* 순위 옵션 소스(ranking_opt) 탭 — Case 2 */}
+          <TabsContent value="ranking_opt" className="space-y-4">
+            <RankingOptCellTab
+              rankingLabel={rankingLabel}
+              onRankingLabelChange={setRankingLabel}
+              spssNumericCode={cellSpssNumericCode}
+              onSpssNumericCodeChange={setCellSpssNumericCode}
+            />
           </TabsContent>
         </Tabs>
 

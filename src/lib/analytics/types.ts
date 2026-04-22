@@ -139,14 +139,31 @@ export interface CellAnalyticsRow {
 export interface CellAnalytics {
   cellId: string;
   columnLabel: string;
-  cellType: 'checkbox' | 'radio' | 'select' | 'input' | 'text' | 'image' | 'video';
+  cellType:
+    | 'checkbox'
+    | 'radio'
+    | 'select'
+    | 'input'
+    | 'text'
+    | 'image'
+    | 'video'
+    | 'ranking'
+    | 'merged-horizontal'
+    | 'merged-vertical'
+    | 'merged-hidden';
   // 체크박스
   checkedCount?: number;
   checkedRate?: number;
   // 라디오/셀렉트
   optionDistribution?: OptionDistribution[];
+  // 라디오/셀렉트 상세 value 분포 (analyzeTable 에서 사용하는 필드)
+  valueCounts?: Record<string, number>;
   // 입력
   textResponses?: string[];
+  // 순위형 셀 (Case 3)
+  rankingPositions?: number;
+  rankingDistribution?: RankingOptionDistribution[];
+  rankingMaxPossibleScore?: number;
 }
 
 export interface RowSummary {

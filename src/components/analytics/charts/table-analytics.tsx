@@ -1,10 +1,10 @@
 'use client';
 
 import { Badge, BarChart, Card, Tab, TabGroup, TabList, TabPanel, TabPanels } from '@tremor/react';
-import { BarChart3, Grid3X3, Table } from 'lucide-react';
+import { BarChart3, Grid3X3, ListOrdered, Table } from 'lucide-react';
 
 import { formatPercentage } from '@/lib/analytics/analyzer';
-import type { TableAnalytics } from '@/lib/analytics/types';
+import type { RankingOptionDistribution, TableAnalytics } from '@/lib/analytics/types';
 
 interface TableAnalyticsChartProps {
   data: TableAnalytics;
@@ -80,6 +80,15 @@ export function TableAnalyticsChart({ data }: TableAnalyticsChartProps) {
     responses: string[];
   }> = [];
 
+  // 6. 순위형(ranking) 셀 집계 수집 (Case 3)
+  const rankingCellData: Array<{
+    rowLabel: string;
+    colLabel: string;
+    positions: number;
+    maxPossibleScore: number;
+    distribution: RankingOptionDistribution[];
+  }> = [];
+
   data.cellAnalytics?.forEach((row) => {
     row.cells.forEach((cell: any) => {
       if (cell.textResponses && cell.textResponses.length > 0) {
@@ -87,6 +96,15 @@ export function TableAnalyticsChart({ data }: TableAnalyticsChartProps) {
           rowLabel: row.rowLabel,
           colLabel: cell.columnLabel,
           responses: cell.textResponses,
+        });
+      }
+      if (cell.cellType === 'ranking' && Array.isArray(cell.rankingDistribution)) {
+        rankingCellData.push({
+          rowLabel: row.rowLabel,
+          colLabel: cell.columnLabel,
+          positions: cell.rankingPositions ?? 3,
+          maxPossibleScore: cell.rankingMaxPossibleScore ?? 0,
+          distribution: cell.rankingDistribution,
         });
       }
     });
@@ -124,6 +142,13 @@ export function TableAnalyticsChart({ data }: TableAnalyticsChartProps) {
                   <Tab key="text" icon={Table}>
                     주관식 답변 (
                     {textResponseData.reduce((acc, curr) => acc + curr.responses.length, 0)})
+                  </Tab>,
+                ]
+              : []),
+            ...(rankingCellData.length > 0
+              ? [
+                  <Tab key="ranking" icon={ListOrdered}>
+                    순위형 셀 ({rankingCellData.length})
                   </Tab>,
                 ]
               : []),
@@ -262,6 +287,82 @@ export function TableAnalyticsChart({ data }: TableAnalyticsChartProps) {
                             </li>
                           ))}
                         </ul>
+                      </div>
+                    ))}
+                  </div>
+                </TabPanel>,
+              ]
+            : []}
+
+          {/* 4. 순위형(ranking) 셀 집계 */}
+          {...rankingCellData.length > 0
+            ? [
+                <TabPanel key="ranking-panel">
+                  <div className="mt-6 space-y-6">
+                    {rankingCellData.map((item, idx) => (
+                      <div key={idx} className="rounded-lg border bg-gray-50 p-4">
+                        <h4 className="mb-3 flex items-center gap-2 font-semibold text-gray-900">
+                          <Badge size="xs" color="gray">
+                            {item.rowLabel}
+                          </Badge>
+                          <span className="text-gray-400">/</span>
+                          <span className="text-gray-700">{item.colLabel}</span>
+                          <span className="ml-2 text-xs text-gray-500">
+                            1~{item.positions}순위 · 최대 총점 {item.maxPossibleScore}
+                          </span>
+                        </h4>
+                        {item.distribution.length === 0 ? (
+                          <p className="text-sm text-gray-500">아직 응답이 없습니다.</p>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full border-collapse text-sm">
+                              <thead>
+                                <tr className="border-b border-gray-200 bg-white">
+                                  <th className="px-3 py-2 text-left font-medium text-gray-700">
+                                    옵션
+                                  </th>
+                                  <th className="px-3 py-2 text-right font-medium text-gray-700">
+                                    총점
+                                  </th>
+                                  <th className="px-3 py-2 text-right font-medium text-gray-700">
+                                    평균 순위
+                                  </th>
+                                  {Array.from({ length: item.positions }, (_, k) => (
+                                    <th
+                                      key={k}
+                                      className="px-3 py-2 text-right font-medium text-gray-700"
+                                    >
+                                      {k + 1}순위
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {item.distribution.map((d) => (
+                                  <tr
+                                    key={d.value}
+                                    className="border-b border-gray-100 hover:bg-white"
+                                  >
+                                    <td className="px-3 py-2 font-medium text-gray-900">
+                                      {d.label}
+                                    </td>
+                                    <td className="px-3 py-2 text-right font-bold text-gray-900">
+                                      {d.totalScore}
+                                    </td>
+                                    <td className="px-3 py-2 text-right text-gray-600">
+                                      {d.avgRank !== undefined ? d.avgRank.toFixed(2) : '-'}
+                                    </td>
+                                    {Array.from({ length: item.positions }, (_, k) => (
+                                      <td key={k} className="px-3 py-2 text-right text-gray-600">
+                                        {d.rankCounts?.[k] ?? 0}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

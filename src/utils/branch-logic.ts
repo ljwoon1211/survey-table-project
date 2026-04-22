@@ -34,9 +34,38 @@ export function getBranchRuleForResponse(question: Question, response: unknown):
       return getBranchRuleForSelect(question, response);
     case 'table':
       return getBranchRuleForTable(question, response);
+    case 'ranking':
+      return getBranchRuleForRanking(question, response);
     default:
       return null;
   }
+}
+
+/**
+ * 순위형(ranking) 응답의 분기 규칙 찾기.
+ * - rankingConfig.branchRankPosition (기본 1) 에 해당하는 순위의 optionValue 를 찾음
+ * - 그 옵션의 branchRule 반환 (기타/orphan 은 null)
+ * - Case 2 는 optionValue 가 cell.id 이므로 question.options 로는 찾지 못함 → 현재는 Case 1 만 지원
+ */
+function getBranchRuleForRanking(question: Question, response: unknown): BranchRule | null {
+  if (!Array.isArray(response)) return null;
+  if (!question.options || question.options.length === 0) return null;
+
+  const branchRank = question.rankingConfig?.branchRankPosition ?? 1;
+  const entry = (response as Array<{ rank?: unknown; optionValue?: unknown }>).find(
+    (a) =>
+      !!a
+      && typeof a === 'object'
+      && a.rank === branchRank
+      && typeof a.optionValue === 'string',
+  );
+  if (!entry || typeof entry.optionValue !== 'string') return null;
+
+  // Case 2 (optionsSource='table') 는 optionValue 가 cell.id 라 question.options 와 매칭 안됨 → 미지원
+  if (question.rankingConfig?.optionsSource === 'table') return null;
+
+  const selected = question.options.find((opt) => opt.value === entry.optionValue);
+  return selected?.branchRule ?? null;
 }
 
 /**

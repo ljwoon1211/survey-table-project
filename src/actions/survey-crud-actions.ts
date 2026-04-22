@@ -252,6 +252,8 @@ export async function duplicateSurvey(surveyId: string) {
         imageUrl: question.imageUrl,
         videoUrl: question.videoUrl,
         allowOtherOption: question.allowOtherOption,
+        optionsColumns: question.optionsColumns,
+        rankingConfig: question.rankingConfig as NewQuestion['rankingConfig'],
         noticeContent: question.noticeContent,
         requiresAcknowledgment: question.requiresAcknowledgment,
         placeholder: question.placeholder,

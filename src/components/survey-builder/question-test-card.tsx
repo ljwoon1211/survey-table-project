@@ -8,6 +8,7 @@ import { convertHtmlImageUrlsToProxy } from '@/lib/image-utils';
 import { isEmptyHtml } from '@/lib/utils';
 import { useTestResponseStore } from '@/stores/test-response-store';
 import { Question } from '@/types/survey';
+import { getOptionsLayout } from '@/utils/options-layout';
 
 import { RankingQuestion } from '@/components/survey-response/ranking-question';
 
@@ -96,8 +97,10 @@ function RadioTestInput({
     return value === optionValue;
   };
 
+  const layout = getOptionsLayout(question.optionsColumns);
+
   return (
-    <div className="space-y-3">
+    <div className={layout.className} style={layout.style}>
       {question.options?.map((option) => (
         <div key={option.id} className="space-y-2">
           <div className="flex items-center space-x-3">
@@ -238,8 +241,10 @@ function CheckboxTestInput({
     return true;
   };
 
+  const layout = getOptionsLayout(question.optionsColumns);
+
   return (
-    <div className="space-y-3">
+    <div className={layout.className} style={layout.style}>
       {question.options?.map((option) => {
         const checked = isChecked(option.value);
         const disabled = !canSelect(option.value);

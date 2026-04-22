@@ -20,6 +20,8 @@ export function sanitizeCellForLibrary(cell: TableCell): Partial<TableCell> {
     imageUrl: _imageUrl,
     // 제거 대상: 라디오 그룹명 (테이블 위치에 종속)
     radioGroupName: _radioGroupName,
+    // 제거 대상: 순위별 수동 SPSS 변수명 (원본 셀 전용, 다른 위치에 로드되면 충돌)
+    rankVarNames: _rankVarNames,
     // 보존 대상
     ...rest
   } = cell;
@@ -96,6 +98,8 @@ export function restoreCellFromLibrary(
     colspan: targetCell.colspan,
     isHidden: targetCell.isHidden,
     radioGroupName: targetCell.radioGroupName,
+    // 순위별 수동 변수명은 셀 위치 종속이라 로드 시 강제 초기화 (legacy 라이브러리 데이터 가드)
+    rankVarNames: undefined,
   } as TableCell;
 }
 
@@ -166,8 +170,17 @@ export function isCellSaveable(cell: TableCell): boolean {
   if (cell.type === 'ranking') {
     return (cell.rankingOptions?.length ?? 0) > 0;
   }
+  if (cell.type === 'ranking_opt') {
+    // content/rankingLabel/imageUrl/videoUrl 중 하나라도 있으면 저장 가능
+    return !!(
+      (cell.content ?? '').trim()
+      || (cell.rankingLabel ?? '').trim()
+      || cell.imageUrl
+      || cell.videoUrl
+    );
+  }
 
-  // input, video, ranking_opt 등은 항상 저장 가능
+  // input, video 등은 항상 저장 가능
   return true;
 }
 

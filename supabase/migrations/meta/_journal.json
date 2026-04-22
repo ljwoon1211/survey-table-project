@@ -71,6 +71,13 @@
       "when": 1776824711975,
       "tag": "0009_pink_spirit",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777000000000,
+      "tag": "0010_add_options_columns",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,5 @@
 import type { Question, QuestionOption, RankingAnswer } from '@/types/survey';
-
-const RANKING_OTHER_VALUE = '__other__';
+import { RANKING_OTHER_VALUE } from '@/utils/ranking-shared';
 
 export interface SPSSColumn {
   spssVarName: string;
@@ -92,12 +91,15 @@ export function transformOtherOption(
 }
 
 /**
- * 순위형(ranking) 응답에서 특정 rank 의 선택된 옵션 숫자코드를 반환한다.
- * - 기타 선택(optionValue='__other__')은 Numeric 변수에서 system-missing (null)
- *   → 기타 텍스트는 `_R{rank}_etc` 문자열 변수에서 별도 저장
+ * 순위형(ranking) 응답에서 특정 rank 의 선택된 옵션 숫자코드를 반환한다 (옵션 주입형).
+ * - Case 1 (standalone): question.options 전달
+ * - Case 2 (table source): resolveRankingOptions 결과 전달
+ * - Case 3 (table cell-internal): cell.rankingOptions 전달
+ * - 기타 선택(optionValue='__other__')은 Numeric 변수에서 system-missing (null).
+ *   기타 텍스트는 `_etc` 문자열 변수에서 별도 저장.
  */
-export function transformRanking(
-  question: Question,
+export function transformRankingWithOptions(
+  options: QuestionOption[] | undefined,
   value: unknown,
   rank: number,
 ): number | null {
@@ -109,28 +111,11 @@ export function transformRanking(
   );
   if (!entry) return null;
   if (entry.optionValue === RANKING_OTHER_VALUE) return null;
-  return getNumericCode(question.options, entry.optionValue);
+  return getNumericCode(options, entry.optionValue);
 }
 
-/**
- * 테이블 셀 내부 랭킹(Case 3) 응답에서 특정 rank 의 선택된 옵션 숫자코드를 반환한다.
- * - 옵션 소스가 질문의 options 가 아닌 셀의 rankingOptions 라는 점이 Case 1 과 다름.
- */
-export function transformCellRanking(
-  cellOptions: QuestionOption[] | undefined,
-  value: unknown,
-  rank: number,
-): number | null {
-  if (!Array.isArray(value)) return null;
-  const entry = (value as unknown[]).find(
-    (a): a is RankingAnswer =>
-      !!a && typeof a === 'object' && (a as RankingAnswer).rank === rank
-        && typeof (a as RankingAnswer).optionValue === 'string',
-  );
-  if (!entry) return null;
-  if (entry.optionValue === RANKING_OTHER_VALUE) return null;
-  return getNumericCode(cellOptions, entry.optionValue);
-}
+/** Case 3 (테이블 셀 내부) 별칭 — transformRankingWithOptions 과 동일 로직. */
+export const transformCellRanking = transformRankingWithOptions;
 
 /**
  * 순위형(ranking) 응답에서 특정 rank 의 기타 텍스트를 반환한다.

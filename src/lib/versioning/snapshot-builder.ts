@@ -41,6 +41,8 @@ interface SnapshotQuestion {
   videoUrl?: string;
   order: number;
   allowOtherOption?: boolean;
+  optionsColumns?: number;
+  rankingConfig?: Question['rankingConfig'];
   minSelections?: number;
   maxSelections?: number;
   noticeContent?: string;
@@ -98,6 +100,8 @@ export function buildSurveySnapshot(survey: Survey): SurveySnapshot {
       videoUrl: q.videoUrl,
       order: q.order,
       allowOtherOption: q.allowOtherOption,
+      optionsColumns: q.optionsColumns,
+      rankingConfig: q.rankingConfig,
       minSelections: q.minSelections,
       maxSelections: q.maxSelections,
       noticeContent: q.noticeContent,

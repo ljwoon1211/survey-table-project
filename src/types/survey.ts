@@ -14,7 +14,12 @@ export interface RankingConfig {
   positions: number; // 매길 순위 개수 (1~10, 기본 3)
   allowDuplicateRanks?: boolean; // 중복 선택 허용 (기본 false)
   requireAllPositions?: boolean; // 모든 순위 입력 필수 (기본 false, required 와 별도)
-  optionsSource?: 'manual' | 'table'; // 질문 레벨 전용. 'table' 이면 Case 2 (tableRowsData 의 ranking_opt 셀이 옵션 소스)
+  // 옵션 소스:
+  // - 'manual' (기본): question.options 직접 입력
+  // - 'table': 이 질문 자신의 tableRowsData 내 ranking_opt(rnk) 셀이 옵션 소스. 질문 안에 설명 테이블 내장 가능
+  optionsSource?: 'manual' | 'table';
+  // branchRule 판정 기준 순위 (기본 1 — 1순위로 선택된 옵션 기준으로 분기 평가).
+  branchRankPosition?: number;
 }
 
 // 순위형 응답 단일 항목
@@ -121,6 +126,8 @@ export interface TableCell {
   // SPSS 변수 타입 / 측정 수준 (셀 단위)
   spssVarType?: 'Numeric' | 'String' | 'Date' | 'DateTime';
   spssMeasure?: 'Nominal' | 'Ordinal' | 'Continuous';
+  // SPSS 숫자코드 (ranking_opt 셀이 Case 2 옵션 소스로 쓰일 때 사용. 비어있으면 1-based 인덱스 자동)
+  spssNumericCode?: number;
   content: string;
   imageUrl?: string;
   videoUrl?: string;
@@ -141,6 +148,9 @@ export interface TableCell {
   // select 관련 속성
   selectOptions?: QuestionOption[];
   allowOtherOption?: boolean; // 기타 옵션 허용 여부 (ranking 셀에서도 재사용)
+  // 셀 내부 옵션 리스트 배치 (radio/checkbox/ranking 셀 공통)
+  // undefined/1 = 세로 1열(기본) / 0 = 가로 한 줄(wrap) / N ≥ 2 = N열 그리드
+  optionsColumns?: number;
   // input 관련 속성
   placeholder?: string; // 단문형 입력 필드 placeholder
   inputMaxLength?: number; // 단문형 입력 필드 최대 길이
@@ -150,9 +160,13 @@ export interface TableCell {
   // 순위형 셀 (type='ranking') — 셀 자체가 독립 랭킹 질문
   rankingConfig?: RankingConfig;
   rankingOptions?: QuestionOption[]; // 셀별 옵션 리스트
-  // SPSS 변수명 접미사 템플릿 (기본 '_R{k}', Case 1 standalone 과 통일)
-  // {k} 는 rank 번호(1-based)로 치환. 예: '_R{k}' → _R1/_R2, '_Rank{k}' → _Rank1/_Rank2
+  // SPSS 변수명 접미사 템플릿 (기본 '_rk{k}').
+  // {k} 는 rank 번호(1-based)로 치환. 예: '_rk{k}' → _rk1/_rk2, '_rnk{k}' → _rnk1/_rnk2
+  // SPSS 변수명은 대소문자 미구분이므로 소문자 권장.
   rankSuffixPattern?: string;
+  // 각 순위별 SPSS 변수명 수동 오버라이드 (배열 index = rank-1).
+  // 특정 항목이 비어있으면 rankSuffixPattern 기반 자동 생성으로 폴백.
+  rankVarNames?: string[];
   // ranking_opt 셀 (type='ranking_opt') — Case 2 의 옵션 소스로 쓰일 때의 라벨
   // 이미지/비디오 셀이면 필수, 텍스트 셀이면 비워두고 content 평문을 자동 사용
   rankingLabel?: string;
@@ -282,6 +296,9 @@ export interface Question {
   videoUrl?: string;
   order: number;
   allowOtherOption?: boolean; // 기타 옵션 허용 여부 (radio, checkbox, select용)
+  // 옵션 리스트 렌더 방식 (radio/checkbox/ranking 공통)
+  // undefined 또는 1 = 세로 1열(기본) / 0 = 가로 한 줄(wrap) / N ≥ 2 = N열 그리드
+  optionsColumns?: number;
   // 체크박스 선택 개수 제한 (checkbox 타입 전용)
   minSelections?: number; // 최소 선택 개수
   maxSelections?: number; // 최대 선택 개수

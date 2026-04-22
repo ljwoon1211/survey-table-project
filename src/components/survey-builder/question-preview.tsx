@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { convertHtmlImageUrlsToProxy } from '@/lib/image-utils';
 import { isEmptyHtml } from '@/lib/utils';
 import { Question } from '@/types/survey';
+import { getOptionsLayout } from '@/utils/options-layout';
 
 import { NoticeRenderer } from './notice-renderer';
 import { TablePreview } from './table-preview';
@@ -31,9 +32,10 @@ export function QuestionPreview({ question }: { question: Question }) {
       );
 
     case 'radio':
-    case 'checkbox':
+    case 'checkbox': {
+      const layout = getOptionsLayout(question.optionsColumns);
       return (
-        <div className="space-y-2">
+        <div className={layout.className} style={layout.style}>
           {question.options?.map((option) => (
             <div key={option.id} className="flex items-center space-x-2">
               <input type={question.type} name={question.id} disabled className="text-blue-500" />
@@ -42,6 +44,7 @@ export function QuestionPreview({ question }: { question: Question }) {
           ))}
         </div>
       );
+    }
 
     case 'select':
       return (
@@ -61,29 +64,8 @@ export function QuestionPreview({ question }: { question: Question }) {
         <div className="text-sm text-gray-400">다단계 Select가 설정되지 않았습니다.</div>
       );
 
-    case 'ranking': {
-      const positions = Math.max(1, question.rankingConfig?.positions ?? 3);
-      const optionsCount = question.options?.length ?? 0;
-      const renderPositions = Math.min(positions, Math.max(optionsCount, 1));
-      return (
-        <div className="space-y-2">
-          {Array.from({ length: renderPositions }, (_, i) => i + 1).map((rank) => (
-            <div key={rank} className="flex items-center gap-2">
-              <span className="w-12 shrink-0 text-sm font-medium text-gray-700">{rank}순위</span>
-              <select
-                disabled
-                className="w-full rounded-md border border-gray-200 bg-white p-2 text-sm"
-              >
-                <option>선택하세요...</option>
-                {question.options?.map((o) => (
-                  <option key={o.id}>{o.label}</option>
-                ))}
-              </select>
-            </div>
-          ))}
-        </div>
-      );
-    }
+    case 'ranking':
+      return <RankingPreview question={question} />;
 
     case 'table':
       return question.tableColumns && question.tableRowsData ? (
@@ -114,4 +96,67 @@ export function QuestionPreview({ question }: { question: Question }) {
     default:
       return <div className="text-sm text-gray-400">미리보기 준비 중...</div>;
   }
+}
+
+/** 순위형 질문 미리보기: 드롭다운 스택 + (옵션 목록 | 내장 테이블) */
+function RankingPreview({ question }: { question: Question }) {
+  const positions = Math.max(1, question.rankingConfig?.positions ?? 3);
+  const optionsCount = question.options?.length ?? 0;
+  const renderPositions = Math.min(positions, Math.max(optionsCount, 1));
+  const layout = getOptionsLayout(question.optionsColumns);
+  const isTableSource = question.rankingConfig?.optionsSource === 'table';
+  const hasEmbeddedTable =
+    isTableSource
+    && !!question.tableColumns
+    && question.tableColumns.length > 0
+    && !!question.tableRowsData
+    && question.tableRowsData.length > 0;
+
+  return (
+    <div className="space-y-3">
+      <div className={layout.className} style={layout.style}>
+        {Array.from({ length: renderPositions }, (_, i) => i + 1).map((rank) => (
+          <div key={rank} className="flex items-center gap-2">
+            <span className="w-12 shrink-0 text-sm font-medium text-gray-700">{rank}순위</span>
+            <select
+              disabled
+              className="w-full rounded-md border border-gray-200 bg-white p-2 text-sm"
+            >
+              <option>선택하세요...</option>
+              {question.options?.map((o) => (
+                <option key={o.id}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </div>
+
+      {hasEmbeddedTable ? (
+        <TablePreview
+          tableTitle={question.tableTitle}
+          columns={question.tableColumns}
+          rows={question.tableRowsData}
+          tableHeaderGrid={question.tableHeaderGrid}
+          className="border-0 shadow-none"
+          hideColumnLabels={question.hideColumnLabels}
+        />
+      ) : (
+        optionsCount > 0 && (
+          <div
+            className={`rounded-md border border-gray-200 bg-gray-50/50 p-3 text-sm ${layout.className}`}
+            style={layout.style}
+          >
+            {question.options?.map((opt) => (
+              <div
+                key={opt.id}
+                className="whitespace-pre-wrap text-gray-800 [overflow-wrap:anywhere]"
+              >
+                {opt.label}
+              </div>
+            ))}
+          </div>
+        )
+      )}
+    </div>
+  );
 }

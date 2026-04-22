@@ -7,6 +7,7 @@ import { NoticeRenderer } from '@/components/survey-builder/notice-renderer';
 import { UserDefinedMultiLevelSelect } from '@/components/survey-builder/user-defined-multi-level-select';
 import { Input } from '@/components/ui/input';
 import { Question, QuestionOption, RankingAnswer } from '@/types/survey';
+import { getOptionsLayout } from '@/utils/options-layout';
 
 import { RankingQuestion } from './ranking-question';
 
@@ -217,8 +218,10 @@ function RadioQuestion({
     return value === optionValue;
   };
 
+  const layout = getOptionsLayout(question.optionsColumns);
+
   return (
-    <div className="space-y-3">
+    <div className={layout.className} style={layout.style}>
       {question.options?.map((option: QuestionOption) => (
         <div key={option.id} className="space-y-2">
           <div className="flex items-center space-x-3">
@@ -357,8 +360,10 @@ function CheckboxQuestion({
     return true;
   };
 
+  const layout = getOptionsLayout(question.optionsColumns);
+
   return (
-    <div className="space-y-3">
+    <div className={layout.className} style={layout.style}>
       {question.options?.map((option: QuestionOption) => {
         const checked = isChecked(option.value);
         const disabled = !canSelect(option.value);

@@ -36,6 +36,7 @@ export async function createQuestion(data: {
   imageUrl?: string;
   videoUrl?: string;
   allowOtherOption?: boolean;
+  optionsColumns?: number;
   minSelections?: number;
   maxSelections?: number;
   noticeContent?: string;
@@ -77,6 +78,7 @@ export async function createQuestion(data: {
     imageUrl: data.imageUrl,
     videoUrl: data.videoUrl,
     allowOtherOption: data.allowOtherOption,
+    optionsColumns: data.optionsColumns,
     minSelections: data.minSelections,
     maxSelections: data.maxSelections,
     noticeContent: data.noticeContent,
@@ -119,6 +121,7 @@ export async function updateQuestion(
     imageUrl: string;
     videoUrl: string;
     allowOtherOption: boolean;
+    optionsColumns: number;
     minSelections: number;
     maxSelections: number;
     noticeContent: string;
@@ -155,6 +158,7 @@ export async function updateQuestion(
   if (data.imageUrl !== undefined) allowed.imageUrl = data.imageUrl;
   if (data.videoUrl !== undefined) allowed.videoUrl = data.videoUrl;
   if (data.allowOtherOption !== undefined) allowed.allowOtherOption = data.allowOtherOption;
+  if (data.optionsColumns !== undefined) allowed.optionsColumns = data.optionsColumns;
   if (data.minSelections !== undefined) allowed.minSelections = data.minSelections;
   if (data.maxSelections !== undefined) allowed.maxSelections = data.maxSelections;
   if (data.noticeContent !== undefined) allowed.noticeContent = data.noticeContent;

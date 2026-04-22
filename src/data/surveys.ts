@@ -144,6 +144,8 @@ export async function getSurveyWithDetails(surveyId: string): Promise<SurveyType
         videoUrl: q.videoUrl ?? undefined,
         order: q.order,
         allowOtherOption: q.allowOtherOption ?? undefined,
+        optionsColumns: q.optionsColumns ?? undefined,
+        rankingConfig: (q as any).rankingConfig as QuestionType['rankingConfig'],
         minSelections: q.minSelections ?? undefined,
         maxSelections: q.maxSelections ?? undefined,
         noticeContent: q.noticeContent ?? undefined,

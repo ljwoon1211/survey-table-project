@@ -10,15 +10,15 @@
 import type { Question, QuestionOption, SurveySubmission, TableCell, TableRow } from '@/types/survey';
 
 import {
-  transformCellRanking,
-  transformRanking,
   transformRankingOtherText,
+  transformRankingWithOptions,
   transformSingleChoice,
   transformTableCell,
   transformText,
 } from '@/lib/spss/data-transformer';
 import { getOtherOptionCode } from '@/utils/option-code-generator';
-import { buildRankVarName, buildTableCellVarName } from '@/utils/table-cell-code-generator';
+import { resolveRankingOptions } from '@/utils/ranking-source';
+import { buildTableCellVarName, resolveRankVarName } from '@/utils/table-cell-code-generator';
 
 export interface SPSSExportColumn {
   spssVarName: string;
@@ -140,22 +140,24 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
           type: 'other-text',
         });
       }
-    } else if (q.type === 'ranking' && q.rankingConfig?.optionsSource !== 'table') {
-      // Case 1 (standalone ranking): Q{n}_R{k} + Q{n}_R{k}_etc (옵션 선택 시)
-      // Case 2 (optionsSource='table')는 Phase C 에서 처리
+    } else if (q.type === 'ranking') {
+      // Case 1 (standalone): question.options / Case 2 (table source): ranking_opt 셀
+      const resolvedOptions = resolveRankingOptions(q);
       const positions = Math.max(1, q.rankingConfig?.positions ?? 3);
       for (let k = 1; k <= positions; k++) {
         columns.push({
-          spssVarName: `${q.questionCode}_R${k}`,
+          spssVarName: `${q.questionCode}_rk${k}`,
           questionText: q.title,
           optionLabel: `${k}순위`,
           questionId: q.id,
           type: 'ranking-rank',
           rankIndex: k,
+          // Case 2 value labels / 응답값 변환을 위해 해결된 옵션을 주입
+          cellOptions: resolvedOptions,
         });
         if (q.allowOtherOption) {
           columns.push({
-            spssVarName: `${q.questionCode}_R${k}_etc`,
+            spssVarName: `${q.questionCode}_rk${k}_etc`,
             questionText: q.title,
             optionLabel: `${k}순위 기타 입력`,
             questionId: q.id,
@@ -188,14 +190,19 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
             || buildTableCellVarName(q, tRow, colIdx, q.tableColumns, q.tableRowsData!);
 
           // ranking 셀 (Case 3): positions 만큼 {baseVarName}{접미사} 변수 생성.
-          // 접미사는 셀의 rankSuffixPattern (기본 '_R{k}') 으로 결정.
+          // 접미사는 셀의 rankSuffixPattern (기본 '_rk{k}') 으로 결정. rankVarNames 오버라이드 우선.
           if (cell.type === 'ranking') {
             const rowLabel = tRow.label;
             const colLabel = q.tableColumns[colIdx].label;
             const cellOptions = cell.rankingOptions ?? [];
             const positions = Math.max(1, cell.rankingConfig?.positions ?? 3);
             for (let k = 1; k <= positions; k++) {
-              const rankVarName = buildRankVarName(varName, cell.rankSuffixPattern, k);
+              const rankVarName = resolveRankVarName(
+                varName,
+                cell.rankSuffixPattern,
+                cell.rankVarNames,
+                k,
+              );
               columns.push({
                 spssVarName: rankVarName,
                 questionText: q.title,
@@ -528,7 +535,8 @@ export function buildDataRows(
 
         case 'ranking-rank':
           if (col.rankIndex == null) return null;
-          return transformRanking(question, rawValue, col.rankIndex);
+          // col.cellOptions 에 Case 1/2 해결된 옵션 리스트가 있음 (generateSPSSColumns에서 주입)
+          return transformRankingWithOptions(col.cellOptions, rawValue, col.rankIndex);
 
         case 'ranking-other':
           if (col.rankIndex == null) return null;
@@ -539,7 +547,7 @@ export function buildDataRows(
           if (!rawValue || typeof rawValue !== 'object') return null;
           const tableAnswer = rawValue as Record<string, unknown>;
           const cellVal = tableAnswer[col.tableCellId];
-          return transformCellRanking(col.cellOptions, cellVal, col.rankIndex);
+          return transformRankingWithOptions(col.cellOptions, cellVal, col.rankIndex);
         }
 
         case 'table-cell-ranking-other': {

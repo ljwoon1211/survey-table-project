@@ -4,6 +4,7 @@ import React, { useCallback } from 'react';
 
 import { Input } from '@/components/ui/input';
 
+import { CellOptionsContainer } from './cell-options-container';
 import type { InteractiveCellProps } from './types';
 
 /** 체크박스 셀 (인터랙티브) */
@@ -84,14 +85,23 @@ export const CheckboxCell = React.memo(function CheckboxCell({
     );
   }
 
-  return (
-    <div className="space-y-2">
-      {cell.content && cell.content.trim() && (
-        <div className="mb-3 text-sm font-medium whitespace-pre-wrap [overflow-wrap:anywhere] text-gray-700">
-          {cell.content}
+  const footer =
+    maxSelections !== undefined || minSelections !== undefined ? (
+      <div className="mt-2 border-t border-gray-200 pt-2">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-gray-600">
+            {maxSelections !== undefined && maxSelections > 0
+              ? `${currentCount}/${maxSelections}개 선택됨`
+              : `${currentCount}개 선택됨`}
+          </span>
+          {isMinNotMet && <span className="text-orange-600">최소 {minSelections}개 이상</span>}
+          {isMaxReached && <span className="text-blue-600">최대 도달</span>}
         </div>
-      )}
+      </div>
+    ) : null;
 
+  return (
+    <CellOptionsContainer cell={cell} footer={footer}>
       {cell.checkboxOptions.map((option) => {
         const optionKey = option.value ?? option.id;
         const isChecked = cellResponseArray.some((item) => {
@@ -149,22 +159,6 @@ export const CheckboxCell = React.memo(function CheckboxCell({
           </div>
         );
       })}
-
-      {(maxSelections !== undefined || minSelections !== undefined) && (
-        <div className="mt-2 border-t border-gray-200 pt-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-gray-600">
-              {maxSelections !== undefined && maxSelections > 0
-                ? `${currentCount}/${maxSelections}개 선택됨`
-                : `${currentCount}개 선택됨`}
-            </span>
-            {isMinNotMet && (
-              <span className="text-orange-600">최소 {minSelections}개 이상</span>
-            )}
-            {isMaxReached && <span className="text-blue-600">최대 도달</span>}
-          </div>
-        </div>
-      )}
-    </div>
+    </CellOptionsContainer>
   );
 });

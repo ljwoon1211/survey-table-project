@@ -29,6 +29,7 @@ import { deleteImagesFromR2 } from '@/lib/image-utils';
 import { isValidUUID } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { Question } from '@/types/survey';
+import { collectRankingOptCells } from '@/utils/ranking-source';
 import { useShallow } from 'zustand/react/shallow';
 
 import { QuestionBasicTab } from './question-basic-tab';
@@ -151,6 +152,8 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         tableRowsData: (question as any).tableRowsData ? [...(question as any).tableRowsData] : [],
         tableHeaderGrid: (question as any).tableHeaderGrid || undefined,
         allowOtherOption: (question as any).allowOtherOption || false,
+        optionsColumns: (question as any).optionsColumns,
+        rankingConfig: (question as any).rankingConfig,
         minSelections: (question as any).minSelections,
         maxSelections: (question as any).maxSelections,
         noticeContent: (question as any).noticeContent || '',
@@ -186,7 +189,11 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
     if (!question) return false;
 
     const currentFormData = formDataRef.current;
-    const needsOptions = ['radio', 'checkbox', 'select', 'ranking'].includes(question.type);
+    // Case 2 (ranking + optionsSource='table') 는 manual options 검증 스킵
+    const isRankingTableSource =
+      question.type === 'ranking' && currentFormData.rankingConfig?.optionsSource === 'table';
+    const needsOptions =
+      ['radio', 'checkbox', 'select', 'ranking'].includes(question.type) && !isRankingTableSource;
     const needsSelectLevels = question.type === 'multiselect';
     const errors: Record<string, string> = {};
 
@@ -200,6 +207,15 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
 
     if (needsSelectLevels && (!currentFormData.selectLevels || currentFormData.selectLevels.length === 0)) {
       errors.selectLevels = '최소 하나의 선택 레벨이 필요합니다.';
+    }
+
+    // 질문 내장 테이블 옵션: tableRowsData 에 ranking_opt 셀이 최소 1개는 있어야 함
+    if (isRankingTableSource) {
+      const hasRankingOpt = collectRankingOptCells(currentFormData.tableRowsData).length > 0;
+      if (!hasRankingOpt) {
+        errors.rankingOptions =
+          '질문 내장 테이블에 "순위 옵션" 셀이 최소 1개는 있어야 합니다. 테이블 편집기에서 옵션으로 쓸 셀을 클릭 → 셀 편집 모달의 "순위 옵션" 탭으로 저장하세요.';
+      }
     }
 
     setValidationErrors(errors);
@@ -286,6 +302,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
               imageUrl: currentFormData.imageUrl || question?.imageUrl,
               videoUrl: currentFormData.videoUrl || question?.videoUrl,
               allowOtherOption: currentFormData.allowOtherOption ?? question?.allowOtherOption,
+              optionsColumns: currentFormData.optionsColumns ?? question?.optionsColumns,
               minSelections: currentFormData.minSelections ?? question?.minSelections,
               maxSelections: currentFormData.maxSelections ?? question?.maxSelections,
               noticeContent: currentFormData.noticeContent || question?.noticeContent,
@@ -315,11 +332,12 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
               }));
             }
             if (createdQuestion?.id && createdQuestion.id !== questionId) {
+              const newId = createdQuestion.id;
               useSurveyBuilderStore.setState((state) => ({
                 currentSurvey: {
                   ...state.currentSurvey,
                   questions: state.currentSurvey.questions.map((q) =>
-                    q.id === questionId ? { ...q, id: createdQuestion.id } : q,
+                    q.id === questionId ? { ...q, id: newId } : q,
                   ),
                 },
               }));
@@ -511,7 +529,14 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                 </div>
               )}
               {Object.keys(validationErrors).length > 0 && !isSaving && (
-                <span className="text-red-600">입력 정보를 확인해주세요</span>
+                <div className="space-y-0.5">
+                  <div className="text-sm font-medium text-red-600">입력 정보를 확인해주세요</div>
+                  {Object.entries(validationErrors).map(([key, msg]) => (
+                    <div key={key} className="text-xs text-red-600">
+                      • {msg}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
