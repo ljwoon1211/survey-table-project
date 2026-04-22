@@ -1,4 +1,4 @@
-import type { Question, RankingAnswer } from '@/types/survey';
+import type { Question, QuestionOption, RankingAnswer } from '@/types/survey';
 
 const RANKING_OTHER_VALUE = '__other__';
 
@@ -22,7 +22,7 @@ interface CheckboxResult {
  * 옵션의 SPSS 숫자코드를 반환한다.
  * spssNumericCode가 있으면 사용, 없으면 1-based 인덱스 사용.
  */
-function getNumericCode(options: Question['options'], optionId: string): number | null {
+function getNumericCode(options: QuestionOption[] | undefined, optionId: string): number | null {
   if (!options) return null;
   const idx = options.findIndex((o) => o.id === optionId || o.value === optionId);
   if (idx === -1) return null;
@@ -113,7 +113,28 @@ export function transformRanking(
 }
 
 /**
+ * 테이블 셀 내부 랭킹(Case 3) 응답에서 특정 rank 의 선택된 옵션 숫자코드를 반환한다.
+ * - 옵션 소스가 질문의 options 가 아닌 셀의 rankingOptions 라는 점이 Case 1 과 다름.
+ */
+export function transformCellRanking(
+  cellOptions: QuestionOption[] | undefined,
+  value: unknown,
+  rank: number,
+): number | null {
+  if (!Array.isArray(value)) return null;
+  const entry = (value as unknown[]).find(
+    (a): a is RankingAnswer =>
+      !!a && typeof a === 'object' && (a as RankingAnswer).rank === rank
+        && typeof (a as RankingAnswer).optionValue === 'string',
+  );
+  if (!entry) return null;
+  if (entry.optionValue === RANKING_OTHER_VALUE) return null;
+  return getNumericCode(cellOptions, entry.optionValue);
+}
+
+/**
  * 순위형(ranking) 응답에서 특정 rank 의 기타 텍스트를 반환한다.
+ * Case 1(질문 레벨) / Case 3(셀 레벨) 공통.
  */
 export function transformRankingOtherText(
   value: unknown,

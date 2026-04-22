@@ -14,31 +14,27 @@ const MAX_POSITIONS = 10;
 const DEFAULT_POSITIONS = 3;
 
 interface RankingConfigEditorProps {
-  formData: Partial<Question>;
-  setFormData: React.Dispatch<React.SetStateAction<Partial<Question>>>;
+  value: RankingConfig | undefined;
+  onChange: (next: RankingConfig) => void;
+  optionsCount?: number;
 }
 
 /**
- * 순위형(ranking) 질문 전용 설정 에디터.
+ * 순위형(ranking) 설정 에디터 (일반화된 value/onChange 시그니처).
  * - positions: 매길 순위 개수 (1~10)
  * - allowDuplicateRanks: 중복 선택 허용
  * - requireAllPositions: 모든 순위 입력 필수
- * Case 2 전환용 optionsSource 토글은 Phase C 에서 추가 예정.
+ * Case 1 질문 레벨 / Case 3 셀 레벨 모두 사용 가능.
  */
-export function RankingConfigEditor({ formData, setFormData }: RankingConfigEditorProps) {
-  const config: RankingConfig = formData.rankingConfig ?? { positions: DEFAULT_POSITIONS };
-  const optionsCount = formData.options?.length ?? 0;
+export function RankingConfigEditor({ value, onChange, optionsCount = 0 }: RankingConfigEditorProps) {
+  const config: RankingConfig = value ?? { positions: DEFAULT_POSITIONS };
   const exceedsOptions = !config.allowDuplicateRanks && config.positions > optionsCount;
 
   const updateConfig = (patch: Partial<RankingConfig>) => {
-    setFormData((prev) => ({
-      ...prev,
-      rankingConfig: {
-        positions: DEFAULT_POSITIONS,
-        ...(prev.rankingConfig ?? {}),
-        ...patch,
-      },
-    }));
+    onChange({
+      ...config,
+      ...patch,
+    });
   };
 
   const handlePositionsChange = (raw: string) => {
@@ -109,5 +105,24 @@ export function RankingConfigEditor({ formData, setFormData }: RankingConfigEdit
         />
       </div>
     </div>
+  );
+}
+
+interface RankingConfigEditorForQuestionProps {
+  formData: Partial<Question>;
+  setFormData: React.Dispatch<React.SetStateAction<Partial<Question>>>;
+}
+
+/** 질문(Case 1) 폼 상태 어댑터 — 기존 호출부 호환. */
+export function RankingConfigEditorForQuestion({
+  formData,
+  setFormData,
+}: RankingConfigEditorForQuestionProps) {
+  return (
+    <RankingConfigEditor
+      value={formData.rankingConfig}
+      onChange={(next) => setFormData((prev) => ({ ...prev, rankingConfig: next }))}
+      optionsCount={formData.options?.length ?? 0}
+    />
   );
 }

@@ -5,6 +5,25 @@ import { generateAllOptionCodes } from './option-code-generator';
 /** 입력 가능한 셀 타입 (SPSS 변수 생성 대상) */
 export const INTERACTIVE_CELL_TYPES = new Set(['checkbox', 'radio', 'select', 'input']);
 
+/** ranking 셀의 SPSS 변수 접미사 기본 템플릿 (Case 1 standalone 과 통일) */
+export const DEFAULT_RANK_SUFFIX_PATTERN = '_R{k}';
+
+/**
+ * ranking 셀의 SPSS 변수명을 생성한다.
+ * 예: baseVarName='Q1_r01_c01', pattern='_R{k}', rank=2 → 'Q1_r01_c01_R2'
+ * pattern 에 '{k}' 가 없으면 자동으로 뒤에 붙여 중복 변수명을 방지한다.
+ */
+export function buildRankVarName(
+  baseVarName: string,
+  pattern: string | undefined,
+  rank: number,
+): string {
+  const raw = pattern && pattern.trim().length > 0 ? pattern.trim() : DEFAULT_RANK_SUFFIX_PATTERN;
+  const template = raw.includes('{k}') ? raw : `${raw}{k}`;
+  const suffix = template.replace(/\{k\}/g, String(rank));
+  return `${baseVarName}${suffix}`;
+}
+
 /** 셀이 자동생성 대상인지 판별 (모든 타입, hidden만 제외) */
 function isAutoGeneratable(cell: TableCell): boolean {
   return !cell.isHidden;

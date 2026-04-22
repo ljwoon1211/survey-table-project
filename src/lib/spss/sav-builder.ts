@@ -51,6 +51,7 @@ function resolveVarType(col: SPSSExportColumn, question: Question | undefined): 
     case 'notice-agree':
     case 'ranking-rank':
     case 'radio-group':
+    case 'table-cell-ranking':
       return VariableType.Numeric;
 
     case 'text':
@@ -58,6 +59,7 @@ function resolveVarType(col: SPSSExportColumn, question: Question | undefined): 
     case 'ranking-other':
     case 'multiselect':
     case 'notice-date':
+    case 'table-cell-ranking-other':
       return VariableType.String;
 
     case 'table-cell':
@@ -89,7 +91,7 @@ function resolveMeasure(col: SPSSExportColumn, question: Question | undefined): 
   }
 
   // ranking 순위 변수는 Ordinal (Kendall's W 등 순위통계 지원)
-  if (col.type === 'ranking-rank') {
+  if (col.type === 'ranking-rank' || col.type === 'table-cell-ranking') {
     return VariableMeasure.Ordinal;
   }
 
@@ -120,6 +122,22 @@ function buildLabel(col: SPSSExportColumn): string {
       return `${col.questionText} (${col.rankIndex}순위)`;
     case 'ranking-other':
       return `${col.questionText} - ${col.rankIndex}순위 기타 입력`;
+    case 'table-cell-ranking': {
+      const loc = col.rowLabel && col.colLabel
+        ? `${col.rowLabel} > ${col.colLabel}`
+        : col.optionLabel;
+      return loc
+        ? `${col.questionText} - ${loc} (${col.rankIndex}순위)`
+        : `${col.questionText} (${col.rankIndex}순위)`;
+    }
+    case 'table-cell-ranking-other': {
+      const loc = col.rowLabel && col.colLabel
+        ? `${col.rowLabel} > ${col.colLabel}`
+        : col.optionLabel;
+      return loc
+        ? `${col.questionText} - ${loc} - ${col.rankIndex}순위 기타 입력`
+        : `${col.questionText} - ${col.rankIndex}순위 기타 입력`;
+    }
     case 'table-cell':
       return col.optionLabel
         ? `${col.questionText} - ${col.optionLabel}`
@@ -160,12 +178,12 @@ function buildValueLabels(
       return [{ value: 1, label: '동의' }];
 
     case 'radio-group': {
-      // radio-group: generateSPSSColumns가 미리 계산한 valueLabels를 그대로 사용
+      // radio-group: generateSPSSColumns가 미리 계산한 valueLabels를 그대로 사용.
+      // SPSS Variable View에서 작은 값부터 표시되도록 명시적 ascending 정렬.
       if (!col.radioGroupValueLabels) return undefined;
-      return Object.entries(col.radioGroupValueLabels).map(([value, label]) => ({
-        value: Number(value),
-        label,
-      }));
+      return Object.entries(col.radioGroupValueLabels)
+        .map(([value, label]) => ({ value: Number(value), label }))
+        .sort((a, b) => Number(a.value) - Number(b.value));
     }
 
     case 'table-cell': {
@@ -182,6 +200,17 @@ function buildValueLabels(
       const cellOpts = findTableCellOptions(question, col.tableCellId, col.tableCellType || '');
       if (!cellOpts || cellOpts.length === 0) return undefined;
       return cellOpts.map((opt, i) => ({
+        value: opt.spssNumericCode ?? i + 1,
+        label: opt.label,
+      }));
+    }
+
+    case 'table-cell-ranking': {
+      // 셀의 rankingOptions 에서 value labels 구성 (컬럼 메타에 이미 담겨있음 → 폴백으로 findTableCellOptions)
+      const opts = col.cellOptions
+        ?? findTableCellOptions(question, col.tableCellId, 'ranking');
+      if (!opts || opts.length === 0) return undefined;
+      return opts.map((opt, i) => ({
         value: opt.spssNumericCode ?? i + 1,
         label: opt.label,
       }));
@@ -207,6 +236,7 @@ function findTableCellOptions(
         if (cellType === 'radio') return cell.radioOptions;
         if (cellType === 'select') return cell.selectOptions;
         if (cellType === 'checkbox') return cell.checkboxOptions;
+        if (cellType === 'ranking') return cell.rankingOptions;
       }
     }
   }

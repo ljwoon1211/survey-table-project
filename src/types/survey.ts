@@ -150,6 +150,9 @@ export interface TableCell {
   // 순위형 셀 (type='ranking') — 셀 자체가 독립 랭킹 질문
   rankingConfig?: RankingConfig;
   rankingOptions?: QuestionOption[]; // 셀별 옵션 리스트
+  // SPSS 변수명 접미사 템플릿 (기본 '_R{k}', Case 1 standalone 과 통일)
+  // {k} 는 rank 번호(1-based)로 치환. 예: '_R{k}' → _R1/_R2, '_Rank{k}' → _Rank1/_Rank2
+  rankSuffixPattern?: string;
   // ranking_opt 셀 (type='ranking_opt') — Case 2 의 옵션 소스로 쓰일 때의 라벨
   // 이미지/비디오 셀이면 필수, 텍스트 셀이면 비워두고 content 평문을 자동 사용
   rankingLabel?: string;

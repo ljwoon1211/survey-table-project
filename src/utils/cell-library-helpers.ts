@@ -74,6 +74,12 @@ export function restoreCellFromLibrary(
       id: generateId(),
     }));
   }
+  if (data.rankingOptions) {
+    data.rankingOptions = data.rankingOptions.map((opt) => ({
+      ...opt,
+      id: generateId(),
+    }));
+  }
 
   return {
     // 보관함에서 가져오는 속성 (기본값 포함)
@@ -119,6 +125,14 @@ export function getCellPreviewText(cell: Partial<TableCell>): string {
       return '(이미지)';
     case 'video':
       return cell.content ? cell.content.slice(0, 30) : '(비디오)';
+    case 'ranking':
+      if (cell.rankingOptions && cell.rankingOptions.length > 0) {
+        const positions = cell.rankingConfig?.positions ?? 3;
+        return `🥇 ${positions}순위 · ${cell.rankingOptions.map((o) => o.label).join(', ')}`;
+      }
+      return '(빈 순위형)';
+    case 'ranking_opt':
+      return cell.rankingLabel || cell.content || '(순위 옵션 소스)';
     case 'text':
     default:
       return cell.content ? cell.content.slice(0, 30) : '';
@@ -149,8 +163,11 @@ export function isCellSaveable(cell: TableCell): boolean {
   if (cell.type === 'select') {
     return (cell.selectOptions?.length ?? 0) > 0;
   }
+  if (cell.type === 'ranking') {
+    return (cell.rankingOptions?.length ?? 0) > 0;
+  }
 
-  // input, video 등은 항상 저장 가능
+  // input, video, ranking_opt 등은 항상 저장 가능
   return true;
 }
 

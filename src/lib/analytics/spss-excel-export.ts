@@ -7,9 +7,10 @@
  *
  * 과거 엑셀 Blob/워크북/코딩북 헬퍼는 UI에서 제거됨에 따라 함께 삭제되었다.
  */
-import type { Question, SurveySubmission, TableCell, TableRow } from '@/types/survey';
+import type { Question, QuestionOption, SurveySubmission, TableCell, TableRow } from '@/types/survey';
 
 import {
+  transformCellRanking,
   transformRanking,
   transformRankingOtherText,
   transformSingleChoice,
@@ -17,20 +18,38 @@ import {
   transformText,
 } from '@/lib/spss/data-transformer';
 import { getOtherOptionCode } from '@/utils/option-code-generator';
-import { buildTableCellVarName } from '@/utils/table-cell-code-generator';
+import { buildRankVarName, buildTableCellVarName } from '@/utils/table-cell-code-generator';
 
 export interface SPSSExportColumn {
   spssVarName: string;
   questionText: string;
   optionLabel: string;
   questionId: string;
-  type: 'single' | 'checkbox-item' | 'text' | 'multiselect' | 'table-cell' | 'other-text' | 'notice-agree' | 'notice-date' | 'ranking-rank' | 'ranking-other' | 'radio-group';
+  type:
+    | 'single'
+    | 'checkbox-item'
+    | 'text'
+    | 'multiselect'
+    | 'table-cell'
+    | 'other-text'
+    | 'notice-agree'
+    | 'notice-date'
+    | 'ranking-rank'
+    | 'ranking-other'
+    | 'radio-group'
+    | 'table-cell-ranking'
+    | 'table-cell-ranking-other';
   optionIndex?: number;
   optionValue?: string;
   tableCellId?: string;
   tableCellType?: string;
-  // ranking-rank / ranking-other 전용: 1-based 순위 인덱스
+  // ranking-rank / ranking-other / table-cell-ranking(-other) 전용: 1-based 순위 인덱스
   rankIndex?: number;
+  // table-cell-ranking(-other) 전용: 행/열 라벨 (SPSS 변수 라벨 생성용)
+  rowLabel?: string;
+  colLabel?: string;
+  // table-cell-ranking(-other) 전용: 셀의 랭킹 옵션 (value labels / 응답값 변환용)
+  cellOptions?: QuestionOption[];
   // 셀 단위 SPSS 오버라이드
   cellSpssVarType?: 'Numeric' | 'String' | 'Date' | 'DateTime';
   cellSpssMeasure?: 'Nominal' | 'Ordinal' | 'Continuous';
@@ -158,8 +177,8 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
           if (!cell) continue;
           // radioGroup 그룹에 속한 셀은 스킵 (그룹 변수로 이미 emit됨)
           if (groupedCellIds.has(cell.id)) continue;
-          // 입력 불가능한 셀(text, image, video)은 건너뛰기
-          if (!['checkbox', 'radio', 'select', 'input'].includes(cell.type)) continue;
+          // 입력 불가능한 셀(text, image, video, ranking_opt)은 건너뛰기
+          if (!['checkbox', 'radio', 'select', 'input', 'ranking'].includes(cell.type)) continue;
           // 셀코드가 의도적으로 비어있으면 내보내기에서 제외 (표시용 셀)
           if (cell.isCustomCellCode === true && !cell.cellCode) continue;
 
@@ -167,6 +186,46 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
           // exportLabel은 한국어가 포함될 수 있어 SPSS 변수명으로 부적합
           const varName = cell.cellCode
             || buildTableCellVarName(q, tRow, colIdx, q.tableColumns, q.tableRowsData!);
+
+          // ranking 셀 (Case 3): positions 만큼 {baseVarName}{접미사} 변수 생성.
+          // 접미사는 셀의 rankSuffixPattern (기본 '_R{k}') 으로 결정.
+          if (cell.type === 'ranking') {
+            const rowLabel = tRow.label;
+            const colLabel = q.tableColumns[colIdx].label;
+            const cellOptions = cell.rankingOptions ?? [];
+            const positions = Math.max(1, cell.rankingConfig?.positions ?? 3);
+            for (let k = 1; k <= positions; k++) {
+              const rankVarName = buildRankVarName(varName, cell.rankSuffixPattern, k);
+              columns.push({
+                spssVarName: rankVarName,
+                questionText: q.title,
+                optionLabel: `${k}순위`,
+                questionId: q.id,
+                type: 'table-cell-ranking',
+                tableCellId: cell.id,
+                tableCellType: 'ranking',
+                rankIndex: k,
+                rowLabel,
+                colLabel,
+                cellOptions,
+              });
+              if (cell.allowOtherOption) {
+                columns.push({
+                  spssVarName: `${rankVarName}_etc`,
+                  questionText: q.title,
+                  optionLabel: `${k}순위 기타 입력`,
+                  questionId: q.id,
+                  type: 'table-cell-ranking-other',
+                  tableCellId: cell.id,
+                  tableCellType: 'ranking',
+                  rankIndex: k,
+                  rowLabel,
+                  colLabel,
+                });
+              }
+            }
+            continue;
+          }
 
           // checkbox 셀: checkboxOptions가 있으면 옵션별 분리 변수 생성
           if (cell.type === 'checkbox' && cell.checkboxOptions && cell.checkboxOptions.length > 0) {
@@ -324,6 +383,11 @@ function collectAndEmitRadioGroupColumns(
       radioGroupName: groupName,
       radioGroupCellValueMap: cellValueMap,
       radioGroupValueLabels: valueLabels,
+      // 그룹 멤버들의 셀 단위 SPSS 오버라이드를 그룹 컬럼에 전파.
+      // 사용자가 5점 척도 셀에 spssMeasure='Continuous'를 명시한 경우 등을 보존.
+      // 멤버들이 서로 다른 값을 가질 가능성은 낮으므로 첫 멤버의 값을 채택.
+      cellSpssVarType: members[0].cell.spssVarType,
+      cellSpssMeasure: members[0].cell.spssMeasure,
     });
 
     members.forEach((m) => groupedCellIds.add(m.cell.id));
@@ -469,6 +533,22 @@ export function buildDataRows(
         case 'ranking-other':
           if (col.rankIndex == null) return null;
           return transformRankingOtherText(rawValue, col.rankIndex);
+
+        case 'table-cell-ranking': {
+          if (col.rankIndex == null || !col.tableCellId) return null;
+          if (!rawValue || typeof rawValue !== 'object') return null;
+          const tableAnswer = rawValue as Record<string, unknown>;
+          const cellVal = tableAnswer[col.tableCellId];
+          return transformCellRanking(col.cellOptions, cellVal, col.rankIndex);
+        }
+
+        case 'table-cell-ranking-other': {
+          if (col.rankIndex == null || !col.tableCellId) return null;
+          if (!rawValue || typeof rawValue !== 'object') return null;
+          const tableAnswer = rawValue as Record<string, unknown>;
+          const cellVal = tableAnswer[col.tableCellId];
+          return transformRankingOtherText(cellVal, col.rankIndex);
+        }
 
         case 'text':
           return transformText(rawValue as string | null);
