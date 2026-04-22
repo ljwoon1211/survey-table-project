@@ -38,6 +38,7 @@ import { BranchRuleEditor } from './branch-rule-editor';
 import { DynamicTableEditor } from './dynamic-table-editor';
 import { NoticeEditor } from './notice-editor';
 import { NoticeRenderer } from './notice-renderer';
+import { RankingConfigEditor } from './ranking-config-editor';
 import { SpssVariableEditor } from './spss-variable-editor';
 import { TablePreview } from './table-preview';
 import { UserDefinedMultiSelectPreview } from './user-defined-multi-select';
@@ -103,7 +104,7 @@ export function QuestionBasicTab({
   updateLevelOption,
   removeLevelOption,
 }: QuestionBasicTabProps) {
-  const needsOptions = ['radio', 'checkbox', 'select'].includes(question.type);
+  const needsOptions = ['radio', 'checkbox', 'select', 'ranking'].includes(question.type);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -578,6 +579,11 @@ export function QuestionBasicTab({
               </p>
             )}
         </div>
+      )}
+
+      {/* 순위형(ranking) 설정 */}
+      {question.type === 'ranking' && (
+        <RankingConfigEditor formData={formData} setFormData={setFormData} />
       )}
 
       {/* 다단계 Select 설정 */}

@@ -1,4 +1,6 @@
-import type { Question } from '@/types/survey';
+import type { Question, RankingAnswer } from '@/types/survey';
+
+const RANKING_OTHER_VALUE = '__other__';
 
 export interface SPSSColumn {
   spssVarName: string;
@@ -87,6 +89,45 @@ export function transformOtherOption(
 ): string | null {
   if (!otherData || !otherData.hasOther) return null;
   return otherData.otherValue ?? '';
+}
+
+/**
+ * 순위형(ranking) 응답에서 특정 rank 의 선택된 옵션 숫자코드를 반환한다.
+ * - 기타 선택(optionValue='__other__')은 Numeric 변수에서 system-missing (null)
+ *   → 기타 텍스트는 `_R{rank}_etc` 문자열 변수에서 별도 저장
+ */
+export function transformRanking(
+  question: Question,
+  value: unknown,
+  rank: number,
+): number | null {
+  if (!Array.isArray(value)) return null;
+  const entry = (value as unknown[]).find(
+    (a): a is RankingAnswer =>
+      !!a && typeof a === 'object' && (a as RankingAnswer).rank === rank
+        && typeof (a as RankingAnswer).optionValue === 'string',
+  );
+  if (!entry) return null;
+  if (entry.optionValue === RANKING_OTHER_VALUE) return null;
+  return getNumericCode(question.options, entry.optionValue);
+}
+
+/**
+ * 순위형(ranking) 응답에서 특정 rank 의 기타 텍스트를 반환한다.
+ */
+export function transformRankingOtherText(
+  value: unknown,
+  rank: number,
+): string | null {
+  if (!Array.isArray(value)) return null;
+  const entry = (value as unknown[]).find(
+    (a): a is RankingAnswer =>
+      !!a && typeof a === 'object' && (a as RankingAnswer).rank === rank,
+  );
+  if (!entry) return null;
+  if (entry.optionValue !== RANKING_OTHER_VALUE) return null;
+  const text = entry.otherText?.trim();
+  return text && text.length > 0 ? text : null;
 }
 
 /**

@@ -10,6 +10,7 @@ import {
   FileText,
   Info,
   List,
+  ListOrdered,
   Plus,
   Save,
   Table,
@@ -42,6 +43,7 @@ const questionTypeIcons: Record<string, React.ElementType> = {
   checkbox: CheckSquare,
   select: ChevronDown,
   multiselect: List,
+  ranking: ListOrdered,
   table: Table,
   notice: Info,
 };
@@ -54,6 +56,7 @@ const questionTypeLabels: Record<string, string> = {
   checkbox: '다중선택',
   select: '드롭다운',
   multiselect: '다단계선택',
+  ranking: '순위형',
   table: '테이블',
   notice: '공지사항',
 };

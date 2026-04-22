@@ -1,6 +1,6 @@
 // src/lib/analytics/analyzer.ts
 import type { SurveyResponse } from '@/db/schema';
-import type { Question, QuestionType } from '@/types/survey';
+import type { Question, QuestionType, RankingAnswer } from '@/types/survey';
 
 import type {
   AnalyticsResult,
@@ -9,6 +9,8 @@ import type {
   MultipleChoiceAnalytics,
   NoticeAnalytics,
   OptionDistribution,
+  RankingAnalytics,
+  RankingOptionDistribution,
   RowSummary,
   SingleChoiceAnalytics,
   SurveyAnalytics,
@@ -17,6 +19,8 @@ import type {
   TextAnalytics,
   TimelineData,
 } from './types';
+
+const RANKING_OTHER_VALUE = '__other__';
 
 // ========================
 // 유틸리티 함수
@@ -126,6 +130,9 @@ export function analyzeQuestion(question: Question, responses: SurveyResponse[])
 
     case 'multiselect':
       return analyzeMultiSelect(question, questionResponses, totalResponses, responseRate);
+
+    case 'ranking':
+      return analyzeRanking(question, questionResponses, totalResponses, responseRate);
 
     case 'notice':
       return analyzeNotice(question, questionResponses, totalResponses, responseRate);
@@ -583,6 +590,83 @@ function analyzeMultiSelect(
     totalResponses,
     responseRate,
     levelAnalytics,
+  };
+}
+
+/**
+ * 순위형 분석 (ranking)
+ * - 가중치 점수: k 순위 = (positions - k + 1) 점
+ * - positions=3 이면 1위=3점, 2위=2점, 3위=1점
+ * - positions 축소 후 orphan rank(N 초과)는 무시
+ * - 삭제된 옵션 value 는 "(삭제된 옵션)" 폴백 라벨
+ */
+function analyzeRanking(
+  question: Question,
+  responses: { value: unknown }[],
+  totalResponses: number,
+  responseRate: number,
+): RankingAnalytics {
+  const N = Math.max(1, question.rankingConfig?.positions ?? 3);
+  const totalScores: Record<string, number> = {};
+  const rankCounts: Record<string, number[]> = {};
+  const rankSums: Record<string, { sum: number; n: number }> = {};
+  let answeredCount = 0;
+
+  for (const r of responses) {
+    if (!Array.isArray(r.value)) continue;
+    let hasValid = false;
+    for (const raw of r.value as unknown[]) {
+      if (!raw || typeof raw !== 'object') continue;
+      const a = raw as RankingAnswer;
+      if (typeof a.rank !== 'number' || typeof a.optionValue !== 'string') continue;
+      if (a.rank < 1 || a.rank > N) continue; // positions 축소 후 orphan 무시
+      hasValid = true;
+
+      const key = a.optionValue === RANKING_OTHER_VALUE
+        ? `${RANKING_OTHER_VALUE}:${(a.otherText ?? '').trim()}`
+        : a.optionValue;
+
+      totalScores[key] = (totalScores[key] ?? 0) + (N - a.rank + 1);
+      if (!rankCounts[key]) rankCounts[key] = new Array(N).fill(0);
+      rankCounts[key][a.rank - 1] += 1;
+      const prev = rankSums[key] ?? { sum: 0, n: 0 };
+      rankSums[key] = { sum: prev.sum + a.rank, n: prev.n + 1 };
+    }
+    if (hasValid) answeredCount++;
+  }
+
+  const optionMeta = new Map(
+    (question.options ?? []).map((o) => [o.value, o.label]),
+  );
+
+  const distribution: RankingOptionDistribution[] = Object.keys(totalScores).map((key) => {
+    let label: string;
+    if (key.startsWith(`${RANKING_OTHER_VALUE}:`)) {
+      const text = key.slice(RANKING_OTHER_VALUE.length + 1);
+      label = text ? `기타: ${text}` : '기타';
+    } else {
+      label = optionMeta.get(key) ?? `(삭제된 옵션) ${key}`;
+    }
+    const sums = rankSums[key];
+    return {
+      value: key,
+      label,
+      totalScore: totalScores[key],
+      avgRank: sums && sums.n > 0 ? sums.sum / sums.n : undefined,
+      rankCounts: rankCounts[key],
+    };
+  }).sort((a, b) => b.totalScore - a.totalScore);
+
+  return {
+    type: 'ranking',
+    questionId: question.id,
+    questionTitle: question.title,
+    questionType: question.type,
+    totalResponses,
+    responseRate,
+    positions: N,
+    maxPossibleScore: N * answeredCount,
+    distribution,
   };
 }
 

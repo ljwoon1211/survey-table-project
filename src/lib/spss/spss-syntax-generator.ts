@@ -34,6 +34,14 @@ export function generateVariableLabels(questions: Question[]): string {
       if (q.allowOtherOption) {
         lines.push(`  ${q.questionCode}_${getOtherOptionCode(q.options)}_etc '${esc(q.title)} - 기타 입력'`);
       }
+    } else if (q.type === 'ranking' && q.rankingConfig?.optionsSource !== 'table') {
+      const positions = Math.max(1, q.rankingConfig?.positions ?? 3);
+      for (let k = 1; k <= positions; k++) {
+        lines.push(`  ${q.questionCode}_R${k} '${esc(q.title)} (${k}순위)'`);
+        if (q.allowOtherOption) {
+          lines.push(`  ${q.questionCode}_R${k}_etc '${esc(q.title)} - ${k}순위 기타 입력'`);
+        }
+      }
     } else {
       lines.push(`  ${q.questionCode} '${esc(q.title)}'`);
       if ((q.type === 'radio' || q.type === 'select') && q.allowOtherOption) {
@@ -71,6 +79,17 @@ export function generateValueLabels(questions: Question[]): string {
         })
         .join(' ');
       entries.push(`  ${q.questionCode} ${valuePairs}`);
+    } else if (q.type === 'ranking' && q.rankingConfig?.optionsSource !== 'table') {
+      const positions = Math.max(1, q.rankingConfig?.positions ?? 3);
+      const valuePairs = q.options
+        .map((opt, idx) => {
+          const code = opt.spssNumericCode ?? idx + 1;
+          return `${code} '${esc(opt.label)}'`;
+        })
+        .join(' ');
+      // 모든 _R{k} 변수에 동일한 value set 공유
+      const varNames = Array.from({ length: positions }, (_, k) => `${q.questionCode}_R${k + 1}`).join(' ');
+      entries.push(`  ${varNames} ${valuePairs}`);
     } else if (q.type === 'checkbox') {
       for (let i = 0; i < q.options.length; i++) {
         const opt = q.options[i];
@@ -91,6 +110,7 @@ export function generateValueLabels(questions: Question[]): string {
  */
 export function generateVariableLevel(questions: Question[]): string {
   const nominal: string[] = [];
+  const ordinal: string[] = [];
   const scale: string[] = [];
 
   for (const q of questions) {
@@ -117,6 +137,14 @@ export function generateVariableLevel(questions: Question[]): string {
       if (q.allowOtherOption) {
         scale.push(`${q.questionCode}_${getOtherOptionCode(q.options)}_etc`);
       }
+    } else if (q.type === 'ranking' && q.rankingConfig?.optionsSource !== 'table') {
+      const positions = Math.max(1, q.rankingConfig?.positions ?? 3);
+      for (let k = 1; k <= positions; k++) {
+        ordinal.push(`${q.questionCode}_R${k}`);
+        if (q.allowOtherOption) {
+          scale.push(`${q.questionCode}_R${k}_etc`);
+        }
+      }
     } else {
       scale.push(q.questionCode);
     }
@@ -125,6 +153,9 @@ export function generateVariableLevel(questions: Question[]): string {
   const parts: string[] = [];
   if (nominal.length > 0) {
     parts.push(`  ${nominal.join(' ')} (NOMINAL)`);
+  }
+  if (ordinal.length > 0) {
+    parts.push(`  ${ordinal.join(' ')} (ORDINAL)`);
   }
   if (scale.length > 0) {
     parts.push(`  ${scale.join(' ')} (SCALE)`);

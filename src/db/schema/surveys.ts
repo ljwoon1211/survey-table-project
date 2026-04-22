@@ -7,6 +7,7 @@ import type {
   QuestionConditionGroup,
   QuestionData,
   QuestionOption,
+  RankingConfig,
   SelectLevel,
   SurveyVersionSnapshot,
   TableCell,
@@ -98,6 +99,9 @@ export const questions = pgTable('questions', {
   // 체크박스 선택 개수 제한 (checkbox 타입 전용)
   minSelections: integer('min_selections'),
   maxSelections: integer('max_selections'),
+
+  // 순위형(ranking) 타입 전용 설정
+  rankingConfig: jsonb('ranking_config').$type<RankingConfig>(),
 
   // 공지사항용
   noticeContent: text('notice_content'),

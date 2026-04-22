@@ -32,7 +32,16 @@ export function answersToQuestionResponses(
     } else if (answer.arrayValue !== null) {
       result[answer.questionId] = answer.arrayValue;
     } else if (answer.objectValue !== null) {
-      result[answer.questionId] = answer.objectValue;
+      // normalizer 가 객체 원소 포함 배열을 { __array: [...] } 로 래핑했으면 언래핑
+      const obj = answer.objectValue;
+      if (
+        Object.prototype.hasOwnProperty.call(obj, '__array') &&
+        Array.isArray((obj as { __array?: unknown }).__array)
+      ) {
+        result[answer.questionId] = (obj as { __array: unknown[] }).__array;
+      } else {
+        result[answer.questionId] = obj;
+      }
     }
   }
 

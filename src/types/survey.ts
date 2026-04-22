@@ -5,8 +5,24 @@ export type QuestionType =
   | 'checkbox'
   | 'select'
   | 'multiselect'
+  | 'ranking'
   | 'table'
   | 'notice';
+
+// 순위형 질문 설정
+export interface RankingConfig {
+  positions: number; // 매길 순위 개수 (1~10, 기본 3)
+  allowDuplicateRanks?: boolean; // 중복 선택 허용 (기본 false)
+  requireAllPositions?: boolean; // 모든 순위 입력 필수 (기본 false, required 와 별도)
+  optionsSource?: 'manual' | 'table'; // 질문 레벨 전용. 'table' 이면 Case 2 (tableRowsData 의 ranking_opt 셀이 옵션 소스)
+}
+
+// 순위형 응답 단일 항목
+export interface RankingAnswer {
+  rank: number; // 1-based
+  optionValue: string; // Case 1: 옵션 value / Case 2: ranking_opt 셀의 cellId / 기타: '__other__'
+  otherText?: string; // optionValue='__other__' 일 때 자유입력 텍스트
+}
 
 // 분기 동작 타입
 export type BranchAction = 'goto' | 'end';
@@ -108,20 +124,35 @@ export interface TableCell {
   content: string;
   imageUrl?: string;
   videoUrl?: string;
-  type: 'text' | 'image' | 'video' | 'checkbox' | 'radio' | 'select' | 'input';
+  type:
+    | 'text'
+    | 'image'
+    | 'video'
+    | 'checkbox'
+    | 'radio'
+    | 'select'
+    | 'input'
+    | 'ranking' // Case 3: 셀 내부 랭킹 (셀별 옵션 + 순위 드롭다운 N개)
+    | 'ranking_opt'; // Case 2: 이 셀이 질문 레벨 ranking 의 옵션 소스로 사용됨
   // 체크박스/라디오 버튼 관련 속성
   checkboxOptions?: CheckboxOption[];
   radioOptions?: RadioOption[];
   radioGroupName?: string; // 라디오 버튼 그룹명
   // select 관련 속성
   selectOptions?: QuestionOption[];
-  allowOtherOption?: boolean; // 기타 옵션 허용 여부
+  allowOtherOption?: boolean; // 기타 옵션 허용 여부 (ranking 셀에서도 재사용)
   // input 관련 속성
   placeholder?: string; // 단문형 입력 필드 placeholder
   inputMaxLength?: number; // 단문형 입력 필드 최대 길이
   // 체크박스 선택 개수 제한 (체크박스 타입 셀 전용)
   minSelections?: number; // 최소 선택 개수
   maxSelections?: number; // 최대 선택 개수
+  // 순위형 셀 (type='ranking') — 셀 자체가 독립 랭킹 질문
+  rankingConfig?: RankingConfig;
+  rankingOptions?: QuestionOption[]; // 셀별 옵션 리스트
+  // ranking_opt 셀 (type='ranking_opt') — Case 2 의 옵션 소스로 쓰일 때의 라벨
+  // 이미지/비디오 셀이면 필수, 텍스트 셀이면 비워두고 content 평문을 자동 사용
+  rankingLabel?: string;
   // 셀 병합 관련 속성
   rowspan?: number; // 행 병합 (세로)
   colspan?: number; // 열 병합 (가로)
@@ -251,6 +282,8 @@ export interface Question {
   // 체크박스 선택 개수 제한 (checkbox 타입 전용)
   minSelections?: number; // 최소 선택 개수
   maxSelections?: number; // 최대 선택 개수
+  // 순위형(ranking) 타입 전용. optionsSource='table' 이면 Case 2 (tableRowsData 의 ranking_opt 셀을 옵션으로)
+  rankingConfig?: RankingConfig;
   // 공지사항(notice) 타입용
   noticeContent?: string; // TipTap HTML 콘텐츠
   requiresAcknowledgment?: boolean; // 이해했다는 체크 필요 여부

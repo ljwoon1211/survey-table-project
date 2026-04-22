@@ -6,7 +6,9 @@ import { InteractiveTableResponse } from '@/components/survey-builder/interactiv
 import { NoticeRenderer } from '@/components/survey-builder/notice-renderer';
 import { UserDefinedMultiLevelSelect } from '@/components/survey-builder/user-defined-multi-level-select';
 import { Input } from '@/components/ui/input';
-import { Question, QuestionOption } from '@/types/survey';
+import { Question, QuestionOption, RankingAnswer } from '@/types/survey';
+
+import { RankingQuestion } from './ranking-question';
 
 interface QuestionInputProps {
   question: Question;
@@ -120,6 +122,15 @@ export function QuestionInput({
         />
       ) : (
         <div className="py-4 text-center text-gray-500">다단계 선택이 구성되지 않았습니다.</div>
+      );
+
+    case 'ranking':
+      return (
+        <RankingQuestion
+          question={question}
+          value={value}
+          onChange={(v: RankingAnswer[]) => onChange(v)}
+        />
       );
 
     case 'table':

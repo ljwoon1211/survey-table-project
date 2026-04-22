@@ -49,10 +49,12 @@ function resolveVarType(col: SPSSExportColumn, question: Question | undefined): 
     case 'single':
     case 'checkbox-item':
     case 'notice-agree':
+    case 'ranking-rank':
       return VariableType.Numeric;
 
     case 'text':
     case 'other-text':
+    case 'ranking-other':
     case 'multiselect':
     case 'notice-date':
       return VariableType.String;
@@ -85,6 +87,11 @@ function resolveMeasure(col: SPSSExportColumn, question: Question | undefined): 
     return measureMap[question.spssMeasure] ?? VariableMeasure.Nominal;
   }
 
+  // ranking 순위 변수는 Ordinal (Kendall's W 등 순위통계 지원)
+  if (col.type === 'ranking-rank') {
+    return VariableMeasure.Ordinal;
+  }
+
   return VariableMeasure.Nominal;
 }
 
@@ -103,6 +110,10 @@ function buildLabel(col: SPSSExportColumn): string {
       return `${col.questionText} - 동의 여부`;
     case 'notice-date':
       return `${col.questionText} - 동의 일시`;
+    case 'ranking-rank':
+      return `${col.questionText} (${col.rankIndex}순위)`;
+    case 'ranking-other':
+      return `${col.questionText} - ${col.rankIndex}순위 기타 입력`;
     case 'table-cell':
       return col.optionLabel
         ? `${col.questionText} - ${col.optionLabel}`
@@ -120,7 +131,8 @@ function buildValueLabels(
   question: Question | undefined,
 ): Array<{ label: string; value: string | number }> | undefined {
   switch (col.type) {
-    case 'single': {
+    case 'single':
+    case 'ranking-rank': {
       if (!question?.options) return undefined;
       return question.options.map((opt, i) => ({
         value: opt.spssNumericCode ?? i + 1,

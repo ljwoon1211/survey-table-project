@@ -6,6 +6,7 @@ import { AlertCircle } from 'lucide-react';
 import type { AnalyticsResult } from '@/lib/analytics/types';
 
 import { MultipleChoiceChart } from './charts/multiple-choice-chart';
+import { RankingChart } from './charts/ranking-chart';
 import { SingleChoiceChart } from './charts/single-choice-chart';
 import { TableAnalyticsChart } from './charts/table-analytics';
 import { TextResponses } from './charts/text-responses';
@@ -51,6 +52,9 @@ export function QuestionAnalytics({ data }: QuestionAnalyticsProps) {
 
     case 'multiselect':
       return <MultiSelectChart data={data} />;
+
+    case 'ranking':
+      return <RankingChart data={data} />;
 
     case 'notice':
       return <NoticeChart data={data} />;

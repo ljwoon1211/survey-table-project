@@ -707,6 +707,7 @@ function getDefaultQuestionTitle(type: QuestionType): string {
     checkbox: '다중 선택 질문',
     select: '드롭다운 질문',
     multiselect: '다중 드롭다운 질문',
+    ranking: '순위형 질문',
     table: '테이블 질문',
     notice: '공지사항',
   };
@@ -714,7 +715,7 @@ function getDefaultQuestionTitle(type: QuestionType): string {
 }
 
 function needsOptions(type: QuestionType): boolean {
-  return ['radio', 'checkbox', 'select'].includes(type);
+  return ['radio', 'checkbox', 'select', 'ranking'].includes(type);
 }
 
 function needsSelectLevels(type: QuestionType): boolean {

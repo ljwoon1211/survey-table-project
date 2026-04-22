@@ -93,6 +93,27 @@ function generateSummaryData(survey: Survey, responses: SurveySubmission[]) {
             });
           });
         });
+      } else if (q.type === 'ranking' && q.rankingConfig?.optionsSource !== 'table' && q.options) {
+        // 순위형: 옵션별 총점(가중치) + 선택 횟수
+        const N = Math.max(1, q.rankingConfig?.positions ?? 3);
+        q.options.forEach((opt) => {
+          let totalScore = 0;
+          let count = 0;
+          responses.forEach((r) => {
+            const ans = (r.questionResponses as any)?.[q.id];
+            if (!Array.isArray(ans)) return;
+            const entry = ans.find((a: any) => a?.optionValue === opt.value);
+            if (entry && typeof entry.rank === 'number' && entry.rank >= 1 && entry.rank <= N) {
+              totalScore += N - entry.rank + 1;
+              count++;
+            }
+          });
+          summary.push({
+            구분: `  - ${opt.label} (총점 ${totalScore})`,
+            '응답 수': count,
+            '비율(%)': (totalResponses > 0 ? (count / totalResponses) * 100 : 0).toFixed(1) + '%',
+          });
+        });
       } else if (q.options) {
         q.options.forEach((opt) => {
           const count = responses.filter((r) => {
@@ -130,7 +151,7 @@ function generateVariableMap(survey: Survey) {
       let valueLabels = '';
       if (q.type === 'notice' && q.requiresAcknowledgment) {
         valueLabels = '동의=확인함, 빈값=미확인';
-      } else if ((q.type === 'radio' || q.type === 'select' || q.type === 'checkbox') && q.options) {
+      } else if ((q.type === 'radio' || q.type === 'select' || q.type === 'checkbox' || q.type === 'ranking') && q.options) {
         valueLabels = q.options
           .map((o, i) => `${o.spssNumericCode ?? i + 1}=${o.label}`)
           .join(', ');
@@ -162,6 +183,28 @@ function generateVariableMap(survey: Survey) {
             '질문 제목': '  기타 입력',
             '값 라벨': '(기타 텍스트)',
           });
+        }
+      }
+
+      if (q.type === 'ranking' && q.rankingConfig?.optionsSource !== 'table' && q.options) {
+        const N = Math.max(1, q.rankingConfig?.positions ?? 3);
+        for (let k = 1; k <= N; k++) {
+          mapData.push({
+            '질문 ID': '',
+            '타입': `Ranking (${k}순위)`,
+            'SPSS 변수명': `${q.questionCode}_R${k}`,
+            '질문 제목': `  ${k}순위`,
+            '값 라벨': valueLabels,
+          });
+          if (q.allowOtherOption) {
+            mapData.push({
+              '질문 ID': '',
+              '타입': 'Ranking Other',
+              'SPSS 변수명': `${q.questionCode}_R${k}_etc`,
+              '질문 제목': `  ${k}순위 기타 입력`,
+              '값 라벨': '(기타 텍스트)',
+            });
+          }
         }
       }
 

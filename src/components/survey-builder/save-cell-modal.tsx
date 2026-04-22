@@ -6,6 +6,7 @@ import {
   CheckSquare,
   ChevronDown,
   Circle,
+  ListOrdered,
   PenLine,
   Save,
   Type,
@@ -35,6 +36,8 @@ const cellTypeIcons: Record<TableCell['type'], React.ElementType> = {
   checkbox: CheckSquare,
   radio: Circle,
   select: ChevronDown,
+  ranking: ListOrdered,
+  ranking_opt: ListOrdered,
 };
 
 interface SaveCellModalProps {

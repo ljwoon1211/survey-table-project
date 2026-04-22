@@ -77,8 +77,8 @@ export function DynamicRowSelectorModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[80vh] max-w-md overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[85vh] max-w-md flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="p-6 pb-3">
           <DialogTitle className="flex items-center gap-2">
             <ListChecks className="h-5 w-5" />
             {label || '항목 선택'}
@@ -93,7 +93,7 @@ export function DynamicRowSelectorModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-1 py-2">
+        <div className="min-h-0 space-y-1 overflow-y-scroll px-6 py-1 [scrollbar-gutter:stable] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-track]:bg-transparent hover:[&::-webkit-scrollbar-thumb]:bg-gray-400">
           {/* 전체 선택/해제 */}
           <label className="flex cursor-pointer items-center gap-3 rounded-md border-b px-3 py-2.5 font-medium hover:bg-accent/50">
             <Checkbox
@@ -122,7 +122,7 @@ export function DynamicRowSelectorModal({
           })}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="border-t bg-background px-6 py-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             취소
           </Button>

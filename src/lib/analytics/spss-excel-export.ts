@@ -9,7 +9,13 @@
  */
 import type { Question, SurveySubmission } from '@/types/survey';
 
-import { transformSingleChoice, transformTableCell, transformText } from '@/lib/spss/data-transformer';
+import {
+  transformRanking,
+  transformRankingOtherText,
+  transformSingleChoice,
+  transformTableCell,
+  transformText,
+} from '@/lib/spss/data-transformer';
 import { getOtherOptionCode } from '@/utils/option-code-generator';
 import { buildTableCellVarName } from '@/utils/table-cell-code-generator';
 
@@ -18,11 +24,13 @@ export interface SPSSExportColumn {
   questionText: string;
   optionLabel: string;
   questionId: string;
-  type: 'single' | 'checkbox-item' | 'text' | 'multiselect' | 'table-cell' | 'other-text' | 'notice-agree' | 'notice-date';
+  type: 'single' | 'checkbox-item' | 'text' | 'multiselect' | 'table-cell' | 'other-text' | 'notice-agree' | 'notice-date' | 'ranking-rank' | 'ranking-other';
   optionIndex?: number;
   optionValue?: string;
   tableCellId?: string;
   tableCellType?: string;
+  // ranking-rank / ranking-other 전용: 1-based 순위 인덱스
+  rankIndex?: number;
   // 셀 단위 SPSS 오버라이드
   cellSpssVarType?: 'Numeric' | 'String' | 'Date' | 'DateTime';
   cellSpssMeasure?: 'Nominal' | 'Ordinal' | 'Continuous';
@@ -105,6 +113,30 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
           questionId: q.id,
           type: 'other-text',
         });
+      }
+    } else if (q.type === 'ranking' && q.rankingConfig?.optionsSource !== 'table') {
+      // Case 1 (standalone ranking): Q{n}_R{k} + Q{n}_R{k}_etc (옵션 선택 시)
+      // Case 2 (optionsSource='table')는 Phase C 에서 처리
+      const positions = Math.max(1, q.rankingConfig?.positions ?? 3);
+      for (let k = 1; k <= positions; k++) {
+        columns.push({
+          spssVarName: `${q.questionCode}_R${k}`,
+          questionText: q.title,
+          optionLabel: `${k}순위`,
+          questionId: q.id,
+          type: 'ranking-rank',
+          rankIndex: k,
+        });
+        if (q.allowOtherOption) {
+          columns.push({
+            spssVarName: `${q.questionCode}_R${k}_etc`,
+            questionText: q.title,
+            optionLabel: `${k}순위 기타 입력`,
+            questionId: q.id,
+            type: 'ranking-other',
+            rankIndex: k,
+          });
+        }
       }
     } else if (q.type === 'table' && q.tableRowsData && q.tableColumns) {
       // 테이블 질문: 입력 가능한 셀마다 개별 열 생성
@@ -287,6 +319,14 @@ export function buildDataRows(
 
           return transformTableCell(col.tableCellType || 'input', cellVal);
         }
+
+        case 'ranking-rank':
+          if (col.rankIndex == null) return null;
+          return transformRanking(question, rawValue, col.rankIndex);
+
+        case 'ranking-other':
+          if (col.rankIndex == null) return null;
+          return transformRankingOtherText(rawValue, col.rankIndex);
 
         case 'text':
           return transformText(rawValue as string | null);

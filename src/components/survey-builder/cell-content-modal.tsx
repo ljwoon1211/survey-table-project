@@ -82,9 +82,14 @@ export function CellContentModal({
   const questions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
   const ensureSurvey = useEnsureSurveyInDb();
   const [isSaving, setIsSaving] = useState(false);
+  // ranking / ranking_opt 셀은 별도 에디터에서 편집. 이 모달은 기존 7개 타입만 지원.
+  const narrowCellType = (
+    t: TableCell['type'] | undefined,
+  ): 'text' | 'image' | 'video' | 'checkbox' | 'radio' | 'select' | 'input' =>
+    !t || t === 'ranking' || t === 'ranking_opt' ? 'text' : t;
   const [contentType, setContentType] = useState<
     'text' | 'image' | 'video' | 'checkbox' | 'radio' | 'select' | 'input'
-  >(cell.type || 'text');
+  >(narrowCellType(cell.type));
   const [textContent, setTextContent] = useState(cell.content || '');
   const [imageUrl, setImageUrl] = useState(cell.imageUrl || '');
   const [videoUrl, setVideoUrl] = useState(cell.videoUrl || '');
@@ -133,7 +138,7 @@ export function CellContentModal({
   // 셀이 변경될 때 상태 동기화 (모달이 열릴 때마다 최신 셀 데이터 반영)
   useEffect(() => {
     if (isOpen && cell) {
-      setContentType(cell.type || 'text');
+      setContentType(narrowCellType(cell.type));
       setTextContent(cell.content || '');
       setImageUrl(cell.imageUrl || '');
       setVideoUrl(cell.videoUrl || '');
@@ -292,7 +297,7 @@ export function CellContentModal({
 
   const handleCancel = () => {
     // 원래 값으로 되돌리기
-    setContentType(cell.type || 'text');
+    setContentType(narrowCellType(cell.type));
     setTextContent(cell.content || '');
     setImageUrl(cell.imageUrl || '');
     setVideoUrl(cell.videoUrl || '');

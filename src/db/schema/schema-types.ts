@@ -57,6 +57,14 @@ export interface SelectLevel {
   options: QuestionOption[];
 }
 
+// 순위형 질문 설정
+export interface RankingConfig {
+  positions: number;
+  allowDuplicateRanks?: boolean;
+  requireAllPositions?: boolean;
+  optionsSource?: 'manual' | 'table';
+}
+
 // 체크박스 옵션
 export interface CheckboxOption {
   id: string;
@@ -83,7 +91,16 @@ export interface TableCell {
   content: string;
   imageUrl?: string;
   videoUrl?: string;
-  type: 'text' | 'image' | 'video' | 'checkbox' | 'radio' | 'select' | 'input';
+  type:
+    | 'text'
+    | 'image'
+    | 'video'
+    | 'checkbox'
+    | 'radio'
+    | 'select'
+    | 'input'
+    | 'ranking'
+    | 'ranking_opt';
   checkboxOptions?: CheckboxOption[];
   radioOptions?: RadioOption[];
   radioGroupName?: string;
@@ -98,6 +115,11 @@ export interface TableCell {
   isHidden?: boolean;
   horizontalAlign?: 'left' | 'center' | 'right';
   verticalAlign?: 'top' | 'middle' | 'bottom';
+  // 순위형 셀 (type='ranking')
+  rankingConfig?: RankingConfig;
+  rankingOptions?: QuestionOption[];
+  // ranking_opt 셀 (type='ranking_opt') — Case 2 옵션 소스용 라벨
+  rankingLabel?: string;
 }
 
 // 테이블 행
@@ -210,4 +232,5 @@ export interface QuestionData {
   tableValidationRules?: TableValidationRule[];
   hideColumnLabels?: boolean;
   displayCondition?: QuestionConditionGroup;
+  rankingConfig?: RankingConfig;
 }

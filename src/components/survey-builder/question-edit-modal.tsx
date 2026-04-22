@@ -10,6 +10,7 @@ import {
   Eye,
   FileText,
   Info,
+  ListOrdered,
   Settings,
   Table,
   Type,
@@ -185,7 +186,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
     if (!question) return false;
 
     const currentFormData = formDataRef.current;
-    const needsOptions = ['radio', 'checkbox', 'select'].includes(question.type);
+    const needsOptions = ['radio', 'checkbox', 'select', 'ranking'].includes(question.type);
     const needsSelectLevels = question.type === 'multiselect';
     const errors: Record<string, string> = {};
 
@@ -295,6 +296,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
               tableValidationRules: currentFormData.tableValidationRules || question?.tableValidationRules,
               displayCondition: currentFormData.displayCondition || question?.displayCondition,
               dynamicRowConfigs: currentFormData.dynamicRowConfigs || question?.dynamicRowConfigs,
+              rankingConfig: currentFormData.rankingConfig || question?.rankingConfig,
               questionCode: currentFormData.questionCode || question?.questionCode,
               isCustomSpssVarName: currentFormData.isCustomSpssVarName ?? question?.isCustomSpssVarName,
               exportLabel: currentFormData.exportLabel || question?.exportLabel,
@@ -549,6 +551,7 @@ function getQuestionTypeIcon(type: string) {
     checkbox: CheckSquare,
     select: ChevronDown,
     multiselect: Settings,
+    ranking: ListOrdered,
     table: Table,
   };
   const IconComponent = icons[type as keyof typeof icons] || Type;
@@ -564,6 +567,7 @@ function getQuestionTypeLabel(type: string): string {
     checkbox: '다중선택',
     select: '드롭다운',
     multiselect: '다단계선택',
+    ranking: '순위형',
     table: '테이블',
   };
   return labels[type as keyof typeof labels] || type;

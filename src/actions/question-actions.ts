@@ -45,6 +45,7 @@ export async function createQuestion(data: {
   displayCondition?: QuestionType['displayCondition'];
   dynamicRowConfigs?: QuestionType['dynamicRowConfigs'];
   hideColumnLabels?: boolean;
+  rankingConfig?: QuestionType['rankingConfig'];
   questionCode?: string;
   isCustomSpssVarName?: boolean;
   exportLabel?: string;
@@ -85,6 +86,7 @@ export async function createQuestion(data: {
     displayCondition: data.displayCondition as NewQuestion['displayCondition'],
     dynamicRowConfigs: data.dynamicRowConfigs as NewQuestion['dynamicRowConfigs'],
     hideColumnLabels: data.hideColumnLabels,
+    rankingConfig: data.rankingConfig as NewQuestion['rankingConfig'],
     questionCode: data.questionCode,
     isCustomSpssVarName: data.isCustomSpssVarName,
     exportLabel: data.exportLabel,
@@ -125,6 +127,7 @@ export async function updateQuestion(
     tableValidationRules: QuestionType['tableValidationRules'];
     dynamicRowConfigs: QuestionType['dynamicRowConfigs'];
     hideColumnLabels: boolean;
+    rankingConfig: QuestionType['rankingConfig'];
     displayCondition: QuestionType['displayCondition'];
     questionCode: string;
     isCustomSpssVarName: boolean;
@@ -160,6 +163,7 @@ export async function updateQuestion(
   if (data.tableValidationRules !== undefined) allowed.tableValidationRules = data.tableValidationRules as NewQuestion['tableValidationRules'];
   if (data.dynamicRowConfigs !== undefined) allowed.dynamicRowConfigs = data.dynamicRowConfigs as NewQuestion['dynamicRowConfigs'];
   if (data.hideColumnLabels !== undefined) allowed.hideColumnLabels = data.hideColumnLabels;
+  if (data.rankingConfig !== undefined) allowed.rankingConfig = data.rankingConfig as NewQuestion['rankingConfig'];
   if (data.displayCondition !== undefined) allowed.displayCondition = data.displayCondition as NewQuestion['displayCondition'];
   if (data.questionCode !== undefined) allowed.questionCode = data.questionCode;
   if (data.isCustomSpssVarName !== undefined) allowed.isCustomSpssVarName = data.isCustomSpssVarName;

@@ -9,6 +9,8 @@ import { isEmptyHtml } from '@/lib/utils';
 import { useTestResponseStore } from '@/stores/test-response-store';
 import { Question } from '@/types/survey';
 
+import { RankingQuestion } from '@/components/survey-response/ranking-question';
+
 import { InteractiveTableResponse } from './interactive-table-response';
 import { LazyMount } from './sortable-question-list';
 import { NoticeRenderer } from './notice-renderer';
@@ -454,6 +456,15 @@ function QuestionTestInput({
           className="w-full"
         />
       ) : null;
+
+    case 'ranking':
+      return (
+        <RankingQuestion
+          question={question}
+          value={value}
+          onChange={(v) => onChange(v)}
+        />
+      );
 
     case 'table':
       return question.tableColumns && question.tableRowsData ? (

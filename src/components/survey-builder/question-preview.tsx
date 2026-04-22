@@ -61,6 +61,30 @@ export function QuestionPreview({ question }: { question: Question }) {
         <div className="text-sm text-gray-400">다단계 Select가 설정되지 않았습니다.</div>
       );
 
+    case 'ranking': {
+      const positions = Math.max(1, question.rankingConfig?.positions ?? 3);
+      const optionsCount = question.options?.length ?? 0;
+      const renderPositions = Math.min(positions, Math.max(optionsCount, 1));
+      return (
+        <div className="space-y-2">
+          {Array.from({ length: renderPositions }, (_, i) => i + 1).map((rank) => (
+            <div key={rank} className="flex items-center gap-2">
+              <span className="w-12 shrink-0 text-sm font-medium text-gray-700">{rank}순위</span>
+              <select
+                disabled
+                className="w-full rounded-md border border-gray-200 bg-white p-2 text-sm"
+              >
+                <option>선택하세요...</option>
+                {question.options?.map((o) => (
+                  <option key={o.id}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
     case 'table':
       return question.tableColumns && question.tableRowsData ? (
         <TablePreview

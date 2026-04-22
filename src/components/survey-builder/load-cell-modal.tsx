@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Circle,
   Download,
+  ListOrdered,
   Loader2,
   PenLine,
   Search,
@@ -46,6 +47,8 @@ const cellTypeIcons: Record<TableCell['type'], React.ElementType> = {
   checkbox: CheckSquare,
   radio: Circle,
   select: ChevronDown,
+  ranking: ListOrdered,
+  ranking_opt: ListOrdered,
 };
 
 interface LoadCellModalProps {

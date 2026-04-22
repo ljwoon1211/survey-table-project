@@ -16,6 +16,7 @@ import {
   FolderOpen,
   Info,
   List,
+  ListOrdered,
   PlayCircle,
   Plus,
   Save,
@@ -85,6 +86,13 @@ const questionTypes = [
     icon: List,
     description: '다중 드롭다운',
     color: 'bg-teal-100 text-teal-600',
+  },
+  {
+    type: 'ranking' as const,
+    label: '순위형',
+    icon: ListOrdered,
+    description: '순위 매기기 (1순위, 2순위...)',
+    color: 'bg-amber-100 text-amber-600',
   },
   {
     type: 'table' as const,

@@ -163,4 +163,6 @@ export const CELL_TYPE_LABELS: Record<TableCell['type'], string> = {
   checkbox: '체크박스',
   radio: '라디오',
   select: '선택',
+  ranking: '순위',
+  ranking_opt: '순위 옵션',
 };

@@ -33,6 +33,10 @@ export function estimateInputHeight(question: Question): number {
     }
     case 'multiselect':
       return (question.selectLevels?.length ?? 1) * ML_LEVEL;
+    case 'ranking': {
+      const positions = Math.max(1, question.rankingConfig?.positions ?? 3);
+      return positions * (INPUT_H + 8);
+    }
     case 'table':
       return computeTableEstimatedHeight(
         question.tableColumns ?? [],
@@ -64,6 +68,7 @@ export function getQuestionTypeLabel(type: string): string {
     checkbox: '다중선택',
     select: '드롭다운',
     multiselect: '다단계선택',
+    ranking: '순위형',
     table: '테이블',
   };
   return labels[type as keyof typeof labels] || type;

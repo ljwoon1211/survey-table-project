@@ -53,7 +53,15 @@ export function normalizeToAnswers(
     if (typeof value === 'string') {
       answer.textValue = value;
     } else if (Array.isArray(value)) {
-      answer.arrayValue = value.map(String);
+      // 배열 원소에 객체가 하나라도 섞여 있으면 (ranking 응답, checkbox+기타 응답 등)
+      // String() 변환 시 "[object Object]" 손실이 발생하므로 objectValue 컨테이너에 래핑 저장.
+      // response-adapter 에서 __array 키를 복원하여 원본 배열 shape 유지.
+      const hasObjectItem = value.some((v) => v !== null && typeof v === 'object');
+      if (hasObjectItem) {
+        answer.objectValue = { __array: value as unknown[] } as Record<string, unknown>;
+      } else {
+        answer.arrayValue = value.map(String);
+      }
     } else if (typeof value === 'object') {
       answer.objectValue = value as Record<string, unknown>;
     }

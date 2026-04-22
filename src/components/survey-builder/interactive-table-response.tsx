@@ -232,58 +232,50 @@ interface SelectorRowProps {
 const SelectorRow = React.memo(function SelectorRow({
   groupId,
   label,
-  buttonAlign,
   selectedCount,
   onSelect,
   gridRow,
   isExpanded,
   onToggleExpand,
-  stickyLeftPadding,
 }: SelectorRowProps) {
+  // buttonAlign은 가로 스크롤에서 항상 보이도록 좌측 sticky로 통일한다.
   return (
     <div
-      className={cn(
-        'flex items-center gap-2 border-r border-b border-gray-300 bg-white px-3 py-2',
-        buttonAlign === 'center' ? 'justify-center'
-          : buttonAlign === 'right' ? 'justify-end'
-          : 'justify-start',
-      )}
-      style={{
-        gridColumn: '1 / -1',
-        gridRow,
-        paddingLeft: stickyLeftPadding ? stickyLeftPadding + 12 : undefined,
-      }}
+      className="border-r border-b border-gray-300 bg-white"
+      style={{ gridColumn: '1 / -1', gridRow }}
     >
-      {/* 펼침/접힘 chevron — 선택된 행이 있을 때만 토글 */}
-      {selectedCount > 0 && (
-        <button
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
-          onClick={(e) => { e.stopPropagation(); onToggleExpand(groupId); }}
-          aria-label={isExpanded ? '접기' : '펼치기'}
-        >
-          <ChevronDown className={cn(
-            'h-4 w-4 transition-transform',
-            isExpanded ? '' : '-rotate-90',
-          )} />
-        </button>
-      )}
-
-      {/* 그룹 바 본체 — 클릭 시 모달 열기 */}
-      <button
-        className="flex flex-1 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-gray-100"
-        onClick={() => onSelect(groupId)}
-      >
-        <ListChecks className="h-3.5 w-3.5 shrink-0 text-gray-500" />
-        <span className="text-sm font-medium text-gray-700">
-          {label || '항목 선택'}
-        </span>
+      <div className="sticky left-0 flex w-fit items-center gap-2 py-2 pr-3 pl-3">
+        {/* 펼침/접힘 chevron — 선택된 행이 있을 때만 토글 */}
         {selectedCount > 0 && (
-          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-gray-200 px-1.5 text-xs font-semibold text-gray-700">
-            {selectedCount}
-          </span>
+          <button
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+            onClick={(e) => { e.stopPropagation(); onToggleExpand(groupId); }}
+            aria-label={isExpanded ? '접기' : '펼치기'}
+          >
+            <ChevronDown className={cn(
+              'h-4 w-4 transition-transform',
+              isExpanded ? '' : '-rotate-90',
+            )} />
+          </button>
         )}
-        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-      </button>
+
+        {/* 그룹 바 본체 — 클릭 시 모달 열기 */}
+        <button
+          className="flex flex-1 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-gray-100"
+          onClick={() => onSelect(groupId)}
+        >
+          <ListChecks className="h-3.5 w-3.5 shrink-0 text-gray-500" />
+          <span className="text-sm font-medium text-gray-700">
+            {label || '항목 선택'}
+          </span>
+          {selectedCount > 0 && (
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-gray-200 px-1.5 text-xs font-semibold text-gray-700">
+              {selectedCount}
+            </span>
+          )}
+          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+        </button>
+      </div>
     </div>
   );
 });

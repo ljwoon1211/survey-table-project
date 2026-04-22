@@ -10,7 +10,8 @@ export type AnalyticsResult =
   | TextAnalytics
   | TableAnalytics
   | MultiSelectAnalytics
-  | NoticeAnalytics;
+  | NoticeAnalytics
+  | RankingAnalytics;
 
 // 단일 선택 (radio, select)
 export interface SingleChoiceAnalytics {
@@ -82,6 +83,28 @@ export interface MultiSelectAnalytics {
     levelLabel: string;
     distribution: OptionDistribution[];
   }[];
+}
+
+// 순위형 (ranking)
+export interface RankingAnalytics {
+  type: 'ranking';
+  questionId: string;
+  questionTitle: string;
+  questionType: QuestionType;
+  totalResponses: number;
+  responseRate: number;
+  positions: number; // rankingConfig.positions
+  maxPossibleScore: number; // positions × 응답자 수 (모두 1위 선택한 가상의 상한)
+  // 옵션별 가중치 점수 + 순위별 선택 횟수
+  distribution: RankingOptionDistribution[];
+}
+
+export interface RankingOptionDistribution {
+  value: string; // optionValue 또는 '__other__:<text>' 같은 기타 키
+  label: string;
+  totalScore: number; // 가중치 합산 (k순위 = positions - k + 1 점)
+  avgRank?: number; // 평균 순위 (선택된 응답 기준)
+  rankCounts: number[]; // 인덱스 i = (i+1)순위 선택 횟수
 }
 
 // 공지사항

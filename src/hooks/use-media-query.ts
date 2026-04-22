@@ -20,7 +20,7 @@ export function useMediaQuery(query: string): boolean {
   return matches;
 }
 
-/** 1024px 미만 = 모바일/태블릿 (lg 브레이크포인트) */
+/** 768px 미만 = 모바일 (md 브레이크포인트). 태블릿은 데스크탑과 동일 취급 */
 export function useMobileView(): boolean {
-  return useMediaQuery('(max-width: 1023px)');
+  return useMediaQuery('(max-width: 767px)');
 }
