@@ -12,6 +12,7 @@ export const RadioCell = React.memo(function RadioCell({
   cell,
   cellResponse,
   onUpdateValue,
+  groupName,
 }: InteractiveCellProps) {
   const handleRadioChange = useCallback(
     (optionId: string) => {
@@ -89,6 +90,7 @@ export const RadioCell = React.memo(function RadioCell({
               <input
                 type="radio"
                 id={`${cell.id}-${option.id}`}
+                name={groupName ?? `${cell.id}-radio`}
                 checked={isSelected}
                 onChange={() => {}}
                 onClick={() => handleRadioChange(optionKey)}
