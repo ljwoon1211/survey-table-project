@@ -6,7 +6,7 @@ import { TablePreview } from '@/components/survey-builder/table-preview';
 import { Question, RankingAnswer } from '@/types/survey';
 import { getOptionsLayout } from '@/utils/options-layout';
 import { resolveRankingOptions } from '@/utils/ranking-source';
-import { parseRankingAnswers } from '@/utils/ranking-shared';
+import { parseRankingAnswers, RANKING_OTHER_VALUE } from '@/utils/ranking-shared';
 
 import { RankingDropdownStack } from './ranking-dropdown-stack';
 
@@ -32,7 +32,9 @@ export function RankingQuestion({ question, value, onChange }: RankingQuestionPr
   const requestedPositions = Math.max(1, config?.positions ?? 3);
   const positions = Math.min(requestedPositions, Math.max(rawOptions.length, 1));
   const allowDuplicates = config?.allowDuplicateRanks === true;
-  const allowOther = question.allowOtherOption === true;
+  // 셀-레벨 기타가 있으면 질문-레벨 synthetic 엔트리는 중복 방지 차원에서 추가하지 않음.
+  const hasOtherCell = rawOptions.some((o) => o.value === RANKING_OTHER_VALUE);
+  const allowOther = question.allowOtherOption === true && !hasOtherCell;
 
   const answers = useMemo(() => parseRankingAnswers(value), [value]);
 
@@ -62,7 +64,7 @@ export function RankingQuestion({ question, value, onChange }: RankingQuestionPr
         allowDuplicates={allowDuplicates}
         allowOther={allowOther}
         onChange={onChange}
-        columns={question.optionsColumns}
+        columns={config?.positionsColumns}
       />
 
       {positions < requestedPositions && (

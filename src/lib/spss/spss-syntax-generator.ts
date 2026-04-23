@@ -1,7 +1,11 @@
 import type { Question, QuestionOption, TableCell, TableRow } from '@/types/survey';
 
 import { getOtherOptionCode } from '@/utils/option-code-generator';
-import { resolveRankingOptions } from '@/utils/ranking-source';
+import {
+  hasOtherRankingCell,
+  resolveRankingOptions,
+  toSpssValueLabelPairs,
+} from '@/utils/ranking-source';
 import { buildTableCellVarName, resolveRankVarName } from '@/utils/table-cell-code-generator';
 
 /** SPSS 문자열 리터럴에서 작은따옴표를 이스케이프한다. */
@@ -85,9 +89,10 @@ export function generateVariableLabels(questions: Question[]): string {
     } else if (q.type === 'ranking') {
       // Case 1/2 공통 — 변수명 규칙 동일, Case 2 라벨 소스는 generateValueLabels 에서 다름
       const positions = Math.max(1, q.rankingConfig?.positions ?? 3);
+      const needsOtherColumn = q.allowOtherOption || hasOtherRankingCell(q);
       for (let k = 1; k <= positions; k++) {
         lines.push(`  ${q.questionCode}_rk${k} '${esc(q.title)} (${k}순위)'`);
-        if (q.allowOtherOption) {
+        if (needsOtherColumn) {
           lines.push(`  ${q.questionCode}_rk${k}_etc '${esc(q.title)} - ${k}순위 기타 입력'`);
         }
       }
@@ -138,12 +143,10 @@ export function generateValueLabels(questions: Question[]): string {
       const resolved = resolveRankingOptions(q);
       if (resolved.length === 0) continue;
       const positions = Math.max(1, q.rankingConfig?.positions ?? 3);
-      const valuePairs = resolved
-        .map((opt, idx) => {
-          const code = opt.spssNumericCode ?? idx + 1;
-          return `${code} '${esc(opt.label)}'`;
-        })
+      const valuePairs = toSpssValueLabelPairs(resolved)
+        .map((p) => `${p.code} '${esc(p.label)}'`)
         .join(' ');
+      if (valuePairs.length === 0) continue;
       const varNames = Array.from(
         { length: positions },
         (_, k) => `${q.questionCode}_rk${k + 1}`,
@@ -231,9 +234,10 @@ export function generateVariableLevel(questions: Question[]): string {
     } else if (q.type === 'ranking') {
       // Case 1/2 공통 변수 레벨
       const positions = Math.max(1, q.rankingConfig?.positions ?? 3);
+      const needsOtherColumn = q.allowOtherOption || hasOtherRankingCell(q);
       for (let k = 1; k <= positions; k++) {
         ordinal.push(`${q.questionCode}_rk${k}`);
-        if (q.allowOtherOption) {
+        if (needsOtherColumn) {
           scale.push(`${q.questionCode}_rk${k}_etc`);
         }
       }

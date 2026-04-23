@@ -1,5 +1,13 @@
 import { generateId } from '@/lib/utils';
-import type { CheckboxOption, QuestionOption, RadioOption, TableCell } from '@/types/survey';
+import type {
+  CheckboxOption,
+  QuestionOption,
+  RadioOption,
+  TableCell,
+  TableRow,
+} from '@/types/survey';
+
+import { hasExistingOtherRankingCell } from './ranking-source';
 
 /**
  * 셀을 보관함에 저장할 때 위치/메타/이미지 필드를 제거한다.
@@ -50,13 +58,24 @@ export function sanitizeCellForLibrary(cell: TableCell): Partial<TableCell> {
 
 /**
  * 보관함에서 셀 데이터를 불러올 때, 대상 셀의 구조적 속성을 보존하며 머지한다.
+ * currentRows 를 넘기면 ranking_opt "기타" 셀 중복을 감지해 플래그를 자동 해제.
  */
 export function restoreCellFromLibrary(
   savedCellData: Partial<TableCell>,
   targetCell: TableCell,
+  currentRows?: TableRow[],
 ): TableCell {
   // 옵션에 새 UUID 생성
   const data = { ...savedCellData };
+
+  // ranking_opt "기타" 중복 방지: 같은 테이블에 이미 기타 셀이 있으면 로드된 셀의 플래그 해제.
+  if (
+    data.type === 'ranking_opt'
+    && data.isOtherRankingCell === true
+    && hasExistingOtherRankingCell(currentRows, targetCell.id)
+  ) {
+    data.isOtherRankingCell = undefined;
+  }
 
   if (data.checkboxOptions) {
     data.checkboxOptions = data.checkboxOptions.map((opt) => ({
@@ -136,7 +155,7 @@ export function getCellPreviewText(cell: Partial<TableCell>): string {
       }
       return '(빈 순위형)';
     case 'ranking_opt':
-      return cell.rankingLabel || cell.content || '(순위 옵션 소스)';
+      return cell.content || cell.rankingLabel || '(순위 옵션 소스)';
     case 'text':
     default:
       return cell.content ? cell.content.slice(0, 30) : '';
@@ -171,6 +190,8 @@ export function isCellSaveable(cell: TableCell): boolean {
     return (cell.rankingOptions?.length ?? 0) > 0;
   }
   if (cell.type === 'ranking_opt') {
+    // 기타 셀은 드롭다운 라벨이 자동 폴백되므로 내용 없어도 저장 가능.
+    if (cell.isOtherRankingCell === true) return true;
     // content/rankingLabel/imageUrl/videoUrl 중 하나라도 있으면 저장 가능
     return !!(
       (cell.content ?? '').trim()

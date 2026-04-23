@@ -3,7 +3,11 @@ import * as XLSX from 'xlsx';
 import { isCellInputable } from '@/lib/analytics/excel-export-utils';
 import { Survey, SurveySubmission } from '@/types/survey';
 import { getOtherOptionCode } from '@/utils/option-code-generator';
-import { resolveRankingOptions } from '@/utils/ranking-source';
+import {
+  hasOtherRankingCell,
+  resolveRankingOptions,
+  toSpssValueLabelPairs,
+} from '@/utils/ranking-source';
 import {
   buildTableCellVarName,
   resolveRankVarName,
@@ -218,11 +222,14 @@ function generateVariableMap(survey: Survey) {
       }
 
       if (q.type === 'ranking') {
-        // Case 1/2 공통: 변수명 동일, 값 라벨은 resolveRankingOptions 로 통합
+        // Case 1/2 공통: 변수명 동일, 값 라벨은 resolveRankingOptions 로 통합.
+        // 기타(sentinel) 엔트리는 numeric 변수에서 system-missing 이라 라벨에서 자동 제외됨.
         const resolved = resolveRankingOptions(q);
-        const rankingValueLabels = resolved.length > 0
-          ? resolved.map((o, i) => `${o.spssNumericCode ?? i + 1}=${o.label}`).join(', ')
+        const labelPairs = toSpssValueLabelPairs(resolved);
+        const rankingValueLabels = labelPairs.length > 0
+          ? labelPairs.map((p) => `${p.code}=${p.label}`).join(', ')
           : '(옵션 없음)';
+        const needsOtherColumn = q.allowOtherOption || hasOtherRankingCell(q);
         const N = Math.max(1, q.rankingConfig?.positions ?? 3);
         for (let k = 1; k <= N; k++) {
           mapData.push({
@@ -232,7 +239,7 @@ function generateVariableMap(survey: Survey) {
             '질문 제목': `  ${k}순위`,
             '값 라벨': rankingValueLabels,
           });
-          if (q.allowOtherOption) {
+          if (needsOtherColumn) {
             mapData.push({
               '질문 ID': '',
               '타입': 'Ranking Other',

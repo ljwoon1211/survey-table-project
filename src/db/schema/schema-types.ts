@@ -63,6 +63,7 @@ export interface RankingConfig {
   allowDuplicateRanks?: boolean;
   requireAllPositions?: boolean;
   optionsSource?: 'manual' | 'table';
+  positionsColumns?: number;
 }
 
 // 체크박스 옵션
@@ -121,6 +122,7 @@ export interface TableCell {
   rankingOptions?: QuestionOption[];
   // ranking_opt 셀 (type='ranking_opt') — Case 2 옵션 소스용 라벨
   rankingLabel?: string;
+  isOtherRankingCell?: boolean;
 }
 
 // 테이블 행

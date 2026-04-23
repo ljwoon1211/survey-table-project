@@ -418,18 +418,20 @@ export function QuestionBasicTab({
               선택 옵션 <span className="text-red-500">*</span>
             </Label>
             <div className="flex items-center space-x-4">
-              {/* 기타 옵션 토글 */}
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="allow-other-option"
-                  checked={formData.allowOtherOption || false}
-                  onCheckedChange={handleOtherOptionToggle}
-                  className="scale-75"
-                />
-                <Label htmlFor="allow-other-option" className="text-xs text-gray-600">
-                  기타 옵션 추가
-                </Label>
-              </div>
+              {/* 기타 옵션 토글 — ranking 타입은 RankingConfigEditor 로 이관했으므로 숨김 */}
+              {question.type !== 'ranking' && (
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="allow-other-option"
+                    checked={formData.allowOtherOption || false}
+                    onCheckedChange={handleOtherOptionToggle}
+                    className="scale-75"
+                  />
+                  <Label htmlFor="allow-other-option" className="text-xs text-gray-600">
+                    기타 옵션 추가
+                  </Label>
+                </div>
+              )}
               {/* 조건부 분기 토글 */}
               <div className="flex items-center space-x-2">
                 <Switch
@@ -502,7 +504,7 @@ export function QuestionBasicTab({
             </div>
           )}
 
-          {formData.allowOtherOption && (
+          {formData.allowOtherOption && question.type !== 'ranking' && (
             <div className="rounded-lg bg-blue-50 p-3">
               <p className="text-sm text-blue-700">
                 <strong>💡 기타 옵션이 활성화되었습니다.</strong>

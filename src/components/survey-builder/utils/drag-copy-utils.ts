@@ -32,6 +32,8 @@ const TYPE_SPECIFIC_KEYS: Record<string, (keyof TableCell)[]> = {
   input: ['placeholder', 'inputMaxLength'],
   image: ['imageUrl'],
   video: ['videoUrl'],
+  ranking: ['rankingOptions', 'rankingConfig', 'rankSuffixPattern', 'rankVarNames'],
+  ranking_opt: ['rankingLabel', 'isOtherRankingCell'],
 };
 
 /**

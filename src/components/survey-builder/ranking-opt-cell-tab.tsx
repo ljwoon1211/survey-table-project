@@ -6,12 +6,15 @@ import { Tag } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 
 interface RankingOptCellTabProps {
   rankingLabel: string;
   onRankingLabelChange: (v: string) => void;
   spssNumericCode: number | '';
   onSpssNumericCodeChange: (v: number | '') => void;
+  isOtherRankingCell: boolean;
+  onIsOtherRankingCellChange: (v: boolean) => void;
 }
 
 /**
@@ -23,7 +26,10 @@ export function RankingOptCellTab({
   onRankingLabelChange,
   spssNumericCode,
   onSpssNumericCodeChange,
+  isOtherRankingCell,
+  onIsOtherRankingCellChange,
 }: RankingOptCellTabProps) {
+  const isOther = isOtherRankingCell === true;
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
@@ -39,6 +45,11 @@ export function RankingOptCellTab({
         </div>
       </div>
 
+      <div className="flex items-center justify-between gap-4">
+        <Label className="text-sm font-medium">이 셀을 &quot;기타&quot;로 사용</Label>
+        <Switch checked={isOther} onCheckedChange={onIsOtherRankingCellChange} />
+      </div>
+
       <div className="space-y-2">
         <Label htmlFor="ranking-opt-label" className="text-sm font-medium">
           옵션 라벨 (선택)
@@ -47,7 +58,12 @@ export function RankingOptCellTab({
           id="ranking-opt-label"
           value={rankingLabel}
           onChange={(e) => onRankingLabelChange(e.target.value)}
-          placeholder="옵션 라벨 (비워두면 상단의 셀 텍스트 내용이 사용됨)"
+          placeholder={
+            isOther
+              ? '(기타 모드: 드롭다운 라벨은 위 "셀 텍스트 내용" 우선, 없으면 "기타 (직접 입력)")'
+              : '옵션 라벨 (비워두면 상단의 셀 텍스트 내용이 사용됨)'
+          }
+          disabled={isOther}
         />
         <p className="text-xs text-gray-500">
           이미지/비디오 셀이면 라벨을 명시적으로 지정하는 것을 권장합니다. 비워두면 상단 &quot;셀
@@ -63,7 +79,7 @@ export function RankingOptCellTab({
           id="ranking-opt-spss-code"
           type="number"
           inputMode="numeric"
-          value={spssNumericCode}
+          value={isOther ? '' : spssNumericCode}
           onChange={(e) => {
             const v = e.target.value;
             if (v === '') {
@@ -73,8 +89,13 @@ export function RankingOptCellTab({
               if (!Number.isNaN(n)) onSpssNumericCodeChange(n);
             }
           }}
-          placeholder="(비워두면 자동: 수집 순서 기반 1-based 인덱스)"
-          className="w-40"
+          placeholder={
+            isOther
+              ? '(기타 모드에서는 사용되지 않음 — system-missing)'
+              : '(비워두면 자동: 수집 순서 기반 1-based 인덱스)'
+          }
+          className="w-64"
+          disabled={isOther}
         />
         <p className="text-xs text-gray-500">
           소스 테이블에서 이 셀이 랭킹 옵션으로 쓰일 때 SPSS 변수의 값으로 기록됩니다. 셀 순서가

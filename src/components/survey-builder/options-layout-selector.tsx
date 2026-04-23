@@ -6,16 +6,22 @@ interface OptionsLayoutSelectorProps {
   /** 현재 값. undefined/1 = 세로, 0 = 가로, N ≥ 2 = N열 그리드. */
   value: number | undefined;
   onChange: (next: number) => void;
+  /** 라벨 텍스트 커스터마이즈 (기본 "옵션 배치:"). */
+  label?: string;
 }
 
 /**
  * 라디오/체크박스/순위형 옵션의 응답 페이지 배치 선택기.
  * 질문 편집 UI 의 여러 탭에서 재사용하기 위해 분리.
  */
-export function OptionsLayoutSelector({ value, onChange }: OptionsLayoutSelectorProps) {
+export function OptionsLayoutSelector({
+  value,
+  onChange,
+  label = '옵션 배치:',
+}: OptionsLayoutSelectorProps) {
   return (
     <div className="flex items-center gap-2 text-xs">
-      <Label className="text-gray-600">옵션 배치:</Label>
+      <Label className="text-gray-600">{label}</Label>
       <select
         value={value ?? 1}
         onChange={(e) => onChange(parseInt(e.target.value, 10))}

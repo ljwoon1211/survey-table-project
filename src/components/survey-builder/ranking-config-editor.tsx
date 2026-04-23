@@ -10,6 +10,8 @@ import { Switch } from '@/components/ui/switch';
 import { Question, RankingConfig } from '@/types/survey';
 import { collectRankingOptCells } from '@/utils/ranking-source';
 
+import { OptionsLayoutSelector } from './options-layout-selector';
+
 const MIN_POSITIONS = 1;
 const DEFAULT_POSITIONS = 3;
 
@@ -22,6 +24,9 @@ interface RankingConfigEditorProps {
   tableOptionsCount?: number;
   /** true 면 optionsSource 토글과 인터랙션 모드, branchRank 블록 노출 (질문 레벨에서만). 기본 false (셀 레벨은 비노출). */
   showQuestionLevelOptions?: boolean;
+  /** 질문 레벨에서 노출할 "기타 옵션 허용" 토글 상태 (showQuestionLevelOptions=true 에서만 사용). */
+  allowOtherOption?: boolean;
+  onAllowOtherOptionChange?: (v: boolean) => void;
 }
 
 /**
@@ -37,6 +42,8 @@ export function RankingConfigEditor({
   optionsCount = 0,
   tableOptionsCount = 0,
   showQuestionLevelOptions = false,
+  allowOtherOption,
+  onAllowOtherOptionChange,
 }: RankingConfigEditorProps) {
   const config: RankingConfig = value ?? { positions: DEFAULT_POSITIONS };
   const isTableSource = config.optionsSource === 'table';
@@ -103,6 +110,14 @@ export function RankingConfigEditor({
         )}
       </div>
 
+      {config.positions >= 2 && (
+        <OptionsLayoutSelector
+          value={config.positionsColumns}
+          onChange={(next) => updateConfig({ positionsColumns: next })}
+          label="순위 드롭다운 배치:"
+        />
+      )}
+
       <div className="flex items-center justify-between gap-4">
         <div className="space-y-0.5">
           <Label className="flex items-center gap-2 text-sm font-medium">
@@ -132,6 +147,22 @@ export function RankingConfigEditor({
           onCheckedChange={(v) => updateConfig({ requireAllPositions: v })}
         />
       </div>
+
+      {showQuestionLevelOptions && (
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <Label className="text-sm font-medium">기타 옵션 허용</Label>
+            <p className="text-xs text-gray-500">
+              ON: 순위 드롭다운 마지막에 &quot;기타 (직접 입력)&quot; 옵션이 추가되고, 선택 시 자유입력
+              필드가 나타납니다. 특정 셀을 기타로 지정했다면 이 토글은 자동 무시됩니다.
+            </p>
+          </div>
+          <Switch
+            checked={allowOtherOption === true}
+            onCheckedChange={(v) => onAllowOtherOptionChange?.(v)}
+          />
+        </div>
+      )}
 
       {/* 조건부 분기 판정 순위 (수동 옵션에서만 의미 있음 — 테이블 옵션은 cell.id 가 value 라 기존 branchRule 매칭 불가) */}
       {showQuestionLevelOptions && !isTableSource && (
@@ -186,6 +217,10 @@ export function RankingConfigEditorForQuestion({
       optionsCount={formData.options?.length ?? 0}
       tableOptionsCount={tableOptionsCount}
       showQuestionLevelOptions
+      allowOtherOption={formData.allowOtherOption}
+      onAllowOtherOptionChange={(v) =>
+        setFormData((prev) => ({ ...prev, allowOtherOption: v }))
+      }
     />
   );
 }

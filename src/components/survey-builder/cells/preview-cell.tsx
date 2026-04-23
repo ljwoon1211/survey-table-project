@@ -173,20 +173,17 @@ export const PreviewCell = React.memo(function PreviewCell({ cell }: { cell: Tab
       // 랭킹 옵션 소스 셀 — 읽기 전용으로 이미지 + 라벨 표시
       return (
         <div className="flex flex-col gap-1">
-          <span className="inline-flex w-fit items-center rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
-            순위 옵션
-          </span>
           {cell.imageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={cell.imageUrl}
-              alt={cell.rankingLabel || cell.content || '순위 옵션'}
+              alt={cell.content || cell.rankingLabel || '순위 옵션'}
               className="h-16 w-full rounded object-cover"
             />
           )}
-          {(cell.rankingLabel || cell.content) && (
+          {cell.content && (
             <div className="text-sm whitespace-pre-wrap text-gray-800 [overflow-wrap:anywhere]">
-              {cell.rankingLabel || cell.content}
+              {cell.content}
             </div>
           )}
         </div>

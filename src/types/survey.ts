@@ -20,6 +20,10 @@ export interface RankingConfig {
   optionsSource?: 'manual' | 'table';
   // branchRule 판정 기준 순위 (기본 1 — 1순위로 선택된 옵션 기준으로 분기 평가).
   branchRankPosition?: number;
+  // 1/2/3... 순위 드롭다운 배치 — getOptionsLayout 과 동일한 의미.
+  // undefined/1 = 세로 1열(기본) / 0 = 가로(wrap) / N ≥ 2 = N열 그리드.
+  // 일반 options 레이아웃(question.optionsColumns) 과 분리.
+  positionsColumns?: number;
 }
 
 // 순위형 응답 단일 항목
@@ -170,6 +174,10 @@ export interface TableCell {
   // ranking_opt 셀 (type='ranking_opt') — Case 2 의 옵션 소스로 쓰일 때의 라벨
   // 이미지/비디오 셀이면 필수, 텍스트 셀이면 비워두고 content 평문을 자동 사용
   rankingLabel?: string;
+  // ranking_opt 셀 전용: 이 셀을 랭킹 질문의 "기타 (직접 입력)" 엔트리로 사용.
+  // 선택 시 RankingAnswer.optionValue='__other__' + otherText 자유입력 저장.
+  // 질문 당 최대 1개.
+  isOtherRankingCell?: boolean;
   // 셀 병합 관련 속성
   rowspan?: number; // 행 병합 (세로)
   colspan?: number; // 열 병합 (가로)

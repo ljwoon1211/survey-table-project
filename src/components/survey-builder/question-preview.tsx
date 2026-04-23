@@ -5,6 +5,11 @@ import { convertHtmlImageUrlsToProxy } from '@/lib/image-utils';
 import { isEmptyHtml } from '@/lib/utils';
 import { Question } from '@/types/survey';
 import { getOptionsLayout } from '@/utils/options-layout';
+import {
+  RANKING_HORIZONTAL_ITEM_WIDTH,
+  RANKING_SELECT_BASE_CLS,
+} from '@/utils/ranking-shared';
+import { resolveRankingOptions } from '@/utils/ranking-source';
 
 import { NoticeRenderer } from './notice-renderer';
 import { TablePreview } from './table-preview';
@@ -101,9 +106,13 @@ export function QuestionPreview({ question }: { question: Question }) {
 /** 순위형 질문 미리보기: 드롭다운 스택 + (옵션 목록 | 내장 테이블) */
 function RankingPreview({ question }: { question: Question }) {
   const positions = Math.max(1, question.rankingConfig?.positions ?? 3);
-  const optionsCount = question.options?.length ?? 0;
-  const renderPositions = Math.min(positions, Math.max(optionsCount, 1));
-  const layout = getOptionsLayout(question.optionsColumns);
+  // Case 2 는 options 가 비어있고 실제 옵션은 tableRowsData 의 ranking_opt 셀.
+  // resolveRankingOptions 로 통합해서 정확한 옵션 카운트를 얻는다.
+  const resolvedOptions = resolveRankingOptions(question);
+  const renderPositions = Math.min(positions, Math.max(resolvedOptions.length, 1));
+  const columns = question.rankingConfig?.positionsColumns;
+  const layout = getOptionsLayout(columns);
+  const isHorizontal = columns === 0;
   const isTableSource = question.rankingConfig?.optionsSource === 'table';
   const hasEmbeddedTable =
     isTableSource
@@ -116,14 +125,23 @@ function RankingPreview({ question }: { question: Question }) {
     <div className="space-y-3">
       <div className={layout.className} style={layout.style}>
         {Array.from({ length: renderPositions }, (_, i) => i + 1).map((rank) => (
-          <div key={rank} className="flex items-center gap-2">
-            <span className="w-12 shrink-0 text-sm font-medium text-gray-700">{rank}순위</span>
+          <div key={rank} className="flex items-center gap-1.5">
+            <span
+              className={
+                isHorizontal
+                  ? 'shrink-0 text-sm font-medium text-gray-700'
+                  : 'w-12 shrink-0 text-sm font-medium text-gray-700'
+              }
+            >
+              {rank}순위
+            </span>
             <select
               disabled
-              className="w-full rounded-md border border-gray-200 bg-white p-2 text-sm"
+              className={isHorizontal ? RANKING_SELECT_BASE_CLS : `w-full ${RANKING_SELECT_BASE_CLS}`}
+              style={isHorizontal ? { width: RANKING_HORIZONTAL_ITEM_WIDTH } : undefined}
             >
               <option>선택하세요...</option>
-              {question.options?.map((o) => (
+              {resolvedOptions.map((o) => (
                 <option key={o.id}>{o.label}</option>
               ))}
             </select>
@@ -141,7 +159,7 @@ function RankingPreview({ question }: { question: Question }) {
           hideColumnLabels={question.hideColumnLabels}
         />
       ) : (
-        optionsCount > 0 && (
+        (question.options?.length ?? 0) > 0 && (
           <div
             className={`rounded-md border border-gray-200 bg-gray-50/50 p-3 text-sm ${layout.className}`}
             style={layout.style}

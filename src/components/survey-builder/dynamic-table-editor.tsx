@@ -796,6 +796,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
         onOpenChange={(open) => { if (!open) setLoadCellTarget(null); }}
         targetCell={loadCellTarget?.targetCell ?? null}
         onApply={handleCellApplied}
+        currentRows={currentRows}
       />
 
       {/* 행 일괄 생성 모달 */}

@@ -50,6 +50,7 @@ import {
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { generateId } from '@/lib/utils';
 import { getMaxSpssCode } from '@/utils/option-code-generator';
+import { hasExistingOtherRankingCell } from '@/utils/ranking-source';
 import {
   CheckboxOption,
   QuestionOption,
@@ -139,6 +140,9 @@ export function CellContentModal({
   const [cellSpssNumericCode, setCellSpssNumericCode] = useState<number | ''>(
     cell.spssNumericCode ?? '',
   );
+  const [isOtherRankingCell, setIsOtherRankingCell] = useState<boolean>(
+    cell.isOtherRankingCell === true,
+  );
 
   // 정렬 관련 state
   const [horizontalAlign, setHorizontalAlign] = useState<'left' | 'center' | 'right'>(
@@ -192,6 +196,7 @@ export function CellContentModal({
       setRankVarNames(cell.rankVarNames || []);
       setRankingLabel(cell.rankingLabel || '');
       setCellSpssNumericCode(cell.spssNumericCode ?? '');
+      setIsOtherRankingCell(cell.isOtherRankingCell === true);
       setIsMergeEnabled(
         (cell.rowspan && cell.rowspan > 1) || (cell.colspan && cell.colspan > 1) || false,
       );
@@ -230,7 +235,8 @@ export function CellContentModal({
       return;
     }
     // ranking_opt 셀은 content/rankingLabel/imageUrl/videoUrl 중 하나 이상 필요.
-    if (contentType === 'ranking_opt') {
+    // 단, "기타로 사용" 셀은 드롭다운 라벨이 자동 폴백(기타 (직접 입력))되므로 빈 상태도 허용.
+    if (contentType === 'ranking_opt' && !isOtherRankingCell) {
       const hasContent = !!(
         textContent.trim()
         || rankingLabel.trim()
@@ -239,6 +245,16 @@ export function CellContentModal({
       );
       if (!hasContent) {
         alert('순위 옵션 소스 셀은 텍스트/라벨/이미지/비디오 중 하나 이상을 설정해야 합니다.');
+        return;
+      }
+    }
+    if (contentType === 'ranking_opt' && isOtherRankingCell) {
+      // 같은 질문 내 기타 ranking_opt 셀이 이미 존재하면 차단 (자기 자신은 제외).
+      const hostQuestion = questions.find((q) => q.id === currentQuestionId);
+      if (hasExistingOtherRankingCell(hostQuestion?.tableRowsData, cell.id)) {
+        alert(
+          '이 질문에는 이미 "기타"로 지정된 순위 옵션 셀이 있습니다. 질문당 최대 1개만 지정할 수 있습니다.',
+        );
         return;
       }
     }
@@ -290,10 +306,16 @@ export function CellContentModal({
             ? rankingLabel.trim()
             : undefined,
         // ranking_opt 전용 spssNumericCode (Case 2 SPSS 재-export 안정성)
+        // isOther 모드면 numeric 변수가 system-missing 이라 spssNumericCode 는 의미 없음 → 강제 undefined.
         spssNumericCode:
-          contentType === 'ranking_opt' && typeof cellSpssNumericCode === 'number'
+          contentType === 'ranking_opt'
+            && !isOtherRankingCell
+            && typeof cellSpssNumericCode === 'number'
             ? cellSpssNumericCode
             : undefined,
+        // ranking_opt 셀을 질문-레벨 "기타" 엔트리로 사용할지 (타입 전환 시 undefined 로 클리어).
+        isOtherRankingCell:
+          contentType === 'ranking_opt' && isOtherRankingCell ? true : undefined,
         // 셀 병합 속성 추가
         rowspan: isMergeEnabled && typeof rowspan === 'number' && rowspan > 1 ? rowspan : undefined,
         colspan: isMergeEnabled && typeof colspan === 'number' && colspan > 1 ? colspan : undefined,
@@ -401,6 +423,9 @@ export function CellContentModal({
     setMaxSelections(cell.maxSelections);
     setRankingOptions(cell.rankingOptions || []);
     setRankingConfig(cell.rankingConfig);
+    setRankingLabel(cell.rankingLabel || '');
+    setCellSpssNumericCode(cell.spssNumericCode ?? '');
+    setIsOtherRankingCell(cell.isOtherRankingCell === true);
     setIsMergeEnabled(
       (cell.rowspan && cell.rowspan > 1) || (cell.colspan && cell.colspan > 1) || false,
     );
@@ -920,6 +945,8 @@ export function CellContentModal({
               onRankingLabelChange={setRankingLabel}
               spssNumericCode={cellSpssNumericCode}
               onSpssNumericCodeChange={setCellSpssNumericCode}
+              isOtherRankingCell={isOtherRankingCell}
+              onIsOtherRankingCellChange={setIsOtherRankingCell}
             />
           </TabsContent>
         </Tabs>

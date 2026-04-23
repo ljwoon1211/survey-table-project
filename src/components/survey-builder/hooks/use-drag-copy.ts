@@ -252,6 +252,21 @@ export function useDragCopy({
             }
           }
         }
+
+        // ranking_opt 기타 셀 중복 해제 — 질문당 최대 1개만 유지.
+        // 영역 복사로 여러 기타 셀이 생기면 가장 앞쪽 하나만 남기고 나머지 플래그 제거.
+        let foundFirst = false;
+        for (const row of draft) {
+          for (const cell of row.cells) {
+            if (cell.type !== 'ranking_opt' || cell.isHidden) continue;
+            if (cell.isOtherRankingCell !== true) continue;
+            if (!foundFirst) {
+              foundFirst = true;
+            } else {
+              cell.isOtherRankingCell = undefined;
+            }
+          }
+        }
       },
     );
 

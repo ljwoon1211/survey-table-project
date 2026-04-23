@@ -443,6 +443,8 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-feature-settings: "rlig" 1, "calt" 1;
+  /* 숫자 자릿수를 고정폭으로 — 표/코드/응답값에서 세로 정렬 유지 */
+  font-variant-numeric: tabular-nums;
 }
 
 /* Apple 스타일 스무스 스크롤 */

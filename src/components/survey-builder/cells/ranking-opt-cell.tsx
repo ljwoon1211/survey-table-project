@@ -14,15 +14,11 @@ export const RankingOptCell = React.memo(function RankingOptCell({
 }: InteractiveCellProps | PreviewCellProps) {
   return (
     <div className="flex w-full flex-col gap-1">
-      <div className="inline-flex w-fit items-center rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
-        순위 옵션
-      </div>
-
       {cell.imageUrl && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={cell.imageUrl}
-          alt={cell.rankingLabel || cell.content || '순위 옵션 이미지'}
+          alt={cell.content || cell.rankingLabel || '순위 옵션 이미지'}
           className="h-20 w-full rounded object-cover"
         />
       )}
@@ -31,9 +27,9 @@ export const RankingOptCell = React.memo(function RankingOptCell({
         <div className="truncate text-xs text-gray-500">🎬 {cell.videoUrl}</div>
       )}
 
-      {(cell.rankingLabel || cell.content) && (
+      {cell.content && (
         <div className="text-sm whitespace-pre-wrap text-gray-800 [overflow-wrap:anywhere]">
-          {cell.rankingLabel || cell.content}
+          {cell.content}
         </div>
       )}
     </div>

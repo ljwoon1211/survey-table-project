@@ -17,7 +17,7 @@ import {
   transformText,
 } from '@/lib/spss/data-transformer';
 import { getOtherOptionCode } from '@/utils/option-code-generator';
-import { resolveRankingOptions } from '@/utils/ranking-source';
+import { hasOtherRankingCell, resolveRankingOptions } from '@/utils/ranking-source';
 import { buildTableCellVarName, resolveRankVarName } from '@/utils/table-cell-code-generator';
 
 export interface SPSSExportColumn {
@@ -144,6 +144,8 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
       // Case 1 (standalone): question.options / Case 2 (table source): ranking_opt 셀
       const resolvedOptions = resolveRankingOptions(q);
       const positions = Math.max(1, q.rankingConfig?.positions ?? 3);
+      // 기타 응답값 저장용 _etc 컬럼은 질문-레벨 토글 OR 셀-레벨 isOtherRankingCell 둘 중 하나라도 있으면 emit
+      const needsOtherColumn = q.allowOtherOption || hasOtherRankingCell(q);
       for (let k = 1; k <= positions; k++) {
         columns.push({
           spssVarName: `${q.questionCode}_rk${k}`,
@@ -155,7 +157,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
           // Case 2 value labels / 응답값 변환을 위해 해결된 옵션을 주입
           cellOptions: resolvedOptions,
         });
-        if (q.allowOtherOption) {
+        if (needsOtherColumn) {
           columns.push({
             spssVarName: `${q.questionCode}_rk${k}_etc`,
             questionText: q.title,

@@ -31,7 +31,7 @@ import {
   useSavedCells,
   useSearchSavedCells,
 } from '@/hooks/queries/use-cell-library';
-import type { SavedCell, TableCell } from '@/types/survey';
+import type { SavedCell, TableCell, TableRow } from '@/types/survey';
 import {
   CELL_TYPE_LABELS,
   getCellPreviewText,
@@ -56,9 +56,17 @@ interface LoadCellModalProps {
   onOpenChange: (open: boolean) => void;
   targetCell: TableCell | null;
   onApply: (restoredCell: TableCell) => void;
+  /** ranking_opt "기타" 셀 중복 감지를 위한 현재 테이블 행들. */
+  currentRows?: TableRow[];
 }
 
-export function LoadCellModal({ open, onOpenChange, targetCell, onApply }: LoadCellModalProps) {
+export function LoadCellModal({
+  open,
+  onOpenChange,
+  targetCell,
+  onApply,
+  currentRows,
+}: LoadCellModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -78,7 +86,7 @@ export function LoadCellModal({ open, onOpenChange, targetCell, onApply }: LoadC
     const cellData = await applySavedCell.mutateAsync(savedCell.id);
     if (!cellData) return;
 
-    const restoredCell = restoreCellFromLibrary(cellData, targetCell);
+    const restoredCell = restoreCellFromLibrary(cellData, targetCell, currentRows);
     onApply(restoredCell);
     onOpenChange(false);
   };

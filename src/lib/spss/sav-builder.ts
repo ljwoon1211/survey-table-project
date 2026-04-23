@@ -14,17 +14,21 @@ import {
 import type { Question, QuestionOption, SurveySubmission } from '@/types/survey';
 
 import { buildDataRows, generateSPSSColumns, SPSSExportColumn } from '@/lib/analytics/spss-excel-export';
+import { toSpssValueLabelPairs } from '@/utils/ranking-source';
 import { sanitizeSpssVarName } from '@/utils/spss-var-name';
 
-/** QuestionOption[] → SPSS value labels 배열. spssNumericCode 가 없으면 1-based 인덱스 사용. */
+/**
+ * QuestionOption[] → SPSS value labels 배열.
+ * 기타(sentinel) 엔트리는 numeric 변수에서 system-missing 이라 자동 제외됨.
+ */
 function optionsToValueLabels(
   opts: QuestionOption[] | undefined,
 ): Array<{ value: string | number; label: string }> | undefined {
-  if (!opts || opts.length === 0) return undefined;
-  return opts.map((opt, i) => ({
-    value: opt.spssNumericCode ?? i + 1,
-    label: opt.label,
+  const pairs = toSpssValueLabelPairs(opts).map(({ code, label }) => ({
+    value: code,
+    label,
   }));
+  return pairs.length > 0 ? pairs : undefined;
 }
 
 // ── 상수 ──

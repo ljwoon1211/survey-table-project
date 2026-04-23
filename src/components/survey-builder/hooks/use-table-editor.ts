@@ -9,6 +9,7 @@ import {
   TableColumn,
   TableRow,
 } from '@/types/survey';
+import { hasExistingOtherRankingCell } from '@/utils/ranking-source';
 import {
   generateAllCellCodes,
   generateCellCodesForRow,
@@ -982,8 +983,17 @@ export function useTableEditor({
 
       const targetRow = rows[rowIndex];
       const targetColumn = columns[cellIndex];
+      // 기타 ranking_opt 셀 중복 방지: 같은 테이블에 이미 기타 셀이 있으면 복사본의 플래그 해제.
+      let sanitizedCopy = copied;
+      if (
+        copied.type === 'ranking_opt'
+        && copied.isOtherRankingCell === true
+        && hasExistingOtherRankingCell(rows, targetCell.id)
+      ) {
+        sanitizedCopy = { ...copied, isOtherRankingCell: undefined };
+      }
       const pastedCell: TableCell = regenerateCellCodeForPaste(
-        { ...copied, id: targetCell.id },
+        { ...sanitizedCopy, id: targetCell.id },
         questionCodeRef.current,
         questionTitleRef.current,
         targetRow?.rowCode,
