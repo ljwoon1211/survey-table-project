@@ -17,6 +17,29 @@ import {
 
 import { PreviewCell } from './cells';
 
+const HEADER_CELL_CLASS =
+  'flex items-center justify-center border-r border-b border-gray-300 bg-gray-50 px-4 py-3 text-center font-medium';
+
+const EMPTY_LABEL = <span className="text-sm text-gray-400 italic" />;
+
+interface HeaderCellViewProps {
+  label?: string;
+  colspan?: number;
+  rowspan?: number;
+}
+
+function HeaderCellView({ label, colspan = 1, rowspan = 1 }: HeaderCellViewProps) {
+  return (
+    <div
+      className={HEADER_CELL_CLASS}
+      style={getGridSpanStyle(colspan, rowspan)}
+      {...getGridCellAria('columnheader', colspan, rowspan)}
+    >
+      {label || EMPTY_LABEL}
+    </div>
+  );
+}
+
 interface TablePreviewProps {
   tableTitle?: string;
   columns?: TableColumn[];
@@ -56,16 +79,14 @@ export const TablePreview = React.memo(function TablePreview({
     if (hideColumnLabels) return null;
 
     if (tableHeaderGrid && tableHeaderGrid.length > 0) {
-      return tableHeaderGrid.flatMap((headerRow, rowIdx) =>
+      return tableHeaderGrid.flatMap((headerRow) =>
         headerRow.map((cell) => (
-          <div
+          <HeaderCellView
             key={cell.id}
-            className="flex items-center justify-center border-r border-b border-gray-300 bg-gray-50 px-4 py-3 text-center font-medium"
-            style={getGridSpanStyle(cell.colspan, cell.rowspan)}
-            {...getGridCellAria('columnheader', cell.colspan, cell.rowspan)}
-          >
-            {cell.label || <span className="text-sm text-gray-400 italic" />}
-          </div>
+            label={cell.label}
+            colspan={cell.colspan}
+            rowspan={cell.rowspan}
+          />
         )),
       );
     }
@@ -73,16 +94,8 @@ export const TablePreview = React.memo(function TablePreview({
     // 단일 행 헤더 (폴백)
     return columns.map((column) => {
       if (column.isHeaderHidden) return null;
-      const headerColspan = column.colspan || 1;
       return (
-        <div
-          key={column.id}
-          className="border-r border-b border-gray-300 bg-gray-50 px-4 py-3 text-center font-medium"
-          style={getGridSpanStyle(headerColspan)}
-          {...getGridCellAria('columnheader', headerColspan)}
-        >
-          {column.label || <span className="text-sm text-gray-400 italic" />}
-        </div>
+        <HeaderCellView key={column.id} label={column.label} colspan={column.colspan} />
       );
     });
   };
