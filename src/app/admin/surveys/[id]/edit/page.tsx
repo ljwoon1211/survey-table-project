@@ -143,6 +143,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   // 페이지에서는 길이만 구독하여 리렌더 최소화
   const questionCount = useSurveyBuilderStore((s) => s.currentSurvey.questions.length);
   const groupCount = useSurveyBuilderStore((s) => (s.currentSurvey.groups || []).length);
+  const isDirty = useSurveyBuilderStore((s) => s.isDirty);
 
   const { selectedQuestionId, isTestMode, selectQuestion, toggleTestMode } = useSurveyUIStore(
     useShallow((s) => ({
@@ -180,6 +181,17 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
       setInitializedSurveyId(id);
     }
   }, [survey, initializedSurveyId, id]);
+
+  // 저장되지 않은 변경이 있을 때 페이지 이탈 경고
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
 
   // 슬러그 입력 핸들러 (입력값만 업데이트, 서버 호출은 제거)
   const handleSlugChange = (value: string) => {

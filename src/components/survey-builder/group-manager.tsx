@@ -389,32 +389,17 @@ export function GroupManager({ className }: GroupManagerProps) {
     }
   };
 
-  const handleDeleteGroup = async (groupId: string) => {
+  const handleDeleteGroup = (groupId: string) => {
     const subGroups = getSubGroups(groupId);
     const message =
       subGroups.length > 0
         ? `이 그룹과 ${subGroups.length}개의 하위 그룹을 삭제하시겠습니까? (그룹에 속한 질문들은 그룹 없음 상태가 됩니다)`
         : '이 그룹을 삭제하시겠습니까? (그룹에 속한 질문들은 그룹 없음 상태가 됩니다)';
 
-    if (confirm(message)) {
-      // DB에서 그룹 삭제 (deleteQuestionGroup이 재귀적으로 하위 그룹도 함께 처리)
-      if (surveyId && isUUID(surveyId)) {
-        try {
-          await ensureSurvey();
-          const { deleteQuestionGroup } = await import('@/actions/question-group-actions');
-          // 최상위 그룹만 삭제하면, 서버 액션에서 하위 그룹도 함께 처리됨
-          await deleteQuestionGroup(groupId);
-        } catch (error) {
-          console.error('그룹 삭제 실패:', error);
-          alert('그룹 삭제에 실패했습니다. 다시 시도해주세요.');
-          return;
-        }
-      }
+    if (!confirm(message)) return;
 
-      // 로컬 스토어 업데이트 (deleteGroup이 질문들의 groupId도 undefined로 설정)
-      deleteGroup(groupId);
-      // 그룹 삭제는 이미 deleteQuestionGroup API로 저장됨
-    }
+    // 로컬 스토어만 업데이트 — 저장 버튼 클릭 시 saveSurveyDiff가 그룹 배열 diff로 삭제 반영
+    deleteGroup(groupId);
   };
 
   const handleDragStart = (event: DragStartEvent) => {

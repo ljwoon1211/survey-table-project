@@ -495,6 +495,22 @@ export function QuestionBasicTab({
             </SortableContext>
           </DndContext>
 
+          {/* 순위형(ranking) 전용 synthetic "기타" 엔트리 — options 배열에는 추가하지 않고 UI 표시만.
+              응답 UI 는 RankingDropdownStack 이 allowOtherOption 플래그로 드롭다운 마지막에 렌더. */}
+          {question?.type === 'ranking' && formData.allowOtherOption && (
+            <div className="flex items-center gap-2 rounded-md border border-dashed border-gray-300 bg-gray-50 p-3 text-sm text-gray-600">
+              <span className="flex-1 italic">
+                기타 (직접 입력)
+                <span className="ml-2 text-xs text-gray-400">
+                  — 응답 시 자유입력 필드가 나타납니다
+                </span>
+              </span>
+              <span className="text-xs text-gray-400">
+                위 &ldquo;기타 옵션 허용&rdquo; 토글로 제거
+              </span>
+            </div>
+          )}
+
           {(formData.options?.length || 0) === 0 && (
             <div className="py-8 text-center text-gray-500">
               <p className="mb-2">아직 옵션이 없습니다.</p>

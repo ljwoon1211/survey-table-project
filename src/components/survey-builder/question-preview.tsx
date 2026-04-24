@@ -7,6 +7,7 @@ import { Question } from '@/types/survey';
 import { getOptionsLayout } from '@/utils/options-layout';
 import {
   RANKING_HORIZONTAL_ITEM_WIDTH,
+  RANKING_OTHER_VALUE,
   RANKING_SELECT_BASE_CLS,
 } from '@/utils/ranking-shared';
 import { resolveRankingOptions } from '@/utils/ranking-source';
@@ -109,6 +110,10 @@ function RankingPreview({ question }: { question: Question }) {
   // Case 2 는 options 가 비어있고 실제 옵션은 tableRowsData 의 ranking_opt 셀.
   // resolveRankingOptions 로 통합해서 정확한 옵션 카운트를 얻는다.
   const resolvedOptions = resolveRankingOptions(question);
+  // 셀-레벨 기타가 있으면 질문-레벨 synthetic 엔트리는 중복 방지 차원에서 추가하지 않음
+  // (응답 UI 의 ranking-question.tsx:36-37 와 동일 규칙).
+  const hasOtherCell = resolvedOptions.some((o) => o.value === RANKING_OTHER_VALUE);
+  const allowOther = question.allowOtherOption === true && !hasOtherCell;
   const renderPositions = Math.min(positions, Math.max(resolvedOptions.length, 1));
   const columns = question.rankingConfig?.positionsColumns;
   const layout = getOptionsLayout(columns);
@@ -144,6 +149,7 @@ function RankingPreview({ question }: { question: Question }) {
               {resolvedOptions.map((o) => (
                 <option key={o.id}>{o.label}</option>
               ))}
+              {allowOther && <option>기타 (직접 입력)</option>}
             </select>
           </div>
         ))}
@@ -159,7 +165,7 @@ function RankingPreview({ question }: { question: Question }) {
           hideColumnLabels={question.hideColumnLabels}
         />
       ) : (
-        (question.options?.length ?? 0) > 0 && (
+        ((question.options?.length ?? 0) > 0 || allowOther) && (
           <div
             className={`rounded-md border border-gray-200 bg-gray-50/50 p-3 text-sm ${layout.className}`}
             style={layout.style}
@@ -172,6 +178,11 @@ function RankingPreview({ question }: { question: Question }) {
                 {opt.label}
               </div>
             ))}
+            {allowOther && (
+              <div className="whitespace-pre-wrap text-gray-500 italic [overflow-wrap:anywhere]">
+                기타 (직접 입력)
+              </div>
+            )}
           </div>
         )
       )}

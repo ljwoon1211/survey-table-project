@@ -33,7 +33,6 @@ import {
 } from 'lucide-react';
 
 import {
-  deleteQuestion as deleteQuestionAction,
   reorderQuestions as reorderQuestionsAction,
 } from '@/actions/question-actions';
 import { useEnsureSurveyInDb } from '@/hooks/use-ensure-survey-in-db';
@@ -48,7 +47,7 @@ import {
   findParentGroupId,
 } from '@/lib/group-ordering';
 import { convertHtmlImageUrlsToProxy, deleteImagesFromR2 } from '@/lib/image-utils';
-import { generateId, isEmptyHtml, isValidUUID } from '@/lib/utils';
+import { generateId, isEmptyHtml } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { useSurveyUIStore } from '@/stores/ui-store';
 import { computeTableEstimatedHeight } from '@/hooks/use-row-heights';
@@ -539,33 +538,22 @@ export function SortableQuestionList({
   }, []);
 
   const handleDelete = useCallback(async (questionId: string) => {
-    if (confirm('이 질문을 삭제하시겠습니까?')) {
-      const questionToDelete = questionsRef.current.find((q) => q.id === questionId);
-      if (questionToDelete) {
-        const images = extractImageUrlsFromQuestion(questionToDelete);
-        if (images.length > 0) {
-          try {
-            await deleteImagesFromR2(images);
-          } catch (error) {
-            console.error('질문 삭제 시 이미지 삭제 실패:', error);
-          }
-        }
-      }
+    if (!confirm('이 질문을 삭제하시겠습니까?')) return;
 
-      const isNewQuestion = !!useSurveyBuilderStore.getState().questionChanges.added[questionId];
-      deleteQuestion(questionId);
-
-      // DB에 이미 존재하는 질문만 서버 삭제 호출 (아직 저장 전인 질문은 스킵)
-      if (!isNewQuestion && isValidUUID(questionId)) {
+    const questionToDelete = questionsRef.current.find((q) => q.id === questionId);
+    if (questionToDelete) {
+      const images = extractImageUrlsFromQuestion(questionToDelete);
+      if (images.length > 0) {
         try {
-          await ensureSurvey();
-          await deleteQuestionAction(questionId);
+          await deleteImagesFromR2(images);
         } catch (error) {
-          console.error('질문 삭제 실패:', error);
+          console.error('질문 삭제 시 이미지 삭제 실패:', error);
         }
       }
     }
-  }, [deleteQuestion, ensureSurvey]);
+
+    deleteQuestion(questionId);
+  }, [deleteQuestion]);
 
   const handleDuplicate = useCallback(async (questionId: string) => {
     const questionToDuplicate = questionsRef.current.find((q) => q.id === questionId);
