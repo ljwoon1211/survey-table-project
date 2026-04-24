@@ -101,6 +101,11 @@ export function getGridContainerStyle(
 const STICKY_ELIGIBLE_CELL_TYPES = new Set(['text', 'image', 'video', 'radio']);
 const MIN_COLUMNS_FOR_STICKY = 4;
 
+/** 헤더 행의 최소 높이(px). sticky 활성 시 grid row가 contents 높이로 붕괴되는 것을 방지 */
+export const HEADER_ROW_MIN_HEIGHT = 40;
+/** 바디 sticky 셀의 z-index (페이지 sticky 헤더보다 낮게) */
+export const STICKY_BODY_Z = 10;
+
 export interface StickyLeftInfo {
   stickyColCount: number;
   leftOffsets: number[];

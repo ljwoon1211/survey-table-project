@@ -1,44 +1,33 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 
 import { FileText } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useHorizontalScrollIndicators } from '@/hooks/use-horizontal-scroll-indicators';
+import { useScrollLeftSync } from '@/hooks/use-scroll-left-sync';
 import { cn } from '@/lib/utils';
 import { HeaderCell, TableColumn, TableRow } from '@/types/survey';
 import {
   buildGridTemplateCols,
   calcTotalWidth,
+  computeStickyLeftColumns,
   getAlignmentClasses,
   getGridCellAria,
-  getGridSpanStyle,
+  getHeaderCellStickyStyle,
+  HEADER_ROW_MIN_HEIGHT,
+  STICKY_BODY_Z,
+  type StickyLeftInfo,
 } from '@/utils/table-grid-utils';
 
 import { PreviewCell } from './cells';
+import { HEADER_SCROLL_CLASS, TableScrollControls } from './table-scroll-controls';
 
 const HEADER_CELL_CLASS =
   'flex items-center justify-center border-r border-b border-gray-300 bg-gray-50 px-4 py-3 text-center font-medium';
 
 const EMPTY_LABEL = <span className="text-sm text-gray-400 italic" />;
-
-interface HeaderCellViewProps {
-  label?: string;
-  colspan?: number;
-  rowspan?: number;
-}
-
-function HeaderCellView({ label, colspan = 1, rowspan = 1 }: HeaderCellViewProps) {
-  return (
-    <div
-      className={HEADER_CELL_CLASS}
-      style={getGridSpanStyle(colspan, rowspan)}
-      {...getGridCellAria('columnheader', colspan, rowspan)}
-    >
-      {label || EMPTY_LABEL}
-    </div>
-  );
-}
 
 interface TablePreviewProps {
   tableTitle?: string;
@@ -60,6 +49,33 @@ export const TablePreview = React.memo(function TablePreview({
   const totalWidth = useMemo(() => calcTotalWidth(columns), [columns]);
   const gridTemplateCols = useMemo(() => buildGridTemplateCols(columns), [columns]);
 
+  // 가로 스크롤: 헤더/바디 별도 컨테이너 + 썸-버튼 컨트롤 + 좌우 그라디언트 힌트 + sticky 좌측 열
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const headerScrollRef = useRef<HTMLDivElement>(null);
+
+  const { canScrollLeft, canScrollRight } = useHorizontalScrollIndicators(
+    tableContainerRef,
+    { deps: [columns.length, rows.length] },
+  );
+
+  // 헤더가 null일 때는 동기화 불필요 (null ref 접근 방지)
+  useScrollLeftSync(headerScrollRef, tableContainerRef, hideColumnLabels);
+
+  const stickyInfo = useMemo<StickyLeftInfo | undefined>(() => {
+    if (columns.length === 0) return undefined;
+    return computeStickyLeftColumns(columns, rows);
+  }, [columns, rows]);
+
+  const gridContainerStyle = useMemo<React.CSSProperties>(
+    () => ({
+      display: 'grid',
+      gridTemplateColumns: gridTemplateCols,
+      width: `${totalWidth}px`,
+      minWidth: `${totalWidth}px`,
+    }),
+    [gridTemplateCols, totalWidth],
+  );
+
   if (columns.length === 0 || rows.length === 0) {
     return (
       <Card className={className}>
@@ -74,31 +90,84 @@ export const TablePreview = React.memo(function TablePreview({
     );
   }
 
-  // 헤더 셀 렌더링 (다단계 or 단일)
+  const minHeight = stickyInfo && stickyInfo.stickyColCount > 0 ? HEADER_ROW_MIN_HEIGHT : undefined;
+  const stickyCount = stickyInfo?.stickyColCount ?? 0;
+
+  // 헤더 셀 렌더 — 다단계(tableHeaderGrid) 또는 단일 행(fallback). sticky 적용 포함.
   const renderHeaderCells = () => {
     if (hideColumnLabels) return null;
 
     if (tableHeaderGrid && tableHeaderGrid.length > 0) {
-      return tableHeaderGrid.flatMap((headerRow) =>
-        headerRow.map((cell) => (
-          <HeaderCellView
-            key={cell.id}
-            label={cell.label}
-            colspan={cell.colspan}
-            rowspan={cell.rowspan}
-          />
-        )),
-      );
+      const totalRows = tableHeaderGrid.length;
+      const occupied = Array.from({ length: totalRows }, () => new Map<number, boolean>());
+
+      return tableHeaderGrid.flatMap((headerRow, rowIdx) => {
+        let col = 1;
+        return headerRow.map((cell) => {
+          while (occupied[rowIdx]?.get(col)) col++;
+
+          const startCol = col;
+          const cs = cell.colspan || 1;
+          const rs = cell.rowspan || 1;
+
+          if (rs > 1) {
+            for (let r = rowIdx + 1; r < rowIdx + rs && r < totalRows; r++) {
+              for (let c = startCol; c < startCol + cs; c++) {
+                occupied[r].set(c, true);
+              }
+            }
+          }
+          col += cs;
+
+          const style: React.CSSProperties = {
+            gridRow: rs > 1 ? `${rowIdx + 1} / span ${rs}` : rowIdx + 1,
+            gridColumn: cs > 1 ? `${startCol} / span ${cs}` : startCol,
+            minHeight,
+            ...getHeaderCellStickyStyle(startCol, cs, stickyInfo),
+          };
+
+          return (
+            <div
+              key={cell.id}
+              className={HEADER_CELL_CLASS}
+              style={style}
+              {...getGridCellAria('columnheader', cs, rs)}
+            >
+              {cell.label || EMPTY_LABEL}
+            </div>
+          );
+        });
+      });
     }
 
-    // 단일 행 헤더 (폴백)
-    return columns.map((column) => {
+    // 단일 행 헤더 (폴백) — 명시적 grid-column으로 sticky 좌표 보장
+    return columns.map((column, colIdx) => {
       if (column.isHeaderHidden) return null;
+      const startCol = colIdx + 1;
+      const cs = column.colspan || 1;
+
+      const style: React.CSSProperties = {
+        gridColumn: cs > 1 ? `${startCol} / span ${cs}` : startCol,
+        minHeight,
+        ...getHeaderCellStickyStyle(startCol, cs, stickyInfo),
+      };
+
       return (
-        <HeaderCellView key={column.id} label={column.label} colspan={column.colspan} />
+        <div
+          key={column.id}
+          className={HEADER_CELL_CLASS}
+          style={style}
+          {...getGridCellAria('columnheader', cs)}
+        >
+          {column.label || EMPTY_LABEL}
+        </div>
       );
     });
   };
+
+  const headerRowCount = hideColumnLabels
+    ? 0
+    : (tableHeaderGrid && tableHeaderGrid.length > 0 ? tableHeaderGrid.length : 1);
 
   return (
     <Card className={className}>
@@ -108,40 +177,101 @@ export const TablePreview = React.memo(function TablePreview({
         </CardHeader>
       )}
       <CardContent>
-        <div className="overflow-x-auto">
+        <div className="relative">
           <div
             role="grid"
-            className="mx-auto overflow-hidden rounded-md border-t border-l border-r border-gray-300 bg-white"
-            style={{
-              display: 'grid',
-              gridTemplateColumns: gridTemplateCols,
-              width: `${totalWidth}px`,
-            }}
+            aria-rowcount={headerRowCount + rows.length}
+            aria-colcount={columns.length}
           >
-            {/* 헤더 */}
-            {renderHeaderCells()}
-
-            {/* 바디 */}
-            {rows.map((row) =>
-              row.cells.map((cell) => {
-                if (cell.isHidden) return null;
-
-                return (
-                  <div
-                    key={cell.id}
-                    className={cn(
-                      'min-w-0 border-r border-b border-gray-300 bg-white p-3',
-                      getAlignmentClasses(cell.horizontalAlign, cell.verticalAlign),
-                    )}
-                    style={getGridSpanStyle(cell.colspan, cell.rowspan)}
-                    data-row-id={row.id}
-                    {...getGridCellAria('gridcell', cell.colspan, cell.rowspan)}
-                  >
-                    <PreviewCell cell={cell} />
+            {/* 헤더: 페이지 스크롤 기준 sticky + 별도 가로 스크롤 컨테이너 */}
+            {!hideColumnLabels && (
+              <div className="sticky top-0 z-30 bg-white print:static print:z-auto">
+                <TableScrollControls
+                  scrollRef={tableContainerRef}
+                  canScrollLeft={canScrollLeft}
+                  canScrollRight={canScrollRight}
+                />
+                <div className="relative">
+                  <div ref={headerScrollRef} className={HEADER_SCROLL_CLASS}>
+                    <div
+                      role="rowgroup"
+                      className="mx-auto rounded-t-md border-t border-l border-r border-gray-300 bg-gray-50 text-sm"
+                      style={gridContainerStyle}
+                    >
+                      {renderHeaderCells()}
+                    </div>
                   </div>
-                );
-              }),
+                  {/* 우측 페이드 — 오른쪽에 아직 열이 더 있다는 시각 힌트 */}
+                  {canScrollRight && (
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-gray-50 via-gray-50/60 to-transparent print:hidden"
+                    />
+                  )}
+                  {canScrollLeft && (
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-gray-50/80 to-transparent print:hidden"
+                    />
+                  )}
+                </div>
+              </div>
             )}
+
+            {/* 바디: 가로 스크롤 전용 */}
+            <div
+              ref={tableContainerRef}
+              className="overflow-x-auto print:overflow-visible"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
+              <div
+                role="rowgroup"
+                className={cn(
+                  'mx-auto rounded-b-md border-l border-r border-gray-300 bg-white text-sm',
+                  hideColumnLabels && 'rounded-t-md border-t',
+                )}
+                style={gridContainerStyle}
+              >
+                {rows.map((row) =>
+                  row.cells.map((cell, cellIndex) => {
+                    if (cell.isHidden) return null;
+                    const col = cellIndex + 1;
+                    const cs = cell.colspan || 1;
+                    const rs = cell.rowspan || 1;
+                    const isSticky = cellIndex < stickyCount;
+                    const isLastSticky = isSticky && cellIndex === stickyCount - 1;
+
+                    const style: React.CSSProperties = {
+                      gridColumn: cs > 1 ? `${col} / span ${cs}` : col,
+                      ...(rs > 1 ? { gridRow: `span ${rs}` } : {}),
+                    };
+                    if (isSticky && stickyInfo) {
+                      style.position = 'sticky';
+                      style.left = stickyInfo.leftOffsets[cellIndex];
+                      style.zIndex = STICKY_BODY_Z;
+                      if (isLastSticky) {
+                        style.boxShadow = '2px 0 4px rgba(0,0,0,0.06)';
+                      }
+                    }
+
+                    return (
+                      <div
+                        key={cell.id}
+                        className={cn(
+                          'min-w-0 border-r border-b border-gray-300 bg-white p-3',
+                          getAlignmentClasses(cell.horizontalAlign, cell.verticalAlign),
+                        )}
+                        style={style}
+                        data-row-id={row.id}
+                        {...getGridCellAria('gridcell', cs, rs)}
+                      >
+                        <PreviewCell cell={cell} />
+                      </div>
+                    );
+                  }),
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </CardContent>
