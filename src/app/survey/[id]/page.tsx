@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useParams, useRouter } from 'next/navigation';
 
-import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle, ChevronLeft, ChevronRight, Loader2, Lock } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle, Loader2, Lock } from 'lucide-react';
 
 import {
   getSurveyByPrivateToken,
@@ -12,10 +12,12 @@ import {
   getSurveyForResponse,
 } from '@/actions/query-actions';
 import { completeResponse, startResponse } from '@/actions/response-actions';
+import { MobileBottomNav } from '@/components/survey-response/mobile-bottom-nav';
 import { QuestionInput } from '@/components/survey-response/question-input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
+import { useKeyboardOpen } from '@/hooks/use-keyboard-open';
 import { useMultiLineDetection } from '@/hooks/use-line-count-detection';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import {
@@ -89,15 +91,7 @@ export default function SurveyResponsePage() {
     () => new Set(),
   );
 
-  // iOS 키보드 감지 (#7) — 키보드 올라오면 고정 하단바 숨김
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const handler = () => setKeyboardOpen(vv.height < window.innerHeight * 0.75);
-    vv.addEventListener('resize', handler);
-    return () => vv.removeEventListener('resize', handler);
-  }, []);
+  const keyboardOpen = useKeyboardOpen();
 
   // URL 식별자로 설문 조회
   useEffect(() => {
@@ -667,7 +661,7 @@ export default function SurveyResponsePage() {
       {/* 메인 콘텐츠 */}
       <div
         className={`${containerMaxWidth} mx-auto px-4 py-6 transition-all duration-300 md:px-6 md:py-8 ${
-          isMobile && !keyboardOpen ? 'pb-28' : ''
+          isMobile ? 'pb-28' : ''
         }`}
       >
         {currentStep.kind === 'table' ? (
@@ -718,69 +712,18 @@ export default function SurveyResponsePage() {
         </div>
       </div>
 
-      {/* 모바일 고정 하단 네비게이션 — 테이블 step은 MobileTableStepper가 자체 네비 보유 → 숨김 */}
-      {isMobile && !keyboardOpen && !isTableStep && (
-        <div
-          className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.05)] md:hidden"
-          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-        >
-          <div className="flex items-center justify-between px-4 py-3">
-            <button
-              onClick={handlePrevious}
-              disabled={!hasPreviousDisplayable}
-              className="flex items-center gap-1 rounded-lg px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 active:scale-[0.98] disabled:pointer-events-none disabled:text-gray-300"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              이전
-            </button>
-
-            <div className="flex flex-col items-center">
-              <span className="text-sm font-medium text-gray-900">
-                {currentVisibleStepNumber || 1} / {Math.max(totalVisibleStepCount, 1)}
-              </span>
-              {!canProceed() && (
-                <span className="text-[11px] text-red-500">필수 질문</span>
-              )}
-            </div>
-
-            {isLastVisibleStep ? (
-              <button
-                onClick={handleNext}
-                disabled={!canProceed() || isSubmitting}
-                className="flex items-center gap-1 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.98] disabled:pointer-events-none disabled:bg-gray-200 disabled:text-gray-400"
-              >
-                {isSubmitting ? '제출 중...' : '제출'}
-              </button>
-            ) : (
-              <button
-                onClick={handleNext}
-                disabled={!canProceed()}
-                className="flex items-center gap-1 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.98] disabled:pointer-events-none disabled:bg-gray-200 disabled:text-gray-400"
-              >
-                다음
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 모바일: 테이블 step은 MobileTableStepper 자체 네비가 있어서 제출 전용 고정 바만 필요 시 노출 */}
-      {isMobile && !keyboardOpen && isTableStep && isLastVisibleStep && (
-        <div
-          className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.05)] md:hidden"
-          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-        >
-          <div className="flex items-center justify-end px-4 py-3">
-            <button
-              onClick={handleNext}
-              disabled={!canProceed() || isSubmitting}
-              className="flex items-center gap-1 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.98] disabled:pointer-events-none disabled:bg-gray-200 disabled:text-gray-400"
-            >
-              {isSubmitting ? '제출 중...' : '제출'}
-            </button>
-          </div>
-        </div>
+      {isMobile && (
+        <MobileBottomNav
+          keyboardOpen={keyboardOpen}
+          currentStepNumber={currentVisibleStepNumber}
+          totalStepCount={totalVisibleStepCount}
+          canProceed={canProceed()}
+          hasPrevious={hasPreviousDisplayable}
+          isLastStep={isLastVisibleStep}
+          isSubmitting={isSubmitting}
+          onPrevious={handlePrevious}
+          onNext={handleNext}
+        />
       )}
     </div>
   );
