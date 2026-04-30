@@ -24,6 +24,8 @@ interface Props {
   hourModeDate?: string;
   /** hour 모드 날짜 select 의 옵션. day 모드에서도 토글 시 기본 날짜 결정에 쓰인다. */
   availableDates: string[];
+  /** day 모드에서 보여줄 7일 구간의 offset. 0 = 최근 7일, 1 = 그 이전 7일, ... */
+  weekOffset: number;
 }
 
 /**
@@ -52,6 +54,7 @@ export function DailyParticipationChart({
   mode,
   hourModeDate,
   availableDates,
+  weekOffset,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -96,11 +99,33 @@ export function DailyParticipationChart({
     [pushParams],
   );
 
-  // day 모드는 마지막 응답일 기준 최근 7개만, hour 모드는 24버킷 그대로
-  const visibleData = useMemo(
-    () => (mode === 'day' ? data.slice(-RECENT_DAYS_LIMIT) : data),
-    [data, mode],
+  const handleWeekOffset = useCallback(
+    (delta: 1 | -1) => {
+      const next = Math.max(0, weekOffset + delta);
+      pushParams((p) => {
+        p.set('mode', 'day');
+        if (next === 0) {
+          p.delete('weekOffset');
+        } else {
+          p.set('weekOffset', String(next));
+        }
+      });
+    },
+    [pushParams, weekOffset],
   );
+
+  // day 모드는 weekOffset 기준 7개 슬라이스, hour 모드는 24버킷 그대로
+  // weekOffset=0 → 마지막 7개, weekOffset=1 → 그 이전 7개, ...
+  const visibleData = useMemo(() => {
+    if (mode !== 'day') return data;
+    const end = data.length - RECENT_DAYS_LIMIT * weekOffset;
+    const start = Math.max(0, end - RECENT_DAYS_LIMIT);
+    return data.slice(start, end);
+  }, [data, mode, weekOffset]);
+
+  const totalDays = mode === 'day' ? data.length : 0;
+  const canGoPrev = mode === 'day' && (weekOffset + 1) * RECENT_DAYS_LIMIT < totalDays;
+  const canGoNext = mode === 'day' && weekOffset > 0;
 
   return (
     <Card>
@@ -108,6 +133,31 @@ export function DailyParticipationChart({
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-slate-900">일자별 참여자수</h3>
           <div className="flex items-center gap-2">
+            {mode === 'day' && visibleData.length > 0 && (
+              <div className="flex items-center gap-2 text-xs text-slate-600">
+                <button
+                  type="button"
+                  onClick={() => handleWeekOffset(1)}
+                  disabled={!canGoPrev}
+                  aria-label="이전 7일"
+                  className="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  ‹
+                </button>
+                <span className="tabular-nums">
+                  {visibleData[0].bucket} ~ {visibleData[visibleData.length - 1].bucket}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleWeekOffset(-1)}
+                  disabled={!canGoNext}
+                  aria-label="다음 7일"
+                  className="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  ›
+                </button>
+              </div>
+            )}
             {mode === 'hour' && (
               <select
                 aria-label="시간 분포를 표시할 일자"

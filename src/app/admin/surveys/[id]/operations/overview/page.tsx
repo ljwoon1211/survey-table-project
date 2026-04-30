@@ -38,6 +38,7 @@ interface OperationsOverviewPageProps {
   searchParams: Promise<{
     mode?: 'day' | 'hour';
     date?: string;
+    weekOffset?: string;
   }>;
 }
 
@@ -74,7 +75,8 @@ export default async function OperationsOverviewPage({
   searchParams,
 }: OperationsOverviewPageProps) {
   const { id: surveyId } = await params;
-  const { mode = 'day', date } = await searchParams;
+  const { mode = 'day', date, weekOffset: weekOffsetStr } = await searchParams;
+  const weekOffset = Math.max(0, parseInt(weekOffsetStr ?? '0', 10) || 0);
 
   // ── 설문 존재 확인 (soft-delete 포함) ──
   const survey = await getSurveyById(surveyId);
@@ -124,6 +126,7 @@ export default async function OperationsOverviewPage({
         mode={mode}
         hourModeDate={effectiveDate}
         availableDates={availableDates}
+        weekOffset={weekOffset}
       />
 
       {/* A3 — 일자별 응답 통계 테이블 */}
