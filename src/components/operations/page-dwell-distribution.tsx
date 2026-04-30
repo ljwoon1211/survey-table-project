@@ -6,6 +6,7 @@ import {
   BarChart,
   CartesianGrid,
   ErrorBar,
+  LabelList,
   XAxis,
   YAxis,
 } from 'recharts';
@@ -284,6 +285,14 @@ export function PageDwellDistribution({ data, pageOffset }: Props) {
                   width={6}
                   stroke="currentColor"
                   strokeWidth={1.5}
+                />
+                <LabelList
+                  dataKey="meanSeconds"
+                  position="top"
+                  className="fill-slate-700"
+                  fontSize={11}
+                  offset={12}
+                  formatter={(v: number) => (v > 0 ? formatSeconds(v) : '')}
                 />
               </Bar>
             </BarChart>

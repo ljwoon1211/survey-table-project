@@ -1,6 +1,6 @@
 'use client';
 
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from 'recharts';
 
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -99,7 +99,7 @@ export function DropFunnel({ data }: Props) {
             이탈 응답 위치별 사례
           </h3>
           <p className="mt-0.5 text-xs text-slate-400">
-            x: 질문 위치 (라벨 / 페이지 / 진행률) · y: 이탈자 수
+            x: 질문 위치 (질문번호 / 페이지 / 진행률) · y: 이탈자 수
           </p>
         </div>
 
@@ -175,7 +175,15 @@ export function DropFunnel({ data }: Props) {
                 fill="var(--color-dropCount)"
                 radius={[3, 3, 0, 0]}
                 isAnimationActive={false}
-              />
+              >
+                <LabelList
+                  dataKey="dropCount"
+                  position="top"
+                  className="fill-slate-700"
+                  fontSize={11}
+                  formatter={(v: number) => (v > 0 ? numberFormatter.format(v) : '')}
+                />
+              </Bar>
             </BarChart>
           </ChartContainer>
         )}
