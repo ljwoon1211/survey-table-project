@@ -49,3 +49,7 @@ backups
 scripts
 .serena*.png
 .playwright-mcp
+
+.serena
+.superpowers
+.worktrees
