@@ -112,6 +112,12 @@ export async function createResponseWithFirstAnswer(input: {
   const platform = parsePlatform(userAgent);
   const browser = parseBrowser(userAgent);
 
+  // 2-1. 클라이언트 IP 추출 (Vercel/edge 환경 표준)
+  //   - x-forwarded-for 는 "client, proxy1, proxy2" 형태 → 첫 IP 사용
+  //   - 없으면 x-real-ip fallback
+  //   - 둘 다 없으면 null (DB 컬럼 nullable)
+  const ipAddress = extractClientIp(headerStore.get('x-forwarded-for'), headerStore.get('x-real-ip'));
+
   // 3. 첫 페이지 방문 기록 (ISO 문자열 — JSONB 형태가 PageVisit 타입과 일치하도록)
   const nowIso = new Date().toISOString();
   const firstVisit: PageVisit = {
@@ -129,6 +135,7 @@ export async function createResponseWithFirstAnswer(input: {
     isCompleted: false,
     status: 'in_progress',
     userAgent,
+    ipAddress,
     platform,
     browser,
     currentStepId,
@@ -386,4 +393,22 @@ export async function clearAllResponses() {
 
   await db.delete(surveyResponses);
   revalidatePath('/analytics');
+}
+
+/**
+ * 헤더에서 클라이언트 IP 를 추출한다.
+ *
+ * - `x-forwarded-for` 가 "client, proxy1, proxy2" 형태인 경우 첫 항목 사용
+ * - 없으면 `x-real-ip` fallback
+ * - 둘 다 비어 있으면 null
+ *
+ * 운영자 콘솔의 응답자 목록 페이지에서 회사·사무실 단위 그룹화에 사용한다.
+ * 표시는 `formatIpMask` 로 끝 옥텟 마스킹.
+ */
+function extractClientIp(xff: string | null, xri: string | null): string | null {
+  if (xff) {
+    const first = xff.split(',')[0]?.trim();
+    if (first) return first;
+  }
+  return xri?.trim() || null;
 }
