@@ -83,10 +83,11 @@ function KpiCell({ label, value, delta, deltaTone }: KpiCellProps) {
 
 /**
  * 운영 현황 콘솔 — A1 KPI Row.
- * 6개 셀(Total / Completed / Screened / Quotaful / Bad / Drop)을 가로로 나열한다.
+ * 7개 셀(전체 / 진행중 / 완료 / 자격 미달 / 쿼터마감 / 불성실 / 이탈)을 가로로 나열한다.
  *
- * total === 0 (응답 없음)일 때:
- *   - 행 자체는 그대로 유지하고, 각 셀의 값/비율을 "—"로 표기한다.
+ * total === 0 (종결 응답 없음)일 때:
+ *   - 종결성 셀은 "—"로 표기 (전체/완료/자격미달/쿼터마감/불성실/이탈)
+ *   - 진행중 셀(deltaTone === 'live')은 in_progress 가시성이 존재 이유라 항상 실수 노출
  *   - 페이지 단위 EmptyState는 상위 컴포지션에서 처리한다 (plan §9).
  */
 export function KpiRow({ counts }: KpiRowProps) {
@@ -96,12 +97,14 @@ export function KpiRow({ counts }: KpiRowProps) {
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
       {CELLS.map((cell) => {
         const value = counts[cell.field];
+        // 진행중 셀은 isEmpty 와 무관하게 항상 카운트 노출 (live 가시성 보존)
+        const cellIsEmpty = cell.deltaTone === 'live' ? false : isEmpty;
         return (
           <KpiCell
             key={cell.field}
             label={cell.label}
-            value={formatValue(value, isEmpty)}
-            delta={formatDelta(value, counts.total, cell.deltaTone, isEmpty)}
+            value={formatValue(value, cellIsEmpty)}
+            delta={formatDelta(value, counts.total, cell.deltaTone, cellIsEmpty)}
             deltaTone={cell.deltaTone}
           />
         );
