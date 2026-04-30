@@ -33,3 +33,24 @@ export function formatIpMask(ip: string | null | undefined): string {
 
   return '—'
 }
+
+/**
+ * 응답 소요시간을 운영자 시점 표시 문자열로 변환.
+ *
+ * - `in_progress` → 항상 "진행 중" (소요시간 표기 무의미)
+ * - `total_seconds = null` → "—"
+ * - 음수 (시계 역행) → 0 으로 클램프
+ * - 그 외 → 분 단위 반올림: "X분"
+ *
+ * 분 미만은 운영 가시성에 의미가 없어 정수 분으로만 표기.
+ */
+export function formatTotalTime(
+  totalSeconds: number | null | undefined,
+  status: string,
+): string {
+  if (status === 'in_progress') return '진행 중'
+  if (totalSeconds === null || totalSeconds === undefined) return '—'
+  const clamped = Math.max(0, totalSeconds)
+  const minutes = Math.round(clamped / 60)
+  return `${minutes}분`
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatIpMask } from '@/lib/operations/profiles'
+import { formatIpMask, formatTotalTime } from '@/lib/operations/profiles'
 
 describe('formatIpMask', () => {
   it('IPv4 → 끝 옥텟 마스킹', () => {
@@ -28,5 +28,35 @@ describe('formatIpMask', () => {
 
   it('비정상 문자열 → "—"', () => {
     expect(formatIpMask('not-an-ip')).toBe('—')
+  })
+})
+
+describe('formatTotalTime', () => {
+  it('completed + 300초 → "5분"', () => {
+    expect(formatTotalTime(300, 'completed')).toBe('5분')
+  })
+
+  it('completed + 0초 → "0분"', () => {
+    expect(formatTotalTime(0, 'completed')).toBe('0분')
+  })
+
+  it('completed + 13080초 → "218분" (큰 값)', () => {
+    expect(formatTotalTime(13080, 'completed')).toBe('218분')
+  })
+
+  it('completed + null → "—"', () => {
+    expect(formatTotalTime(null, 'completed')).toBe('—')
+  })
+
+  it('in_progress + 임의 값 → "진행 중"', () => {
+    expect(formatTotalTime(120, 'in_progress')).toBe('진행 중')
+  })
+
+  it('drop + null → "—"', () => {
+    expect(formatTotalTime(null, 'drop')).toBe('—')
+  })
+
+  it('completed + 음수 (시계 역행) → "0분" 클램프', () => {
+    expect(formatTotalTime(-5, 'completed')).toBe('0분')
   })
 })
