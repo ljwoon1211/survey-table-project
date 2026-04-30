@@ -145,7 +145,8 @@ export function DailyParticipationChart({
                   ‹
                 </button>
                 <span className="tabular-nums">
-                  {visibleData[0].bucket} ~ {visibleData[visibleData.length - 1].bucket}
+                  {formatRangeLabel(visibleData[0].bucket)} ~{' '}
+                  {formatRangeLabel(visibleData[visibleData.length - 1].bucket)}
                 </span>
                 <button
                   type="button"
@@ -245,6 +246,12 @@ interface ToggleButtonProps {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
+}
+
+/** 'YYYY-MM-DD' → 'MM-DD' 로 단축. 다른 형식은 그대로 (M-2). */
+function formatRangeLabel(bucket: string): string {
+  const m = bucket.match(/^(\d{4})-(\d{2}-\d{2})$/);
+  return m ? m[2] : bucket;
 }
 
 /**

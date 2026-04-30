@@ -262,12 +262,21 @@ export async function resumeOrCreateResponse(input: {
     return { id: existing.id, status: 'in_progress', resumed: false };
   }
 
-  // 종결 상태 — 그대로
-  return {
-    id: existing.id,
-    status: existing.status as 'completed' | 'screened_out' | 'quotaful_out' | 'bad',
-    resumed: false,
-  };
+  // 종결 상태 — 알려진 값만 통과시키고 알 수 없으면 null 로 fallback
+  const concludedStatuses = ['completed', 'screened_out', 'quotaful_out', 'bad'] as const;
+  type ConcludedStatus = (typeof concludedStatuses)[number];
+  if ((concludedStatuses as readonly string[]).includes(existing.status)) {
+    return {
+      id: existing.id,
+      status: existing.status as ConcludedStatus,
+      resumed: false,
+    };
+  }
+  // 알 수 없는 status — 호출자가 새 응답 흐름으로 가도록 null 반환
+  console.warn(
+    `[resumeOrCreateResponse] 알 수 없는 status 발견: ${existing.status} (id=${existing.id})`,
+  );
+  return null;
 }
 
 // 응답 완료 (JSONB + response_answers 이중 쓰기)

@@ -122,6 +122,9 @@ export default function SurveyResponsePage() {
   // INSERT 진행 중인지 추적 (첫 답변 동시 발사 시 중복 INSERT 방어).
   // ref가 아닌 state라도 OK — `handleResponse` 클로저에서 캡처되는 시점이 한 번이면 충분.
   const [isCreatingResponse, setIsCreatingResponse] = useState(false);
+  // recovery effect 가 resumeOrCreateResponse 를 await 하는 동안 true.
+  // handleResponse 의 INSERT 가드에서 참조해 recovery 완료 전 신규 INSERT 발사를 차단한다 (I-1).
+  const [isRecovering, setIsRecovering] = useState(false);
   // 제출 시도 후 하이라이트할 질문 ID 집합
   const [highlightQuestionIds, setHighlightQuestionIds] = useState<Set<string>>(
     () => new Set(),
@@ -306,6 +309,7 @@ export default function SurveyResponsePage() {
     const savedSessionId = window.localStorage.getItem(key);
     if (!savedSessionId) return;
 
+    setIsRecovering(true);
     resumeOrCreateResponse({ surveyId: loadedSurvey.id, sessionId: savedSessionId })
       .then((result) => {
         if (!result) {
@@ -328,6 +332,9 @@ export default function SurveyResponsePage() {
       })
       .catch((err) => {
         console.error('응답 회복 실패:', err);
+      })
+      .finally(() => {
+        setIsRecovering(false);
       });
   }, [loadedSurvey, currentResponseId, setCurrentResponseId]);
 
@@ -447,6 +454,7 @@ export default function SurveyResponsePage() {
       if (
         currentResponseId === null &&
         !isCreatingResponse &&
+        !isRecovering &&    // I-1 fix: 회복 진행 중에는 INSERT 발사 안 함
         loadedSurvey &&
         currentStep
       ) {
@@ -478,6 +486,7 @@ export default function SurveyResponsePage() {
       setPendingResponse,
       currentResponseId,
       isCreatingResponse,
+      isRecovering,
       loadedSurvey,
       currentStep,
       sessionId,
