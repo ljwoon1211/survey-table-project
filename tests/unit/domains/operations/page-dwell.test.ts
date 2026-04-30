@@ -120,9 +120,9 @@ describe('shapePageDwell', () => {
   /**
    * 표준 snapshot — 그룹 G1(인적사항) 안에 q1(text)+q2(table), 그리고 ungrouped q3(text).
    * 캐노니컬 step 순서:
-   *   1. group:G1 (q1)        '페이지 1: 인적사항'
-   *   2. table:q2             'Q2 (table)'
-   *   3. group:root (q3)      '페이지 3'  (ungrouped, name 없음)
+   *   1. group:G1 (q1)        label='인적사항', page=1 (G1.order=0 → 0+1)
+   *   2. table:q2             label='Q2',      page=1 (G1.order=0 → 0+1)
+   *   3. group:root (q3)      label='',        page=null (ungrouped)
    */
   const baseGroups: QuestionGroupData[] = [makeGroup('G1', '인적사항', 0)];
   const baseQuestions: QuestionData[] = [
@@ -141,9 +141,9 @@ describe('shapePageDwell', () => {
       'group:root',
     ]);
     expect(out.pages.map((p) => p.label)).toEqual([
-      '페이지 1: 인적사항',
-      'Q2 (table)',
-      '페이지 3',
+      '인적사항',
+      'Q2',
+      '',
     ]);
     for (const p of out.pages) {
       expect(p.n).toBe(0);
@@ -243,7 +243,7 @@ describe('shapePageDwell', () => {
     expect(g1.sdSeconds!).toBeCloseTo(10, 10);
   });
 
-  it('테이블 step의 라벨은 questionCode → fallback', () => {
+  it('테이블 step의 라벨은 questionCode → fallback (페이지 번호는 page 필드)', () => {
     // questionCode 있는 q2 vs 없는 q4 두 케이스.
     // questionCode는 schema-types에 명시되지 않은 필드 — 런타임에는 들어있다 (drop-funnel 동일 패턴).
     const groups = [makeGroup('G1', 'A', 0)];
@@ -258,9 +258,13 @@ describe('shapePageDwell', () => {
     const out = shapePageDwell({ responses: [], snapshot: snap });
     const t1 = out.pages.find((p) => p.stepId === 'table:q2')!;
     const t2 = out.pages.find((p) => p.stepId === 'table:q4')!;
-    expect(t1.label).toBe('Q3 (table)');
+    // label: questionCode 또는 fallback — '(table)' 접미어 없음.
+    expect(t1.label).toBe('Q3');
     // q4는 snapshot 인덱스 2번째 → 'Q2'
-    expect(t2.label).toBe('Q2 (table)');
+    expect(t2.label).toBe('Q2');
+    // page: G1.order=0 → page=1
+    expect(t1.page).toBe(1);
+    expect(t2.page).toBe(1);
   });
 
   it('빈 snapshot (그룹 + 질문 0건) → pages=[]', () => {
@@ -329,7 +333,30 @@ describe('shapePageDwell', () => {
       'group:G1',
     ]);
     expect(out.pages.map((p) => p.position)).toEqual([1, 2, 3]);
-    expect(out.pages[0].label).toBe('페이지 1: 메인');
-    expect(out.pages[2].label).toBe('페이지 3: 메인');
+    expect(out.pages[0].label).toBe('메인');
+    expect(out.pages[2].label).toBe('메인');
+  });
+
+  it('page 필드: group step은 order+1, table step은 그룹 order+1, ungrouped는 null', () => {
+    // G1(order=0): q1(text), G2(order=1): q2(table), ungrouped: q3(text)
+    const groups = [makeGroup('G1', '그룹1', 0), makeGroup('G2', '그룹2', 1)];
+    const questions: QuestionData[] = [
+      makeQuestion('q1', 'text', 0, 'G1'),
+      makeQuestion('q2', 'table', 0, 'G2'),
+      makeQuestion('q3', 'text', 0), // ungrouped
+    ];
+    const snap = makeSnapshot(groups, questions);
+    const out = shapePageDwell({ responses: [], snapshot: snap });
+    // step 순서: group:G1(q1) → table:q2 → group:root(q3)
+    expect(out.pages).toHaveLength(3);
+    const g1step = out.pages.find((p) => p.stepId === 'group:G1')!;
+    const tq2step = out.pages.find((p) => p.stepId === 'table:q2')!;
+    const rootStep = out.pages.find((p) => p.stepId === 'group:root')!;
+    // G1.order=0 → page=1
+    expect(g1step.page).toBe(1);
+    // G2.order=1 → page=2
+    expect(tq2step.page).toBe(2);
+    // ungrouped → page=null
+    expect(rootStep.page).toBeNull();
   });
 });

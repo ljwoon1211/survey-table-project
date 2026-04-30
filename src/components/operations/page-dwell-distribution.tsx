@@ -18,7 +18,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
-import type { DwellOutput } from '@/lib/operations/page-dwell';
+import type { DwellOutput, DwellPage } from '@/lib/operations/page-dwell';
 
 import { EmptyState } from './empty-state';
 
@@ -61,11 +61,38 @@ function formatSeconds(s: number): string {
   return `${minutes}:${ss}`;
 }
 
-/** x축 눈금 라벨이 길면 12자 + ellipsis로 잘라낸다. */
-function tickFormatter(value: string): string {
-  if (typeof value !== 'string') return String(value);
-  if (value.length <= 12) return value;
-  return `${value.slice(0, 12)}…`;
+/**
+ * X축 멀티라인 tick — mockup p1 형식 (2줄):
+ *   1행: 페이지 N (page 있을 때만, 회색)
+ *   2행: 라벨 (questionCode 또는 groupName)
+ *
+ * A5(drop-funnel)의 FunnelTick과 동일한 패턴.
+ */
+interface DwellTickProps {
+  x?: number;
+  y?: number;
+  payload?: { value?: string | number; index?: number };
+  pages: DwellPage[];
+}
+
+function DwellTick({ x = 0, y = 0, payload, pages }: DwellTickProps) {
+  const idx = payload?.index ?? 0;
+  const page = pages[idx];
+  const label = String(payload?.value ?? '');
+  const pageText = page?.page != null ? `페이지 ${page.page}` : '';
+
+  return (
+    <text x={x} y={y} textAnchor="middle" fontSize={11}>
+      {pageText && (
+        <tspan x={x} dy={12} fill="#94a3b8">
+          {pageText}
+        </tspan>
+      )}
+      <tspan x={x} dy={12} fill="#475569">
+        {label}
+      </tspan>
+    </text>
+  );
 }
 
 /**
@@ -200,9 +227,12 @@ export function PageDwellDistribution({ data, pageOffset }: Props) {
                 dataKey="label"
                 tickLine={false}
                 axisLine={false}
-                tickMargin={6}
+                tickMargin={4}
                 interval={0}
-                tickFormatter={tickFormatter}
+                height={44}
+                tick={(tickProps) => (
+                  <DwellTick {...tickProps} pages={visiblePages} />
+                )}
               />
               <YAxis
                 allowDecimals={false}

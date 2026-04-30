@@ -40,10 +40,16 @@ import type {
 export interface DwellPage {
   /** stepId — 'group:<rootGroupId | "root">' 또는 'table:<questionId>'. */
   stepId: string;
-  /** 차트 라벨. group: '페이지 N: <name>' / table: '<questionCode>' or 'QN (table)'. */
+  /** 차트 라벨. group: groupName (없으면 빈 문자열) / table: questionCode 또는 'QN'. */
   label: string;
   /** 캐노니컬 순서 내 1-based 위치. */
   position: number;
+  /**
+   * 소속 페이지 번호 (1-based).
+   * - group step: 해당 그룹의 order + 1.
+   * - table step: 질문이 속한 그룹의 order + 1. 그룹 없으면 null.
+   */
+  page: number | null;
   /** 트리밍 적용 후 표본 수. */
   n: number;
   /** 평균 체류시간(초). n=0 → null. */
@@ -100,11 +106,13 @@ export function trimmedStats(
   return { n, mean, sd };
 }
 
-/** 캐노니컬 순서로 정렬된 step 식별자 + 라벨. */
+/** 캐노니컬 순서로 정렬된 step 식별자 + 라벨 + 페이지 번호. */
 interface CanonicalStep {
   stepId: string;
   label: string;
   position: number;
+  /** 소속 페이지 번호 (1-based). group: order+1, table: 그룹 order+1 or null. */
+  page: number | null;
 }
 
 /**
@@ -116,9 +124,9 @@ interface CanonicalStep {
  *      그룹 step은 stepId='group:'+rootId 단 하나, 테이블 질문은 단독 'table:'+qid step.
  *   3. ungrouped 질문(groupId 없음)도 동일하게 — stepId='group:root' 단 하나.
  *
- * 라벨 규칙:
- *   - group step: '페이지 N: <name>' (이름이 비어있으면 '페이지 N')
- *   - table step: questionCode (있으면) 그대로 + '(table)' / 없으면 'Q<position>(table)'
+ * 라벨 규칙 (멀티라인 X축 분리 기준):
+ *   - group step: groupName (없으면 빈 문자열). 페이지 번호는 DwellPage.page 필드.
+ *   - table step: questionCode (있으면) 그대로 / 없으면 'Q<questionPosition>'. 페이지 번호는 DwellPage.page.
  *
  * Edge:
  *   - 그룹/질문 0건 → [] 반환.
@@ -224,16 +232,18 @@ function buildCanonicalSteps(snapshot: SurveyVersionSnapshot): CanonicalStep[] {
     items: QuestionData[],
     rootGroupId: string | null,
     rootGroupName: string | null,
+    rootGroupOrder: number | null,
   ): void => {
     let nonTableBuffer: QuestionData[] = [];
     const flush = () => {
       if (nonTableBuffer.length === 0) return;
       position += 1;
       const stepId = `group:${rootGroupId ?? 'root'}`;
-      const label = rootGroupName
-        ? `페이지 ${position}: ${rootGroupName}`
-        : `페이지 ${position}`;
-      steps.push({ stepId, label, position });
+      // label: groupName만 (페이지 번호는 page 필드로 분리).
+      const label = rootGroupName ?? '';
+      // page: group order + 1 (1-based). ungrouped 영역은 null.
+      const page = rootGroupOrder != null ? rootGroupOrder + 1 : null;
+      steps.push({ stepId, label, position, page });
       nonTableBuffer = [];
     };
 
@@ -246,10 +256,13 @@ function buildCanonicalSteps(snapshot: SurveyVersionSnapshot): CanonicalStep[] {
           typeof code === 'string' && code.length > 0
             ? code
             : `Q${questionPosition.get(q.id) ?? position}`;
+        // page: 질문이 속한 루트 그룹의 order + 1. ungrouped table은 null.
+        const page = rootGroupOrder != null ? rootGroupOrder + 1 : null;
         steps.push({
           stepId: `table:${q.id}`,
-          label: `${baseLabel} (table)`,
+          label: baseLabel,
           position,
+          page,
         });
       } else {
         nonTableBuffer.push(q);
@@ -265,13 +278,13 @@ function buildCanonicalSteps(snapshot: SurveyVersionSnapshot): CanonicalStep[] {
   for (const root of topLevel) {
     const items = flattenScope(root.id);
     if (items.length === 0) continue;
-    splitByTable(items, root.id, root.name ?? null);
+    splitByTable(items, root.id, root.name ?? null, root.order);
   }
 
   // 2) ungrouped 영역.
   const ungrouped = flattenScope(null);
   if (ungrouped.length > 0) {
-    splitByTable(ungrouped, null, null);
+    splitByTable(ungrouped, null, null, null);
   }
 
   return steps;
@@ -324,6 +337,7 @@ export function shapePageDwell(input: DwellInput): DwellOutput {
       stepId: step.stepId,
       label: step.label,
       position: step.position,
+      page: step.page,
       n: stats.n,
       meanSeconds: stats.mean,
       sdSeconds: stats.sd,
