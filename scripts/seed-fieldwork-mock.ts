@@ -112,6 +112,8 @@ function buildSteps(snapshot: SurveyVersionSnapshot): RenderStep[] {
 interface VisitSimResult {
   visits: PageVisit[];
   totalSeconds: number;
+  /** drop 시 마지막으로 방문한 step 의 인덱스 (0-based). completed 시 steps.length - 1. */
+  lastVisitedIdx: number;
 }
 
 /** page_visits 시뮬레이션 — completed 는 끝까지, drop 은 50~80% 지점에서 멈춤. */
@@ -121,7 +123,7 @@ function buildPageVisits(
   status: 'completed' | 'drop',
 ): VisitSimResult {
   if (steps.length === 0) {
-    return { visits: [], totalSeconds: 0 };
+    return { visits: [], totalSeconds: 0, lastVisitedIdx: -1 };
   }
 
   const stopIdx =
@@ -145,7 +147,35 @@ function buildPageVisits(
   }
 
   const totalSeconds = Math.floor((cursor.getTime() - startedAt.getTime()) / 1000);
-  return { visits, totalSeconds };
+  return { visits, totalSeconds, lastVisitedIdx: stopIdx - 1 };
+}
+
+/**
+ * lastVisitedIdx 까지 방문한 step 에 해당하는 question ID 집합을 반환.
+ *
+ * - group step: snapshot.questions 중 groupId 가 일치하는 모든 질문
+ * - table step: question ID 1개
+ */
+function questionsUpToStep(
+  steps: RenderStep[],
+  upToIdx: number,
+  snapshotQuestions: Array<{ id: string; type: string; groupId?: string | null }>,
+): Set<string> {
+  const allowed = new Set<string>();
+  for (let i = 0; i <= upToIdx; i++) {
+    const step = steps[i];
+    if (step.kind === 'group') {
+      for (const q of snapshotQuestions) {
+        if (q.groupId === step.id) {
+          allowed.add(q.id);
+        }
+      }
+    } else {
+      // table step: question ID 직접
+      allowed.add(step.id);
+    }
+  }
+  return allowed;
 }
 
 // === main ===
@@ -209,7 +239,7 @@ async function main() {
     const jitterMs = Math.random() * 12 * 60 * 60 * 1000;
     const startedAt = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000 - jitterMs);
 
-    const { visits, totalSeconds: simSeconds } = buildPageVisits(steps, startedAt, status);
+    const { visits, totalSeconds: simSeconds, lastVisitedIdx } = buildPageVisits(steps, startedAt, status);
 
     // 응답시간 outlier (idx 0, 1 — completed 만): N(600, 200) 대신 4500/9000 추가
     let totalSeconds = simSeconds;
@@ -227,7 +257,19 @@ async function main() {
     const lastActivityAt =
       completedAt ?? new Date(startedAt.getTime() + simSeconds * 1000);
 
-    const questionResponses = generateFakeSurveyResponse(surveyForGenerator);
+    let questionResponses = generateFakeSurveyResponse(surveyForGenerator);
+
+    // drop 응답: lastVisitedIdx 까지의 step에 해당하는 question 만 남김
+    if (status === 'drop' && lastVisitedIdx >= 0) {
+      const allowed = questionsUpToStep(
+        steps,
+        lastVisitedIdx,
+        snapshot.questions as Array<{ id: string; type: string; groupId?: string | null }>,
+      );
+      questionResponses = Object.fromEntries(
+        Object.entries(questionResponses).filter(([qid]) => allowed.has(qid)),
+      );
+    }
 
     const sessionId = `seed-mock-${Date.now()}-${i}`;
     const lastVisit = visits[visits.length - 1];
@@ -259,19 +301,40 @@ async function main() {
     .values(toInsert)
     .returning({ id: surveyResponses.id });
 
-  // 6. response_answers 정규화 (completed 만)
+  // 6. response_answers 정규화 (completed + drop 모두 포함)
+  // drop 응답도 적재해야 drop-funnel 어댑터가 lastQuestionId 를 올바르게 읽을 수 있다.
+  const orderedQuestionIds = (snapshot.questions as Array<{ id: string }>).map((q) => q.id);
+  const questionOrder = new Map(orderedQuestionIds.map((id, idx) => [id, idx]));
+
   let normalizedRows = 0;
   for (let i = 0; i < records.length; i++) {
-    if (records[i]._status !== 'completed') continue;
+    const rec = records[i];
     const normalized = normalizeToAnswers(
       inserted[i].id,
-      records[i].questionResponses,
+      rec.questionResponses,
       surveyQuestions,
     );
-    if (normalized.length > 0) {
-      await db.insert(responseAnswers).values(normalized);
-      normalizedRows += normalized.length;
-    }
+    if (normalized.length === 0) continue;
+
+    // snapshot.questions 순서로 정렬 후 startedAt ~ lastActivityAt 사이에 균등 점진 배치.
+    // 이렇게 하면 drop 의 last created_at 이 마지막으로 답한 question 을 가리키게 된다.
+    normalized.sort((a, b) => {
+      const ai = questionOrder.get(a.questionId) ?? 999999;
+      const bi = questionOrder.get(b.questionId) ?? 999999;
+      return ai - bi;
+    });
+
+    const startMs = rec.startedAt!.getTime();
+    const endMs = rec.lastActivityAt!.getTime();
+    const span = (endMs - startMs) / Math.max(1, normalized.length);
+
+    const withTimestamps = normalized.map((ra, idx) => ({
+      ...ra,
+      createdAt: new Date(startMs + (idx + 1) * span),
+    }));
+
+    await db.insert(responseAnswers).values(withTimestamps);
+    normalizedRows += withTimestamps.length;
   }
 
   console.log(`✓ inserted ${inserted.length} mock responses for survey ${surveyId}`);
