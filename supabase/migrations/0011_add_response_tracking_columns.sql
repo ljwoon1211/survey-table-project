@@ -19,6 +19,10 @@ SET
   status = CASE WHEN is_completed THEN 'completed' ELSE 'in_progress' END,
   last_activity_at = COALESCE(completed_at, started_at, created_at, now());
 
+UPDATE survey_responses
+SET page_visits = '[]'::jsonb
+WHERE page_visits IS NULL;
+
 -- Indexes
 CREATE INDEX idx_responses_survey_status ON survey_responses (survey_id, status);
 CREATE INDEX idx_responses_survey_started ON survey_responses (survey_id, started_at DESC);

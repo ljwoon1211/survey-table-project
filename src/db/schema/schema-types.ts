@@ -209,6 +209,13 @@ export interface QuestionConditionGroup {
   logicType: 'AND' | 'OR' | 'NOT';
 }
 
+// 운영 현황 콘솔 — 응답 페이지 방문 기록
+export interface PageVisit {
+  stepId: string;
+  enteredAt: string;
+  leftAt?: string;
+}
+
 // 보관함용 질문 데이터
 export interface QuestionData {
   id: string;

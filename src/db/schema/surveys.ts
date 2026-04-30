@@ -4,6 +4,7 @@ import { boolean, integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle
 import type {
   DynamicRowGroupConfig,
   HeaderCell,
+  PageVisit,
   QuestionConditionGroup,
   QuestionData,
   QuestionOption,
@@ -15,13 +16,6 @@ import type {
   TableRow,
   TableValidationRule,
 } from './schema-types';
-
-// 운영 현황 콘솔용 타입
-type PageVisit = {
-  stepId: string;
-  enteredAt: string;
-  leftAt?: string;
-};
 
 // 설문 테이블
 export const surveys = pgTable('surveys', {
