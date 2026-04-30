@@ -41,10 +41,10 @@ export function OperationsTabStrip({ surveyId }: OperationsTabStripProps) {
           href={`${operationsBase}/overview`}
           active={pathname?.startsWith(`${operationsBase}/overview`) ?? false}
         >
-          Field work
+          응답 현황
         </TabLink>
-        <TabDisabled>Report</TabDisabled>
-        <TabDisabled>Contact</TabDisabled>
+        <TabDisabled>보고서</TabDisabled>
+        <TabDisabled>컨택</TabDisabled>
       </nav>
     </div>
   );

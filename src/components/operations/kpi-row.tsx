@@ -19,12 +19,12 @@ interface KpiCellSpec {
 }
 
 const CELLS: KpiCellSpec[] = [
-  { label: 'Total', field: 'total', deltaTone: 'hidden' },
-  { label: 'Completed', field: 'completed', deltaTone: 'slate' },
-  { label: 'Screened', field: 'screenedOut', deltaTone: 'slate' },
-  { label: 'Quotaful', field: 'quotafulOut', deltaTone: 'slate' },
-  { label: 'Bad Answer', field: 'bad', deltaTone: 'slate' },
-  { label: 'Drop(ing..)', field: 'drop', deltaTone: 'rose' },
+  { label: '전체', field: 'total', deltaTone: 'hidden' },
+  { label: '완료', field: 'completed', deltaTone: 'slate' },
+  { label: '스크린아웃', field: 'screenedOut', deltaTone: 'slate' },
+  { label: '쿼터마감', field: 'quotafulOut', deltaTone: 'slate' },
+  { label: '불성실', field: 'bad', deltaTone: 'slate' },
+  { label: '이탈', field: 'drop', deltaTone: 'rose' },
 ];
 
 const numberFormatter = new Intl.NumberFormat('ko-KR');

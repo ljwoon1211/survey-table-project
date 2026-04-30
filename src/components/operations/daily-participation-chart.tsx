@@ -1,20 +1,21 @@
 'use client';
 
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from 'recharts';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from '@/components/ui/chart';
+import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
 import { cn } from '@/lib/utils';
 import type { DailyBucket, DailyMode } from '@/lib/operations/aggregate-daily';
 
 import { EmptyState } from './empty-state';
+
+/**
+ * day 모드일 때 차트에 노출할 최근 N일.
+ * hour 모드는 24버킷 고정이라 영향 없음.
+ */
+const RECENT_DAYS_LIMIT = 7;
 
 interface Props {
   data: DailyBucket[];
@@ -95,6 +96,12 @@ export function DailyParticipationChart({
     [pushParams],
   );
 
+  // day 모드는 마지막 응답일 기준 최근 7개만, hour 모드는 24버킷 그대로
+  const visibleData = useMemo(
+    () => (mode === 'day' ? data.slice(-RECENT_DAYS_LIMIT) : data),
+    [data, mode],
+  );
+
   return (
     <Card>
       <CardContent className="px-5 py-4">
@@ -133,24 +140,26 @@ export function DailyParticipationChart({
           </div>
         </div>
 
-        {data.length === 0 ? (
+        {visibleData.length === 0 ? (
           <EmptyState message="참여자 데이터가 없습니다" />
         ) : (
           <ChartContainer
             config={CHART_CONFIG}
-            className="aspect-auto h-60 w-full"
+            className="aspect-auto h-64 w-full"
           >
             <BarChart
-              data={data}
-              margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+              data={visibleData}
+              margin={{ top: 20, right: 8, bottom: 12, left: 0 }}
             >
               <CartesianGrid vertical={false} strokeDasharray="3 3" />
               <XAxis
                 dataKey="label"
                 tickLine={false}
                 axisLine={false}
-                tickMargin={6}
-                interval="preserveStartEnd"
+                tickMargin={4}
+                interval={0}
+                height={40}
+                tick={<MultiLineTick />}
               />
               <YAxis
                 allowDecimals={false}
@@ -160,16 +169,20 @@ export function DailyParticipationChart({
                 width={32}
                 tickFormatter={(v: number) => numberFormatter.format(v)}
               />
-              <ChartTooltip
-                cursor={{ fill: 'rgba(148, 163, 184, 0.15)' }}
-                content={<ChartTooltipContent indicator="dot" hideLabel={false} />}
-              />
               <Bar
                 dataKey="count"
                 fill="var(--color-count)"
                 radius={[3, 3, 0, 0]}
                 isAnimationActive={false}
-              />
+              >
+                <LabelList
+                  dataKey="count"
+                  position="top"
+                  className="fill-slate-700"
+                  fontSize={11}
+                  formatter={(v: number) => (v > 0 ? numberFormatter.format(v) : '')}
+                />
+              </Bar>
             </BarChart>
           </ChartContainer>
         )}
@@ -182,6 +195,33 @@ interface ToggleButtonProps {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
+}
+
+/**
+ * X축 tick 커스텀 렌더러 — day 모드의 'MM-DD (요일)' 라벨을
+ * 두 줄(MM-DD / (요일))로 분리해 표기. 다른 형식은 한 줄 그대로.
+ */
+interface TickProps {
+  x?: number;
+  y?: number;
+  payload?: { value?: string };
+}
+function MultiLineTick({ x = 0, y = 0, payload }: TickProps) {
+  const value = String(payload?.value ?? '');
+  const dayMatch = value.match(/^(\d{2}-\d{2})\s+(\(.\))$/);
+  if (dayMatch) {
+    return (
+      <text x={x} y={y} textAnchor="middle" fill="#64748b" fontSize={11}>
+        <tspan x={x} dy="12">{dayMatch[1]}</tspan>
+        <tspan x={x} dy="14">{dayMatch[2]}</tspan>
+      </text>
+    );
+  }
+  return (
+    <text x={x} y={y} dy={14} textAnchor="middle" fill="#64748b" fontSize={11}>
+      {value}
+    </text>
+  );
 }
 
 function ToggleButton({ active, onClick, children }: ToggleButtonProps) {

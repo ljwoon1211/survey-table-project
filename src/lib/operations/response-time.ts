@@ -66,11 +66,10 @@ const SCOPE_ORDER: Array<{
   label: string;
   platform: Platform | null;
 }> = [
-  { scope: 'total', label: 'Total', platform: null },
-  { scope: 'desktop', label: 'Desktop', platform: 'desktop' },
-  { scope: 'mobile', label: 'Mobile', platform: 'mobile' },
-  // 사용자 피드백: 목업의 'Tab' 대신 'Pad' 사용.
-  { scope: 'tablet', label: 'Pad', platform: 'tablet' },
+  { scope: 'total', label: '전체', platform: null },
+  { scope: 'desktop', label: '데스크톱', platform: 'desktop' },
+  { scope: 'mobile', label: '모바일', platform: 'mobile' },
+  { scope: 'tablet', label: '태블릿', platform: 'tablet' },
 ];
 
 /**

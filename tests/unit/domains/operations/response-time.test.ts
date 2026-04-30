@@ -63,7 +63,7 @@ describe('shapeResponseTime', () => {
     const result = shapeResponseTime([]);
     expect(result).toHaveLength(4);
     expect(result.map((r) => r.scope)).toEqual(['total', 'desktop', 'mobile', 'tablet']);
-    expect(result.map((r) => r.label)).toEqual(['Total', 'Desktop', 'Mobile', 'Pad']);
+    expect(result.map((r) => r.label)).toEqual(['전체', '데스크톱', '모바일', '태블릿']);
     for (const row of result) {
       expect(row.n).toBe(0);
       expect(row.avg).toBeNull();
@@ -90,7 +90,7 @@ describe('shapeResponseTime', () => {
     expect(total.min).toBe(100);
     expect(total.max).toBe(300);
 
-    expect(desktop).toEqual(total ? { ...total, scope: 'desktop', label: 'Desktop' } : total);
+    expect(desktop).toEqual(total ? { ...total, scope: 'desktop', label: '데스크톱' } : total);
 
     expect(mobile.n).toBe(0);
     expect(mobile.avg).toBeNull();
@@ -150,13 +150,13 @@ describe('shapeResponseTime', () => {
     expect(result.find((r) => r.scope === 'tablet')!.n).toBe(0);
   });
 
-  it('tablet platform은 "Pad" 라벨 행으로 매핑', () => {
+  it('tablet platform은 "태블릿" 라벨 행으로 매핑', () => {
     const rows: Array<{ platform: Platform | null; totalSeconds: number | null }> = [
       { platform: 'tablet', totalSeconds: 250 },
     ];
     const result = shapeResponseTime(rows);
     const padRow = result.find((r) => r.scope === 'tablet')!;
-    expect(padRow.label).toBe('Pad');
+    expect(padRow.label).toBe('태블릿');
     expect(padRow.n).toBe(1);
     expect(padRow.avg).toBe(250);
   });

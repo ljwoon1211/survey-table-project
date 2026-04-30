@@ -30,7 +30,7 @@ import { getResponseTime } from '@/lib/operations/response-time.server';
 export const revalidate = 30;
 
 export const metadata: Metadata = {
-  title: '현황 - Fieldwork report',
+  title: '현황 - 응답 진행 현황',
 };
 
 interface OperationsOverviewPageProps {
@@ -107,9 +107,9 @@ export default async function OperationsOverviewPage({
     <div className="mx-auto max-w-7xl space-y-4 p-6">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">현황</h1>
+          <h1 className="text-xl font-bold text-gray-900">응답 현황</h1>
           <p className="text-sm text-slate-500">
-            Fieldwork report — 응답자 진행 현황 · 시간대별 추이 · 응답시간 통계 · Drop 위치 분석
+            응답자 진행 현황 · 일자별 추이 · 응답시간 통계 · 이탈 위치 분석
           </p>
         </div>
         <RefreshButton />

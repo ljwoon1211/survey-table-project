@@ -69,7 +69,7 @@ export function DropFunnel({ data }: Props) {
       <CardContent className="px-5 py-4">
         <div className="mb-3">
           <h3 className="text-sm font-semibold text-slate-900">
-            Drop 응답 위치별 사례 (Funnel)
+            이탈 응답 위치별 사례
           </h3>
           <p className="mt-0.5 text-xs text-slate-400">
             x: 질문 위치 · y: 이탈자 수 · 라벨: 누적 진행률 %

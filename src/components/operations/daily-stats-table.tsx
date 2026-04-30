@@ -3,9 +3,11 @@
 import {
   flexRender,
   getCoreRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
+  type PaginationState,
   type SortingState,
 } from '@tanstack/react-table';
 import { useMemo, useState } from 'react';
@@ -45,6 +47,7 @@ function formatColumnPct(pct: number | null): string {
  */
 export function DailyStatsTable({ data }: Props) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'date', desc: true }]);
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
 
   const columns = useMemo<ColumnDef<DailyStatsRow>[]>(
     () => [
@@ -61,7 +64,7 @@ export function DailyStatsTable({ data }: Props) {
       {
         id: 'total',
         accessorKey: 'total',
-        header: 'Total',
+        header: '전체',
         cell: ({ getValue }) => numberFormatter.format(getValue<number>()),
         meta: { align: 'right' as const },
       },
@@ -69,7 +72,7 @@ export function DailyStatsTable({ data }: Props) {
         id: 'completed',
         // completed 자체로 정렬 (rate가 아니라 count 기준이 더 자연스러움 — 목업과 동일)
         accessorKey: 'completed',
-        header: 'Completed',
+        header: '완료',
         cell: ({ row }) => {
           const completed = row.original.completed;
           const rate = row.original.completionRate;
@@ -89,16 +92,16 @@ export function DailyStatsTable({ data }: Props) {
       {
         id: 'columnPct',
         accessorKey: 'columnPct',
-        header: 'Col %',
+        header: '점유율',
         cell: ({ getValue }) => formatColumnPct(getValue<number | null>()),
-        // null 은 항상 가장 작은 값으로 — Col %는 total=0일 때만 null이라 실 데이터에는 없음
+        // null 은 항상 가장 작은 값으로 — 점유율은 total=0일 때만 null이라 실 데이터에는 없음
         sortUndefined: 'last',
         meta: { align: 'right' as const },
       },
       {
         id: 'drop',
         accessorKey: 'drop',
-        header: 'Drop',
+        header: '이탈',
         cell: ({ getValue }) => numberFormatter.format(getValue<number>()),
         meta: { align: 'right' as const },
       },
@@ -109,10 +112,12 @@ export function DailyStatsTable({ data }: Props) {
   const table = useReactTable({
     data,
     columns,
-    state: { sorting },
+    state: { sorting, pagination },
     onSortingChange: setSorting,
+    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
   });
 
   return (
@@ -195,6 +200,32 @@ export function DailyStatsTable({ data }: Props) {
                 ))}
               </tbody>
             </table>
+            {table.getPageCount() > 1 && (
+              <div className="mt-3 flex items-center justify-between gap-2 px-1 text-xs text-slate-600">
+                <span>
+                  총 {numberFormatter.format(data.length)}건 ·{' '}
+                  {table.getState().pagination.pageIndex + 1} / {table.getPageCount()} 페이지
+                </span>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => table.previousPage()}
+                    disabled={!table.getCanPreviousPage()}
+                    className="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    ‹ 이전
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => table.nextPage()}
+                    disabled={!table.getCanNextPage()}
+                    className="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    다음 ›
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </CardContent>

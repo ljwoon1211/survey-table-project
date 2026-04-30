@@ -42,10 +42,10 @@ interface StatColumnSpec {
 
 const STAT_COLUMNS: StatColumnSpec[] = [
   { key: 'n', label: 'N' },
-  { key: 'avg', label: 'Avg' },
-  { key: 'avgTrimmed', label: 'Avg(±2.5%)' },
-  { key: 'min', label: 'Min' },
-  { key: 'max', label: 'Max' },
+  { key: 'avg', label: '평균' },
+  { key: 'avgTrimmed', label: '절사평균(±2.5%)' },
+  { key: 'min', label: '최소' },
+  { key: 'max', label: '최대' },
 ];
 
 /**
@@ -156,7 +156,7 @@ export function ResponseTimeStats({ data }: Props) {
           </table>
         </div>
         <p className="mt-2 text-xs text-slate-400">
-          ※ 트리밍 평균 = 상하 2.5% outlier 제외 (며칠 뒤 재접속 보정)
+          ※ 절사평균 = 상하 2.5% 이상값 제외 (며칠 뒤 재접속 보정)
         </p>
       </CardContent>
     </Card>
