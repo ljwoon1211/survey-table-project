@@ -20,15 +20,14 @@ describe('shapeDropFunnel', () => {
     const input: DropFunnelInput = {
       questions: makeQuestions(5),
       drops: [],
-      reachedCounts: {},
-      totalStarted: 0,
     };
     const result = shapeDropFunnel(input);
     expect(result.bars).toEqual([]);
     expect(result.totalDrops).toBe(0);
   });
 
-  it('한 질문에 모든 drop 집중 → 단일 막대 + cumulativeProgressPct 정확', () => {
+  it('한 질문에 모든 drop 집중 → 단일 막대 + position-based 진행률 정확', () => {
+    // q3 / 5문항 → (3/5)*100 = 60%
     const input: DropFunnelInput = {
       questions: makeQuestions(5),
       drops: [
@@ -36,8 +35,6 @@ describe('shapeDropFunnel', () => {
         { responseId: 'r2', lastQuestionId: 'q3', exposedQuestionIds: null },
         { responseId: 'r3', lastQuestionId: 'q3', exposedQuestionIds: null },
       ],
-      reachedCounts: { q3: 80 },
-      totalStarted: 100,
     };
     const result = shapeDropFunnel(input);
 
@@ -46,14 +43,16 @@ describe('shapeDropFunnel', () => {
       questionId: 'q3',
       label: 'Q3',
       position: 3,
+      page: null,
       dropCount: 3,
-      cumulativeProgressPct: 80, // 80/100 * 100
+      cumulativeProgressPct: 60, // (3/5)*100
     });
     expect(result.totalDrops).toBe(3);
   });
 
-  it('topN=3, 5개 질문에 drop 분포 → 상위 3 막대 + 기타 1 막대', () => {
+  it('topN=3, 5개 질문에 drop 분포 → 상위 3 막대(position ASC) + 기타 1 막대', () => {
     // dropCount: q1=10, q2=8, q3=5, q4=3, q5=1 (총 27)
+    // 상위 3: q1, q2, q3 → position ASC 정렬 시 q1, q2, q3 순서 유지
     const drops: DropFunnelInput['drops'] = [];
     const counts: Record<string, number> = { q1: 10, q2: 8, q3: 5, q4: 3, q5: 1 };
     let rid = 0;
@@ -65,8 +64,6 @@ describe('shapeDropFunnel', () => {
     const input: DropFunnelInput = {
       questions: makeQuestions(5),
       drops,
-      reachedCounts: { q1: 90, q2: 70, q3: 50, q4: 30, q5: 10 },
-      totalStarted: 100,
       topN: 3,
     };
     const result = shapeDropFunnel(input);
@@ -75,6 +72,8 @@ describe('shapeDropFunnel', () => {
     expect(result.bars).toHaveLength(4);
     expect(result.bars.slice(0, 3).map((b) => b.questionId)).toEqual(['q1', 'q2', 'q3']);
     expect(result.bars.slice(0, 3).map((b) => b.dropCount)).toEqual([10, 8, 5]);
+    // position-based 진행률: q1=20%, q2=40%, q3=60% (총 5문항)
+    expect(result.bars.slice(0, 3).map((b) => b.cumulativeProgressPct)).toEqual([20, 40, 60]);
 
     const others = result.bars[3];
     expect(others.questionId).toBe('others');
@@ -82,6 +81,7 @@ describe('shapeDropFunnel', () => {
     expect(others.dropCount).toBe(4);
     expect(others.cumulativeProgressPct).toBeNull();
     expect(others.position).toBeNull();
+    expect(others.page).toBeNull();
 
     expect(result.totalDrops).toBe(27);
   });
@@ -94,8 +94,6 @@ describe('shapeDropFunnel', () => {
         { responseId: 'r2', lastQuestionId: 'q-deleted', exposedQuestionIds: null },
         { responseId: 'r3', lastQuestionId: 'q-other-version', exposedQuestionIds: null },
       ],
-      reachedCounts: { q1: 50 },
-      totalStarted: 100,
     };
     const result = shapeDropFunnel(input);
 
@@ -110,6 +108,7 @@ describe('shapeDropFunnel', () => {
     expect(legacy.dropCount).toBe(2);
     expect(legacy.cumulativeProgressPct).toBeNull();
     expect(legacy.position).toBeNull();
+    expect(legacy.page).toBeNull();
 
     expect(result.totalDrops).toBe(3);
   });
@@ -121,8 +120,6 @@ describe('shapeDropFunnel', () => {
         { responseId: 'r1', lastQuestionId: null, exposedQuestionIds: null },
         { responseId: 'r2', lastQuestionId: null, exposedQuestionIds: null },
       ],
-      reachedCounts: {},
-      totalStarted: 5,
     };
     const result = shapeDropFunnel(input);
 
@@ -143,8 +140,6 @@ describe('shapeDropFunnel', () => {
         // 제외: q5가 노출 목록에 없음.
         { responseId: 'r3', lastQuestionId: 'q5', exposedQuestionIds: ['q1', 'q4'] },
       ],
-      reachedCounts: { q3: 80 },
-      totalStarted: 100,
     };
     const result = shapeDropFunnel(input);
 
@@ -162,14 +157,12 @@ describe('shapeDropFunnel', () => {
         { responseId: 'r1', lastQuestionId: 'q1', exposedQuestionIds: ['q1', 'q2'] },
         { responseId: 'r2', lastQuestionId: 'q2', exposedQuestionIds: ['q1', 'q2', 'q3'] },
       ],
-      reachedCounts: { q1: 10, q2: 5 },
-      totalStarted: 20,
     };
     const result = shapeDropFunnel(input);
 
     expect(result.bars).toHaveLength(2);
-    // q1 dropCount=1, q2 dropCount=1, 동률이지만 둘 다 포함.
-    expect(result.bars.map((b) => b.questionId).sort()).toEqual(['q1', 'q2']);
+    // q1, q2 모두 포함 — position ASC 정렬이므로 [q1, q2] 순서 (입력 순서 무관).
+    expect(result.bars.map((b) => b.questionId)).toEqual(['q1', 'q2']);
     expect(result.totalDrops).toBe(2);
   });
 
@@ -180,8 +173,6 @@ describe('shapeDropFunnel', () => {
         { responseId: 'r1', lastQuestionId: 'q2', exposedQuestionIds: null },
         { responseId: 'r2', lastQuestionId: 'q2', exposedQuestionIds: null },
       ],
-      reachedCounts: { q2: 30 },
-      totalStarted: 50,
     };
     const result = shapeDropFunnel(input);
 
@@ -191,9 +182,10 @@ describe('shapeDropFunnel', () => {
     expect(result.totalDrops).toBe(2);
   });
 
-  it('막대 정렬 — dropCount 내림차순', () => {
+  it('막대 정렬 — position ASC (sequential funnel 형태)', () => {
+    // q5에 5건, q1에 3건, q3에 7건.
+    // dropCount DESC 라면 [q3, q5, q1] 이지만, 새 사양은 position ASC → [q1, q3, q5].
     const drops: DropFunnelInput['drops'] = [];
-    // q5에 5건, q1에 3건, q3에 7건 — 정렬 후 q3, q5, q1 순서.
     const counts: Record<string, number> = { q5: 5, q1: 3, q3: 7 };
     let rid = 0;
     for (const [qid, n] of Object.entries(counts)) {
@@ -204,49 +196,53 @@ describe('shapeDropFunnel', () => {
     const input: DropFunnelInput = {
       questions: makeQuestions(5),
       drops,
-      reachedCounts: { q1: 50, q3: 30, q5: 10 },
-      totalStarted: 100,
     };
     const result = shapeDropFunnel(input);
 
-    expect(result.bars.map((b) => b.questionId)).toEqual(['q3', 'q5', 'q1']);
-    expect(result.bars.map((b) => b.dropCount)).toEqual([7, 5, 3]);
+    expect(result.bars.map((b) => b.questionId)).toEqual(['q1', 'q3', 'q5']);
+    expect(result.bars.map((b) => b.dropCount)).toEqual([3, 7, 5]);
+    // 진행률: q1 = 1/5*100=20, q3=60, q5=100
+    expect(result.bars.map((b) => b.cumulativeProgressPct)).toEqual([20, 60, 100]);
   });
 
-  it('totalStarted=0 → 모든 cumulativeProgressPct가 null', () => {
+  it('totalQuestions=0인데 drops가 있으면 → 모두 legacy (정상 귀속 자체가 불가능)', () => {
     const input: DropFunnelInput = {
-      questions: makeQuestions(3),
+      questions: [],
       drops: [
         { responseId: 'r1', lastQuestionId: 'q2', exposedQuestionIds: null },
       ],
-      reachedCounts: {},
-      totalStarted: 0,
     };
     const result = shapeDropFunnel(input);
 
+    // 빈 questions → 어떤 id든 questionMap.has=false → legacy.
     expect(result.bars).toHaveLength(1);
+    expect(result.bars[0].questionId).toBe('legacy');
     expect(result.bars[0].cumulativeProgressPct).toBeNull();
   });
 
-  it('cumulativeProgressPct 정확 계산 — reached=80, total=100 → 80%', () => {
+  it('position-based 진행률 — 16번 / 50문항 → 32%', () => {
+    // mockup p1 예시: Q16 / 50문항 → 32.0%
+    const questions: FunnelQuestion[] = Array.from({ length: 50 }, (_, i) => ({
+      id: `q${i + 1}`,
+      position: i + 1,
+      label: `Q${i + 1}`,
+    }));
     const input: DropFunnelInput = {
-      questions: makeQuestions(3),
+      questions,
       drops: [
-        { responseId: 'r1', lastQuestionId: 'q3', exposedQuestionIds: null },
+        { responseId: 'r1', lastQuestionId: 'q16', exposedQuestionIds: null },
       ],
-      reachedCounts: { q3: 80 },
-      totalStarted: 100,
     };
     const result = shapeDropFunnel(input);
-    expect(result.bars[0].cumulativeProgressPct).toBe(80);
+    expect(result.bars[0].cumulativeProgressPct).toBe(32);
   });
 
-  it('topN 기본값 10 — 12개 위치에 drop 분산 시 10막대 + 기타 1막대', () => {
+  it('topN 기본값 10 — 12개 위치에 drop 분산 시 10막대(position ASC) + 기타 1막대', () => {
     const drops: DropFunnelInput['drops'] = [];
-    // 12개 질문에 dropCount 12, 11, 10, ..., 1 할당.
+    // 12개 질문에 dropCount 12, 11, 10, ..., 1 할당. (q1=12, ..., q12=1)
     let rid = 0;
     for (let i = 1; i <= 12; i++) {
-      const n = 13 - i; // q1=12, q2=11, ..., q12=1
+      const n = 13 - i;
       for (let k = 0; k < n; k++) {
         drops.push({ responseId: `r${rid++}`, lastQuestionId: `q${i}`, exposedQuestionIds: null });
       }
@@ -254,26 +250,23 @@ describe('shapeDropFunnel', () => {
     const input: DropFunnelInput = {
       questions: makeQuestions(12),
       drops,
-      reachedCounts: {},
-      totalStarted: 100,
     };
     const result = shapeDropFunnel(input);
 
-    // 상위 10개 + 기타 1개 = 11막대
+    // 단독 막대 후보: dropCount DESC 상위 10 = q1..q10. 잔여 q11(2)+q12(1)=3 → 기타.
+    // 단독 막대들은 position ASC 재정렬 → q1..q10. 그 뒤 기타.
     expect(result.bars).toHaveLength(11);
-    // 상위 10개는 q1..q10 (가장 많은 drop).
     expect(result.bars.slice(0, 10).map((b) => b.questionId)).toEqual([
       'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8', 'q9', 'q10',
     ]);
-    // 기타 = q11(2) + q12(1) = 3
     const others = result.bars[10];
     expect(others.questionId).toBe('others');
     expect(others.dropCount).toBe(3);
   });
 
-  it('legacy + others 모두 존재 → [정상...상위N, others, legacy] 순서', () => {
+  it('legacy + others 모두 존재 → [정상(position ASC), others, legacy] 순서', () => {
     const drops: DropFunnelInput['drops'] = [
-      // 정상: q1×3, q2×2, q3×1 (topN=2 → q1, q2 살리고 q3는 기타로)
+      // 정상: q1×3, q2×2, q3×1 (topN=2 → q1, q2 단독, q3는 기타)
       { responseId: 'r1', lastQuestionId: 'q1', exposedQuestionIds: null },
       { responseId: 'r2', lastQuestionId: 'q1', exposedQuestionIds: null },
       { responseId: 'r3', lastQuestionId: 'q1', exposedQuestionIds: null },
@@ -287,18 +280,44 @@ describe('shapeDropFunnel', () => {
     const input: DropFunnelInput = {
       questions: makeQuestions(3),
       drops,
-      reachedCounts: { q1: 50, q2: 30, q3: 10 },
-      totalStarted: 80,
       topN: 2,
     };
     const result = shapeDropFunnel(input);
 
-    // [q1, q2, others(q3=1), legacy(2)]
+    // 단독: q1, q2 (position ASC). 기타(q3=1). legacy(2).
+    // [q1, q2, others(1), legacy(2)]
     expect(result.bars).toHaveLength(4);
     expect(result.bars.map((b) => b.questionId)).toEqual(['q1', 'q2', 'others', 'legacy']);
     expect(result.bars.map((b) => b.dropCount)).toEqual([3, 2, 1, 2]);
     expect(result.bars[2].cumulativeProgressPct).toBeNull();
     expect(result.bars[3].cumulativeProgressPct).toBeNull();
     expect(result.totalDrops).toBe(8);
+  });
+
+  it('FunnelQuestion.page 필드 → DropFunnelBar.page 로 전파', () => {
+    // mockup 예: Q16 (page 6). 여기선 단순화해 q3을 page=2, q5를 page=3 으로.
+    const questions: FunnelQuestion[] = [
+      { id: 'q1', position: 1, label: 'Q1', page: 1 },
+      { id: 'q2', position: 2, label: 'Q2', page: 1 },
+      { id: 'q3', position: 3, label: 'Q3', page: 2 },
+      { id: 'q4', position: 4, label: 'Q4' }, // ungrouped → page undefined
+      { id: 'q5', position: 5, label: 'Q5', page: 3 },
+    ];
+    const input: DropFunnelInput = {
+      questions,
+      drops: [
+        { responseId: 'r1', lastQuestionId: 'q3', exposedQuestionIds: null },
+        { responseId: 'r2', lastQuestionId: 'q4', exposedQuestionIds: null },
+        { responseId: 'r3', lastQuestionId: 'q5', exposedQuestionIds: null },
+      ],
+    };
+    const result = shapeDropFunnel(input);
+
+    // position ASC: q3 (page 2), q4 (page null), q5 (page 3)
+    expect(result.bars).toHaveLength(3);
+    expect(result.bars.map((b) => b.questionId)).toEqual(['q3', 'q4', 'q5']);
+    expect(result.bars.map((b) => b.page)).toEqual([2, null, 3]);
+    // 진행률: q3=60, q4=80, q5=100
+    expect(result.bars.map((b) => b.cumulativeProgressPct)).toEqual([60, 80, 100]);
   });
 });

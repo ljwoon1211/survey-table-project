@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 import { db } from '@/db';
 import {
@@ -9,7 +9,10 @@ import {
   surveys,
   surveyVersions,
 } from '@/db/schema';
-import type { SurveyVersionSnapshot } from '@/db/schema/schema-types';
+import type {
+  QuestionGroupData,
+  SurveyVersionSnapshot,
+} from '@/db/schema/schema-types';
 
 import {
   shapeDropFunnel,
@@ -39,6 +42,10 @@ function toStringArray(value: unknown): string[] | null {
  * - snapshot.questions의 배열 인덱스를 1-based position으로 사용.
  * - 라벨 우선순위: questionCode → `Q{position}` 폴백.
  *   (questionCode는 SPSS 변수명으로 'SQ', 'Q3', 'Q5_1' 등 mockup 형식과 일치한다.)
+ * - page: 그 질문이 속한 *최상위* 그룹의 1-based 페이지 번호.
+ *   - parentGroupId 체인을 따라 root까지 거슬러 올라가 root group을 찾는다.
+ *   - 최상위 그룹들을 order ASC 로 정렬한 뒤 인덱스 + 1.
+ *   - 질문이 ungrouped(groupId 없음) 또는 root group이 snapshot에 없으면 undefined.
  *
  * 주의: schema-types.ts의 QuestionData 인터페이스에는 questionCode 필드가 빠져있지만
  *   실제 저장된 snapshot에는 포함되어 있다 (questions 테이블의 question_code 컬럼이 그대로 들어감).
@@ -49,12 +56,57 @@ function buildFunnelQuestions(
 ): FunnelQuestion[] {
   if (!snapshot || !Array.isArray(snapshot.questions)) return [];
 
+  const groups: QuestionGroupData[] = Array.isArray(snapshot.groups)
+    ? snapshot.groups
+    : [];
+
+  // groupId → group 매핑 (parent walk 용).
+  const groupById = new Map<string, QuestionGroupData>();
+  for (const g of groups) {
+    groupById.set(g.id, g);
+  }
+
+  // 최상위 그룹을 order ASC 로 정렬 → 페이지 번호 (1-based) 매핑.
+  const topLevelGroups = groups
+    .filter((g) => !g.parentGroupId)
+    .sort((a, b) => a.order - b.order);
+  const pageByRootId = new Map<string, number>();
+  topLevelGroups.forEach((g, idx) => {
+    pageByRootId.set(g.id, idx + 1);
+  });
+
+  /**
+   * 그룹의 root(최상위) group id를 찾는다.
+   * parentGroupId 체인을 따라가며, 사이클이 있을 경우 방어적으로 종료.
+   */
+  const findRootGroupId = (groupId: string): string | null => {
+    const visited = new Set<string>();
+    let current: QuestionGroupData | undefined = groupById.get(groupId);
+    while (current) {
+      if (visited.has(current.id)) return null; // 사이클 방어.
+      visited.add(current.id);
+      if (!current.parentGroupId) return current.id;
+      current = groupById.get(current.parentGroupId);
+    }
+    return null;
+  };
+
   return snapshot.questions.map((q, idx) => {
     const position = idx + 1;
     // questionCode는 schema-types에 명시되지 않은 필드 — 인덱스 액세스로 안전 읽기.
     const code = (q as { questionCode?: string | null }).questionCode;
     const label = typeof code === 'string' && code.length > 0 ? code : `Q${position}`;
-    return { id: q.id, position, label };
+
+    // page 결정: groupId 있으면 root까지 거슬러 → 페이지 번호 lookup.
+    let page: number | undefined;
+    if (q.groupId) {
+      const rootId = findRootGroupId(q.groupId);
+      if (rootId !== null) {
+        page = pageByRootId.get(rootId);
+      }
+    }
+
+    return { id: q.id, position, label, page };
   });
 }
 
@@ -64,14 +116,15 @@ function buildFunnelQuestions(
  * 처리 단계:
  *   A) surveys.currentVersionId → surveyVersions.snapshot에서 질문 순서 추출.
  *   B) drop 세션의 마지막 답변 질문(`response_answers.created_at` 최댓값) + exposedQuestionIds 수집.
- *   C) 질문별 도달자 수 (drop+completed 세션 중 distinct response_id) 집계.
- *   D) 시작된 세션 총수 (drop+completed) 집계.
- *   E) 순수 함수 `shapeDropFunnel` 에 위임해 막대 배열 생성.
+ *   C) 순수 함수 `shapeDropFunnel` 에 위임해 막대 배열 생성.
  *
  * Edge case:
  *   - currentVersionId 없음 / snapshot.questions 비어있음 → 빈 결과.
- *   - drop 세션 0건이어도 reachedCounts/totalStarted는 의미 있을 수 있지만,
- *     순수 함수가 빈 drops 입력에서 빈 bars를 반환하므로 자연스럽게 처리된다.
+ *   - drop 세션 0건이어도 순수 함수가 빈 bars를 반환하므로 자연스럽게 처리된다.
+ *
+ * 진행률 의미:
+ *   `cumulativeProgressPct`는 도달자 비율이 아니라 *질문 위치 비율* (position / totalQuestions × 100)
+ *   이므로 reachedCounts / totalStarted 쿼리는 더 이상 필요 없다.
  */
 export async function getDropFunnel(surveyId: string): Promise<DropFunnelOutput> {
   // ── A) 현재 published snapshot 로드 ──────────────────────────────────────
@@ -124,44 +177,9 @@ export async function getDropFunnel(surveyId: string): Promise<DropFunnelOutput>
     exposedQuestionIds: toStringArray(r.exposedQuestionIdsRaw),
   }));
 
-  // ── C) 질문별 도달자 수 (drop + completed) ─────────────────────────────
-  const reachedRows = await db
-    .select({
-      questionId: responseAnswers.questionId,
-      reached: sql<number>`count(distinct ${responseAnswers.responseId})::int`,
-    })
-    .from(responseAnswers)
-    .innerJoin(surveyResponses, eq(surveyResponses.id, responseAnswers.responseId))
-    .where(
-      and(
-        eq(surveyResponses.surveyId, surveyId),
-        inArray(surveyResponses.status, ['drop', 'completed']),
-      ),
-    )
-    .groupBy(responseAnswers.questionId);
-
-  const reachedCounts: Record<string, number> = {};
-  for (const row of reachedRows) {
-    reachedCounts[row.questionId] = row.reached;
-  }
-
-  // ── D) 시작된 세션 총수 (drop + completed) ──────────────────────────────
-  const totalRow = await db
-    .select({ total: sql<number>`count(*)::int` })
-    .from(surveyResponses)
-    .where(
-      and(
-        eq(surveyResponses.surveyId, surveyId),
-        inArray(surveyResponses.status, ['drop', 'completed']),
-      ),
-    );
-  const totalStarted = totalRow[0]?.total ?? 0;
-
-  // ── E) 순수 함수에 위임 ─────────────────────────────────────────────
+  // ── C) 순수 함수에 위임 ─────────────────────────────────────────────
   return shapeDropFunnel({
     questions,
     drops,
-    reachedCounts,
-    totalStarted,
   });
 }

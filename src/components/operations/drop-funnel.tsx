@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  LabelList,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -16,7 +9,10 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
-import type { DropFunnelOutput } from '@/lib/operations/drop-funnel';
+import type {
+  DropFunnelBar,
+  DropFunnelOutput,
+} from '@/lib/operations/drop-funnel';
 
 import { EmptyState } from './empty-state';
 
@@ -34,31 +30,62 @@ const CHART_CONFIG: ChartConfig = {
 
 const numberFormatter = new Intl.NumberFormat('ko-KR');
 
-/** x축 눈금 라벨이 길면 8자 + ellipsis로 잘라낸다. */
-function tickFormatter(value: string): string {
-  if (typeof value !== 'string') return String(value);
-  if (value.length <= 8) return value;
-  return `${value.slice(0, 8)}…`;
+/**
+ * X축 멀티라인 tick — mockup p1 형식 (3줄):
+ *   1행: 라벨 (Q16 / SQ / 기타 / (legacy))
+ *   2행: page N (값 있을 때만, 회색)
+ *   3행: 진행률 % (값 있을 때만, 회색)
+ *
+ * recharts XAxis tick prop 시그니처:
+ *   - x, y: tick 좌표 (axisLine 기준)
+ *   - payload.value: dataKey('label')에서 추출된 값
+ *   - payload.index: 데이터 배열 내 인덱스
+ *
+ * tspan dy 누적: 각 tspan은 직전 tspan의 baseline 기준 상대 이동.
+ *   1행 dy=12 (axis line 아래 약간), 2행/3행 dy=12.
+ */
+interface FunnelTickProps {
+  x?: number;
+  y?: number;
+  payload?: { value?: string | number; index?: number };
+  bars: DropFunnelBar[];
 }
 
-/**
- * LabelList formatter — 누적 진행률 % 라벨.
- * - null (others/legacy)이면 빈 문자열 → 라벨 미표시.
- * - 0~100 사이 숫자 → 정수 % 표기 (예: '80%').
- *
- * recharts의 formatter 시그니처: (value: ValueType, ...) => ReactNode | string.
- * value는 LabelList가 dataKey로 추출한 cumulativeProgressPct 값.
- */
-function formatProgressLabel(value: unknown): string {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return '';
-  return `${Math.round(value)}%`;
+function FunnelTick({ x = 0, y = 0, payload, bars }: FunnelTickProps) {
+  const idx = payload?.index ?? 0;
+  const bar = bars[idx];
+  const label = String(payload?.value ?? '');
+  const pageText = bar?.page != null ? `page ${bar.page}` : '';
+  const pctText =
+    bar?.cumulativeProgressPct != null && Number.isFinite(bar.cumulativeProgressPct)
+      ? `${bar.cumulativeProgressPct.toFixed(1)}%`
+      : '';
+
+  return (
+    <text x={x} y={y} textAnchor="middle" fontSize={11}>
+      <tspan x={x} dy={12} fill="#475569">
+        {label}
+      </tspan>
+      {pageText && (
+        <tspan x={x} dy={12} fill="#94a3b8">
+          {pageText}
+        </tspan>
+      )}
+      {pctText && (
+        <tspan x={x} dy={12} fill="#94a3b8">
+          {pctText}
+        </tspan>
+      )}
+    </text>
+  );
 }
 
 /**
  * 운영 현황 콘솔 — A5 Drop funnel.
  *
- * x축: 질문 위치 (라벨), y축: 이탈자 수.
- * 막대 위 라벨: 누적 진행률(%). '기타'/'(legacy)' 막대는 단일 위치가 아니므로 라벨 생략.
+ * x축: 질문 위치 (멀티라인 라벨: Q16 / page 6 / 32.0%).
+ * y축: 이탈자 수.
+ * 정렬: 질문 위치 ASC (snapshot 순서대로 funnel 형태).
  *
  * 빈 상태:
  *   bars 배열이 비어 있으면 EmptyState로 대체 (drop 응답이 없는 경우).
@@ -72,7 +99,7 @@ export function DropFunnel({ data }: Props) {
             이탈 응답 위치별 사례
           </h3>
           <p className="mt-0.5 text-xs text-slate-400">
-            x: 질문 위치 · y: 이탈자 수 · 라벨: 누적 진행률 %
+            x: 질문 위치 (라벨 / 페이지 / 진행률) · y: 이탈자 수
           </p>
         </div>
 
@@ -85,16 +112,19 @@ export function DropFunnel({ data }: Props) {
           >
             <BarChart
               data={data.bars}
-              margin={{ top: 24, right: 8, bottom: 0, left: 0 }}
+              margin={{ top: 16, right: 8, bottom: 0, left: 0 }}
             >
               <CartesianGrid vertical={false} strokeDasharray="3 3" />
               <XAxis
                 dataKey="label"
                 tickLine={false}
                 axisLine={false}
-                tickMargin={6}
+                tickMargin={4}
                 interval={0}
-                tickFormatter={tickFormatter}
+                height={56}
+                tick={(tickProps) => (
+                  <FunnelTick {...tickProps} bars={data.bars} />
+                )}
               />
               <YAxis
                 allowDecimals={false}
@@ -112,21 +142,26 @@ export function DropFunnel({ data }: Props) {
                     hideLabel={false}
                     formatter={(value, _name, item) => {
                       // 'value' = dropCount (number). 'item.payload' = DropFunnelBar.
-                      const payload = item.payload as {
-                        cumulativeProgressPct: number | null;
-                      };
+                      const payload = item.payload as DropFunnelBar;
                       const lines: React.ReactNode[] = [
                         <span key="count">
                           이탈자 {numberFormatter.format(Number(value))}명
                         </span>,
                       ];
+                      if (payload.page != null) {
+                        lines.push(
+                          <span key="page" className="ml-2 text-slate-500">
+                            page {payload.page}
+                          </span>,
+                        );
+                      }
                       if (
                         typeof payload.cumulativeProgressPct === 'number' &&
                         Number.isFinite(payload.cumulativeProgressPct)
                       ) {
                         lines.push(
                           <span key="pct" className="ml-2 text-slate-500">
-                            누적 {Math.round(payload.cumulativeProgressPct)}%
+                            진행 {payload.cumulativeProgressPct.toFixed(1)}%
                           </span>,
                         );
                       }
@@ -140,14 +175,7 @@ export function DropFunnel({ data }: Props) {
                 fill="var(--color-dropCount)"
                 radius={[3, 3, 0, 0]}
                 isAnimationActive={false}
-              >
-                <LabelList
-                  dataKey="cumulativeProgressPct"
-                  position="top"
-                  formatter={formatProgressLabel}
-                  className="fill-slate-500 text-[10px]"
-                />
-              </Bar>
+              />
             </BarChart>
           </ChartContainer>
         )}
