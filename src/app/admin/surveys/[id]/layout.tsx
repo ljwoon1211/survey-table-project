@@ -1,27 +1,14 @@
-import { OperationsTabStrip } from '@/components/operations/operations-tab-strip';
-
 interface SurveyAdminLayoutProps {
   children: React.ReactNode;
-  params: Promise<{ id: string }>;
 }
 
 /**
  * /admin/surveys/[id]/* 공용 레이아웃.
  *
- * - edit/, analytics/ 는 자체 헤더(<nav>)를 가지고 있어 추가 UI를 주입하지 않는다.
- * - operations/* 경로에서만 상단 탭 스트립을 노출한다 (탭 표시 여부 판단은
- *   클라이언트 자식 컴포넌트가 usePathname()으로 처리).
+ * 슬라이스 1 시점에는 모든 [id] 자식 페이지(edit/analytics/operations)가
+ * 자체 nav 헤더와 (operations 의 경우) 탭 스트립을 직접 렌더링하므로
+ * 본 레이아웃은 단순 pass-through 만 한다.
  */
-export default async function SurveyAdminLayout({
-  children,
-  params,
-}: SurveyAdminLayoutProps) {
-  const { id } = await params;
-
-  return (
-    <>
-      <OperationsTabStrip surveyId={id} />
-      {children}
-    </>
-  );
+export default function SurveyAdminLayout({ children }: SurveyAdminLayoutProps) {
+  return <>{children}</>;
 }

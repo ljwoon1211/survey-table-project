@@ -6,6 +6,7 @@ import { Activity, ArrowLeft, Pencil } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { DailyParticipationChart } from '@/components/operations/daily-participation-chart';
+import { OperationsTabStrip } from '@/components/operations/operations-tab-strip';
 import { DailyStatsTable } from '@/components/operations/daily-stats-table';
 import { DropFunnel } from '@/components/operations/drop-funnel';
 import { InquiriesEmptyCard } from '@/components/operations/inquiries-empty-card';
@@ -143,6 +144,9 @@ export default async function OperationsOverviewPage({
           </div>
         </div>
       </nav>
+
+      {/* 응답 현황 / 보고서 / 컨택 탭 strip — nav 헤더 아래 */}
+      <OperationsTabStrip surveyId={surveyId} />
 
       {/* 메인 콘텐츠 */}
       <main className="mx-auto max-w-7xl space-y-4 px-6 py-8">
