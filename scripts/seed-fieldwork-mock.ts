@@ -150,34 +150,6 @@ function buildPageVisits(
   return { visits, totalSeconds, lastVisitedIdx: stopIdx - 1 };
 }
 
-/**
- * lastVisitedIdx 까지 방문한 step 에 해당하는 question ID 집합을 반환.
- *
- * - group step: snapshot.questions 중 groupId 가 일치하는 모든 질문
- * - table step: question ID 1개
- */
-function questionsUpToStep(
-  steps: RenderStep[],
-  upToIdx: number,
-  snapshotQuestions: Array<{ id: string; type: string; groupId?: string | null }>,
-): Set<string> {
-  const allowed = new Set<string>();
-  for (let i = 0; i <= upToIdx; i++) {
-    const step = steps[i];
-    if (step.kind === 'group') {
-      for (const q of snapshotQuestions) {
-        if (q.groupId === step.id) {
-          allowed.add(q.id);
-        }
-      }
-    } else {
-      // table step: question ID 직접
-      allowed.add(step.id);
-    }
-  }
-  return allowed;
-}
-
 // === production DB 가드 ===
 const _isProd =
   process.env.NODE_ENV === 'production' ||
