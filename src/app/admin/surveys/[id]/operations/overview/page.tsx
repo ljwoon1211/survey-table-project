@@ -1,6 +1,10 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { Activity, ArrowLeft, Pencil } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
 import { DailyParticipationChart } from '@/components/operations/daily-participation-chart';
 import { DailyStatsTable } from '@/components/operations/daily-stats-table';
 import { DropFunnel } from '@/components/operations/drop-funnel';
@@ -108,43 +112,74 @@ export default async function OperationsOverviewPage({
     ]);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4 p-6">
-      <header className="flex items-start justify-between gap-4">
+    <div className="min-h-screen bg-gray-50">
+      {/* 헤더 — Admin 스타일 (편집·분석 페이지와 동일 패턴) */}
+      <nav className="border-b border-gray-200 bg-white px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Link href="/admin/surveys">
+              <Button variant="ghost" size="sm">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                목록으로
+              </Button>
+            </Link>
+            <div className="h-6 w-px bg-gray-300" />
+            <div className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-blue-500" />
+              <h1 className="max-w-md truncate text-lg font-medium text-gray-900">
+                {survey.title}
+              </h1>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-3">
+            <RefreshButton />
+            <Link href={`/admin/surveys/${surveyId}/edit`}>
+              <Button variant="outline" size="sm">
+                <Pencil className="mr-2 h-4 w-4" />
+                설문 편집
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </nav>
+
+      {/* 메인 콘텐츠 */}
+      <main className="mx-auto max-w-7xl space-y-4 px-6 py-8">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">응답 현황</h1>
+          <h2 className="text-xl font-bold text-gray-900">응답 현황</h2>
           <p className="text-sm text-slate-500">
             응답자 진행 현황 · 일자별 추이 · 응답시간 통계 · 이탈 위치 분석
           </p>
         </div>
-        <RefreshButton />
-      </header>
 
-      {/* A1 — 응답 진행 현황 KPI */}
-      <KpiRow counts={statusCounts} />
+        {/* A1 — 응답 진행 현황 KPI */}
+        <KpiRow counts={statusCounts} />
 
-      {/* A2 — 일자별/시간대별 참여자수 차트 */}
-      <DailyParticipationChart
-        data={dailyBuckets}
-        mode={mode}
-        hourModeDate={effectiveDate}
-        availableDates={availableDates}
-        weekOffset={weekOffset}
-      />
+        {/* A2 — 일자별/시간대별 참여자수 차트 */}
+        <DailyParticipationChart
+          data={dailyBuckets}
+          mode={mode}
+          hourModeDate={effectiveDate}
+          availableDates={availableDates}
+          weekOffset={weekOffset}
+        />
 
-      {/* A3 — 일자별 응답 통계 테이블 */}
-      <DailyStatsTable data={dailyStats} />
+        {/* A3 — 일자별 응답 통계 테이블 */}
+        <DailyStatsTable data={dailyStats} />
 
-      {/* A4 — 응답시간 통계 (절사평균 ± SD) */}
-      <ResponseTimeStats data={responseTime} />
+        {/* A4 — 응답시간 통계 (절사평균 ± SD) */}
+        <ResponseTimeStats data={responseTime} />
 
-      {/* A5 — Drop funnel (질문별 누적 진행률 + Top10 이탈) */}
-      <DropFunnel data={dropFunnel} />
+        {/* A5 — Drop funnel (질문별 누적 진행률 + Top10 이탈) */}
+        <DropFunnel data={dropFunnel} />
 
-      {/* A6 — Page dwell distribution (RenderStep별 평균 ± SD) */}
-      <PageDwellDistribution data={pageDwell} pageOffset={dwellOffset} />
+        {/* A6 — Page dwell distribution (RenderStep별 평균 ± SD) */}
+        <PageDwellDistribution data={pageDwell} pageOffset={dwellOffset} />
 
-      {/* 응답자 문의사항 (백엔드 미구현 — 슬라이스 1 범위 외) */}
-      <InquiriesEmptyCard />
+        {/* 응답자 문의사항 (백엔드 미구현 — 슬라이스 1 범위 외) */}
+        <InquiriesEmptyCard />
+      </main>
     </div>
   );
 }
