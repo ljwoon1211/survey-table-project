@@ -178,6 +178,22 @@ function questionsUpToStep(
   return allowed;
 }
 
+// === production DB 가드 ===
+const _isProd =
+  process.env.NODE_ENV === 'production' ||
+  !!process.env.SUPABASE_URL?.includes('prod') ||
+  !!process.env.DATABASE_URL?.includes('prod');
+
+if (_isProd && process.env.SEED_ALLOW_PROD !== 'true') {
+  throw new Error(
+    '[seed-fieldwork-mock] production DB 로 인식되는 환경에서는 실행 거부. ' +
+      '명시적 opt-in 이 필요하면 SEED_ALLOW_PROD=true 환경변수 사용.',
+  );
+}
+if (_isProd) {
+  console.warn('[seed-fieldwork-mock] SEED_ALLOW_PROD=true 명시 opt-in 으로 실행됩니다.');
+}
+
 // === main ===
 async function main() {
   const surveyId = process.argv[2];

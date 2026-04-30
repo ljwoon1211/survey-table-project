@@ -71,7 +71,7 @@ function KpiCell({ label, value, delta, deltaTone }: KpiCellProps) {
             deltaTone === 'slate' && 'text-slate-400',
           )}>
             {deltaTone === 'live' && (
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse motion-reduce:animate-none" />
             )}
             <span>{delta}</span>
           </div>

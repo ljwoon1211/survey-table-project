@@ -104,7 +104,7 @@ export function DropFunnel({ data }: Props) {
         </div>
 
         {data.bars.length === 0 ? (
-          <EmptyState message="drop 응답이 없습니다" />
+          <EmptyState message="이탈 응답이 없습니다" />
         ) : (
           <ChartContainer
             config={CHART_CONFIG}

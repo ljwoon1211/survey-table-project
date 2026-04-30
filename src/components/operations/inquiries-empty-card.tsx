@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 
 import { EmptyState } from './empty-state';
 
@@ -6,11 +6,11 @@ import { EmptyState } from './empty-state';
 export function InquiriesEmptyCard() {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-sm">응답자 문의사항</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <EmptyState message="문의사항이 없습니다." />
+      <CardContent className="px-5 py-4">
+        <h3 className="mb-3 text-sm font-semibold text-slate-900">
+          응답자 문의사항
+        </h3>
+        <EmptyState message="문의사항이 없습니다" />
       </CardContent>
     </Card>
   );
