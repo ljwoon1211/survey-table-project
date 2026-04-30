@@ -170,7 +170,8 @@ export function PageDwellDistribution({ data, pageOffset }: Props) {
     });
   }, [visiblePages]);
 
-  const allEmpty = visiblePages.length === 0 || data.pages.length === 0;
+  // visiblePages 는 data.pages 의 슬라이스이므로, data.pages 가 비어 있으면 visiblePages 도 비어 있다.
+  const allEmpty = visiblePages.length === 0;
 
   return (
     <Card>

@@ -7,7 +7,7 @@ interface KpiRowProps {
 }
 
 interface KpiCellSpec {
-  /** 셀 라벨 (목업 기준) — 한/영 혼용은 의도적임 (운영팀 관행) */
+  /** 셀 라벨 (목업 기준 한국어). */
   label: string;
   /** counts에서 이 셀이 보여줄 값 키 */
   field: keyof StatusCounts;

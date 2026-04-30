@@ -56,9 +56,8 @@ export function DailyStatsTable({ data }: Props) {
         accessorKey: 'date',
         header: '일자',
         // label 필드를 표시하되 정렬은 underlying date 문자열(YYYY-MM-DD lexical)로
-        cell: ({ row }) => (
-          <span className="text-slate-700">{row.original.label}</span>
-        ),
+        // (색상은 부모 <td> 의 text-slate-700 을 상속)
+        cell: ({ row }) => row.original.label,
         meta: { align: 'left' as const },
       },
       {

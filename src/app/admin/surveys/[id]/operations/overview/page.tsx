@@ -26,11 +26,15 @@ import { getPageDwell } from '@/lib/operations/page-dwell.server';
 import { getResponseTime } from '@/lib/operations/response-time.server';
 
 /**
- * 플랜 §9 정책 — 30초 자동 폴링.
- * 단, 본 라우트는 `searchParams` 를 사용하므로 Next.js 16 의 동적 렌더 규칙상
- * 매 요청마다 RSC 가 재평가된다. `revalidate` 는 캐시가 활성화된 환경(예: ISR)에
- * 한해 의미를 갖는다. 사용자 체감 갱신은 (a) 페이지 진입/네비게이션 (b)
- * `<RefreshButton />` 의 `router.refresh()` 두 경로로 보장된다.
+ * 플랜 §9 정책 — 30초 자동 폴링 의도.
+ *
+ * 본 라우트는 `searchParams` 를 사용하므로 Next.js 16 의 동적 렌더 규칙상
+ * 매 요청 RSC 가 재평가된다 → `revalidate` 는 동적 라우트에서는 사실상 무력화되며
+ * ISR 캐시가 활성화된 환경에서만 의미를 갖는다.
+ *
+ * 사용자 체감 갱신은 (a) 페이지 진입/네비게이션 (b) `<RefreshButton />` 의
+ * `router.refresh()` 두 경로로 보장된다. 향후 정적/캐시 환경에서 의미를 살리기
+ * 위해 의도값은 보존한다.
  */
 export const revalidate = 30;
 
