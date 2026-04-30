@@ -128,7 +128,7 @@ function buildPageVisits(
 
   const stopIdx =
     status === 'drop'
-      ? Math.max(1, Math.floor(steps.length * (0.5 + Math.random() * 0.3)))
+      ? Math.max(1, Math.floor(steps.length * (0.1 + Math.random() * 0.85)))
       : steps.length;
 
   const visits: PageVisit[] = [];
@@ -259,15 +259,23 @@ async function main() {
 
     let questionResponses = generateFakeSurveyResponse(surveyForGenerator);
 
-    // drop 응답: lastVisitedIdx 까지의 step에 해당하는 question 만 남김
+    // drop 응답: step 진행 비율을 question-level 비율로 변환해 잘라냄.
+    // (실제 buildRenderSteps 가 group 인터리브이므로 step 단위 매핑 대신 비례적 자르기로 단순화 —
+    // 각 응답의 last_question_id 가 다양한 위치에 분포하도록 한다.)
     if (status === 'drop' && lastVisitedIdx >= 0) {
-      const allowed = questionsUpToStep(
-        steps,
-        lastVisitedIdx,
-        snapshot.questions as Array<{ id: string; type: string; groupId?: string | null }>,
+      const stopRatio = (lastVisitedIdx + 1) / steps.length;
+      const orderedQuestions = [...(snapshot.questions ?? [])].sort(
+        (a, b) => ((a as { order?: number }).order ?? 0) - ((b as { order?: number }).order ?? 0),
+      );
+      const stopAt = Math.max(
+        1,
+        Math.round(orderedQuestions.length * stopRatio),
+      );
+      const allowedIds = new Set(
+        orderedQuestions.slice(0, stopAt).map((q) => (q as { id: string }).id),
       );
       questionResponses = Object.fromEntries(
-        Object.entries(questionResponses).filter(([qid]) => allowed.has(qid)),
+        Object.entries(questionResponses).filter(([qid]) => allowedIds.has(qid)),
       );
     }
 
