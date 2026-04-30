@@ -1,0 +1,203 @@
+'use client';
+
+import { useMemo } from 'react';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ErrorBar,
+  XAxis,
+  YAxis,
+} from 'recharts';
+
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from '@/components/ui/chart';
+import type { DwellOutput } from '@/lib/operations/page-dwell';
+
+import { EmptyState } from './empty-state';
+
+interface Props {
+  data: DwellOutput;
+}
+
+/** 단일 시리즈 — 평균 체류시간 막대. mockup 톤은 monochromatic-blue. */
+const CHART_CONFIG: ChartConfig = {
+  meanSeconds: {
+    label: '평균 체류',
+    color: 'hsl(217, 91%, 60%)', // blue-500 근사
+  },
+};
+
+/**
+ * 초 단위 시간 → 'M:SS' 또는 'H:MM:SS' 라벨.
+ *
+ * - 1시간 미만: 'M:SS'
+ * - 1시간 이상: 'H:MM:SS'
+ * - 음수/NaN/Infinity: '—'
+ *
+ * (T12 response-time-stats의 동일 함수 — 표시 전용이라 의도적으로 로컬 복제.)
+ */
+function formatSeconds(s: number): string {
+  if (!Number.isFinite(s) || s < 0) return '—';
+  const total = Math.round(s);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  const ss = String(seconds).padStart(2, '0');
+  if (hours > 0) {
+    const mm = String(minutes).padStart(2, '0');
+    return `${hours}:${mm}:${ss}`;
+  }
+  return `${minutes}:${ss}`;
+}
+
+/** x축 눈금 라벨이 길면 12자 + ellipsis로 잘라낸다. */
+function tickFormatter(value: string): string {
+  if (typeof value !== 'string') return String(value);
+  if (value.length <= 12) return value;
+  return `${value.slice(0, 12)}…`;
+}
+
+/**
+ * 차트에 직접 들어갈 행 형태.
+ * - meanSeconds: y축 값 (null인 행은 0으로 — 막대가 안 보임).
+ * - errorBar: ErrorBar용 ± 오프셋 (sd가 있으면 sd, 없으면 0).
+ * - sdSeconds: 툴팁에 표기하기 위해 보존.
+ */
+interface ChartRow {
+  stepId: string;
+  label: string;
+  position: number;
+  n: number;
+  meanSeconds: number;
+  sdSeconds: number | null;
+  errorBar: number;
+}
+
+/**
+ * 운영 현황 콘솔 — A6 페이지별 체류시간 분포.
+ *
+ * x축: 페이지 라벨, y축: 평균 체류시간(초).
+ * 각 막대 위에 ± SD ErrorBar.
+ *
+ * Edge:
+ *   - data.pages가 비었거나 모든 page의 n=0 → EmptyState.
+ *   - n=0 또는 mean=null인 행은 차트에서 막대 높이 0 + ErrorBar 미렌더.
+ */
+export function PageDwellDistribution({ data }: Props) {
+  // ErrorBar용 오프셋과 차트 친화적 형태로 변환. data.pages는 변경하지 않는다.
+  const chartRows = useMemo<ChartRow[]>(() => {
+    return data.pages.map((p) => {
+      const mean = p.meanSeconds ?? 0;
+      // sdSeconds가 null이면 errorBar=0 → recharts가 막대를 안 그린다.
+      const errorBar = p.sdSeconds ?? 0;
+      return {
+        stepId: p.stepId,
+        label: p.label,
+        position: p.position,
+        n: p.n,
+        meanSeconds: mean,
+        sdSeconds: p.sdSeconds,
+        errorBar,
+      };
+    });
+  }, [data.pages]);
+
+  const allEmpty = data.pages.length === 0 || data.pages.every((p) => p.n === 0);
+
+  return (
+    <Card>
+      <CardContent className="px-5 py-4">
+        <div className="mb-3">
+          <h3 className="text-sm font-semibold text-slate-900">
+            페이지별 체류시간 분포
+          </h3>
+          <p className="mt-0.5 text-xs text-slate-400">
+            평균 ± 표준편차 (상하 2.5% 트리밍)
+          </p>
+        </div>
+
+        {allEmpty ? (
+          <EmptyState
+            message="체류시간 데이터가 없습니다"
+            description="응답이 누적되면 여기에 표시됩니다"
+          />
+        ) : (
+          <ChartContainer config={CHART_CONFIG} className="aspect-auto h-72 w-full">
+            <BarChart
+              data={chartRows}
+              margin={{ top: 16, right: 8, bottom: 0, left: 0 }}
+            >
+              <CartesianGrid vertical={false} strokeDasharray="3 3" />
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={6}
+                interval={0}
+                tickFormatter={tickFormatter}
+              />
+              <YAxis
+                allowDecimals={false}
+                tickLine={false}
+                axisLine={false}
+                tickMargin={4}
+                width={48}
+                tickFormatter={(v: number) => formatSeconds(v)}
+              />
+              <ChartTooltip
+                cursor={{ fill: 'rgba(148, 163, 184, 0.15)' }}
+                content={
+                  <ChartTooltipContent
+                    indicator="dot"
+                    hideLabel={false}
+                    formatter={(_value, _name, item) => {
+                      const payload = item.payload as ChartRow;
+                      const meanLine =
+                        payload.n === 0
+                          ? '데이터 없음'
+                          : `평균 ${formatSeconds(payload.meanSeconds)}`;
+                      const sdLine =
+                        payload.sdSeconds === null
+                          ? null
+                          : `± ${formatSeconds(payload.sdSeconds)}`;
+                      return (
+                        <div className="flex flex-col gap-0.5">
+                          <span>{meanLine}</span>
+                          {sdLine && (
+                            <span className="text-slate-500">{sdLine}</span>
+                          )}
+                          <span className="text-slate-400 text-[10px]">
+                            n = {payload.n}
+                          </span>
+                        </div>
+                      );
+                    }}
+                  />
+                }
+              />
+              <Bar
+                dataKey="meanSeconds"
+                fill="var(--color-meanSeconds)"
+                radius={[3, 3, 0, 0]}
+                isAnimationActive={false}
+              >
+                <ErrorBar
+                  dataKey="errorBar"
+                  width={6}
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                />
+              </Bar>
+            </BarChart>
+          </ChartContainer>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
