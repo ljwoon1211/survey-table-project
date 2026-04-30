@@ -11,7 +11,11 @@ import {
   getSurveyBySlug,
   getSurveyForResponse,
 } from '@/actions/query-actions';
-import { completeResponse, startResponse } from '@/actions/response-actions';
+import {
+  completeResponse,
+  createResponseWithFirstAnswer,
+  recordStepVisit,
+} from '@/actions/response-actions';
 import { MobileBottomNav } from '@/components/survey-response/mobile-bottom-nav';
 import { QuestionInput } from '@/components/survey-response/question-input';
 import { Button } from '@/components/ui/button';
@@ -39,6 +43,21 @@ import {
 } from '@/utils/branch-logic';
 
 type ResponsesMap = Record<string, unknown>;
+
+/**
+ * 운영 현황 콘솔용 step 고유 식별자.
+ * - table step: 'table:<questionId>'
+ * - group step: 'group:<rootGroupId | "root">' (ungrouped는 'root')
+ *
+ * 동일 RenderStep에 대해 항상 같은 문자열을 반환해야 recordStepVisit의
+ * 멱등성(no-op when currentStepId === nextStepId)이 유지된다.
+ */
+function stepIdOf(step: RenderStep): string {
+  if (step.kind === 'table') {
+    return `table:${step.question.id}`;
+  }
+  return `group:${step.rootGroupId ?? 'root'}`;
+}
 
 // step 내에서 표시 가능한 질문만 추린 뒤 step-like 객체로 반환
 function getDisplayableItemsOfStep(
@@ -84,8 +103,16 @@ export default function SurveyResponsePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [stepHistory, setStepHistory] = useState<number[]>([]);
-  const [responseStarted, setResponseStarted] = useState(false);
   const [versionId, setVersionId] = useState<string | null>(null);
+
+  // 페이지 진입 시 1회 생성된 세션 식별자. 컴포넌트 수명 동안 안정적.
+  // - createResponseWithFirstAnswer의 멱등성 키 (surveyId, sessionId)
+  // - 새 응답 행은 첫 답변 시점에만 INSERT (페이지 진입 시 X)
+  const [sessionId] = useState(() => `session-${Date.now()}`);
+
+  // INSERT 진행 중인지 추적 (첫 답변 동시 발사 시 중복 INSERT 방어).
+  // ref가 아닌 state라도 OK — `handleResponse` 클로저에서 캡처되는 시점이 한 번이면 충분.
+  const [isCreatingResponse, setIsCreatingResponse] = useState(false);
   // 제출 시도 후 하이라이트할 질문 ID 집합
   const [highlightQuestionIds, setHighlightQuestionIds] = useState<Set<string>>(
     () => new Set(),
@@ -150,17 +177,9 @@ export default function SurveyResponsePage() {
     loadSurvey();
   }, [identifier]);
 
-  // 설문 응답 시작 - DB에 레코드 생성 (versionId 포함)
-  useEffect(() => {
-    if (loadedSurvey && !responseStarted) {
-      setResponseStarted(true);
-      startResponse(loadedSurvey.id, undefined, versionId ?? undefined).then((dbResponse) => {
-        setCurrentResponseId(dbResponse.id);
-      }).catch((err) => {
-        console.error('응답 시작 오류:', err);
-      });
-    }
-  }, [loadedSurvey, responseStarted, setCurrentResponseId, versionId]);
+  // 운영 현황 콘솔(T5): 페이지 진입 시 DB INSERT를 더 이상 하지 않는다.
+  // 첫 답변 시점에 createResponseWithFirstAnswer로 행을 생성한다 (handleResponse 참고).
+  // currentResponseId는 행 생성 후에만 set된다.
 
   // 현재 설문의 질문들
   const questions = useMemo(() => loadedSurvey?.questions || [], [loadedSurvey]);
@@ -249,6 +268,19 @@ export default function SurveyResponsePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadedSurvey, currentStepIndex, currentStepQuestions.length]);
+
+  // 운영 현황 콘솔(T5): 스텝 전환 추적.
+  // - currentResponseId가 set된 이후(첫 답변 후)에만 동작
+  // - 동일 stepId면 서버에서 no-op (멱등)
+  // - 실패는 사용자 흐름을 막지 않고 콘솔에만 남긴다 (best-effort)
+  useEffect(() => {
+    if (currentResponseId === null) return;
+    if (!currentStep) return;
+    const nextStepId = stepIdOf(currentStep);
+    recordStepVisit({ responseId: currentResponseId, nextStepId }).catch((err) => {
+      console.error('recordStepVisit 실패:', err);
+    });
+  }, [currentResponseId, currentStep]);
 
   const hasPreviousDisplayable = stepHistory.length > 0;
 
@@ -342,17 +374,56 @@ export default function SurveyResponsePage() {
 
   const handleResponse = useCallback(
     (questionId: string, value: unknown) => {
+      // UI는 즉시 반영 (로컬 응답 맵 + 펜딩 스토어 + 하이라이트 제거)
       setResponses((prev) => ({ ...prev, [questionId]: value }));
       setPendingResponse(questionId, value);
-      // 응답이 들어오면 해당 질문의 하이라이트 제거
       setHighlightQuestionIds((prev) => {
         if (!prev.has(questionId)) return prev;
         const next = new Set(prev);
         next.delete(questionId);
         return next;
       });
+
+      // 운영 현황 콘솔(T5): 첫 답변 시점에 응답 행을 INSERT.
+      // - currentResponseId가 null & 진행 중 INSERT가 없을 때만 트리거
+      // - createResponseWithFirstAnswer는 (surveyId, sessionId) 멱등 — 더블 클릭 방어
+      // - 후속 답변은 별도 DB 쓰기 없음 (제출 시 completeResponse가 일괄 저장)
+      if (
+        currentResponseId === null &&
+        !isCreatingResponse &&
+        loadedSurvey &&
+        currentStep
+      ) {
+        setIsCreatingResponse(true);
+        createResponseWithFirstAnswer({
+          surveyId: loadedSurvey.id,
+          sessionId,
+          versionId: versionId ?? null,
+          questionId,
+          value,
+          currentStepId: stepIdOf(currentStep),
+        })
+          .then(({ id }) => {
+            setCurrentResponseId(id);
+          })
+          .catch((err) => {
+            console.error('응답 시작 오류:', err);
+          })
+          .finally(() => {
+            setIsCreatingResponse(false);
+          });
+      }
     },
-    [setPendingResponse],
+    [
+      setPendingResponse,
+      currentResponseId,
+      isCreatingResponse,
+      loadedSurvey,
+      currentStep,
+      sessionId,
+      versionId,
+      setCurrentResponseId,
+    ],
   );
 
   const handleSubmit = useCallback(async () => {
