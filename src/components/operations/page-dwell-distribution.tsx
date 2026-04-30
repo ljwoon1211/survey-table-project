@@ -19,6 +19,8 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
+import { CHART_COLOR_BLUE_500 } from '@/lib/operations/chart-tokens';
+import { formatSeconds } from '@/lib/operations/format';
 import type { DwellOutput, DwellPage } from '@/lib/operations/page-dwell';
 
 import { EmptyState } from './empty-state';
@@ -35,32 +37,9 @@ interface Props {
 const CHART_CONFIG: ChartConfig = {
   meanSeconds: {
     label: '평균 체류',
-    color: 'hsl(217, 91%, 60%)', // blue-500 근사
+    color: CHART_COLOR_BLUE_500,
   },
 };
-
-/**
- * 초 단위 시간 → 'M:SS' 또는 'H:MM:SS' 라벨.
- *
- * - 1시간 미만: 'M:SS'
- * - 1시간 이상: 'H:MM:SS'
- * - 음수/NaN/Infinity: '—'
- *
- * (T12 response-time-stats의 동일 함수 — 표시 전용이라 의도적으로 로컬 복제.)
- */
-function formatSeconds(s: number): string {
-  if (!Number.isFinite(s) || s < 0) return '—';
-  const total = Math.round(s);
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const seconds = total % 60;
-  const ss = String(seconds).padStart(2, '0');
-  if (hours > 0) {
-    const mm = String(minutes).padStart(2, '0');
-    return `${hours}:${mm}:${ss}`;
-  }
-  return `${minutes}:${ss}`;
-}
 
 /**
  * X축 멀티라인 tick — mockup p1 형식 (2줄):

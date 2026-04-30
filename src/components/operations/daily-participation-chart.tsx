@@ -8,6 +8,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
 import { cn } from '@/lib/utils';
 import type { DailyBucket, DailyMode } from '@/lib/operations/aggregate-daily';
+import { CHART_COLOR_BLUE_500 } from '@/lib/operations/chart-tokens';
+import { numberFormatter } from '@/lib/operations/format';
 
 import { EmptyState } from './empty-state';
 
@@ -30,16 +32,14 @@ interface Props {
 
 /**
  * 단일 색상 막대 — 차트 토큰 1개만 정의한다.
- * (디자인 팔레트의 blue-600 톤을 직접 지정 — 프로젝트 전역 --chart-1 토큰이 아직 없다.)
+ * 색상은 `lib/operations/chart-tokens` 의 단일 진실원에서 가져온다.
  */
 const CHART_CONFIG: ChartConfig = {
   count: {
     label: '참여자',
-    color: 'hsl(217, 91%, 60%)',
+    color: CHART_COLOR_BLUE_500,
   },
 };
-
-const numberFormatter = new Intl.NumberFormat('ko-KR');
 
 /**
  * 운영 현황 콘솔 — A2 일자별 참여자수 차트.

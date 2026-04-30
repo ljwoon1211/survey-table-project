@@ -9,10 +9,12 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
+import { CHART_COLOR_ROSE_400 } from '@/lib/operations/chart-tokens';
 import type {
   DropFunnelBar,
   DropFunnelOutput,
 } from '@/lib/operations/drop-funnel';
+import { numberFormatter } from '@/lib/operations/format';
 
 import { EmptyState } from './empty-state';
 
@@ -24,11 +26,9 @@ interface Props {
 const CHART_CONFIG: ChartConfig = {
   dropCount: {
     label: '이탈자',
-    color: 'hsl(351, 83%, 70%)', // rose-400 근사
+    color: CHART_COLOR_ROSE_400,
   },
 };
-
-const numberFormatter = new Intl.NumberFormat('ko-KR');
 
 /**
  * X축 멀티라인 tick — mockup p1 형식 (3줄):

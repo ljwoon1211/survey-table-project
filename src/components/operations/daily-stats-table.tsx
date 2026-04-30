@@ -15,14 +15,13 @@ import { useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import type { DailyStatsRow } from '@/lib/operations/daily-stats';
+import { numberFormatter } from '@/lib/operations/format';
 
 import { EmptyState } from './empty-state';
 
 interface Props {
   data: DailyStatsRow[];
 }
-
-const numberFormatter = new Intl.NumberFormat('ko-KR');
 
 /** 0~1 비율 → '78.7%' 형태 (소수 첫째 자리). null → '—' */
 function formatRate(rate: number | null): string {

@@ -1,4 +1,5 @@
 import type { StatusCounts } from '@/lib/operations/aggregate-status';
+import { numberFormatter } from '@/lib/operations/format';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
@@ -28,8 +29,6 @@ const CELLS: KpiCellSpec[] = [
   { label: '불성실', field: 'bad', deltaTone: 'slate' },
   { label: '이탈', field: 'drop', deltaTone: 'rose' },
 ];
-
-const numberFormatter = new Intl.NumberFormat('ko-KR');
 
 function formatValue(value: number, isEmpty: boolean): string {
   if (isEmpty) return '—';

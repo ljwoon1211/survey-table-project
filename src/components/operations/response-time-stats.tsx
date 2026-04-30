@@ -1,32 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { formatSeconds, numberFormatter } from '@/lib/operations/format';
 import type { ResponseTimeRow } from '@/lib/operations/response-time';
 
 interface Props {
   data: ResponseTimeRow[];
-}
-
-const numberFormatter = new Intl.NumberFormat('ko-KR');
-
-/**
- * 초 단위 시간 → 'M:SS' 또는 'H:MM:SS' 라벨.
- *
- * - 1시간 미만: 'M:SS' (예: 8:10, 17:56).
- * - 1시간 이상: 'H:MM:SS' (예: 1:02:30).
- * - 음수/NaN/Infinity: '—' (방어적 — 실제로는 발생하지 않음).
- */
-function formatSeconds(s: number): string {
-  if (!Number.isFinite(s) || s < 0) return '—';
-  const total = Math.round(s);
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const seconds = total % 60;
-  const ss = String(seconds).padStart(2, '0');
-  if (hours > 0) {
-    const mm = String(minutes).padStart(2, '0');
-    return `${hours}:${mm}:${ss}`;
-  }
-  return `${minutes}:${ss}`;
 }
 
 /** 통계 셀 표시. n=0 인 행은 호출 측에서 일괄 '—' 처리. */
