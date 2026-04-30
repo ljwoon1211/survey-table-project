@@ -10,6 +10,10 @@
  */
 
 export interface StatusCounts {
+  /**
+   * 종결된 응답의 합계 (completed + screenedOut + quotafulOut + bad + drop).
+   * in_progress는 분모에 포함되지 않음 — 진행중 응답은 KPI Row의 별도 셀로 노출됨.
+   */
   total: number;
   completed: number;
   /** status = 'screened_out' */
@@ -20,7 +24,7 @@ export interface StatusCounts {
   bad: number;
   /** status = 'drop' */
   drop: number;
-  /** status = 'in_progress' — KPI Row에는 표시하지 않지만 total 합산에 사용 */
+  /** status = 'in_progress' — total 분모에서 제외되며, KPI Row의 진행중 셀로 별도 노출됨 */
   inProgress: number;
 }
 
@@ -50,7 +54,6 @@ export function mapRowsToCounts(rows: StatusRow[]): StatusCounts {
   };
 
   for (const { status, count } of rows) {
-    counts.total += count;
     switch (status) {
       case 'completed':
         counts.completed += count;
@@ -70,9 +73,17 @@ export function mapRowsToCounts(rows: StatusRow[]): StatusCounts {
       case 'in_progress':
         counts.inProgress += count;
         break;
-      // default: 알려지지 않은 status — total에만 반영하고 별도 버킷에는 넣지 않음
+      // default: 알려지지 않은 status — 어떤 버킷에도 넣지 않음
     }
   }
+
+  // 종결 응답만 합산 (in_progress 제외) — Total은 "끝까지 진행된 응답"의 의미
+  counts.total =
+    counts.completed +
+    counts.screenedOut +
+    counts.quotafulOut +
+    counts.bad +
+    counts.drop;
 
   return counts;
 }

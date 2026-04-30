@@ -3,20 +3,20 @@ import { describe, expect, it } from 'vitest';
 import { mapRowsToCounts } from '@/lib/operations/aggregate-status';
 
 describe('mapRowsToCounts', () => {
-  it('mixed statuses: completed/in_progress/drop → 각 버킷에 합산되고 total은 합', () => {
+  it('mixed statuses: completed/in_progress/drop → 각 버킷에 합산되고 total은 in_progress 제외 합', () => {
     const rows = [
       { status: 'completed', count: 30 },
       { status: 'in_progress', count: 10 },
       { status: 'drop', count: 5 },
     ];
     expect(mapRowsToCounts(rows)).toEqual({
-      total: 45,
+      total: 35,           // ← in_progress 제외 (completed 30 + drop 5)
       completed: 30,
+      inProgress: 10,
+      drop: 5,
       screenedOut: 0,
       quotafulOut: 0,
       bad: 0,
-      drop: 5,
-      inProgress: 10,
     });
   });
 
@@ -32,10 +32,10 @@ describe('mapRowsToCounts', () => {
     });
   });
 
-  it('알려지지 않은 status는 throw 하지 않고 total에만 합산', () => {
+  it('알려지지 않은 status는 throw 하지 않고 어떤 버킷에도 합산되지 않음', () => {
     const rows = [{ status: 'unknown_value', count: 3 }];
     const result = mapRowsToCounts(rows);
-    expect(result.total).toBe(3);
+    expect(result.total).toBe(0);  // 종결 버킷에 속하지 않으므로 total=0
     expect(result.completed).toBe(0);
     expect(result.screenedOut).toBe(0);
     expect(result.quotafulOut).toBe(0);
@@ -61,7 +61,7 @@ describe('mapRowsToCounts', () => {
     });
   });
 
-  it('total === 모든 카테고리 카운트의 합', () => {
+  it('total === 종결 카테고리 카운트의 합 (in_progress 제외)', () => {
     const rows = [
       { status: 'completed', count: 100 },
       { status: 'in_progress', count: 50 },
@@ -71,14 +71,14 @@ describe('mapRowsToCounts', () => {
       { status: 'drop', count: 15 },
     ];
     const result = mapRowsToCounts(rows);
-    const sumOfCategories =
+    const sumOfConcluded =
       result.completed +
-      result.inProgress +
       result.screenedOut +
       result.quotafulOut +
       result.bad +
       result.drop;
-    expect(result.total).toBe(200);
-    expect(result.total).toBe(sumOfCategories);
+    expect(result.total).toBe(150);  // in_progress(50) 제외
+    expect(result.total).toBe(sumOfConcluded);
+    expect(result.inProgress).toBe(50);  // inProgress 필드는 보존됨
   });
 });
