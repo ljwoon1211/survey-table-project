@@ -5,6 +5,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 
 import {
+  Activity,
   ArrowLeft,
   BarChart3,
   Copy,
@@ -216,6 +217,14 @@ export default function SurveyListPage() {
                             <BarChart3 className="mr-2 h-4 w-4" />
                             분석
                           </Link>
+                          <Link
+                            href={`/admin/surveys/${survey.id}/operations/overview`}
+                            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={() => setOpenMenuId(null)}
+                          >
+                            <Activity className="mr-2 h-4 w-4" />
+                            현황
+                          </Link>
                           <button
                             onClick={() => handleCopyLink(survey)}
                             className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -285,6 +294,12 @@ export default function SurveyListPage() {
                     <Link href={`/admin/surveys/${survey.id}/analytics`}>
                       <BarChart3 className="mr-1 h-3 w-3" />
                       분석
+                    </Link>
+                  </Button>
+                  <Button variant="outline" size="sm" className="flex-1" asChild>
+                    <Link href={`/admin/surveys/${survey.id}/operations/overview`}>
+                      <Activity className="mr-1 h-3 w-3" />
+                      현황
                     </Link>
                   </Button>
                 </div>
