@@ -11,7 +11,12 @@ import {
   getSurveyBySlug,
   getSurveyForResponse,
 } from '@/actions/query-actions';
-import { completeResponse, startResponse } from '@/actions/response-actions';
+import {
+  completeResponse,
+  createResponseWithFirstAnswer,
+  recordStepVisit,
+  resumeOrCreateResponse,
+} from '@/actions/response-actions';
 import { MobileBottomNav } from '@/components/survey-response/mobile-bottom-nav';
 import { QuestionInput } from '@/components/survey-response/question-input';
 import { Button } from '@/components/ui/button';
@@ -39,6 +44,29 @@ import {
 } from '@/utils/branch-logic';
 
 type ResponsesMap = Record<string, unknown>;
+
+/**
+ * 운영 현황 콘솔용 step 고유 식별자.
+ * - table step: 'table:<questionId>'
+ * - group step: 'group:<rootGroupId | "root">' (ungrouped는 'root')
+ *
+ * 동일 RenderStep에 대해 항상 같은 문자열을 반환해야 recordStepVisit의
+ * 멱등성(no-op when currentStepId === nextStepId)이 유지된다.
+ */
+function stepIdOf(step: RenderStep): string {
+  if (step.kind === 'table') {
+    return `table:${step.question.id}`;
+  }
+  return `group:${step.rootGroupId ?? 'root'}`;
+}
+
+/**
+ * localStorage 키 — 회복용 sessionId 보관.
+ * 첫 답변 INSERT 성공 후 SET, completeResponse 성공 후 DELETE.
+ */
+function sessionStorageKey(surveyId: string): string {
+  return `survey-session:${surveyId}`;
+}
 
 // step 내에서 표시 가능한 질문만 추린 뒤 step-like 객체로 반환
 function getDisplayableItemsOfStep(
@@ -84,8 +112,19 @@ export default function SurveyResponsePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [stepHistory, setStepHistory] = useState<number[]>([]);
-  const [responseStarted, setResponseStarted] = useState(false);
   const [versionId, setVersionId] = useState<string | null>(null);
+
+  // 페이지 진입 시 1회 생성된 세션 식별자. 컴포넌트 수명 동안 안정적.
+  // - createResponseWithFirstAnswer의 멱등성 키 (surveyId, sessionId)
+  // - 새 응답 행은 첫 답변 시점에만 INSERT (페이지 진입 시 X)
+  const [sessionId, setSessionId] = useState<string>(() => `session-${Date.now()}`);
+
+  // INSERT 진행 중인지 추적 (첫 답변 동시 발사 시 중복 INSERT 방어).
+  // ref가 아닌 state라도 OK — `handleResponse` 클로저에서 캡처되는 시점이 한 번이면 충분.
+  const [isCreatingResponse, setIsCreatingResponse] = useState(false);
+  // recovery effect 가 resumeOrCreateResponse 를 await 하는 동안 true.
+  // handleResponse 의 INSERT 가드에서 참조해 recovery 완료 전 신규 INSERT 발사를 차단한다 (I-1).
+  const [isRecovering, setIsRecovering] = useState(false);
   // 제출 시도 후 하이라이트할 질문 ID 집합
   const [highlightQuestionIds, setHighlightQuestionIds] = useState<Set<string>>(
     () => new Set(),
@@ -150,17 +189,9 @@ export default function SurveyResponsePage() {
     loadSurvey();
   }, [identifier]);
 
-  // 설문 응답 시작 - DB에 레코드 생성 (versionId 포함)
-  useEffect(() => {
-    if (loadedSurvey && !responseStarted) {
-      setResponseStarted(true);
-      startResponse(loadedSurvey.id, undefined, versionId ?? undefined).then((dbResponse) => {
-        setCurrentResponseId(dbResponse.id);
-      }).catch((err) => {
-        console.error('응답 시작 오류:', err);
-      });
-    }
-  }, [loadedSurvey, responseStarted, setCurrentResponseId, versionId]);
+  // 운영 현황 콘솔(T5): 페이지 진입 시 DB INSERT를 더 이상 하지 않는다.
+  // 첫 답변 시점에 createResponseWithFirstAnswer로 행을 생성한다 (handleResponse 참고).
+  // currentResponseId는 행 생성 후에만 set된다.
 
   // 현재 설문의 질문들
   const questions = useMemo(() => loadedSurvey?.questions || [], [loadedSurvey]);
@@ -249,6 +280,70 @@ export default function SurveyResponsePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadedSurvey, currentStepIndex, currentStepQuestions.length]);
+
+  // 운영 현황 콘솔(T5): 스텝 전환 추적.
+  // - currentResponseId가 set된 이후(첫 답변 후)에만 동작
+  // - 동일 stepId면 서버에서 no-op (멱등)
+  // - 실패는 사용자 흐름을 막지 않고 콘솔에만 남긴다 (best-effort)
+  useEffect(() => {
+    if (currentResponseId === null) return;
+    if (!currentStep) return;
+    const nextStepId = stepIdOf(currentStep);
+    recordStepVisit({ responseId: currentResponseId, nextStepId }).catch((err) => {
+      console.error('recordStepVisit 실패:', err);
+    });
+  }, [currentResponseId, currentStep]);
+
+  // 운영 현황 콘솔(T6): localStorage 기반 응답 회복.
+  // - 진입 시 1회 실행 (loadedSurvey 로드 완료 + currentResponseId 가 아직 null 일 때)
+  // - localStorage에 saved sessionId 가 있으면 resumeOrCreateResponse 호출
+  // - drop → in_progress 회복 시 sessionId/currentResponseId 갱신 + 토스트
+  // - 종결 상태이거나 orphan(DB row 없음)이면 키 정리
+  // - dep array에 sessionId 자체는 넣지 않는다 (saved 값을 effect 내부에서 직접 set → 무한 루프 방지)
+  const [resumeMessage, setResumeMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!loadedSurvey || currentResponseId !== null) return;
+
+    const key = sessionStorageKey(loadedSurvey.id);
+    const savedSessionId = window.localStorage.getItem(key);
+    if (!savedSessionId) return;
+
+    setIsRecovering(true);
+    resumeOrCreateResponse({ surveyId: loadedSurvey.id, sessionId: savedSessionId })
+      .then((result) => {
+        if (!result) {
+          // localStorage 키는 있는데 DB에 row 없음 — orphan, 정리
+          window.localStorage.removeItem(key);
+          return;
+        }
+        // 종결 상태(completed/screened/quotaful/bad)면 회복 안 시키고 새 응답 흐름 둔다
+        if (result.status !== 'in_progress') {
+          window.localStorage.removeItem(key);
+          return;
+        }
+        // 응답 row 사용 — sessionId 를 saved 값으로 갱신해 DB row 와 일치시킨다
+        setSessionId(savedSessionId);
+        setCurrentResponseId(result.id);
+        // 회복된 경우(drop → in_progress)만 토스트
+        if (result.resumed) {
+          setResumeMessage('이전 응답을 이어서 진행합니다');
+        }
+      })
+      .catch((err) => {
+        console.error('응답 회복 실패:', err);
+      })
+      .finally(() => {
+        setIsRecovering(false);
+      });
+  }, [loadedSurvey, currentResponseId, setCurrentResponseId]);
+
+  // 회복 토스트 자동 dismiss (4초)
+  useEffect(() => {
+    if (!resumeMessage) return;
+    const timer = setTimeout(() => setResumeMessage(null), 4000);
+    return () => clearTimeout(timer);
+  }, [resumeMessage]);
 
   const hasPreviousDisplayable = stepHistory.length > 0;
 
@@ -342,17 +437,62 @@ export default function SurveyResponsePage() {
 
   const handleResponse = useCallback(
     (questionId: string, value: unknown) => {
+      // UI는 즉시 반영 (로컬 응답 맵 + 펜딩 스토어 + 하이라이트 제거)
       setResponses((prev) => ({ ...prev, [questionId]: value }));
       setPendingResponse(questionId, value);
-      // 응답이 들어오면 해당 질문의 하이라이트 제거
       setHighlightQuestionIds((prev) => {
         if (!prev.has(questionId)) return prev;
         const next = new Set(prev);
         next.delete(questionId);
         return next;
       });
+
+      // 운영 현황 콘솔(T5): 첫 답변 시점에 응답 행을 INSERT.
+      // - currentResponseId가 null & 진행 중 INSERT가 없을 때만 트리거
+      // - createResponseWithFirstAnswer는 (surveyId, sessionId) 멱등 — 더블 클릭 방어
+      // - 후속 답변은 별도 DB 쓰기 없음 (제출 시 completeResponse가 일괄 저장)
+      if (
+        currentResponseId === null &&
+        !isCreatingResponse &&
+        !isRecovering &&    // I-1 fix: 회복 진행 중에는 INSERT 발사 안 함
+        loadedSurvey &&
+        currentStep
+      ) {
+        setIsCreatingResponse(true);
+        createResponseWithFirstAnswer({
+          surveyId: loadedSurvey.id,
+          sessionId,
+          versionId: versionId ?? null,
+          questionId,
+          value,
+          currentStepId: stepIdOf(currentStep),
+        })
+          .then(({ id }) => {
+            setCurrentResponseId(id);
+            // 회복용 sessionId localStorage 저장 — 같은 브라우저에서 재진입 시 resumeOrCreate가 이 키로 row 조회
+            if (typeof window !== 'undefined' && loadedSurvey) {
+              window.localStorage.setItem(sessionStorageKey(loadedSurvey.id), sessionId);
+            }
+          })
+          .catch((err) => {
+            console.error('응답 시작 오류:', err);
+          })
+          .finally(() => {
+            setIsCreatingResponse(false);
+          });
+      }
     },
-    [setPendingResponse],
+    [
+      setPendingResponse,
+      currentResponseId,
+      isCreatingResponse,
+      isRecovering,
+      loadedSurvey,
+      currentStep,
+      sessionId,
+      versionId,
+      setCurrentResponseId,
+    ],
   );
 
   const handleSubmit = useCallback(async () => {
@@ -447,6 +587,11 @@ export default function SurveyResponsePage() {
           exposedQuestionIds,
           exposedRowIds,
         });
+
+        // 제출 성공 — 회복용 localStorage 키 정리 (재진입 시 새 응답 흐름)
+        if (typeof window !== 'undefined' && loadedSurvey) {
+          window.localStorage.removeItem(sessionStorageKey(loadedSurvey.id));
+        }
       }
 
       resetResponseState();
@@ -462,6 +607,7 @@ export default function SurveyResponsePage() {
     currentStepIndex,
     groups,
     isQuestionAnswered,
+    loadedSurvey,
     questions,
     resetResponseState,
     responses,
@@ -664,6 +810,14 @@ export default function SurveyResponsePage() {
           isMobile ? 'pb-28' : ''
         }`}
       >
+        {resumeMessage && (
+          <div
+            role="status"
+            className="mb-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700"
+          >
+            {resumeMessage}
+          </div>
+        )}
         {currentStep.kind === 'table' ? (
           <TableStepView
             step={currentStep}

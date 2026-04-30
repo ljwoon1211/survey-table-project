@@ -4,6 +4,7 @@ import { boolean, integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle
 import type {
   DynamicRowGroupConfig,
   HeaderCell,
+  PageVisit,
   QuestionConditionGroup,
   QuestionData,
   QuestionOption,
@@ -157,6 +158,16 @@ export const surveyResponses = pgTable('survey_responses', {
 
   // 버전 연결
   versionId: uuid('version_id'),
+
+  // 운영 현황 콘솔용 추적 컬럼
+  // 'in_progress' | 'completed' | 'screened_out' | 'quotaful_out' | 'bad' | 'drop'
+  status: text('status').notNull().default('in_progress'),
+  platform: text('platform'), // 'desktop' | 'mobile' | 'tablet'
+  browser: text('browser'),
+  currentStepId: text('current_step_id'), // 'group:{uuid}' | 'table:{uuid}'
+  pageVisits: jsonb('page_visits').default([]).$type<PageVisit[]>(),
+  lastActivityAt: timestamp('last_activity_at', { withTimezone: true }).defaultNow().notNull(),
+  totalSeconds: integer('total_seconds'),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });

@@ -88,6 +88,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hook-form": "^7.63.0",
+    "recharts": "2.15.4",
     "sav-writer": "^1.0.0",
     "sharp": "^0.34.5",
     "tailwind-merge": "^3.3.1",
