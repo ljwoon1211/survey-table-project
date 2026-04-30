@@ -39,6 +39,7 @@ interface OperationsOverviewPageProps {
     mode?: 'day' | 'hour';
     date?: string;
     weekOffset?: string;
+    dwellOffset?: string;
   }>;
 }
 
@@ -75,8 +76,9 @@ export default async function OperationsOverviewPage({
   searchParams,
 }: OperationsOverviewPageProps) {
   const { id: surveyId } = await params;
-  const { mode = 'day', date, weekOffset: weekOffsetStr } = await searchParams;
+  const { mode = 'day', date, weekOffset: weekOffsetStr, dwellOffset: dwellOffsetStr } = await searchParams;
   const weekOffset = Math.max(0, parseInt(weekOffsetStr ?? '0', 10) || 0);
+  const dwellOffset = Math.max(0, parseInt(dwellOffsetStr ?? '0', 10) || 0);
 
   // ── 설문 존재 확인 (soft-delete 포함) ──
   const survey = await getSurveyById(surveyId);
@@ -139,7 +141,7 @@ export default async function OperationsOverviewPage({
       <DropFunnel data={dropFunnel} />
 
       {/* A6 — Page dwell distribution (RenderStep별 평균 ± SD) */}
-      <PageDwellDistribution data={pageDwell} />
+      <PageDwellDistribution data={pageDwell} pageOffset={dwellOffset} />
 
       {/* 응답자 문의사항 (백엔드 미구현 — 슬라이스 1 범위 외) */}
       <InquiriesEmptyCard />

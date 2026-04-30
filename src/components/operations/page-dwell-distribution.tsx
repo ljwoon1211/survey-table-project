@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   Bar,
   BarChart,
@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -21,8 +22,12 @@ import type { DwellOutput } from '@/lib/operations/page-dwell';
 
 import { EmptyState } from './empty-state';
 
+const DWELL_PAGE_SIZE = 10;
+
 interface Props {
   data: DwellOutput;
+  /** 페이지 offset. 0 = 첫 10개, 1 = 다음 10개, ... */
+  pageOffset: number;
 }
 
 /** 단일 시리즈 — 평균 체류시간 막대. mockup 톤은 monochromatic-blue. */
@@ -89,10 +94,39 @@ interface ChartRow {
  *   - data.pages가 비었거나 모든 page의 n=0 → EmptyState.
  *   - n=0 또는 mean=null인 행은 차트에서 막대 높이 0 + ErrorBar 미렌더.
  */
-export function PageDwellDistribution({ data }: Props) {
-  // ErrorBar용 오프셋과 차트 친화적 형태로 변환. data.pages는 변경하지 않는다.
+export function PageDwellDistribution({ data, pageOffset }: Props) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // 현재 offset에 해당하는 step 슬라이스
+  const visiblePages = useMemo(() => {
+    const start = pageOffset * DWELL_PAGE_SIZE;
+    return data.pages.slice(start, start + DWELL_PAGE_SIZE);
+  }, [data.pages, pageOffset]);
+
+  const totalPages = data.pages.length;
+  const canGoPrev = pageOffset > 0;
+  const canGoNext = (pageOffset + 1) * DWELL_PAGE_SIZE < totalPages;
+
+  const handlePageOffset = useCallback(
+    (delta: 1 | -1) => {
+      const next = Math.max(0, pageOffset + delta);
+      const params = new URLSearchParams(searchParams?.toString() ?? '');
+      if (next === 0) {
+        params.delete('dwellOffset');
+      } else {
+        params.set('dwellOffset', String(next));
+      }
+      const qs = params.toString();
+      router.push(qs ? `${pathname}?${qs}` : pathname ?? '');
+    },
+    [pageOffset, pathname, router, searchParams],
+  );
+
+  // ErrorBar용 오프셋과 차트 친화적 형태로 변환. visiblePages 기준으로 렌더.
   const chartRows = useMemo<ChartRow[]>(() => {
-    return data.pages.map((p) => {
+    return visiblePages.map((p) => {
       const mean = p.meanSeconds ?? 0;
       // sdSeconds가 null이면 errorBar=0 → recharts가 막대를 안 그린다.
       const errorBar = p.sdSeconds ?? 0;
@@ -106,20 +140,48 @@ export function PageDwellDistribution({ data }: Props) {
         errorBar,
       };
     });
-  }, [data.pages]);
+  }, [visiblePages]);
 
-  const allEmpty = data.pages.length === 0 || data.pages.every((p) => p.n === 0);
+  const allEmpty = visiblePages.length === 0 || data.pages.length === 0;
 
   return (
     <Card>
       <CardContent className="px-5 py-4">
-        <div className="mb-3">
-          <h3 className="text-sm font-semibold text-slate-900">
-            페이지별 체류시간 분포
-          </h3>
-          <p className="mt-0.5 text-xs text-slate-400">
-            평균 ± 표준편차 (상하 2.5% 트리밍)
-          </p>
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">
+              페이지별 체류시간 분포
+            </h3>
+            <p className="mt-0.5 text-xs text-slate-400">
+              평균 ± 표준편차 (상하 2.5% 트리밍)
+            </p>
+          </div>
+          {totalPages > DWELL_PAGE_SIZE && (
+            <div className="flex shrink-0 items-center gap-2 text-xs text-slate-600">
+              <button
+                type="button"
+                onClick={() => handlePageOffset(-1)}
+                disabled={!canGoPrev}
+                aria-label="이전 페이지"
+                className="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                ‹
+              </button>
+              <span className="tabular-nums">
+                {pageOffset * DWELL_PAGE_SIZE + 1}~
+                {Math.min((pageOffset + 1) * DWELL_PAGE_SIZE, totalPages)} / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => handlePageOffset(1)}
+                disabled={!canGoNext}
+                aria-label="다음 페이지"
+                className="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                ›
+              </button>
+            </div>
+          )}
         </div>
 
         {allEmpty ? (
