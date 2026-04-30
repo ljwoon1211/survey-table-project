@@ -66,7 +66,7 @@ export function DailyParticipationChart({
       const next = new URLSearchParams(searchParams?.toString() ?? '');
       mutate(next);
       const qs = next.toString();
-      router.push(qs ? `${pathname}?${qs}` : pathname ?? '');
+      router.push(qs ? `${pathname}?${qs}` : pathname ?? '', { scroll: false });
     },
     [pathname, router, searchParams],
   );
