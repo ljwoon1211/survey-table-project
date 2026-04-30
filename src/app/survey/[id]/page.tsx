@@ -15,6 +15,7 @@ import {
   completeResponse,
   createResponseWithFirstAnswer,
   recordStepVisit,
+  resumeOrCreateResponse,
 } from '@/actions/response-actions';
 import { MobileBottomNav } from '@/components/survey-response/mobile-bottom-nav';
 import { QuestionInput } from '@/components/survey-response/question-input';
@@ -57,6 +58,14 @@ function stepIdOf(step: RenderStep): string {
     return `table:${step.question.id}`;
   }
   return `group:${step.rootGroupId ?? 'root'}`;
+}
+
+/**
+ * localStorage 키 — 회복용 sessionId 보관.
+ * 첫 답변 INSERT 성공 후 SET, completeResponse 성공 후 DELETE.
+ */
+function sessionStorageKey(surveyId: string): string {
+  return `survey-session:${surveyId}`;
 }
 
 // step 내에서 표시 가능한 질문만 추린 뒤 step-like 객체로 반환
@@ -108,7 +117,7 @@ export default function SurveyResponsePage() {
   // 페이지 진입 시 1회 생성된 세션 식별자. 컴포넌트 수명 동안 안정적.
   // - createResponseWithFirstAnswer의 멱등성 키 (surveyId, sessionId)
   // - 새 응답 행은 첫 답변 시점에만 INSERT (페이지 진입 시 X)
-  const [sessionId] = useState(() => `session-${Date.now()}`);
+  const [sessionId, setSessionId] = useState<string>(() => `session-${Date.now()}`);
 
   // INSERT 진행 중인지 추적 (첫 답변 동시 발사 시 중복 INSERT 방어).
   // ref가 아닌 state라도 OK — `handleResponse` 클로저에서 캡처되는 시점이 한 번이면 충분.
@@ -282,6 +291,53 @@ export default function SurveyResponsePage() {
     });
   }, [currentResponseId, currentStep]);
 
+  // 운영 현황 콘솔(T6): localStorage 기반 응답 회복.
+  // - 진입 시 1회 실행 (loadedSurvey 로드 완료 + currentResponseId 가 아직 null 일 때)
+  // - localStorage에 saved sessionId 가 있으면 resumeOrCreateResponse 호출
+  // - drop → in_progress 회복 시 sessionId/currentResponseId 갱신 + 토스트
+  // - 종결 상태이거나 orphan(DB row 없음)이면 키 정리
+  // - dep array에 sessionId 자체는 넣지 않는다 (saved 값을 effect 내부에서 직접 set → 무한 루프 방지)
+  const [resumeMessage, setResumeMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!loadedSurvey || currentResponseId !== null) return;
+
+    const key = sessionStorageKey(loadedSurvey.id);
+    const savedSessionId = window.localStorage.getItem(key);
+    if (!savedSessionId) return;
+
+    resumeOrCreateResponse({ surveyId: loadedSurvey.id, sessionId: savedSessionId })
+      .then((result) => {
+        if (!result) {
+          // localStorage 키는 있는데 DB에 row 없음 — orphan, 정리
+          window.localStorage.removeItem(key);
+          return;
+        }
+        // 종결 상태(completed/screened/quotaful/bad)면 회복 안 시키고 새 응답 흐름 둔다
+        if (result.status !== 'in_progress') {
+          window.localStorage.removeItem(key);
+          return;
+        }
+        // 응답 row 사용 — sessionId 를 saved 값으로 갱신해 DB row 와 일치시킨다
+        setSessionId(savedSessionId);
+        setCurrentResponseId(result.id);
+        // 회복된 경우(drop → in_progress)만 토스트
+        if (result.resumed) {
+          setResumeMessage('이전 응답을 이어서 진행합니다');
+        }
+      })
+      .catch((err) => {
+        console.error('응답 회복 실패:', err);
+      });
+  }, [loadedSurvey, currentResponseId, setCurrentResponseId]);
+
+  // 회복 토스트 자동 dismiss (4초)
+  useEffect(() => {
+    if (!resumeMessage) return;
+    const timer = setTimeout(() => setResumeMessage(null), 4000);
+    return () => clearTimeout(timer);
+  }, [resumeMessage]);
+
   const hasPreviousDisplayable = stepHistory.length > 0;
 
   const isQuestionRequired = (question: Question) => question.required;
@@ -405,6 +461,10 @@ export default function SurveyResponsePage() {
         })
           .then(({ id }) => {
             setCurrentResponseId(id);
+            // 회복용 sessionId localStorage 저장 — 같은 브라우저에서 재진입 시 resumeOrCreate가 이 키로 row 조회
+            if (typeof window !== 'undefined' && loadedSurvey) {
+              window.localStorage.setItem(sessionStorageKey(loadedSurvey.id), sessionId);
+            }
           })
           .catch((err) => {
             console.error('응답 시작 오류:', err);
@@ -518,6 +578,11 @@ export default function SurveyResponsePage() {
           exposedQuestionIds,
           exposedRowIds,
         });
+
+        // 제출 성공 — 회복용 localStorage 키 정리 (재진입 시 새 응답 흐름)
+        if (typeof window !== 'undefined' && loadedSurvey) {
+          window.localStorage.removeItem(sessionStorageKey(loadedSurvey.id));
+        }
       }
 
       resetResponseState();
@@ -533,6 +598,7 @@ export default function SurveyResponsePage() {
     currentStepIndex,
     groups,
     isQuestionAnswered,
+    loadedSurvey,
     questions,
     resetResponseState,
     responses,
@@ -735,6 +801,14 @@ export default function SurveyResponsePage() {
           isMobile ? 'pb-28' : ''
         }`}
       >
+        {resumeMessage && (
+          <div
+            role="status"
+            className="mb-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700"
+          >
+            {resumeMessage}
+          </div>
+        )}
         {currentStep.kind === 'table' ? (
           <TableStepView
             step={currentStep}
