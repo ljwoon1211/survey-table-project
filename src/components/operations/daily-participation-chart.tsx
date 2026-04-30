@@ -1,11 +1,11 @@
 'use client';
 
 import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from 'recharts';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
 
 import { Card, CardContent } from '@/components/ui/card';
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
+import { useSearchParamsMutator } from '@/hooks/use-search-params-mutator';
 import { cn } from '@/lib/utils';
 import type { DailyBucket, DailyMode } from '@/lib/operations/aggregate-daily';
 import { CHART_COLOR_BLUE_500 } from '@/lib/operations/chart-tokens';
@@ -56,20 +56,7 @@ export function DailyParticipationChart({
   availableDates,
   weekOffset,
 }: Props) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  /** 현재 search params 를 복제하여 mutate 후 URL 으로 push. */
-  const pushParams = useCallback(
-    (mutate: (params: URLSearchParams) => void) => {
-      const next = new URLSearchParams(searchParams?.toString() ?? '');
-      mutate(next);
-      const qs = next.toString();
-      router.push(qs ? `${pathname}?${qs}` : pathname ?? '', { scroll: false });
-    },
-    [pathname, router, searchParams],
-  );
+  const pushParams = useSearchParamsMutator();
 
   const handleSelectDay = useCallback(() => {
     pushParams((p) => {

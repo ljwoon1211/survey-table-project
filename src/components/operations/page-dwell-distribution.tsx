@@ -10,7 +10,6 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -19,6 +18,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
+import { useSearchParamsMutator } from '@/hooks/use-search-params-mutator';
 import { CHART_COLOR_BLUE_500 } from '@/lib/operations/chart-tokens';
 import { formatSeconds } from '@/lib/operations/format';
 import type { DwellOutput, DwellPage } from '@/lib/operations/page-dwell';
@@ -102,9 +102,7 @@ interface ChartRow {
  *   - n=0 또는 mean=null인 행은 차트에서 막대 높이 0 + ErrorBar 미렌더.
  */
 export function PageDwellDistribution({ data, pageOffset }: Props) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const pushParams = useSearchParamsMutator();
 
   // 현재 offset에 해당하는 step 슬라이스
   const visiblePages = useMemo(() => {
@@ -119,16 +117,15 @@ export function PageDwellDistribution({ data, pageOffset }: Props) {
   const handlePageOffset = useCallback(
     (delta: 1 | -1) => {
       const next = Math.max(0, pageOffset + delta);
-      const params = new URLSearchParams(searchParams?.toString() ?? '');
-      if (next === 0) {
-        params.delete('dwellOffset');
-      } else {
-        params.set('dwellOffset', String(next));
-      }
-      const qs = params.toString();
-      router.push(qs ? `${pathname}?${qs}` : pathname ?? '', { scroll: false });
+      pushParams((p) => {
+        if (next === 0) {
+          p.delete('dwellOffset');
+        } else {
+          p.set('dwellOffset', String(next));
+        }
+      });
     },
-    [pageOffset, pathname, router, searchParams],
+    [pageOffset, pushParams],
   );
 
   // ErrorBar용 오프셋과 차트 친화적 형태로 변환. visiblePages 기준으로 렌더.
