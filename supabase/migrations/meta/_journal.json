@@ -78,6 +78,13 @@
       "when": 1777000000000,
       "tag": "0010_add_options_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1777511595634,
+      "tag": "0011_add_response_tracking_columns",
+      "breakpoints": true
     }
   ]
 }
