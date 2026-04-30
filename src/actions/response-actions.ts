@@ -210,6 +210,66 @@ export async function recordStepVisit(input: {
   }
 }
 
+/**
+ * 같은 (surveyId, sessionId) 조합으로 기존 응답이 있으면 회복, 없으면 null 반환.
+ *
+ * - drop 상태면 in_progress 로 UPDATE + lastActivityAt 갱신
+ * - in_progress 면 그대로 (lastActivityAt만 갱신해 stale 방지)
+ * - completed/screened_out/quotaful_out/bad 면 그대로 반환 — 호출자가 "이미 끝남" UX 처리
+ *
+ * 반환 null 이면 첫 진입 — 호출자는 평소대로 createResponseWithFirstAnswer 흐름.
+ */
+export async function resumeOrCreateResponse(input: {
+  surveyId: string;
+  sessionId: string;
+}): Promise<{
+  id: string;
+  status: 'in_progress' | 'completed' | 'screened_out' | 'quotaful_out' | 'bad' | 'drop';
+  resumed: boolean;
+} | null> {
+  const { surveyId, sessionId } = input;
+
+  const [existing] = await db
+    .select({
+      id: surveyResponses.id,
+      status: surveyResponses.status,
+    })
+    .from(surveyResponses)
+    .where(
+      and(eq(surveyResponses.surveyId, surveyId), eq(surveyResponses.sessionId, sessionId)),
+    )
+    .limit(1);
+
+  if (!existing) return null;
+
+  const now = new Date();
+
+  if (existing.status === 'drop') {
+    // 회복 — drop → in_progress, lastActivityAt 새로 박는다
+    await db
+      .update(surveyResponses)
+      .set({ status: 'in_progress', lastActivityAt: now })
+      .where(eq(surveyResponses.id, existing.id));
+    return { id: existing.id, status: 'in_progress', resumed: true };
+  }
+
+  if (existing.status === 'in_progress') {
+    // stale 방지용 lastActivityAt 터치
+    await db
+      .update(surveyResponses)
+      .set({ lastActivityAt: now })
+      .where(eq(surveyResponses.id, existing.id));
+    return { id: existing.id, status: 'in_progress', resumed: false };
+  }
+
+  // 종결 상태 — 그대로
+  return {
+    id: existing.id,
+    status: existing.status as 'completed' | 'screened_out' | 'quotaful_out' | 'bad',
+    resumed: false,
+  };
+}
+
 // 응답 완료 (JSONB + response_answers 이중 쓰기)
 // 읽기: response_answers 우선 (getResponsesWithAnswers), JSONB fallback
 // JSONB 쓰기는 마이그레이션 완료 + 모든 읽기 경로 전환 후 제거 예정
