@@ -44,8 +44,11 @@ export function OperationsTabStrip({ surveyId }: OperationsTabStripProps) {
 
   return (
     <div className="border-b border-gray-200 bg-white">
-      <NavigationMenu className="mx-auto max-w-7xl px-6">
-        <NavigationMenuList aria-label="현황 콘솔 메뉴" className="gap-1">
+      <NavigationMenu className="mx-auto max-w-7xl justify-start px-6">
+        <NavigationMenuList
+          aria-label="현황 콘솔 메뉴"
+          className="justify-start gap-1"
+        >
           <NavigationMenuItem>
             <NavigationMenuTrigger
               className={cn(
