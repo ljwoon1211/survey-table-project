@@ -16,6 +16,8 @@ interface ContactsTableProps {
   pageSize: number;
   scheme: ContactColumnScheme;
   surveyId: string;
+  /** 행 클릭 시 호출 — 편집 모달 트리거 */
+  onRowClick?: (row: ContactsRow) => void;
 }
 
 const dateShort = new Intl.DateTimeFormat('ko-KR', {
@@ -42,6 +44,7 @@ export function ContactsTable({
   pageSize,
   scheme,
   surveyId,
+  onRowClick,
 }: ContactsTableProps) {
   const pushParams = useSearchParamsMutator();
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -125,7 +128,11 @@ export function ContactsTable({
             {rows.map((row) => {
               const responded = row.respondedAt != null;
               return (
-                <tr key={row.id} className={responded ? 'bg-blue-50' : 'border-t'}>
+                <tr
+                  key={row.id}
+                  className={`${responded ? 'bg-blue-50' : 'border-t'} ${onRowClick ? 'cursor-pointer hover:bg-slate-50' : ''}`}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                >
                   {visibleColumns.map((col) => (
                     <td
                       key={col.key}
@@ -137,7 +144,14 @@ export function ContactsTable({
                   <td
                     className={`px-3 py-2 text-right ${responded ? 'border-t border-blue-100' : ''}`}
                   >
-                    <Button size="sm" variant="ghost" onClick={() => copyInviteLink(row)}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        copyInviteLink(row);
+                      }}
+                    >
                       {copiedId === row.id ? '복사됨!' : '복사'}
                     </Button>
                   </td>
