@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 
 import { addContactAttempt } from '@/actions/contact-actions';
 import { Button } from '@/components/ui/button';
 import type { ContactResultCode } from '@/db/schema/schema-types';
+import { useAutoFadeMessage } from '@/hooks/use-auto-fade-message';
 
 interface ContactAttemptAddCardProps {
   contactTargetId: string;
@@ -20,15 +21,8 @@ export function ContactAttemptAddCard({
   const [resultCode, setResultCode] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useAutoFadeMessage();
   const [isPending, startTransition] = useTransition();
-
-  // M2: 성공 메시지 2초 후 자동 fade
-  useEffect(() => {
-    if (!successMessage) return;
-    const t = setTimeout(() => setSuccessMessage(null), 2000);
-    return () => clearTimeout(t);
-  }, [successMessage]);
 
   function add() {
     if (!resultCode) {

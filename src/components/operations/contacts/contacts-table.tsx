@@ -1,9 +1,12 @@
 'use client';
 
+import { useMemo } from 'react';
+
 import { SortIndicator, TablePagerFooter } from '@/components/operations/table-primitives';
 import type { ContactColumnDef, ContactColumnScheme } from '@/db/schema/schema-types';
 import { useSearchParamsMutator } from '@/hooks/use-search-params-mutator';
 import { attrsKeyOf, type ContactsSortDir, type ContactsSortKey } from '@/lib/operations/contacts';
+import { SHORT_DATE_FMT } from '@/lib/operations/contacts-shared';
 import type { ContactsRow } from '@/lib/operations/contacts.server';
 
 interface ContactsTableProps {
@@ -12,12 +15,11 @@ interface ContactsTableProps {
   page: number;
   pageSize: number;
   scheme: ContactColumnScheme;
-  surveyId: string;
   /** 현재 활성 sort key (URL searchParams) */
   sort: ContactsSortKey;
   /** 현재 정렬 방향 */
   dir: ContactsSortDir;
-  /** 행 클릭 시 호출 — 편집 모달 트리거 */
+  /** 행 클릭 시 호출 — 단건 편집 라우트로 push */
   onRowClick?: (row: ContactsRow) => void;
 }
 
@@ -34,12 +36,61 @@ function sortKeyOf(source: string): ContactsSortKey | null {
   }
 }
 
-const dateShort = new Intl.DateTimeFormat('ko-KR', {
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-});
+/**
+ * 컬럼+행 → { display: ReactNode, plain: string | undefined } 한 번 계산.
+ * `display` 는 셀 안에 렌더, `plain` 은 td title 에 truncate hover 용으로 사용.
+ */
+function computeCell(col: ContactColumnDef, row: ContactsRow): {
+  display: React.ReactNode;
+  plain: string | undefined;
+} {
+  const attrsKey = attrsKeyOf(col.source);
+  if (attrsKey) {
+    if (attrsKey === '이메일') return { display: row.emailMasked, plain: row.emailMasked };
+    if (attrsKey === '사업자번호') return { display: row.bizMasked, plain: row.bizMasked };
+    const v = row.attrs[attrsKey];
+    return v && v !== ''
+      ? { display: v, plain: v }
+      : { display: '—', plain: undefined };
+  }
+  switch (col.source) {
+    case 'system.resid':
+      return {
+        display: <span className="tabular-nums">{row.resid}</span>,
+        plain: String(row.resid),
+      };
+    case 'system.contact_result':
+      return row.latestResultCode
+        ? {
+            display: (
+              <span className="text-xs">
+                [{row.latestAttemptNo}] {row.latestResultCode}
+              </span>
+            ),
+            plain: `[${row.latestAttemptNo}] ${row.latestResultCode}`,
+          }
+        : { display: '—', plain: undefined };
+    case 'system.email_count':
+      return { display: '—', plain: undefined }; // 후속 슬라이스 메일발송
+    case 'system.web': {
+      const t = row.respondedAt
+        ? `응답 ${SHORT_DATE_FMT.format(row.respondedAt)}`
+        : undefined;
+      return {
+        display: row.respondedAt ? (
+          <span className="inline-block h-2 w-2 rounded-full bg-blue-500" title={t} />
+        ) : (
+          <span className="inline-block h-2 w-2 rounded-full bg-slate-200" />
+        ),
+        plain: t,
+      };
+    }
+    case 'system.contact_owner':
+      return { display: '—', plain: undefined }; // 후속 슬라이스 면접원
+    default:
+      return { display: '—', plain: undefined };
+  }
+}
 
 /**
  * 컨택리스트 표.
@@ -57,7 +108,6 @@ export function ContactsTable({
   page,
   pageSize,
   scheme,
-  surveyId,
   sort,
   dir,
   onRowClick,
@@ -66,68 +116,10 @@ export function ContactsTable({
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  const visibleColumns = scheme.columns
-    .filter((c) => !c.hidden)
-    .sort((a, b) => a.order - b.order);
-
-  /**
-   * 셀의 평문 값 — `<td title="...">` hover tooltip 용 (truncate 시 전체 값 노출).
-   * renderCell 의 React 노드 와 별도로 plain string 만 반환.
-   */
-  function cellPlainText(col: ContactColumnDef, row: ContactsRow): string | undefined {
-    const attrsKey = attrsKeyOf(col.source);
-    if (attrsKey) {
-      if (attrsKey === '이메일') return row.emailMasked;
-      if (attrsKey === '사업자번호') return row.bizMasked;
-      return row.attrs[attrsKey] || undefined;
-    }
-    if (col.source === 'system.resid') return String(row.resid);
-    if (col.source === 'system.contact_result' && row.latestResultCode) {
-      return `[${row.latestAttemptNo}] ${row.latestResultCode}`;
-    }
-    if (col.source === 'system.web' && row.respondedAt) {
-      return `응답 ${dateShort.format(row.respondedAt)}`;
-    }
-    return undefined;
-  }
-
-  function renderCell(col: ContactColumnDef, row: ContactsRow): React.ReactNode {
-    const attrsKey = attrsKeyOf(col.source);
-    if (attrsKey) {
-      // 매핑된 시스템 필드는 마스킹 적용
-      if (attrsKey === '이메일') return row.emailMasked;
-      if (attrsKey === '사업자번호') return row.bizMasked;
-      const v = row.attrs[attrsKey];
-      return v && v !== '' ? v : '—';
-    }
-    switch (col.source) {
-      case 'system.resid':
-        return <span className="tabular-nums">{row.resid}</span>;
-      case 'system.contact_result':
-        return row.latestResultCode ? (
-          <span className="text-xs">
-            [{row.latestAttemptNo}] {row.latestResultCode}
-          </span>
-        ) : (
-          '—'
-        );
-      case 'system.email_count':
-        return '—'; // 다음 슬라이스 메일발송
-      case 'system.web':
-        return row.respondedAt ? (
-          <span
-            className="inline-block h-2 w-2 rounded-full bg-blue-500"
-            title={`응답 ${dateShort.format(row.respondedAt)}`}
-          />
-        ) : (
-          <span className="inline-block h-2 w-2 rounded-full bg-slate-200" />
-        );
-      case 'system.contact_owner':
-        return '—'; // 다음 슬라이스 면접원
-      default:
-        return '—';
-    }
-  }
+  const visibleColumns = useMemo(
+    () => scheme.columns.filter((c) => !c.hidden).sort((a, b) => a.order - b.order),
+    [scheme.columns],
+  );
 
   const handlePageChange = (newPage: number) => {
     pushParams((p) => {
@@ -195,15 +187,18 @@ export function ContactsTable({
                   className={`${responded ? 'bg-blue-50' : 'border-t'} ${onRowClick ? 'cursor-pointer hover:bg-slate-50' : ''}`}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                 >
-                  {visibleColumns.map((col) => (
-                    <td
-                      key={col.key}
-                      className={`max-w-[240px] truncate px-3 py-2 whitespace-nowrap ${responded ? 'border-t border-blue-100' : ''}`}
-                      title={cellPlainText(col, row)}
-                    >
-                      {renderCell(col, row)}
-                    </td>
-                  ))}
+                  {visibleColumns.map((col) => {
+                    const { display, plain } = computeCell(col, row);
+                    return (
+                      <td
+                        key={col.key}
+                        className={`max-w-[240px] truncate px-3 py-2 whitespace-nowrap ${responded ? 'border-t border-blue-100' : ''}`}
+                        title={plain}
+                      >
+                        {display}
+                      </td>
+                    );
+                  })}
                 </tr>
               );
             })}

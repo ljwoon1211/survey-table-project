@@ -66,17 +66,19 @@ export async function listContactsForSurvey(
 ): Promise<ListContactsResult> {
   const { surveyId, page, pageSize, q, qfield, resultCode, sort, dir } = args;
 
-  const latestAttempt = sql<string | null>`(
+  // 최신 회차의 result_code / attempt_no — 같은 subquery 모양을 SELECT/WHERE 양쪽에서 사용.
+  // PG planner 가 동일 correlated subquery 를 dedupe 하며, idx_contact_attempts_target
+  // (contact_target_id, attempt_no DESC) INCLUDE (result_code) 가 index-only scan 보장.
+  const latestResultCodeExpr = sql<string | null>`(
     SELECT result_code FROM contact_attempts
     WHERE contact_target_id = ${contactTargets.id}
     ORDER BY attempt_no DESC LIMIT 1
-  )`.as('latest_result_code');
-
-  const latestAttemptNoSql = sql<number | null>`(
+  )`;
+  const latestAttemptNoExpr = sql<number | null>`(
     SELECT attempt_no FROM contact_attempts
     WHERE contact_target_id = ${contactTargets.id}
     ORDER BY attempt_no DESC LIMIT 1
-  )`.as('latest_attempt_no');
+  )`;
 
   const whereParts: SQL[] = [eq(contactTargets.surveyId, surveyId)];
 
@@ -111,11 +113,7 @@ export async function listContactsForSurvey(
   }
 
   if (resultCode !== 'all') {
-    whereParts.push(sql`(
-      SELECT result_code FROM contact_attempts
-      WHERE contact_target_id = ${contactTargets.id}
-      ORDER BY attempt_no DESC LIMIT 1
-    ) = ${resultCode}`);
+    whereParts.push(sql`${latestResultCodeExpr} = ${resultCode}`);
   }
 
   const whereClause = and(...whereParts)!;
@@ -156,8 +154,8 @@ export async function listContactsForSurvey(
       respondedAt: contactTargets.respondedAt,
       inviteToken: contactTargets.inviteToken,
       createdAt: contactTargets.createdAt,
-      latestResultCode: latestAttempt,
-      latestAttemptNo: latestAttemptNoSql,
+      latestResultCode: latestResultCodeExpr.as('latest_result_code'),
+      latestAttemptNo: latestAttemptNoExpr.as('latest_attempt_no'),
     })
     .from(contactTargets)
     .where(whereClause)

@@ -18,6 +18,7 @@ import type {
   ContactMethod,
   ContactResultCode,
 } from '@/db/schema/schema-types';
+import { useAutoFadeMessage } from '@/hooks/use-auto-fade-message';
 import type { ContactAttemptRow } from '@/lib/operations/contacts.server';
 
 interface ContactDetailFormProps {
@@ -55,15 +56,8 @@ export function ContactDetailForm({
   );
   const [localScheme, setLocalScheme] = useState<ContactColumnScheme>(scheme);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useAutoFadeMessage();
   const [isPending, startTransition] = useTransition();
-
-  // M2: 성공 메시지 2초 후 자동 fade
-  useEffect(() => {
-    if (!successMessage) return;
-    const t = setTimeout(() => setSuccessMessage(null), 2000);
-    return () => clearTimeout(t);
-  }, [successMessage]);
 
   const initialAttrs = useMemo(() => initial?.attrs ?? {}, [initial]);
   const initialMemo = initial?.memo ?? null;

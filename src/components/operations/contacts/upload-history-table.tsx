@@ -3,20 +3,13 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/operations/empty-state';
+import { FULL_DATE_FMT } from '@/lib/operations/contacts-shared';
 import type { ContactUploadRow } from '@/lib/operations/contacts.server';
 
 interface UploadHistoryTableProps {
   surveyId: string;
   rows: ContactUploadRow[];
 }
-
-const dateFmt = new Intl.DateTimeFormat('ko-KR', {
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-});
 
 export function UploadHistoryTable({ surveyId, rows }: UploadHistoryTableProps) {
   if (rows.length === 0) {
@@ -71,7 +64,7 @@ export function UploadHistoryTable({ surveyId, rows }: UploadHistoryTableProps) 
                     {r.errorRows.toLocaleString('ko-KR')}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums text-slate-500">
-                    {dateFmt.format(r.createdAt)}
+                    {FULL_DATE_FMT.format(r.createdAt)}
                   </td>
                 </tr>
               ))}

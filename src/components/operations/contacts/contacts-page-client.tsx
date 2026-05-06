@@ -17,8 +17,6 @@ interface ContactsPageClientProps {
   pageSize: number;
   sort: ContactsSortKey;
   dir: ContactsSortDir;
-  /** 호환성 prop — 본 컴포넌트는 사용 안 함. */
-  systemFieldKeys?: { group?: string; email?: string; biz?: string };
 }
 
 export function ContactsPageClient({
@@ -50,7 +48,6 @@ export function ContactsPageClient({
         page={page}
         pageSize={pageSize}
         scheme={scheme}
-        surveyId={surveyId}
         sort={sort}
         dir={dir}
         onRowClick={(row) =>

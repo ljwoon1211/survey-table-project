@@ -11,6 +11,7 @@ import {
   type ContactMethod,
 } from '@/db/schema/schema-types';
 import { attrsKeyOf } from '@/lib/operations/contacts';
+import { FULL_DATE_FMT } from '@/lib/operations/contacts-shared';
 
 interface ContactInfoCardProps {
   surveyId: string;
@@ -28,14 +29,6 @@ interface ContactInfoCardProps {
   onMemoChange: (memo: string) => void;
   onContactMethodChange: (method: ContactMethod | null) => void;
 }
-
-const dateFmt = new Intl.DateTimeFormat('ko-KR', {
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-});
 
 export function ContactInfoCard({
   surveyId,
@@ -136,7 +129,7 @@ export function ContactInfoCard({
             <strong className="text-xs text-slate-600">Web</strong>
             {respondedAt ? (
               <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">
-                응답 완료 {dateFmt.format(respondedAt)}
+                응답 완료 {FULL_DATE_FMT.format(respondedAt)}
               </span>
             ) : (
               <span className="text-xs text-slate-400">미응답</span>
