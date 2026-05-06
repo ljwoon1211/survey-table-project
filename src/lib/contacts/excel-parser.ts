@@ -1,6 +1,18 @@
 import ExcelJS from 'exceljs';
 
 /**
+ * Buffer / ArrayBuffer 입력을 exceljs 가 받는 ArrayBuffer 로 정규화.
+ * Node Buffer 는 Uint8Array view — 독립 ArrayBuffer 로 복사 (slice 만으로는
+ * pool buffer 의 일부일 수 있어 exceljs 가 잘못 파싱).
+ */
+function toArrayBuffer(input: Buffer | ArrayBuffer): ArrayBuffer {
+  if (input instanceof ArrayBuffer) return input;
+  const ab = new ArrayBuffer(input.byteLength);
+  new Uint8Array(ab).set(input);
+  return ab;
+}
+
+/**
  * 엑셀 컬럼명 정규화. 줄바꿈 → 공백, 연속 공백 → 1개, trim.
  * attrs key 로 사용되므로 일관성 중요.
  */
@@ -42,8 +54,7 @@ export async function previewExcel(
   opts: PreviewOptions,
 ): Promise<PreviewResult> {
   const wb = new ExcelJS.Workbook();
-  const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
-  await wb.xlsx.load(buf);
+  await wb.xlsx.load(toArrayBuffer(buffer));
 
   const sheetNames = wb.worksheets.map((w) => w.name);
   const ws = wb.getWorksheet(opts.sheetName) ?? wb.worksheets[0];
@@ -86,8 +97,7 @@ export async function parseExcelRows(
   opts: ParseRowsOptions,
 ): Promise<Array<Record<string, string>>> {
   const wb = new ExcelJS.Workbook();
-  const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
-  await wb.xlsx.load(buf);
+  await wb.xlsx.load(toArrayBuffer(buffer));
   const ws = wb.getWorksheet(opts.sheetName) ?? wb.worksheets[0];
   if (!ws) return [];
 
