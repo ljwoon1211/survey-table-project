@@ -33,6 +33,18 @@ export function OperationsTabStrip({ surveyId }: OperationsTabStripProps) {
   const isProfilesActive = pathname.startsWith(profilesHref);
   const isFieldworkActive = isOverviewActive || isProfilesActive;
 
+  const contactsHref = `${operationsBase}/contacts`;
+  const contactsUploadHref = `${operationsBase}/contacts/upload`;
+  const contactsColumnsHref = `${operationsBase}/contacts/columns`;
+  const isContactsRootActive =
+    pathname === contactsHref ||
+    (pathname.startsWith(`${contactsHref}/`) &&
+     !pathname.startsWith(contactsUploadHref) &&
+     !pathname.startsWith(contactsColumnsHref));
+  const isContactsUploadActive = pathname.startsWith(contactsUploadHref);
+  const isContactsColumnsActive = pathname.startsWith(contactsColumnsHref);
+  const isContactsActive = isContactsRootActive || isContactsUploadActive || isContactsColumnsActive;
+
   return (
     <div className="border-b border-gray-200 bg-white">
       <NavigationMenu className="mx-auto max-w-7xl justify-start px-6">
@@ -62,7 +74,30 @@ export function OperationsTabStrip({ surveyId }: OperationsTabStripProps) {
           </NavigationMenuItem>
 
           <TabDisabled>보고서</TabDisabled>
-          <TabDisabled withCaret>컨택</TabDisabled>
+
+          <NavigationMenuItem>
+            <NavigationMenuTrigger
+              className={cn(
+                'flex h-auto items-center gap-1 rounded-none border-b-2 bg-transparent px-4 py-3 text-sm transition-colors hover:bg-transparent data-[state=open]:bg-transparent',
+                isContactsActive
+                  ? 'border-blue-600 font-semibold text-blue-600 hover:text-blue-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-900',
+              )}
+            >
+              컨택
+            </NavigationMenuTrigger>
+            <NavigationMenuContent className="min-w-[180px] p-1">
+              <SubLink href={contactsHref} active={isContactsRootActive}>
+                컨택리스트
+              </SubLink>
+              <SubLink href={contactsUploadHref} active={isContactsUploadActive}>
+                리스트 업로드
+              </SubLink>
+              <SubLink href={contactsColumnsHref} active={isContactsColumnsActive}>
+                컬럼 설정
+              </SubLink>
+            </NavigationMenuContent>
+          </NavigationMenuItem>
         </NavigationMenuList>
       </NavigationMenu>
     </div>
