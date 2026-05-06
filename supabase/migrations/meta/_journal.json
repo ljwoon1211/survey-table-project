@@ -85,6 +85,20 @@
       "when": 1777511595634,
       "tag": "0011_add_response_tracking_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1777511595635,
+      "tag": "0012_sweep_stale_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1778030126788,
+      "tag": "0013_unique_survey_session",
+      "breakpoints": true
     }
   ]
 }
