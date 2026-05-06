@@ -117,7 +117,7 @@ export async function createResponseWithFirstAnswer(input: {
   value: unknown;
   currentStepId: string;
   inviteToken?: string;
-}): Promise<{ id: string }> {
+}): Promise<{ id: string; contactTargetId: string | null }> {
   const { surveyId, sessionId, versionId, questionId, value, currentStepId, inviteToken } = input;
 
   // UA + IP (Next 15+ 비동기 headers API)
@@ -168,15 +168,15 @@ export async function createResponseWithFirstAnswer(input: {
     .onConflictDoNothing({
       target: [surveyResponses.surveyId, surveyResponses.sessionId],
     })
-    .returning({ id: surveyResponses.id });
+    .returning({ id: surveyResponses.id, contactTargetId: surveyResponses.contactTargetId });
 
   if (inserted.length > 0) {
-    return { id: inserted[0].id };
+    return { id: inserted[0].id, contactTargetId: inserted[0].contactTargetId };
   }
 
   // 충돌 → 기존 행에 답변 머지. UNIQUE 제약이 있으므로 존재가 보장된다.
   const [existing] = await db
-    .select({ id: surveyResponses.id })
+    .select({ id: surveyResponses.id, contactTargetId: surveyResponses.contactTargetId })
     .from(surveyResponses)
     .where(
       and(eq(surveyResponses.surveyId, surveyId), eq(surveyResponses.sessionId, sessionId)),
@@ -190,7 +190,7 @@ export async function createResponseWithFirstAnswer(input: {
   }
 
   await updateQuestionResponse(existing.id, questionId, value);
-  return { id: existing.id };
+  return { id: existing.id, contactTargetId: existing.contactTargetId };
 }
 
 /**
