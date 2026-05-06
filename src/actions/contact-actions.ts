@@ -5,10 +5,12 @@ import { revalidatePath } from 'next/cache';
 import { eq, sql } from 'drizzle-orm';
 
 import { db } from '@/db';
-import { contactTargets, contactUploads, surveys } from '@/db/schema';
+import { contactAttempts, contactTargets, contactUploads, surveys } from '@/db/schema';
 import type {
   ContactColumnDef,
   ContactColumnScheme,
+  ContactMethod,
+  ContactResultCode,
   ContactUploadMapping,
 } from '@/db/schema/schema-types';
 import { requireAuth } from '@/lib/auth';
@@ -264,6 +266,8 @@ export async function getExistingContactsCount(surveyId: string): Promise<number
 export interface AddContactTargetInput {
   surveyId: string;
   attrs: Record<string, string>;
+  memo?: string | null;
+  contactMethod?: ContactMethod | null;
   /** 시스템 필드는 attrs 의 어느 키에 있는지 — 컬럼 스킴의 systemFields 맵 활용 */
   systemFieldKeys?: {
     group?: string;
@@ -285,7 +289,7 @@ export async function addContactTarget(
   input: AddContactTargetInput,
 ): Promise<ContactTargetRow> {
   await requireAuth();
-  const { surveyId, attrs, systemFieldKeys } = input;
+  const { surveyId, attrs, memo, contactMethod, systemFieldKeys } = input;
 
   const groupValue = systemFieldKeys?.group ? (attrs[systemFieldKeys.group] || null) : null;
   const email = systemFieldKeys?.email ? (attrs[systemFieldKeys.email] || null) : null;
@@ -307,6 +311,8 @@ export async function addContactTarget(
         email,
         bizNumber: biz,
         attrs,
+        memo: memo ?? null,
+        contactMethod: contactMethod ?? null,
       })
       .returning({ id: contactTargets.id, resid: contactTargets.resid });
     if (!row) throw new Error('contact_targets INSERT 실패');
@@ -321,6 +327,8 @@ export interface UpdateContactTargetInput {
   id: string;
   surveyId: string;
   attrs: Record<string, string>;
+  memo?: string | null;
+  contactMethod?: ContactMethod | null;
   systemFieldKeys?: {
     group?: string;
     email?: string;
@@ -332,7 +340,7 @@ export async function updateContactTarget(
   input: UpdateContactTargetInput,
 ): Promise<void> {
   await requireAuth();
-  const { id, surveyId, attrs, systemFieldKeys } = input;
+  const { id, surveyId, attrs, memo, contactMethod, systemFieldKeys } = input;
 
   const groupValue = systemFieldKeys?.group ? (attrs[systemFieldKeys.group] || null) : null;
   const email = systemFieldKeys?.email ? (attrs[systemFieldKeys.email] || null) : null;
@@ -345,11 +353,14 @@ export async function updateContactTarget(
       groupValue,
       email,
       bizNumber: biz,
+      memo: memo ?? null,
+      contactMethod: contactMethod ?? null,
       updatedAt: new Date(),
     })
     .where(eq(contactTargets.id, id));
 
   revalidatePath(`/admin/surveys/${surveyId}/operations/contacts`);
+  revalidatePath(`/admin/surveys/${surveyId}/operations/contacts/${id}`);
 }
 
 export async function deleteContactTarget(
@@ -359,4 +370,107 @@ export async function deleteContactTarget(
   await requireAuth();
   await db.delete(contactTargets).where(eq(contactTargets.id, id));
   revalidatePath(`/admin/surveys/${surveyId}/operations/contacts`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 컨택 회차 (contact_attempts) CRUD — slice 3 detail page
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface AddContactAttemptInput {
+  contactTargetId: string;
+  surveyId: string;
+  resultCode: string;
+  note?: string;
+}
+
+/**
+ * 회차 추가 — attempt_no 는 MAX(attempt_no)+1 로 자동 발번.
+ * UNIQUE(contact_target_id, attempt_no) 가 race 가드.
+ */
+export async function addContactAttempt(
+  input: AddContactAttemptInput,
+): Promise<{ id: string; attemptNo: number }> {
+  await requireAuth();
+  const { contactTargetId, surveyId, resultCode, note } = input;
+
+  const result = await db.transaction(async (tx) => {
+    const [maxRow] = await tx
+      .select({ maxNo: sql<number | null>`MAX(${contactAttempts.attemptNo})` })
+      .from(contactAttempts)
+      .where(eq(contactAttempts.contactTargetId, contactTargetId));
+    const nextNo = (maxRow?.maxNo ?? 0) + 1;
+
+    const [row] = await tx
+      .insert(contactAttempts)
+      .values({
+        contactTargetId,
+        attemptNo: nextNo,
+        resultCode,
+        note: note ?? null,
+      })
+      .returning({ id: contactAttempts.id, attemptNo: contactAttempts.attemptNo });
+    if (!row) throw new Error('contact_attempts INSERT 실패');
+    return row;
+  });
+
+  revalidatePath(`/admin/surveys/${surveyId}/operations/contacts/${contactTargetId}`);
+  revalidatePath(`/admin/surveys/${surveyId}/operations/contacts`);
+  return result;
+}
+
+export interface UpdateContactAttemptInput {
+  id: string;
+  contactTargetId: string;
+  surveyId: string;
+  resultCode: string;
+  note?: string;
+}
+
+export async function updateContactAttempt(input: UpdateContactAttemptInput): Promise<void> {
+  await requireAuth();
+  const { id, contactTargetId, surveyId, resultCode, note } = input;
+  await db
+    .update(contactAttempts)
+    .set({ resultCode, note: note ?? null })
+    .where(eq(contactAttempts.id, id));
+  revalidatePath(`/admin/surveys/${surveyId}/operations/contacts/${contactTargetId}`);
+  revalidatePath(`/admin/surveys/${surveyId}/operations/contacts`);
+}
+
+export async function deleteContactAttempt(
+  surveyId: string,
+  contactTargetId: string,
+  id: string,
+): Promise<void> {
+  await requireAuth();
+  await db.delete(contactAttempts).where(eq(contactAttempts.id, id));
+  revalidatePath(`/admin/surveys/${surveyId}/operations/contacts/${contactTargetId}`);
+  revalidatePath(`/admin/surveys/${surveyId}/operations/contacts`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 결과코드 set 갱신 (surveys.contact_result_codes) — slice 3 detail page
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * 결과코드 set 갱신 — NULL 로 set 하면 DEFAULT_RESULT_CODES 폴백.
+ * 빈 배열은 reject (최소 1개 필요).
+ */
+export async function updateContactResultCodes(
+  surveyId: string,
+  codes: ContactResultCode[] | null,
+): Promise<void> {
+  await requireAuth();
+
+  if (codes && codes.length === 0) {
+    throw new Error('결과코드는 최소 1개 이상이어야 합니다.');
+  }
+
+  await db
+    .update(surveys)
+    .set({ contactResultCodes: codes })
+    .where(eq(surveys.id, surveyId));
+
+  revalidatePath(`/admin/surveys/${surveyId}/operations/contacts`);
+  revalidatePath(`/admin/surveys/${surveyId}/operations/contacts/result-codes`);
 }
