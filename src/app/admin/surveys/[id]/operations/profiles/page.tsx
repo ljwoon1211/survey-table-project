@@ -17,9 +17,9 @@ import { questions as questionsTable } from '@/db/schema';
 import {
   PROFILES_PAGE_SIZE,
   hasActiveFilters,
-  listResponsesForProfiles,
   normalizeListArgs,
-} from '@/lib/operations/profiles.server';
+} from '@/lib/operations/profiles';
+import { listResponsesForProfiles } from '@/lib/operations/profiles.server';
 
 export const metadata: Metadata = {
   title: '현황 - 응답자 목록',

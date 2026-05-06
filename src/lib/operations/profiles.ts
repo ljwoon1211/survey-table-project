@@ -1,9 +1,97 @@
 /**
- * 운영 콘솔 응답자 목록 페이지의 표시용 pure helper.
+ * 운영 콘솔 응답자 목록 페이지의 표시용 pure helper + 클라/서버 공용 타입.
  *
- * 모든 함수는 입력만으로 출력이 결정되며, 단위 테스트는
- * `tests/unit/domains/operations/profiles.test.ts` 에 둔다.
+ * 'server-only' marker 는 `profiles.server.ts` 에만 둔다. 클라이언트 컴포넌트
+ * (`profiles-filter-bar.tsx` 등) 가 import 해도 안전하도록 본 모듈은 DB/server-only
+ * 의존을 일체 갖지 않는다.
+ *
+ * 단위 테스트: `tests/unit/domains/operations/profiles.test.ts`.
  */
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 클라/서버 공용 타입 + 화이트리스트 (profiles.server.ts 와 client 양쪽이 사용)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const SORT_KEYS = [
+  'idx',
+  'ip',
+  'platform',
+  'browser',
+  'startedAt',
+  'completedAt',
+  'totalSeconds',
+] as const;
+export type SortKey = (typeof SORT_KEYS)[number];
+
+export type SortDir = 'asc' | 'desc';
+
+export const QFIELDS = ['all', 'idx', 'ip', 'browser'] as const;
+export type QField = (typeof QFIELDS)[number];
+
+export const STATUS_FILTERS = [
+  'all',
+  'completed',
+  'in_progress',
+  'drop',
+  'screened_out',
+  'quotaful_out',
+  'bad',
+] as const;
+export type StatusFilter = (typeof STATUS_FILTERS)[number];
+
+/** UI 가 사용하는 고정 페이지 사이즈. URL 사용자 조작 차단. */
+export const PROFILES_PAGE_SIZE = 20;
+
+export function pickFromWhitelist<T extends string>(
+  value: string | undefined,
+  whitelist: readonly T[],
+  fallback: T,
+): T {
+  return (whitelist as readonly string[]).includes(value ?? '') ? (value as T) : fallback;
+}
+
+/** `searchParams` 의 가공되지 않은 string 입력을 화이트리스트 + 기본값으로 normalize. */
+export function normalizeListArgs(input: {
+  page?: string;
+  q?: string;
+  qfield?: string;
+  status?: string;
+  sort?: string;
+  dir?: string;
+}): {
+  page: number;
+  q: string;
+  qfield: QField;
+  status: StatusFilter;
+  sort: SortKey;
+  dir: SortDir;
+} {
+  return {
+    page: Math.max(1, parseInt(input.page ?? '1', 10) || 1),
+    q: (input.q ?? '').slice(0, 200),
+    qfield: pickFromWhitelist(input.qfield, QFIELDS, 'all'),
+    status: pickFromWhitelist(input.status, STATUS_FILTERS, 'all'),
+    sort: pickFromWhitelist(input.sort, SORT_KEYS, 'idx'),
+    dir: input.dir === 'asc' ? 'asc' : 'desc',
+  };
+}
+
+/** 현재 URL 의 검색 파라미터에 활성 필터가 걸려 있는지 판단. */
+export function hasActiveFilters(input: {
+  q?: string;
+  qfield?: string;
+  status?: string;
+}): boolean {
+  return (
+    (input.q ?? '') !== '' ||
+    (input.qfield ?? 'all') !== 'all' ||
+    (input.status ?? 'all') !== 'all'
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 표시용 pure helper (입력만으로 출력 결정)
+// ─────────────────────────────────────────────────────────────────────────────
 
 const IPV4_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/
 const IPV6_FULL_RE = /^([0-9a-f]{1,4}:){7}[0-9a-f]{1,4}$/i

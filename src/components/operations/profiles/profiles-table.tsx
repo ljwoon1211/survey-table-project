@@ -15,9 +15,11 @@ import {
   formatTotalTime,
   mapStatusPill,
   parseQuestionNumberFromTitle,
+  type SortDir,
+  type SortKey,
   type StatusPillResult,
 } from '@/lib/operations/profiles';
-import type { ProfilesRow, SortDir, SortKey } from '@/lib/operations/profiles.server';
+import type { ProfilesRow } from '@/lib/operations/profiles.server';
 
 import { EmptyState } from '../empty-state';
 import {

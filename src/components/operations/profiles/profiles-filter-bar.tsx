@@ -8,7 +8,7 @@ import {
   hasActiveFilters,
   type QField,
   type StatusFilter,
-} from '@/lib/operations/profiles.server';
+} from '@/lib/operations/profiles';
 
 interface Props {
   initialQ: string;

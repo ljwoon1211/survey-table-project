@@ -6,34 +6,13 @@ import { db } from '@/db';
 import { surveyResponses } from '@/db/schema';
 
 import type { Platform } from './parse-ua';
-import { formatIpMask } from './profiles';
-
-const SORT_KEYS = [
-  'idx',
-  'ip',
-  'platform',
-  'browser',
-  'startedAt',
-  'completedAt',
-  'totalSeconds',
-] as const;
-export type SortKey = (typeof SORT_KEYS)[number];
-
-export type SortDir = 'asc' | 'desc';
-
-const QFIELDS = ['all', 'idx', 'ip', 'browser'] as const;
-export type QField = (typeof QFIELDS)[number];
-
-const STATUS_FILTERS = [
-  'all',
-  'completed',
-  'in_progress',
-  'drop',
-  'screened_out',
-  'quotaful_out',
-  'bad',
-] as const;
-export type StatusFilter = (typeof STATUS_FILTERS)[number];
+import {
+  formatIpMask,
+  type QField,
+  type SortDir,
+  type SortKey,
+  type StatusFilter,
+} from './profiles';
 
 export interface ListProfilesArgs {
   surveyId: string;
@@ -72,14 +51,6 @@ function orderExpr(col: AnyColumn | SQL, direction: SortDir): SQL {
   return direction === 'asc'
     ? sql`${col} ASC NULLS LAST`
     : sql`${col} DESC NULLS LAST`;
-}
-
-function pickFromWhitelist<T extends string>(
-  value: string | undefined,
-  whitelist: readonly T[],
-  fallback: T,
-): T {
-  return (whitelist as readonly string[]).includes(value ?? '') ? (value as T) : fallback;
 }
 
 /**
@@ -217,40 +188,3 @@ export async function listResponsesForProfiles(
 
   return { rows, total, page: clampedPage };
 }
-
-/**
- * `searchParams` 의 가공되지 않은 string 입력을 화이트리스트 + 기본값으로 normalize.
- */
-export function normalizeListArgs(input: {
-  page?: string;
-  q?: string;
-  qfield?: string;
-  status?: string;
-  sort?: string;
-  dir?: string;
-}): Omit<ListProfilesArgs, 'surveyId' | 'pageSize'> {
-  return {
-    page: Math.max(1, parseInt(input.page ?? '1', 10) || 1),
-    q: (input.q ?? '').slice(0, 200),
-    qfield: pickFromWhitelist(input.qfield, QFIELDS, 'all'),
-    status: pickFromWhitelist(input.status, STATUS_FILTERS, 'all'),
-    sort: pickFromWhitelist(input.sort, SORT_KEYS, 'idx'),
-    dir: input.dir === 'asc' ? 'asc' : 'desc',
-  };
-}
-
-/** 현재 URL 의 검색 파라미터에 활성 필터가 걸려 있는지 판단. */
-export function hasActiveFilters(input: {
-  q?: string;
-  qfield?: string;
-  status?: string;
-}): boolean {
-  return (
-    (input.q ?? '') !== '' ||
-    (input.qfield ?? 'all') !== 'all' ||
-    (input.status ?? 'all') !== 'all'
-  );
-}
-
-/** UI 가 사용하는 고정 페이지 사이즈. URL 사용자 조작 차단. */
-export const PROFILES_PAGE_SIZE = 20;
