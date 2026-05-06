@@ -7,6 +7,7 @@ import { ingestContactUpload, parseExcelPreview } from '@/actions/contact-action
 import type { ParseExcelPreviewResult } from '@/actions/contact-actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -16,11 +17,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { ContactUploadMapping } from '@/db/schema/schema-types';
+import { autoDetectSystemFields } from '@/lib/contacts/auto-detect';
 
 type Step = 'file' | 'mapping' | 'result';
 
 interface UploadWizardProps {
   surveyId: string;
+  /** 마법사 진입 시점의 기존 contact_targets 행 수. 0 이면 신규, > 0 이면 통째 교체 경고 */
+  existingContactsCount: number;
 }
 
 interface MappingState {
@@ -29,8 +33,8 @@ interface MappingState {
   bizCol: number | null;
   companyCol: number | null;
   phoneCol: number | null;
-  mergeKey: 'email+biz' | 'email' | 'biz';
-  mergeKeyPolicy: 'either' | 'both';
+  /** 컨택리스트에 표시할 attrs 키 set (체크박스 토글 결과) */
+  selectedAttrs: Set<string>;
 }
 
 const initialMapping: MappingState = {
@@ -39,11 +43,10 @@ const initialMapping: MappingState = {
   bizCol: null,
   companyCol: null,
   phoneCol: null,
-  mergeKey: 'email+biz',
-  mergeKeyPolicy: 'either',
+  selectedAttrs: new Set(),
 };
 
-export function UploadWizard({ surveyId }: UploadWizardProps) {
+export function UploadWizard({ surveyId, existingContactsCount }: UploadWizardProps) {
   const router = useRouter();
   const [step, setStep] = useState<Step>('file');
   const [file, setFile] = useState<File | null>(null);
@@ -57,6 +60,7 @@ export function UploadWizard({ surveyId }: UploadWizardProps) {
     errorRows: number;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [replaceConfirmed, setReplaceConfirmed] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   async function handlePreview() {
@@ -67,6 +71,24 @@ export function UploadWizard({ surveyId }: UploadWizardProps) {
         const r = await parseExcelPreview({ file, sheetName, headerRow });
         setPreview(r);
         if (!sheetName && r.sheetNames.length > 0) setSheetName(r.sheetNames[0]);
+
+        // 한국어 헤더 자동 감지로 시스템 필드 prefill
+        const detected = autoDetectSystemFields(r.headers);
+        setMapping((m) => ({
+          ...m,
+          groupCol: detected.group ?? m.groupCol,
+          emailCol: detected.email ?? m.emailCol,
+          bizCol: detected.biz ?? m.bizCol,
+          phoneCol: detected.phone ?? m.phoneCol,
+          // 디폴트 표시 토글: 자동 감지된 시스템 필드 + 첫 5개 헤더
+          selectedAttrs: new Set([
+            ...r.headers.slice(0, 5),
+            ...(detected.email != null ? [r.headers[detected.email]] : []),
+            ...(detected.biz != null ? [r.headers[detected.biz]] : []),
+            ...(detected.phone != null ? [r.headers[detected.phone]] : []),
+          ]),
+        }));
+        setReplaceConfirmed(false); // 새 파일 업로드마다 reset
         setStep('mapping');
       } catch (e) {
         setError((e as Error).message);
@@ -87,9 +109,8 @@ export function UploadWizard({ surveyId }: UploadWizardProps) {
             company: mapping.companyCol ?? undefined,
             phone: mapping.phoneCol ?? undefined,
           },
-          mergeKey: mapping.mergeKey,
-          mergeKeyPolicy: mapping.mergeKeyPolicy,
-          selectedAttrsKeys: [], // Task 5 에서 토글 UI 로 교체 예정
+          selectedAttrsKeys: Array.from(mapping.selectedAttrs),
+          autoDetected: autoDetectSystemFields(preview.headers),
           headerRow,
           sheetName,
         };
@@ -207,6 +228,9 @@ export function UploadWizard({ surveyId }: UploadWizardProps) {
               </table>
             </div>
 
+            <div className="text-xs text-slate-500 mb-1">
+              시스템 필드 — 그룹은 머지/표시용, 나머지는 PII 마스킹용 (자동 감지됨, 필요 시 수정)
+            </div>
             <div className="grid grid-cols-2 gap-3">
               {(['groupCol', 'emailCol', 'bizCol', 'companyCol', 'phoneCol'] as const).map(
                 (field) => {
@@ -247,51 +271,76 @@ export function UploadWizard({ surveyId }: UploadWizardProps) {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs">머지키</Label>
-                <Select
-                  value={mapping.mergeKey}
-                  onValueChange={(v) =>
-                    setMapping((m) => ({
-                      ...m,
-                      mergeKey: v as 'email+biz' | 'email' | 'biz',
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="email+biz">이메일 + 사업자번호</SelectItem>
-                    <SelectItem value="email">이메일만</SelectItem>
-                    <SelectItem value="biz">사업자번호만</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs">머지 정책 — email+biz 일 때만 적용</Label>
-                <Select
-                  value={mapping.mergeKeyPolicy}
-                  onValueChange={(v) =>
-                    setMapping((m) => ({
-                      ...m,
-                      mergeKeyPolicy: v as 'either' | 'both',
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="either">한쪽이라도 있으면 매칭</SelectItem>
-                    <SelectItem value="both">둘 다 필수</SelectItem>
-                  </SelectContent>
-                </Select>
+            <div>
+              <div className="mb-2 text-xs font-medium text-slate-700">표시할 컬럼 — 컨택리스트에 표시할 헤더 선택</div>
+              <div className="max-h-60 overflow-y-auto rounded border bg-slate-50 p-2">
+                <div className="grid grid-cols-2 gap-1">
+                  {preview.headers.map((h) => (
+                    <label key={h} className="flex items-center gap-2 rounded px-2 py-1 hover:bg-slate-100 text-sm">
+                      <Checkbox
+                        checked={mapping.selectedAttrs.has(h)}
+                        onCheckedChange={(checked) => {
+                          setMapping((m) => {
+                            const next = new Set(m.selectedAttrs);
+                            if (checked) next.add(h);
+                            else next.delete(h);
+                            return { ...m, selectedAttrs: next };
+                          });
+                        }}
+                      />
+                      <span className="truncate" title={h}>{h}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="mt-2 flex gap-2 border-t pt-2 text-xs">
+                  <button
+                    type="button"
+                    className="text-blue-600 hover:underline"
+                    onClick={() => setMapping((m) => ({ ...m, selectedAttrs: new Set(preview.headers) }))}
+                  >
+                    전체 선택
+                  </button>
+                  <button
+                    type="button"
+                    className="text-slate-500 hover:underline"
+                    onClick={() => setMapping((m) => ({ ...m, selectedAttrs: new Set() }))}
+                  >
+                    전체 해제
+                  </button>
+                  <span className="ml-auto text-slate-500">{mapping.selectedAttrs.size}/{preview.headers.length} 선택됨</span>
+                </div>
               </div>
             </div>
 
-            <Button disabled={mapping.groupCol == null || isPending} onClick={handleIngest}>
+            {existingContactsCount > 0 && (
+              <div role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm">
+                <div className="mb-2 font-semibold text-red-800">
+                  ⚠ 기존 컨택 {existingContactsCount.toLocaleString('ko-KR')}건이 통째로 교체됩니다
+                </div>
+                <ul className="ml-4 list-disc space-y-1 text-red-700">
+                  <li>기존 컨택 행 모두 삭제 후 신규 명단으로 교체</li>
+                  <li>각 컨택의 회차 기록 (contact_attempts) 도 함께 삭제됨</li>
+                  <li>이미 발송된 초대 링크 모두 무효화</li>
+                  <li>응답 본체는 보존되지만 컨택 매칭이 끊겨 익명 응답으로 표시됨</li>
+                </ul>
+                <label className="mt-3 flex items-center gap-2 text-red-800">
+                  <Checkbox
+                    checked={replaceConfirmed}
+                    onCheckedChange={(checked) => setReplaceConfirmed(checked === true)}
+                  />
+                  <span>위 영향을 이해했고 진행에 동의합니다.</span>
+                </label>
+              </div>
+            )}
+
+            <Button
+              disabled={
+                mapping.groupCol == null ||
+                isPending ||
+                (existingContactsCount > 0 && !replaceConfirmed)
+              }
+              onClick={handleIngest}
+            >
               {isPending
                 ? '적재 중…'
                 : `${preview.totalRows.toLocaleString('ko-KR')} 행 적재 시작`}
