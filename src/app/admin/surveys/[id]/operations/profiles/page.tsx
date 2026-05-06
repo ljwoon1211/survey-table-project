@@ -16,6 +16,7 @@ import { db } from '@/db';
 import { questions as questionsTable } from '@/db/schema';
 import {
   PROFILES_PAGE_SIZE,
+  hasActiveFilters,
   listResponsesForProfiles,
   normalizeListArgs,
 } from '@/lib/operations/profiles.server';
@@ -71,10 +72,7 @@ export default async function ProfilesPage({ params, searchParams }: PageProps) 
       .orderBy(asc(questionsTable.order), asc(questionsTable.id)),
   ]);
 
-  const hasFilter =
-    (sp.q ?? '') !== '' ||
-    (sp.qfield ?? 'all') !== 'all' ||
-    (sp.status ?? 'all') !== 'all';
+  const hasFilter = hasActiveFilters(sp);
 
   return (
     <div className="min-h-screen bg-slate-50">

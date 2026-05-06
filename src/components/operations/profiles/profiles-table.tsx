@@ -10,7 +10,7 @@ import { useMemo } from 'react';
 
 import { useSearchParamsMutator } from '@/hooks/use-search-params-mutator';
 import { cn } from '@/lib/utils';
-import { formatPlatformKo, type Platform } from '@/lib/operations/parse-ua';
+import { formatPlatformKo } from '@/lib/operations/parse-ua';
 import {
   formatTotalTime,
   mapStatusPill,
@@ -20,12 +20,23 @@ import {
 import type { ProfilesRow, SortDir, SortKey } from '@/lib/operations/profiles.server';
 
 import { EmptyState } from '../empty-state';
+import {
+  ALIGN_CLASS,
+  SortIndicator,
+  TablePagerFooter,
+  type CellAlign,
+} from '../table-primitives';
 import { StatusPill } from './status-pill';
 
 interface QuestionMeta {
   id: string;
   order: number;
   title: string;
+}
+
+interface ColumnMeta {
+  align: CellAlign;
+  sortable: boolean;
 }
 
 interface Props {
@@ -51,7 +62,7 @@ const DATETIME_FORMATTER = new Intl.DateTimeFormat('ko-KR', {
 
 function formatDateTime(d: Date | null): string {
   if (!d) return '—';
-  // ko-KR 'YYYY. MM. DD. HH:mm' → 'YYYY-MM-DD HH:mm'
+  // ko-KR formatToParts → 'YYYY-MM-DD HH:mm'
   const parts = DATETIME_FORMATTER.formatToParts(d);
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
   return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}`;
@@ -69,13 +80,10 @@ interface DisplayRow {
   totalTimeText: string;
 }
 
+const meta = (align: CellAlign, sortable: boolean): ColumnMeta => ({ align, sortable });
+
 /**
- * 응답자 목록 테이블.
- *
- * - 9 컬럼: 순번/컨택그룹/접속IP/접속 단말/브라우저/상태/시작일시/종료일시/소요시간
- * - 정렬 키 클릭 → URL state(`sort`, `dir`) 갱신, 페이지 리셋(`page=1`)
- * - 빈 상태: 검색결과 0건 vs 응답 0건 두 종류는 page.tsx 에서 분기 (이 컴포넌트는 단일 EmptyState)
- * - 페이지네이션: prev/next 만 노출 (slice 1 daily-stats-table 패턴)
+ * 응답자 목록 테이블. 9 컬럼 + URL state sort/pagination + 검색 결과 EmptyState.
  */
 export function ProfilesTable({ rows, total, page, pageSize, sort, dir, questions }: Props) {
   const pushParams = useSearchParamsMutator();
@@ -92,7 +100,7 @@ export function ProfilesTable({ rows, total, page, pageSize, sort, dir, question
   const display = useMemo<DisplayRow[]>(
     () =>
       rows.map((r) => {
-        const q = r.currentStepId ? (questionsById.get(r.currentStepId) ?? null) : null;
+        const q = r.currentStepId ? questionsById.get(r.currentStepId) : undefined;
         const qNumber = q ? parseQuestionNumberFromTitle(q.title) : null;
         const pill = mapStatusPill({
           status: r.status,
@@ -100,19 +108,18 @@ export function ProfilesTable({ rows, total, page, pageSize, sort, dir, question
           totalSteps,
           qNumber,
         });
-        // defensive: completed 인데 completed_at 이 null
         if (r.status === 'completed' && r.completedAt === null) {
+          // DB 일관성 깨짐 방어 — 행은 '—' 로 노출하되 운영자가 파악할 수 있게 로깅
           // eslint-disable-next-line no-console
-          console.warn(
-            '[profiles-table] inconsistent row: completed status with null completed_at',
-            { id: r.id },
-          );
+          console.warn('[profiles-table] completed status with null completed_at', {
+            id: r.id,
+          });
         }
         return {
           id: r.id,
           idx: r.idx,
           ipMasked: r.ipMasked,
-          platformKo: formatPlatformKo(r.platform as Platform | null),
+          platformKo: formatPlatformKo(r.platform),
           browser: r.browser ?? 'Other',
           pill,
           startedAtText: formatDateTime(r.startedAt),
@@ -126,60 +133,45 @@ export function ProfilesTable({ rows, total, page, pageSize, sort, dir, question
 
   const columns = useMemo<ColumnDef<DisplayRow>[]>(
     () => [
-      {
-        id: 'idx',
-        accessorKey: 'idx',
-        header: '순번',
-        meta: { align: 'right' as const, sortable: true },
-      },
+      { id: 'idx', accessorKey: 'idx', header: '순번', meta: meta('right', true) },
       {
         id: 'group',
         accessorFn: () => '공개링크',
         header: '컨택그룹',
-        meta: { align: 'left' as const, sortable: false },
+        meta: meta('left', false),
       },
-      {
-        id: 'ip',
-        accessorKey: 'ipMasked',
-        header: '접속IP',
-        meta: { align: 'left' as const, sortable: true },
-      },
+      { id: 'ip', accessorKey: 'ipMasked', header: '접속IP', meta: meta('left', true) },
       {
         id: 'platform',
         accessorKey: 'platformKo',
         header: '접속 단말',
-        meta: { align: 'left' as const, sortable: true },
+        meta: meta('left', true),
       },
-      {
-        id: 'browser',
-        accessorKey: 'browser',
-        header: '브라우저',
-        meta: { align: 'left' as const, sortable: true },
-      },
+      { id: 'browser', accessorKey: 'browser', header: '브라우저', meta: meta('left', true) },
       {
         id: 'status',
         accessorKey: 'pill',
         header: '상태',
         cell: ({ row }) => <StatusPill pill={row.original.pill} />,
-        meta: { align: 'center' as const, sortable: false },
+        meta: meta('center', false),
       },
       {
         id: 'startedAt',
         accessorKey: 'startedAtText',
         header: '시작일시',
-        meta: { align: 'left' as const, sortable: true },
+        meta: meta('left', true),
       },
       {
         id: 'completedAt',
         accessorKey: 'completedAtText',
         header: '종료일시',
-        meta: { align: 'left' as const, sortable: true },
+        meta: meta('left', true),
       },
       {
         id: 'totalSeconds',
         accessorKey: 'totalTimeText',
         header: '소요시간',
-        meta: { align: 'right' as const, sortable: true },
+        meta: meta('right', true),
       },
     ],
     [],
@@ -224,11 +216,9 @@ export function ProfilesTable({ rows, total, page, pageSize, sort, dir, question
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id} className="bg-slate-50">
               {headerGroup.headers.map((header) => {
-                const meta = header.column.columnDef.meta as
-                  | { align?: 'left' | 'right' | 'center'; sortable?: boolean }
-                  | undefined;
-                const align = meta?.align ?? 'left';
-                const sortable = meta?.sortable ?? false;
+                const m = header.column.columnDef.meta as ColumnMeta | undefined;
+                const align = m?.align ?? 'left';
+                const sortable = m?.sortable ?? false;
                 const isActive = sortable && sort === (header.column.id as SortKey);
                 const ariaSort = isActive
                   ? dir === 'asc'
@@ -242,11 +232,7 @@ export function ProfilesTable({ rows, total, page, pageSize, sort, dir, question
                     aria-sort={ariaSort}
                     className={cn(
                       'px-3 py-2 text-xs font-medium uppercase tracking-wider text-slate-600',
-                      align === 'right'
-                        ? 'text-right'
-                        : align === 'center'
-                          ? 'text-center'
-                          : 'text-left',
+                      ALIGN_CLASS[align],
                     )}
                   >
                     {sortable ? (
@@ -259,14 +245,7 @@ export function ProfilesTable({ rows, total, page, pageSize, sort, dir, question
                         )}
                       >
                         {flexRender(header.column.columnDef.header, header.getContext())}
-                        <span
-                          aria-hidden="true"
-                          className={
-                            isActive ? 'text-slate-400' : 'inline-block w-2 text-transparent'
-                          }
-                        >
-                          {isActive ? (dir === 'asc' ? '▲' : '▼') : '▲'}
-                        </span>
+                        <SortIndicator direction={isActive ? dir : false} />
                       </button>
                     ) : (
                       flexRender(header.column.columnDef.header, header.getContext())
@@ -281,20 +260,14 @@ export function ProfilesTable({ rows, total, page, pageSize, sort, dir, question
           {table.getRowModel().rows.map((row) => (
             <tr key={row.id} className="border-b border-slate-100">
               {row.getVisibleCells().map((cell) => {
-                const meta = cell.column.columnDef.meta as
-                  | { align?: 'left' | 'right' | 'center' }
-                  | undefined;
-                const align = meta?.align ?? 'left';
+                const m = cell.column.columnDef.meta as ColumnMeta | undefined;
+                const align = m?.align ?? 'left';
                 return (
                   <td
                     key={cell.id}
                     className={cn(
                       'px-3 py-2 text-slate-700 tabular-nums',
-                      align === 'right'
-                        ? 'text-right'
-                        : align === 'center'
-                          ? 'text-center'
-                          : 'text-left',
+                      ALIGN_CLASS[align],
                     )}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -307,29 +280,13 @@ export function ProfilesTable({ rows, total, page, pageSize, sort, dir, question
       </table>
 
       {totalPages > 1 && (
-        <div className="mt-3 flex items-center justify-between gap-2 px-1 text-xs text-slate-600">
-          <span>
-            총 {total.toLocaleString('ko-KR')}건 · {page} / {totalPages} 페이지
-          </span>
-          <div className="flex gap-1">
-            <button
-              type="button"
-              onClick={() => handlePageChange(page - 1)}
-              disabled={page <= 1}
-              className="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              ‹ 이전
-            </button>
-            <button
-              type="button"
-              onClick={() => handlePageChange(page + 1)}
-              disabled={page >= totalPages}
-              className="rounded border border-slate-200 px-2 py-1 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              다음 ›
-            </button>
-          </div>
-        </div>
+        <TablePagerFooter
+          total={total}
+          page={page}
+          totalPages={totalPages}
+          onPrev={() => handlePageChange(page - 1)}
+          onNext={() => handlePageChange(page + 1)}
+        />
       )}
     </div>
   );

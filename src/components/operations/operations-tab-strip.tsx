@@ -17,15 +17,12 @@ interface OperationsTabStripProps {
 }
 
 /**
- * 현황 콘솔 상단 탭 스트립 (슬라이스 2 — Field work 드롭다운 추가).
+ * 현황 콘솔 상단 탭 스트립.
  *
- * - "Field work ▼" hover/click → `응답 현황` / `응답자 목록` 드롭다운
- * - "보고서" / "컨택 ▼" 는 시각만 비활성 (`aria-disabled`)
- * - 활성 메뉴 항목은 `aria-current="page"`
- *
- * shadcn NavigationMenu primitive 가 데스크톱 hover + 모바일 click +
- * 키보드(Tab/Enter/Esc/화살표) 표준을 처리한다. Trigger 의 ChevronDown 은
- * primitive 에 내장되어 있어 caret 마크업은 불필요.
+ * - "Field work" trigger hover/click → `응답 현황` / `응답자 목록` 드롭다운
+ * - "보고서" / "컨택" 은 시각만 비활성 (`aria-disabled`)
+ * - shadcn NavigationMenu primitive 가 hover/click/키보드 표준을 처리하며
+ *   Trigger 의 ChevronDown 이 내장돼 있어 caret 마크업은 별도로 그리지 않는다.
  */
 export function OperationsTabStrip({ surveyId }: OperationsTabStripProps) {
   const pathname = usePathname() ?? '';

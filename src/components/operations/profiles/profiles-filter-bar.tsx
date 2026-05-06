@@ -4,21 +4,26 @@ import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 
 import { useSearchParamsMutator } from '@/hooks/use-search-params-mutator';
+import {
+  hasActiveFilters,
+  type QField,
+  type StatusFilter,
+} from '@/lib/operations/profiles.server';
 
 interface Props {
   initialQ: string;
-  initialQField: string;
-  initialStatus: string;
+  initialQField: QField;
+  initialStatus: StatusFilter;
 }
 
-const QFIELD_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+const QFIELD_OPTIONS: ReadonlyArray<{ value: QField; label: string }> = [
   { value: 'all', label: '전체' },
   { value: 'idx', label: '순번' },
   { value: 'ip', label: '접속IP' },
   { value: 'browser', label: '브라우저' },
 ];
 
-const STATUS_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+const STATUS_OPTIONS: ReadonlyArray<{ value: StatusFilter; label: string }> = [
   { value: 'all', label: '전체 상태' },
   { value: 'completed', label: '완료만' },
   { value: 'in_progress', label: '진행중만' },
@@ -31,15 +36,14 @@ const STATUS_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
 /**
  * 응답자 목록 페이지 필터바.
  *
- * - form submit 기반 → 적용 버튼 누르거나 Enter 시 URL 갱신
- * - 검색어가 비면 q 키 자체를 제거 (URL 깔끔)
- * - status='all' / qfield='all' 도 키 제거 (기본값)
- * - 페이지는 1로 reset (필터 변경 시 마지막 페이지에 머무는 거 방지)
+ * - form submit 으로만 URL 갱신 (적용 버튼 또는 Enter)
+ * - 기본값(all / 빈 문자열)은 URL 키 자체를 제거 → 깔끔한 URL
+ * - 필터 변경 시 page 도 리셋 (마지막 페이지에 머무는 거 방지)
  */
 export function ProfilesFilterBar({ initialQ, initialQField, initialStatus }: Props) {
   const [q, setQ] = useState(initialQ);
-  const [qfield, setQField] = useState(initialQField);
-  const [status, setStatus] = useState(initialStatus);
+  const [qfield, setQField] = useState<QField>(initialQField);
+  const [status, setStatus] = useState<StatusFilter>(initialStatus);
   const pushParams = useSearchParamsMutator();
   const searchParams = useSearchParams();
 
@@ -56,7 +60,7 @@ export function ProfilesFilterBar({ initialQ, initialQField, initialStatus }: Pr
       if (status !== 'all') p.set('status', status);
       else p.delete('status');
 
-      p.delete('page'); // 페이지 리셋
+      p.delete('page');
     });
   };
 
@@ -72,10 +76,11 @@ export function ProfilesFilterBar({ initialQ, initialQField, initialStatus }: Pr
     });
   };
 
-  const hasFilters =
-    (searchParams?.get('q') ?? '') !== '' ||
-    (searchParams?.get('qfield') ?? 'all') !== 'all' ||
-    (searchParams?.get('status') ?? 'all') !== 'all';
+  const showReset = hasActiveFilters({
+    q: searchParams?.get('q') ?? undefined,
+    qfield: searchParams?.get('qfield') ?? undefined,
+    status: searchParams?.get('status') ?? undefined,
+  });
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2">
@@ -88,7 +93,7 @@ export function ProfilesFilterBar({ initialQ, initialQField, initialStatus }: Pr
       />
       <select
         value={qfield}
-        onChange={(e) => setQField(e.target.value)}
+        onChange={(e) => setQField(e.target.value as QField)}
         className="h-9 rounded border border-slate-200 px-2 text-sm"
         aria-label="검색 항목"
       >
@@ -100,7 +105,7 @@ export function ProfilesFilterBar({ initialQ, initialQField, initialStatus }: Pr
       </select>
       <select
         value={status}
-        onChange={(e) => setStatus(e.target.value)}
+        onChange={(e) => setStatus(e.target.value as StatusFilter)}
         className="h-9 rounded border border-slate-200 px-2 text-sm"
         aria-label="상태 필터"
       >
@@ -116,7 +121,7 @@ export function ProfilesFilterBar({ initialQ, initialQField, initialStatus }: Pr
       >
         적용
       </button>
-      {hasFilters && (
+      {showReset && (
         <button
           type="button"
           onClick={handleReset}
