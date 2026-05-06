@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';
 
 import { deleteContactAttempt } from '@/actions/contact-actions';
@@ -22,6 +23,7 @@ export function ContactAttemptHistoryCard({
   attempts,
   resultCodes,
 }: ContactAttemptHistoryCardProps) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [successMessage, setSuccessMessage] = useAutoFadeMessage();
 
@@ -32,6 +34,7 @@ export function ContactAttemptHistoryCard({
     startTransition(async () => {
       try {
         await deleteContactAttempt(surveyId, contactTargetId, id);
+        router.refresh();
         setSuccessMessage('회차 삭제 완료');
       } catch (e) {
         window.alert((e as Error).message);

@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 
 import { addContactAttempt } from '@/actions/contact-actions';
@@ -18,6 +19,7 @@ export function ContactAttemptAddCard({
   surveyId,
   resultCodes,
 }: ContactAttemptAddCardProps) {
+  const router = useRouter();
   const [resultCode, setResultCode] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +40,7 @@ export function ContactAttemptAddCard({
           resultCode,
           note: note || undefined,
         });
+        router.refresh();
         setResultCode(null);
         setNote('');
         setSuccessMessage('회차 추가 완료');

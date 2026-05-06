@@ -69,14 +69,17 @@ export async function listContactsForSurvey(
   // 최신 회차의 result_code / attempt_no — 같은 subquery 모양을 SELECT/WHERE 양쪽에서 사용.
   // PG planner 가 동일 correlated subquery 를 dedupe 하며, idx_contact_attempts_target
   // (contact_target_id, attempt_no DESC) INCLUDE (result_code) 가 index-only scan 보장.
+  // outer correlation 은 명시적 qualifier 필수 — Drizzle 의 sql template literal 안에서
+  // ${contactTargets.id} 는 unqualified "id" 로 렌더되어 inner contact_attempts.id 와
+  // 충돌 (둘 다 id 컬럼 보유) → 항상 NULL. "contact_targets"."id" 직접 박는다.
   const latestResultCodeExpr = sql<string | null>`(
     SELECT result_code FROM contact_attempts
-    WHERE contact_target_id = ${contactTargets.id}
+    WHERE contact_target_id = "contact_targets"."id"
     ORDER BY attempt_no DESC LIMIT 1
   )`;
   const latestAttemptNoExpr = sql<number | null>`(
     SELECT attempt_no FROM contact_attempts
-    WHERE contact_target_id = ${contactTargets.id}
+    WHERE contact_target_id = "contact_targets"."id"
     ORDER BY attempt_no DESC LIMIT 1
   )`;
 
