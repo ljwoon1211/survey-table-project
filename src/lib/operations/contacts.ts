@@ -57,6 +57,7 @@ export function normalizeContactListArgs(input: {
     qfield: pickFromWhitelist(input.qfield, CONTACTS_QFIELDS, 'all'),
     resultCode: input.resultCode && input.resultCode !== '' ? input.resultCode : 'all',
     sort: pickFromWhitelist(input.sort, CONTACTS_SORT_KEYS, 'resid'),
+    // 컨택리스트는 resid 오름차순이 기본 (profiles 의 desc 와 의도적으로 다름)
     dir: input.dir === 'desc' ? 'desc' : 'asc',
   };
 }

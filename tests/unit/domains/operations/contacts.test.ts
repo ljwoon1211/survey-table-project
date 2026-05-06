@@ -8,6 +8,7 @@ import {
   maskPhone,
   maskBizNumber,
   hasActiveContactFilters,
+  attrsKeyOf,
 } from '@/lib/operations/contacts';
 
 describe('normalizeContactListArgs', () => {
@@ -118,5 +119,17 @@ describe('whitelist exports', () => {
   });
   it('CONTACTS_QFIELDS contains all/resid/email/group', () => {
     expect(CONTACTS_QFIELDS).toEqual(expect.arrayContaining(['all', 'resid', 'email', 'group']));
+  });
+});
+
+describe('attrsKeyOf', () => {
+  it("'attrs.전시회명' → '전시회명'", () => {
+    expect(attrsKeyOf('attrs.전시회명')).toBe('전시회명');
+  });
+  it("'system.resid' → null", () => {
+    expect(attrsKeyOf('system.resid')).toBeNull();
+  });
+  it("빈 문자열 → null", () => {
+    expect(attrsKeyOf('')).toBeNull();
   });
 });
