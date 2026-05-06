@@ -73,7 +73,7 @@ export function ContactAttemptHistoryCard({
                 </span>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${TONE_CLASS[tone]}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-xs ${TONE_CLASS[tone] ?? TONE_CLASS.slate}`}>
                       [{a.attemptNo}] {meta?.label ?? a.resultCode}
                     </span>
                   </div>

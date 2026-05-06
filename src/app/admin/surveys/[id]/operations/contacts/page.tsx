@@ -10,6 +10,7 @@ import type { ContactColumnScheme } from '@/db/schema/schema-types';
 import {
   attrsKeyOf,
   CONTACTS_PAGE_SIZE,
+  effectiveSortKey,
   hasActiveContactFilters,
   normalizeContactListArgs,
 } from '@/lib/operations/contacts';
@@ -61,10 +62,22 @@ export default async function ContactsPage({ params, searchParams }: PageProps) 
   const sp = await searchParams;
   const args = normalizeContactListArgs(sp);
 
-  const [{ rows, total, page: clampedPage }, scheme] = await Promise.all([
-    listContactsForSurvey({ surveyId, pageSize: CONTACTS_PAGE_SIZE, ...args }),
-    getContactColumnScheme(surveyId),
-  ]);
+  // 스킴 먼저 — sort key 가 hidden 컬럼이면 'resid' 로 폴백 (URL 직접 조작 가드).
+  const scheme = await getContactColumnScheme(surveyId);
+  const visibleAttrsKeys = new Set(
+    (scheme?.columns ?? [])
+      .filter((c) => !c.hidden)
+      .map((c) => attrsKeyOf(c.source))
+      .filter((k): k is string => k != null),
+  );
+  const safeSort = effectiveSortKey(args.sort, visibleAttrsKeys);
+
+  const { rows, total, page: clampedPage } = await listContactsForSurvey({
+    surveyId,
+    pageSize: CONTACTS_PAGE_SIZE,
+    ...args,
+    sort: safeSort,
+  });
 
   if (!scheme) {
     return (
@@ -126,7 +139,7 @@ export default async function ContactsPage({ params, searchParams }: PageProps) 
               pageSize={CONTACTS_PAGE_SIZE}
               scheme={scheme}
               surveyId={surveyId}
-              sort={args.sort}
+              sort={safeSort}
               dir={args.dir}
               systemFieldKeys={extractSystemFieldKeys(scheme)}
             />

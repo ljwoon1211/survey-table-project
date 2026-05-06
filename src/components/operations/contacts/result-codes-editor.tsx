@@ -28,17 +28,27 @@ const TONE_OPTIONS: Array<NonNullable<ContactResultCode['tone']>> = [
   'slate',
 ];
 
+type SaveMode = 'custom' | 'use-default';
+
 export function ResultCodesEditor({ surveyId, initialCodes }: ResultCodesEditorProps) {
   const router = useRouter();
   const [codes, setCodes] = useState<ContactResultCode[]>(initialCodes);
+  const [mode, setMode] = useState<SaveMode>('custom');
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  /** 사용자 편집 시 use-default 모드면 자동으로 custom 으로 전환. */
+  function ensureCustomMode() {
+    if (mode === 'use-default') setMode('custom');
+  }
+
   function update(index: number, patch: Partial<ContactResultCode>) {
+    ensureCustomMode();
     setCodes((prev) => prev.map((c, i) => (i === index ? { ...c, ...patch } : c)));
   }
 
   function move(index: number, dir: -1 | 1) {
+    ensureCustomMode();
     const newCodes = [...codes];
     const target = index + dir;
     if (target < 0 || target >= newCodes.length) return;
@@ -54,12 +64,14 @@ export function ResultCodesEditor({ surveyId, initialCodes }: ResultCodesEditorP
       setError('최소 1개의 결과코드가 필요합니다.');
       return;
     }
+    ensureCustomMode();
     setCodes((prev) =>
       prev.filter((_, i) => i !== index).map((c, i) => ({ ...c, order: i + 1 })),
     );
   }
 
   function add() {
+    ensureCustomMode();
     const nextOrder = codes.length + 1;
     setCodes((prev) => [
       ...prev,
@@ -69,14 +81,39 @@ export function ResultCodesEditor({ surveyId, initialCodes }: ResultCodesEditorP
 
   function reset() {
     if (!window.confirm('디폴트 13개로 복귀합니다. 진행할까요?')) return;
+    ensureCustomMode();
     setCodes(DEFAULT_RESULT_CODES.map((c) => ({ ...c })));
   }
 
+  /**
+   * 저장 전 validation — 빈 코드/라벨 + 코드 중복 차단.
+   * 저장 시 mode='use-default' 면 NULL set, 아니면 현재 codes 저장.
+   */
+  function validate(): string | null {
+    const trimmed = codes.map((c) => c.code.trim());
+    const labelsTrimmed = codes.map((c) => c.label.trim());
+    if (trimmed.some((c) => c.length === 0)) return '코드는 빈 값일 수 없습니다.';
+    if (labelsTrimmed.some((l) => l.length === 0)) return '라벨은 빈 값일 수 없습니다.';
+    const seen = new Set<string>();
+    for (const c of trimmed) {
+      if (seen.has(c)) return `중복된 코드: ${c}`;
+      seen.add(c);
+    }
+    return null;
+  }
+
   function save() {
+    if (mode === 'custom') {
+      const v = validate();
+      if (v) {
+        setError(v);
+        return;
+      }
+    }
     setError(null);
     startTransition(async () => {
       try {
-        await updateContactResultCodes(surveyId, codes);
+        await updateContactResultCodes(surveyId, mode === 'use-default' ? null : codes);
         router.refresh();
       } catch (e) {
         setError((e as Error).message);
@@ -85,16 +122,10 @@ export function ResultCodesEditor({ surveyId, initialCodes }: ResultCodesEditorP
   }
 
   function clearOverride() {
-    if (!window.confirm('사용자 정의를 해제하고 디폴트로 돌아갑니다.')) return;
+    if (!window.confirm('사용자 정의를 해제 모드로 전환합니다. 저장을 누르면 디폴트로 되돌아갑니다.')) return;
     setError(null);
-    startTransition(async () => {
-      try {
-        await updateContactResultCodes(surveyId, null);
-        router.refresh();
-      } catch (e) {
-        setError((e as Error).message);
-      }
-    });
+    setMode('use-default');
+    setCodes(DEFAULT_RESULT_CODES.map((c) => ({ ...c })));
   }
 
   return (
@@ -102,6 +133,12 @@ export function ResultCodesEditor({ surveyId, initialCodes }: ResultCodesEditorP
       {error && (
         <div role="alert" className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
+        </div>
+      )}
+
+      {mode === 'use-default' && (
+        <div role="status" className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          사용자 정의 해제 모드 — 저장 시 디폴트 13개로 되돌아갑니다. 편집을 시작하면 다시 사용자 정의로 전환됩니다.
         </div>
       )}
 

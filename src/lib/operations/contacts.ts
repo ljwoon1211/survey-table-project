@@ -34,6 +34,19 @@ export function attrsSortKey(sort: string): string | null {
   return isAttrsSortKey(sort) ? sort.slice('attrs.'.length) : null;
 }
 
+/**
+ * 컬럼 스킴에서 hidden 컬럼을 sort key 로 받았을 때 'resid' 로 폴백.
+ * 사용자가 URL 직접 조작으로 보이지 않는 컬럼 정렬 상태가 되는 것을 막음.
+ */
+export function effectiveSortKey(
+  sort: ContactsSortKey,
+  visibleAttrsKeys: ReadonlySet<string>,
+): ContactsSortKey {
+  const ak = attrsSortKey(sort);
+  if (ak == null) return sort; // system key 는 그대로
+  return visibleAttrsKeys.has(ak) ? sort : 'resid';
+}
+
 export const CONTACTS_QFIELDS = ['all', 'resid', 'email', 'group', 'biz'] as const;
 export type ContactsQField = (typeof CONTACTS_QFIELDS)[number];
 
