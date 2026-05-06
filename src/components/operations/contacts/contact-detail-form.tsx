@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 
 import {
   addContactTarget,
@@ -53,23 +53,65 @@ export function ContactDetailForm({
   const [contactMethod, setContactMethod] = useState<ContactMethod | null>(
     initial?.contactMethod ?? null,
   );
+  const [localScheme, setLocalScheme] = useState<ContactColumnScheme>(scheme);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  const initialAttrs = useMemo(() => initial?.attrs ?? {}, [initial]);
+  const initialMemo = initial?.memo ?? null;
+  const initialContactMethod = initial?.contactMethod ?? null;
+
+  const isDirty = useMemo(() => {
+    if (!isEdit) {
+      // 신규 모드: 사용자가 attrs/memo/contactMethod 중 하나라도 입력했으면 dirty.
+      const hasAttr = Object.values(attrs).some((v) => v && v.trim().length > 0);
+      const hasMemo = (memo ?? '').trim().length > 0;
+      const hasMethod = contactMethod != null;
+      return hasAttr || hasMemo || hasMethod;
+    }
+    // 편집 모드: initial 과 비교
+    if (!shallowEqualRecord(attrs, initialAttrs)) return true;
+    if ((memo ?? '') !== (initialMemo ?? '')) return true;
+    if (contactMethod !== initialContactMethod) return true;
+    if (!schemeEqual(localScheme, scheme)) return true;
+    return false;
+  }, [
+    isEdit,
+    attrs,
+    memo,
+    contactMethod,
+    localScheme,
+    initialAttrs,
+    initialMemo,
+    initialContactMethod,
+    scheme,
+  ]);
+
+  // beforeunload 보호 — dirty 상태에서 탭 닫기/새로고침 시 경고
+  useEffect(() => {
+    if (!isDirty) return;
+    function handler(e: BeforeUnloadEvent) {
+      e.preventDefault();
+      // Chrome/Edge 는 returnValue 를 요구
+      e.returnValue = '';
+    }
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
+  function confirmIfDirty(): boolean {
+    if (!isDirty) return true;
+    return window.confirm('변경사항이 저장되지 않았습니다. 나가시겠습니까?');
+  }
+
   function onColumnToggle(attrsKey: string, hidden: boolean) {
-    const updated: ContactColumnScheme = {
-      ...scheme,
-      columns: scheme.columns.map((c) =>
+    // I2: 즉시 server 호출 폐기 — localScheme 만 갱신, 저장 시점에 반영
+    setLocalScheme((prev) => ({
+      ...prev,
+      columns: prev.columns.map((c) =>
         c.source === `attrs.${attrsKey}` ? { ...c, hidden } : c,
       ),
-    };
-    startTransition(async () => {
-      try {
-        await updateContactColumns(surveyId, updated);
-      } catch (e) {
-        setError((e as Error).message);
-      }
-    });
+    }));
   }
 
   function remove() {
@@ -79,6 +121,7 @@ export function ContactDetailForm({
     startTransition(async () => {
       try {
         await deleteContactTarget(surveyId, initial.id);
+        // 삭제 후엔 dirty 무시 → router.push 직접
         router.push(`/admin/surveys/${surveyId}/operations/contacts`);
       } catch (e) {
         setError((e as Error).message);
@@ -108,11 +151,21 @@ export function ContactDetailForm({
             systemFieldKeys,
           });
         }
+        // I2: localScheme 이 prop scheme 과 다르면 컬럼 스킴도 함께 저장
+        if (isEdit && !schemeEqual(localScheme, scheme)) {
+          await updateContactColumns(surveyId, localScheme);
+        }
+        // 저장 성공 → dirty reset (initial 동기화 효과를 위해 router.refresh)
         router.refresh();
       } catch (e) {
         setError((e as Error).message);
       }
     });
+  }
+
+  function goList() {
+    if (!confirmIfDirty()) return;
+    router.push(`/admin/surveys/${surveyId}/operations/contacts`);
   }
 
   return (
@@ -127,7 +180,7 @@ export function ContactDetailForm({
         <div>
           <ContactInfoCard
             resid={initial?.resid ?? null}
-            scheme={scheme}
+            scheme={localScheme}
             attrs={attrs}
             memo={memo}
             contactMethod={contactMethod}
@@ -139,10 +192,7 @@ export function ContactDetailForm({
             onContactMethodChange={setContactMethod}
           />
           <div className="mt-2 flex gap-2 rounded-lg border bg-slate-50 px-4 py-3">
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/admin/surveys/${surveyId}/operations/contacts`)}
-            >
+            <Button variant="outline" onClick={goList}>
               목록
             </Button>
             {isEdit && (
@@ -200,4 +250,39 @@ export function ContactDetailForm({
       </div>
     </div>
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+function shallowEqualRecord(
+  a: Record<string, string>,
+  b: Record<string, string>,
+): boolean {
+  const ak = Object.keys(a);
+  const bk = Object.keys(b);
+  if (ak.length !== bk.length) return false;
+  for (const k of ak) {
+    if ((a[k] ?? '') !== (b[k] ?? '')) return false;
+  }
+  return true;
+}
+
+function schemeEqual(a: ContactColumnScheme, b: ContactColumnScheme): boolean {
+  if (a.columns.length !== b.columns.length) return false;
+  for (let i = 0; i < a.columns.length; i++) {
+    const ac = a.columns[i];
+    const bc = b.columns[i];
+    if (
+      ac.key !== bc.key ||
+      ac.source !== bc.source ||
+      ac.label !== bc.label ||
+      ac.order !== bc.order ||
+      Boolean(ac.hidden) !== Boolean(bc.hidden)
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
