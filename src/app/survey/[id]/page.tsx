@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 
 import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle, Loader2, Lock } from 'lucide-react';
 
@@ -88,8 +88,13 @@ function getDisplayableItemsOfStep(
 export default function SurveyResponsePage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   // URL 인코딩된 한글 slug를 디코딩
   const identifier = decodeURIComponent(params.id as string);
+
+  // ?invite=<token> — contact 매칭용. 없으면 익명 응답 흐름 그대로.
+  const inviteToken = searchParams?.get('invite') ?? null;
+  const [inviteIsInvalid, setInviteIsInvalid] = useState(false);
 
   // 응답 스토어 — 액션만 셀렉트 (전체 구독 → 불필요 리렌더 방지)
   const { setCurrentResponseId, setPendingResponse, resetResponseState } =
@@ -310,7 +315,11 @@ export default function SurveyResponsePage() {
     if (!savedSessionId) return;
 
     setIsRecovering(true);
-    resumeOrCreateResponse({ surveyId: loadedSurvey.id, sessionId: savedSessionId })
+    resumeOrCreateResponse({
+      surveyId: loadedSurvey.id,
+      sessionId: savedSessionId,
+      inviteToken: inviteToken ?? undefined,
+    })
       .then((result) => {
         if (!result) {
           // localStorage 키는 있는데 DB에 row 없음 — orphan, 정리
@@ -336,7 +345,7 @@ export default function SurveyResponsePage() {
       .finally(() => {
         setIsRecovering(false);
       });
-  }, [loadedSurvey, currentResponseId, setCurrentResponseId]);
+  }, [loadedSurvey, currentResponseId, setCurrentResponseId, inviteToken]);
 
   // 회복 토스트 자동 dismiss (4초)
   useEffect(() => {
@@ -466,9 +475,14 @@ export default function SurveyResponsePage() {
           questionId,
           value,
           currentStepId: stepIdOf(currentStep),
+          inviteToken: inviteToken ?? undefined,
         })
-          .then(({ id }) => {
+          .then(({ id, contactTargetId }) => {
             setCurrentResponseId(id);
+            // invite 토큰이 있었는데 contactTargetId 매칭 실패 → 무효 토큰. 익명 응답으로 폴백 알림.
+            if (inviteToken && !contactTargetId) {
+              setInviteIsInvalid(true);
+            }
             // 회복용 sessionId localStorage 저장 — 같은 브라우저에서 재진입 시 resumeOrCreate가 이 키로 row 조회
             if (typeof window !== 'undefined' && loadedSurvey) {
               window.localStorage.setItem(sessionStorageKey(loadedSurvey.id), sessionId);
@@ -492,6 +506,7 @@ export default function SurveyResponsePage() {
       sessionId,
       versionId,
       setCurrentResponseId,
+      inviteToken,
     ],
   );
 
@@ -816,6 +831,15 @@ export default function SurveyResponsePage() {
             className="mb-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700"
           >
             {resumeMessage}
+          </div>
+        )}
+        {inviteIsInvalid && (
+          <div
+            role="alert"
+            className="mb-4 flex items-start gap-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          >
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>초대 링크가 유효하지 않아 익명 응답으로 진행됩니다.</div>
           </div>
         )}
         {currentStep.kind === 'table' ? (

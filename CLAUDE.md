@@ -152,7 +152,32 @@ survey_responses           # 수집된 응답
 ├── isCompleted
 ├── startedAt, completedAt
 ├── userAgent, ipAddress, sessionId
+├── contactTargetId (FK → contact_targets, nullable)  # slice 3 — 응답↔컨택 매칭
 └── createdAt
+
+contact_uploads            # 컨택 명단 엑셀 업로드 이력 (slice 3)
+├── id (UUID)
+├── surveyId (FK → surveys)
+├── filename, uploadedRows, mergedRows, errorRows
+├── mapping (JSONB)        # ContactUploadMapping
+├── uploadedBy, createdAt
+└── ...
+
+contact_targets            # 컨택 = 응답 대상 (slice 3)
+├── id (UUID)
+├── surveyId (FK → surveys)
+├── resid                  # 설문별 자동 발번 next_contact_resid + advisory lock
+├── groupValue, email, bizNumber  # 머지키·매칭용
+├── inviteToken (UUID, UNIQUE)    # /survey/[id]?invite=<token> URL
+├── attrs (JSONB)          # 엑셀 한 행 통째 Record<string,string>
+├── responded_at, response_id (FK → survey_responses)
+├── upload_id (FK → contact_uploads)
+└── ...
+
+contact_attempts           # 컨택 결과 회차 (slice 3, read-only)
+├── id, contactTargetId (FK), attemptNo
+├── resultCode, note
+└── ...
 
 saved_questions            # 질문 라이브러리
 ├── id (UUID)
@@ -172,6 +197,8 @@ question_categories        # 질문 카테고리
 ### 관계도
 
 ```
+surveys                              # + contactColumns (JSONB) ContactColumnScheme
+
 surveys (1) ─────────┬───── (N) question_groups
                      │              │
                      │              └── parentGroupId (self-reference)
@@ -180,11 +207,30 @@ surveys (1) ─────────┬───── (N) question_groups
                      │              │
                      │              └── groupId (optional)
                      │
-                     └───── (N) survey_responses
+                     └───── (N) survey_responses ──── (1) contact_targets [optional]
+
+contact_uploads (1) ── (N) contact_targets ── (N) contact_attempts
+                                      └── (1) survey_responses [optional 응답 매칭]
 
 saved_questions (standalone)
 question_categories (standalone)
 ```
+
+---
+
+## 운영 콘솔 라우트 (slice 1~3)
+
+```
+/admin/surveys/[id]/operations/
+├── overview                  # slice 1 — 응답 현황
+├── profiles                  # slice 2 — 응답자 목록
+├── contacts                  # slice 3 — 컨택리스트
+├── contacts/upload           # slice 3 — 업로드 이력
+├── contacts/upload/new       # slice 3 — 엑셀 업로드 마법사
+└── contacts/columns          # slice 3 — 컬럼 스킴 편집
+```
+
+응답 페이지: `/survey/[id]?invite=<uuid>` 진입 시 inviteToken → contact_targets lookup → survey_responses.contactTargetId 매칭. 토큰 무효 시 amber alert + 익명 응답 폴백.
 
 ---
 

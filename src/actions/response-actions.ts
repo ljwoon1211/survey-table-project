@@ -6,11 +6,39 @@ import { headers } from 'next/headers';
 import { and, eq, sql } from 'drizzle-orm';
 
 import { db } from '@/db';
-import { NewSurveyResponse, questions, responseAnswers, surveyResponses } from '@/db/schema';
+import {
+  contactTargets,
+  NewSurveyResponse,
+  questions,
+  responseAnswers,
+  surveyResponses,
+} from '@/db/schema';
 import type { PageVisit } from '@/db/schema/schema-types';
 import { requireAuth } from '@/lib/auth';
 import { parseBrowser, parsePlatform } from '@/lib/operations/parse-ua';
 import { normalizeToAnswers } from '@/lib/response-normalizer';
+
+// ========================
+// 컨택 매칭 helper
+// ========================
+
+/**
+ * inviteToken 으로 컨택 lookup. 무효 토큰이면 null 반환 (silent fallback).
+ * 액션은 mutation 흐름이라 dedupe 가 의미 없어 cache 적용 안 함.
+ */
+async function findContactByInviteToken(
+  surveyId: string,
+  inviteToken: string,
+): Promise<{ id: string } | null> {
+  const rows = await db
+    .select({ id: contactTargets.id })
+    .from(contactTargets)
+    .where(
+      and(eq(contactTargets.surveyId, surveyId), eq(contactTargets.inviteToken, inviteToken)),
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
 
 // ========================
 // 응답 변경 액션 (Mutations)
@@ -88,8 +116,9 @@ export async function createResponseWithFirstAnswer(input: {
   questionId: string;
   value: unknown;
   currentStepId: string;
-}): Promise<{ id: string }> {
-  const { surveyId, sessionId, versionId, questionId, value, currentStepId } = input;
+  inviteToken?: string;
+}): Promise<{ id: string; contactTargetId: string | null }> {
+  const { surveyId, sessionId, versionId, questionId, value, currentStepId, inviteToken } = input;
 
   // UA + IP (Next 15+ 비동기 headers API)
   const headerStore = await headers();
@@ -101,6 +130,13 @@ export async function createResponseWithFirstAnswer(input: {
     headerStore.get('x-forwarded-for'),
     headerStore.get('x-real-ip'),
   );
+
+  // 컨택 매칭: inviteToken 이 있고 유효하면 contactTargetId 세팅. 무효 토큰은 silent fallback (null).
+  let contactTargetId: string | null = null;
+  if (inviteToken) {
+    const target = await findContactByInviteToken(surveyId, inviteToken);
+    contactTargetId = target?.id ?? null;
+  }
 
   const firstVisit: PageVisit = {
     stepId: currentStepId,
@@ -121,6 +157,7 @@ export async function createResponseWithFirstAnswer(input: {
     browser,
     currentStepId,
     pageVisits: [firstVisit],
+    contactTargetId,
   };
 
   // ON CONFLICT DO NOTHING: 동시 INSERT 시 한 쪽만 행을 만들고 다른 쪽은 빈 결과 반환.
@@ -131,15 +168,15 @@ export async function createResponseWithFirstAnswer(input: {
     .onConflictDoNothing({
       target: [surveyResponses.surveyId, surveyResponses.sessionId],
     })
-    .returning({ id: surveyResponses.id });
+    .returning({ id: surveyResponses.id, contactTargetId: surveyResponses.contactTargetId });
 
   if (inserted.length > 0) {
-    return { id: inserted[0].id };
+    return { id: inserted[0].id, contactTargetId: inserted[0].contactTargetId };
   }
 
   // 충돌 → 기존 행에 답변 머지. UNIQUE 제약이 있으므로 존재가 보장된다.
   const [existing] = await db
-    .select({ id: surveyResponses.id })
+    .select({ id: surveyResponses.id, contactTargetId: surveyResponses.contactTargetId })
     .from(surveyResponses)
     .where(
       and(eq(surveyResponses.surveyId, surveyId), eq(surveyResponses.sessionId, sessionId)),
@@ -153,7 +190,7 @@ export async function createResponseWithFirstAnswer(input: {
   }
 
   await updateQuestionResponse(existing.id, questionId, value);
-  return { id: existing.id };
+  return { id: existing.id, contactTargetId: existing.contactTargetId };
 }
 
 /**
@@ -235,12 +272,58 @@ export async function recordStepVisit(input: {
 export async function resumeOrCreateResponse(input: {
   surveyId: string;
   sessionId: string;
+  inviteToken?: string;
 }): Promise<{
   id: string;
   status: 'in_progress' | 'completed' | 'screened_out' | 'quotaful_out' | 'bad' | 'drop';
   resumed: boolean;
 } | null> {
-  const { surveyId, sessionId } = input;
+  const { surveyId, sessionId, inviteToken } = input;
+
+  // 컨택 매칭 우선순위: 유효한 inviteToken 이 있으면 같은 컨택의 in_progress 응답 우선 resume.
+  // - 유효 토큰 + in_progress 행 존재 → 그 행 resume (sessionId 무시)
+  // - 유효 토큰 + in_progress 행 없음 → null (호출자가 새 응답 생성)
+  // - 무효 토큰 → silent fallback, 일반 sessionId 흐름 진행
+  if (inviteToken) {
+    const target = await findContactByInviteToken(surveyId, inviteToken);
+    if (target) {
+      const [existingByContact] = await db
+        .select({
+          id: surveyResponses.id,
+          status: surveyResponses.status,
+        })
+        .from(surveyResponses)
+        .where(
+          and(
+            eq(surveyResponses.contactTargetId, target.id),
+            eq(surveyResponses.isCompleted, false),
+          ),
+        )
+        .limit(1);
+
+      if (existingByContact) {
+        const now = new Date();
+        if (existingByContact.status === 'drop') {
+          await db
+            .update(surveyResponses)
+            .set({ status: 'in_progress', lastActivityAt: now })
+            .where(eq(surveyResponses.id, existingByContact.id));
+          return { id: existingByContact.id, status: 'in_progress', resumed: true };
+        }
+        if (existingByContact.status === 'in_progress') {
+          await db
+            .update(surveyResponses)
+            .set({ lastActivityAt: now })
+            .where(eq(surveyResponses.id, existingByContact.id));
+          return { id: existingByContact.id, status: 'in_progress', resumed: false };
+        }
+        // isCompleted=false 인데 in_progress/drop 도 아닌 알 수 없는 status → fallback
+      }
+      // 유효 토큰이지만 매칭되는 in_progress 응답 없음 → 새 응답 흐름
+      return null;
+    }
+    // 토큰 무효 → 일반 sessionId 흐름 fallback
+  }
 
   const [existing] = await db
     .select({
@@ -363,6 +446,27 @@ export async function completeResponse(
 
     return updated;
   });
+
+  // 컨택 매칭 후처리: 트랜잭션 외부에서 best-effort UPDATE.
+  // 실패하더라도 응답 완료 자체는 성공으로 처리한다 (응답 완료 우선).
+  if (result?.contactTargetId) {
+    try {
+      const completedAt = new Date();
+      await db
+        .update(contactTargets)
+        .set({
+          respondedAt: completedAt,
+          responseId: result.id,
+          updatedAt: completedAt,
+        })
+        .where(eq(contactTargets.id, result.contactTargetId));
+    } catch (err) {
+      console.error(
+        `[completeResponse] contact_targets UPDATE 실패 — 응답 완료는 성공 (responseId=${result.id}, contactTargetId=${result.contactTargetId})`,
+        err,
+      );
+    }
+  }
 
   revalidatePath('/analytics');
   return result;

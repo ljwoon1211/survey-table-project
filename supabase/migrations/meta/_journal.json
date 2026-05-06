@@ -99,6 +99,27 @@
       "when": 1778030126788,
       "tag": "0013_unique_survey_session",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1778500000000,
+      "tag": "0014_add_contacts_and_invite",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1778500000001,
+      "tag": "0015_contacts_polish",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1778600000000,
+      "tag": "0016_contacts_detail",
+      "breakpoints": true
     }
   ]
 }

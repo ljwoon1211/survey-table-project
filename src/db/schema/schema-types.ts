@@ -245,3 +245,114 @@ export interface QuestionData {
   displayCondition?: QuestionConditionGroup;
   rankingConfig?: RankingConfig;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 컨택 (contact_targets·contact_uploads) 관련 JSONB 타입
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** surveys.contact_columns — 컨택리스트 표시 컬럼 스킴 (메타데이터) */
+export interface ContactColumnScheme {
+  version: number;
+  /** 엑셀 헤더 행 (1-based, 디폴트 1) */
+  headerRow: number;
+  columns: ContactColumnDef[];
+}
+
+export interface ContactColumnDef {
+  /** attrs 의 키 또는 system 식별자 */
+  key: string;
+  /** 표 헤더 라벨 (사용자 편집 가능) */
+  label: string;
+  source:
+    | `attrs.${string}`
+    | 'system.resid'
+    | 'system.contact_result'
+    | 'system.email_count'
+    | 'system.web'
+    | 'system.contact_owner';
+  order: number;
+  /** 숨김 (운영 컬럼 일부는 hide 불가 — UI 가드) */
+  hidden?: boolean;
+}
+
+/** contact_uploads.mapping — 엑셀 업로드 매핑 결과 (시나리오 B 단순화) */
+export interface ContactUploadMapping {
+  /** 시스템 필드 → 엑셀 0-based 컬럼 인덱스. group 만 필수. */
+  systemFields: {
+    group: number;
+    email?: number;
+    biz?: number;
+    name?: number;
+    company?: number;
+    phone?: number;
+  };
+  /** 사용자가 컨택리스트에 표시하기로 토글한 attrs 키 (헤더명) 목록. 나머지는 hidden 으로 자동 등록. */
+  selectedAttrsKeys: string[];
+  /** 자동 감지된 시스템 필드 (UI 표시용 — 사용자가 수동 조정 가능). */
+  autoDetected?: {
+    email?: number;
+    biz?: number;
+    phone?: number;
+    group?: number;
+  };
+  /** 1-based, 디폴트 1 */
+  headerRow: number;
+  /** 사용자가 선택한 시트 이름 (디폴트 첫 시트) */
+  sheetName: string;
+  /**
+   * @deprecated 시나리오 B 에서 머지 제거 — backward compat 용 optional.
+   * 본 슬라이스 후속에서는 무시됨.
+   */
+  mergeKey?: 'email+biz' | 'email' | 'biz';
+  /**
+   * @deprecated 시나리오 B 에서 머지 제거 — backward compat 용 optional.
+   */
+  mergeKeyPolicy?: 'either' | 'both';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 컨택 단건 편집 (slice 3 detail page) 타입
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ContactMethod = 'email' | 'sms' | 'visit' | 'mail';
+
+export const CONTACT_METHOD_LABEL: Record<ContactMethod, string> = {
+  email: '이메일',
+  sms: '문자',
+  visit: '방문',
+  mail: '우편',
+};
+
+/** 결과코드 1개 정의 — surveys.contact_result_codes JSONB 안의 항목 */
+export interface ContactResultCode {
+  /** UI 표시 코드 (예: '1.조사완료'). 사용자 자유 텍스트. */
+  code: string;
+  /** UI 라벨 (코드와 동일하게 두는 게 일반적) */
+  label: string;
+  /** 정렬 순서 */
+  order: number;
+  /**
+   * pill 색상 톤. mockup 의 컨택결과 이력 표 색상 매칭용.
+   */
+  tone?: 'green' | 'amber' | 'rose' | 'blue' | 'slate';
+}
+
+/**
+ * surveys.contact_result_codes 가 NULL 일 때 사용되는 디폴트 13개.
+ * mockup §6 의 결과코드 라디오 그대로.
+ */
+export const DEFAULT_RESULT_CODES: ContactResultCode[] = [
+  { code: '1.조사완료',     label: '1.조사완료',     order: 1,  tone: 'green' },
+  { code: '2.재통화예약',   label: '2.재통화예약',   order: 2,  tone: 'blue' },
+  { code: '3.비수신',       label: '3.비수신',       order: 3,  tone: 'slate' },
+  { code: '4.부재',         label: '4.부재',         order: 4,  tone: 'slate' },
+  { code: '5.출장',         label: '5.출장',         order: 5,  tone: 'slate' },
+  { code: '6.거절',         label: '6.거절',         order: 6,  tone: 'rose' },
+  { code: '7.결번·번호오류', label: '7.결번·번호오류', order: 7,  tone: 'rose' },
+  { code: '8.중복',         label: '8.중복',         order: 8,  tone: 'slate' },
+  { code: '9.전시회미참가', label: '9.전시회미참가', order: 9,  tone: 'slate' },
+  { code: '10.메일발송',    label: '10.메일발송',    order: 10, tone: 'blue' },
+  { code: '11.기타',        label: '11.기타',        order: 11, tone: 'amber' },
+  { code: '12.담당자퇴사',  label: '12.담당자퇴사',  order: 12, tone: 'rose' },
+  { code: '수신거부',       label: '수신거부',       order: 13, tone: 'rose' },
+];

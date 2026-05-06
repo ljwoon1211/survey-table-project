@@ -2,6 +2,8 @@ import { relations } from 'drizzle-orm';
 import { boolean, integer, jsonb, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 
 import type {
+  ContactColumnScheme,
+  ContactResultCode,
   DynamicRowGroupConfig,
   HeaderCell,
   PageVisit,
@@ -34,6 +36,12 @@ export const surveys = pgTable('surveys', {
   endDate: timestamp('end_date', { withTimezone: true }),
   maxResponses: integer('max_responses'),
   thankYouMessage: text('thank_you_message').default('응답해주셔서 감사합니다!').notNull(),
+
+  // 컨택리스트 표시 컬럼 스킴 (slice 3 — 0014 마이그레이션)
+  contactColumns: jsonb('contact_columns').$type<ContactColumnScheme>(),
+
+  // 결과코드 사용자 정의 (NULL = DEFAULT_RESULT_CODES 폴백, slice 3 — 0016 마이그레이션)
+  contactResultCodes: jsonb('contact_result_codes').$type<ContactResultCode[]>(),
 
   // 버전 관리
   status: text('status').notNull().default('draft'), // 'draft' | 'published' | 'closed'
@@ -168,6 +176,11 @@ export const surveyResponses = pgTable('survey_responses', {
   pageVisits: jsonb('page_visits').default([]).$type<PageVisit[]>(),
   lastActivityAt: timestamp('last_activity_at', { withTimezone: true }).defaultNow().notNull(),
   totalSeconds: integer('total_seconds'),
+
+  // 컨택 매칭 (slice 3 — 0014 마이그레이션)
+  // FK 는 0014 마이그레이션의 ALTER TABLE 로 생성됨 (순환 참조 회피).
+  // drizzle 에서 .references() 추가하지 말 것 — contacts.ts 와 순환 import 발생.
+  contactTargetId: uuid('contact_target_id'),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({
