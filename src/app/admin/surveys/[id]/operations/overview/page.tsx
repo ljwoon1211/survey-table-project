@@ -81,17 +81,14 @@ export default async function OperationsOverviewPage({
   const weekOffset = Math.max(0, parseInt(weekOffsetStr ?? '0', 10) || 0);
   const dwellOffset = Math.max(0, parseInt(dwellOffsetStr ?? '0', 10) || 0);
 
-  // 설문 존재 확인은 layout 이 처리. hour 모드 일자만 결정한다.
-  // 1) 쿼리에 `date` 가 있으면 그 값 사용
-  // 2) 없으면 응답이 존재하는 가장 최근 일자
-  // 3) 응답 자체가 없으면 KST 오늘 (어댑터가 throw 하지 않도록)
+  // hour 모드 진입 시 date 미지정이면 응답이 있는 가장 최근 일자, 응답 자체가 없으면 KST 오늘로
+  // fallback. 어댑터가 effectiveDate 없는 hour 모드에서 throw 하지 않도록 보장.
   const availableDates = await aggregateDailyAvailableDates(surveyId);
   const latestAvailable =
     availableDates.length > 0 ? availableDates[availableDates.length - 1] : undefined;
   const effectiveDate =
     mode === 'hour' ? (date ?? latestAvailable ?? todayKst()) : undefined;
 
-  // ── 6개 어댑터 병렬 호출 ──
   const [statusCounts, dailyBuckets, dailyStats, responseTime, dropFunnel, pageDwell] =
     await Promise.all([
       aggregateStatus(surveyId),

@@ -27,12 +27,6 @@ interface OperationsTabStripProps {
 export function OperationsTabStrip({ surveyId }: OperationsTabStripProps) {
   const pathname = usePathname() ?? '';
   const operationsBase = `/admin/surveys/${surveyId}/operations`;
-  const isOperations = pathname.startsWith(operationsBase);
-
-  if (!isOperations) {
-    return null;
-  }
-
   const overviewHref = `${operationsBase}/overview`;
   const profilesHref = `${operationsBase}/profiles`;
   const isOverviewActive = pathname.startsWith(overviewHref);

@@ -8,22 +8,15 @@ import { surveyResponses } from '@/db/schema';
 import type { Platform } from './parse-ua';
 import {
   formatIpMask,
-  type QField,
+  type NormalizedListArgs,
   type SortDir,
   type SortKey,
-  type StatusFilter,
 } from './profiles';
 
-export interface ListProfilesArgs {
+export type ListProfilesArgs = NormalizedListArgs & {
   surveyId: string;
-  page: number;
   pageSize: number;
-  q: string;
-  qfield: QField;
-  status: StatusFilter;
-  sort: SortKey;
-  dir: SortDir;
-}
+};
 
 export interface ProfilesRow {
   id: string;
@@ -109,7 +102,6 @@ export async function listResponsesForProfiles(
   if (trimmed.length > 0) {
     if (qfield === 'idx') {
       const n = parseInt(trimmed, 10);
-      // 숫자 변환 실패 → 매칭 없음
       whereParts.push(Number.isFinite(n) && n > 0 ? sql`${numbered.idx} = ${n}` : sql`false`);
     } else {
       const escaped = trimmed
@@ -132,12 +124,7 @@ export async function listResponsesForProfiles(
     }
   }
 
-  const whereClause =
-    whereParts.length === 0
-      ? undefined
-      : whereParts.length === 1
-        ? whereParts[0]
-        : and(...whereParts);
+  const whereClause = whereParts.length > 0 ? and(...whereParts) : undefined;
 
   const countQuery = db.select({ total: sql<number>`count(*)::int` }).from(numbered);
   const [countRow] = await (whereClause ? countQuery.where(whereClause) : countQuery);

@@ -50,6 +50,15 @@ export function pickFromWhitelist<T extends string>(
   return (whitelist as readonly string[]).includes(value ?? '') ? (value as T) : fallback;
 }
 
+export interface NormalizedListArgs {
+  page: number;
+  q: string;
+  qfield: QField;
+  status: StatusFilter;
+  sort: SortKey;
+  dir: SortDir;
+}
+
 /** `searchParams` 의 가공되지 않은 string 입력을 화이트리스트 + 기본값으로 normalize. */
 export function normalizeListArgs(input: {
   page?: string;
@@ -58,14 +67,7 @@ export function normalizeListArgs(input: {
   status?: string;
   sort?: string;
   dir?: string;
-}): {
-  page: number;
-  q: string;
-  qfield: QField;
-  status: StatusFilter;
-  sort: SortKey;
-  dir: SortDir;
-} {
+}): NormalizedListArgs {
   return {
     page: Math.max(1, parseInt(input.page ?? '1', 10) || 1),
     q: (input.q ?? '').slice(0, 200),

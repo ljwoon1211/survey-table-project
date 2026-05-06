@@ -147,7 +147,9 @@ export async function createResponseWithFirstAnswer(input: {
     .limit(1);
 
   if (!existing) {
-    throw new Error('createResponseWithFirstAnswer: 충돌 후 기존 행 조회 실패');
+    throw new Error(
+      `createResponseWithFirstAnswer: 충돌 후 기존 행 조회 실패 (surveyId=${surveyId}, sessionId=${sessionId})`,
+    );
   }
 
   await updateQuestionResponse(existing.id, questionId, value);

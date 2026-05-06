@@ -34,13 +34,9 @@ interface PageProps {
 /**
  * 운영 콘솔 응답자 목록 페이지.
  *
- * - 서버 페이지네이션 + URL state 동기화
- * - questions 메타는 진척률(N/M·Qx) 계산에만 사용 → id/order/title 만 가져온다
- * - rows 0건 분기:
- *     · 검색·필터가 걸려 있으면 ProfilesTable 내부의 EmptyState ("검색 결과가 없습니다")
- *     · 필터 없는데도 0건이면 페이지 단의 "아직 응답이 없습니다"
- *
- * 헤더(목록으로 + 제목 + 새로고침/편집)와 탭 strip 은 상위 layout 이 담당.
+ * 서버 페이지네이션 + URL state 동기화. 0건 케이스 분기:
+ *  - 필터 활성 → ProfilesTable 의 "검색 결과가 없습니다" EmptyState
+ *  - 필터 없는데도 0건 → 페이지 단의 "아직 응답이 없습니다"
  */
 export default async function ProfilesPage({ params, searchParams }: PageProps) {
   const { id: surveyId } = await params;
