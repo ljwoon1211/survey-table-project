@@ -113,6 +113,13 @@
       "when": 1778500000001,
       "tag": "0015_contacts_polish",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1778600000000,
+      "tag": "0016_contacts_detail",
+      "breakpoints": true
     }
   ]
 }
