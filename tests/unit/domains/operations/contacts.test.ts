@@ -114,8 +114,8 @@ describe('whitelist exports', () => {
     expect(CONTACTS_SORT_KEYS).toContain('resid');
     expect(CONTACTS_SORT_KEYS).toContain('respondedAt');
   });
-  it('CONTACTS_PAGE_SIZE = 50', () => {
-    expect(CONTACTS_PAGE_SIZE).toBe(50);
+  it('CONTACTS_PAGE_SIZE = 20', () => {
+    expect(CONTACTS_PAGE_SIZE).toBe(20);
   });
   it('CONTACTS_QFIELDS contains all/resid/email/group', () => {
     expect(CONTACTS_QFIELDS).toEqual(expect.arrayContaining(['all', 'resid', 'email', 'group']));

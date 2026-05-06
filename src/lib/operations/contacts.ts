@@ -24,7 +24,7 @@ export type ContactsQField = (typeof CONTACTS_QFIELDS)[number];
 /** 결과코드 enum 은 후속 슬라이스에서 정의. 본 슬라이스는 자유 텍스트. */
 export type ContactsResultCodeFilter = 'all' | string;
 
-export const CONTACTS_PAGE_SIZE = 50;
+export const CONTACTS_PAGE_SIZE = 20;
 
 export interface NormalizedContactListArgs {
   page: number;
