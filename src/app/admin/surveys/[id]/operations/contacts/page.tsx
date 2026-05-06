@@ -126,6 +126,8 @@ export default async function ContactsPage({ params, searchParams }: PageProps) 
               pageSize={CONTACTS_PAGE_SIZE}
               scheme={scheme}
               surveyId={surveyId}
+              sort={args.sort}
+              dir={args.dir}
               systemFieldKeys={extractSystemFieldKeys(scheme)}
             />
           )}

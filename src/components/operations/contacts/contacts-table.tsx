@@ -3,10 +3,10 @@
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { TablePagerFooter } from '@/components/operations/table-primitives';
+import { SortIndicator, TablePagerFooter } from '@/components/operations/table-primitives';
 import type { ContactColumnDef, ContactColumnScheme } from '@/db/schema/schema-types';
 import { useSearchParamsMutator } from '@/hooks/use-search-params-mutator';
-import { attrsKeyOf } from '@/lib/operations/contacts';
+import { attrsKeyOf, type ContactsSortDir, type ContactsSortKey } from '@/lib/operations/contacts';
 import type { ContactsRow } from '@/lib/operations/contacts.server';
 
 interface ContactsTableProps {
@@ -16,8 +16,25 @@ interface ContactsTableProps {
   pageSize: number;
   scheme: ContactColumnScheme;
   surveyId: string;
+  /** 현재 활성 sort key (URL searchParams) */
+  sort: ContactsSortKey;
+  /** 현재 정렬 방향 */
+  dir: ContactsSortDir;
   /** 행 클릭 시 호출 — 편집 모달 트리거 */
   onRowClick?: (row: ContactsRow) => void;
+}
+
+/** ContactColumnDef.source → sort key 매핑. system.* 중 정렬 가능한 것만 매핑. */
+function sortKeyOf(source: string): ContactsSortKey | null {
+  if (source.startsWith('attrs.')) return source as ContactsSortKey;
+  switch (source) {
+    case 'system.resid':
+      return 'resid';
+    case 'system.web':
+      return 'respondedAt';
+    default:
+      return null;
+  }
 }
 
 const dateShort = new Intl.DateTimeFormat('ko-KR', {
@@ -44,6 +61,8 @@ export function ContactsTable({
   pageSize,
   scheme,
   surveyId,
+  sort,
+  dir,
   onRowClick,
 }: ContactsTableProps) {
   const pushParams = useSearchParamsMutator();
@@ -128,20 +147,54 @@ export function ContactsTable({
     });
   };
 
+  /**
+   * 컬럼 헤더 클릭 — sort/dir 토글.
+   * 다른 컬럼 클릭 → 새 sort, dir=asc.
+   * 같은 컬럼 재클릭 → dir 토글 (asc ↔ desc).
+   */
+  function toggleSort(key: ContactsSortKey) {
+    pushParams((p) => {
+      p.delete('page');
+      if (sort === key) {
+        const nextDir = dir === 'asc' ? 'desc' : 'asc';
+        if (nextDir === 'asc') p.delete('dir');
+        else p.set('dir', 'desc');
+      } else {
+        p.set('sort', key);
+        p.delete('dir');
+      }
+    });
+  }
+
   return (
     <div>
       <div className="overflow-x-auto rounded border">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-600">
             <tr>
-              {visibleColumns.map((col) => (
-                <th
-                  key={col.key}
-                  className="border-b px-3 py-2 text-left whitespace-nowrap"
-                >
-                  {col.label}
-                </th>
-              ))}
+              {visibleColumns.map((col) => {
+                const sortKey = sortKeyOf(col.source);
+                const isActive = sortKey != null && sortKey === sort;
+                return (
+                  <th
+                    key={col.key}
+                    className="border-b px-3 py-2 text-left whitespace-nowrap"
+                  >
+                    {sortKey ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleSort(sortKey)}
+                        className="inline-flex items-center gap-1 hover:text-slate-900"
+                      >
+                        {col.label}
+                        <SortIndicator direction={isActive ? dir : false} />
+                      </button>
+                    ) : (
+                      col.label
+                    )}
+                  </th>
+                );
+              })}
               <th className="border-b px-3 py-2 text-right">초대링크</th>
             </tr>
           </thead>

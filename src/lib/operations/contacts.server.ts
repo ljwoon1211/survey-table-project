@@ -8,6 +8,7 @@ import { contactTargets, contactUploads, surveys } from '@/db/schema';
 import type { ContactColumnScheme } from '@/db/schema/schema-types';
 
 import {
+  attrsSortKey,
   maskBizNumber,
   maskEmail,
   type ContactsSortDir,
@@ -130,16 +131,19 @@ export async function listContactsForSurvey(
   const clampedPage = Math.min(Math.max(1, page), totalPages);
   const offset = (clampedPage - 1) * pageSize;
 
-  // 정렬 컬럼
-  const SORT_MAP: Record<ContactsSortKey, AnyColumn | SQL> = {
+  // 정렬 컬럼 — 시스템 키는 fixed 매핑, attrs.<key> 는 JSONB 추출
+  const SYSTEM_SORT_MAP = {
     resid: contactTargets.resid,
     respondedAt: contactTargets.respondedAt,
     createdAt: contactTargets.createdAt,
     email: contactTargets.email,
     group: contactTargets.groupValue,
-  };
+  } as const;
 
-  const orderCol = SORT_MAP[sort];
+  const attrsKey = attrsSortKey(sort);
+  const orderCol: AnyColumn | SQL = attrsKey
+    ? sql`${contactTargets.attrs} ->> ${attrsKey}`
+    : SYSTEM_SORT_MAP[sort as keyof typeof SYSTEM_SORT_MAP];
 
   const dataRows = await db
     .select({

@@ -7,6 +7,10 @@
  * 단위 테스트: tests/unit/domains/operations/contacts.test.ts.
  */
 
+/**
+ * 사전 정의된 시스템 정렬 키. attrs.* 정렬은 별도로 `attrs.<key>` 형태로 받음
+ * (`isAttrsSortKey` / `attrsSortKey` helper).
+ */
 export const CONTACTS_SORT_KEYS = [
   'resid',
   'respondedAt',
@@ -14,9 +18,21 @@ export const CONTACTS_SORT_KEYS = [
   'email',
   'group',
 ] as const;
-export type ContactsSortKey = (typeof CONTACTS_SORT_KEYS)[number];
+export type ContactsSystemSortKey = (typeof CONTACTS_SORT_KEYS)[number];
+
+/** 시스템 키 또는 'attrs.<header>' 형식. */
+export type ContactsSortKey = ContactsSystemSortKey | `attrs.${string}`;
 
 export type ContactsSortDir = 'asc' | 'desc';
+
+export function isAttrsSortKey(sort: string): sort is `attrs.${string}` {
+  return sort.startsWith('attrs.');
+}
+
+/** 'attrs.<key>' → '<key>'. attrs 가 아니면 null. */
+export function attrsSortKey(sort: string): string | null {
+  return isAttrsSortKey(sort) ? sort.slice('attrs.'.length) : null;
+}
 
 export const CONTACTS_QFIELDS = ['all', 'resid', 'email', 'group', 'biz'] as const;
 export type ContactsQField = (typeof CONTACTS_QFIELDS)[number];
@@ -43,6 +59,16 @@ function pickFromWhitelist<T extends string>(
   return (whitelist as readonly string[]).includes(value ?? '') ? (value as T) : fallback;
 }
 
+/**
+ * sort 파라미터 normalize — 시스템 키 화이트리스트 OR 'attrs.<key>' 형식.
+ * attrs 키는 길이 200 이내 + DB 안전성은 server adapter 가 책임 (drizzle SQL placeholder).
+ */
+function normalizeSortKey(value: string | undefined): ContactsSortKey {
+  if (!value) return 'resid';
+  if (isAttrsSortKey(value) && value.length <= 200) return value;
+  return (CONTACTS_SORT_KEYS as readonly string[]).includes(value) ? (value as ContactsSortKey) : 'resid';
+}
+
 export function normalizeContactListArgs(input: {
   page?: string;
   q?: string;
@@ -56,7 +82,7 @@ export function normalizeContactListArgs(input: {
     q: (input.q ?? '').slice(0, 200),
     qfield: pickFromWhitelist(input.qfield, CONTACTS_QFIELDS, 'all'),
     resultCode: input.resultCode && input.resultCode !== '' ? input.resultCode : 'all',
-    sort: pickFromWhitelist(input.sort, CONTACTS_SORT_KEYS, 'resid'),
+    sort: normalizeSortKey(input.sort),
     // 컨택리스트는 resid 오름차순이 기본 (profiles 의 desc 와 의도적으로 다름)
     dir: input.dir === 'desc' ? 'desc' : 'asc',
   };
