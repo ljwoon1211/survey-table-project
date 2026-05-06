@@ -1,8 +1,5 @@
 'use client';
 
-import { useState } from 'react';
-
-import { Button } from '@/components/ui/button';
 import { SortIndicator, TablePagerFooter } from '@/components/operations/table-primitives';
 import type { ContactColumnDef, ContactColumnScheme } from '@/db/schema/schema-types';
 import { useSearchParamsMutator } from '@/hooks/use-search-params-mutator';
@@ -66,7 +63,6 @@ export function ContactsTable({
   onRowClick,
 }: ContactsTableProps) {
   const pushParams = useSearchParamsMutator();
-  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -133,13 +129,6 @@ export function ContactsTable({
     }
   }
 
-  function copyInviteLink(row: ContactsRow) {
-    const url = `${window.location.origin}/survey/${surveyId}?invite=${row.inviteToken}`;
-    navigator.clipboard.writeText(url);
-    setCopiedId(row.id);
-    setTimeout(() => setCopiedId(null), 1500);
-  }
-
   const handlePageChange = (newPage: number) => {
     pushParams((p) => {
       if (newPage <= 1) p.delete('page');
@@ -195,7 +184,6 @@ export function ContactsTable({
                   </th>
                 );
               })}
-              <th className="border-b px-3 py-2 text-right">초대링크</th>
             </tr>
           </thead>
           <tbody>
@@ -216,20 +204,6 @@ export function ContactsTable({
                       {renderCell(col, row)}
                     </td>
                   ))}
-                  <td
-                    className={`px-3 py-2 text-right ${responded ? 'border-t border-blue-100' : ''}`}
-                  >
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        copyInviteLink(row);
-                      }}
-                    >
-                      {copiedId === row.id ? '복사됨!' : '복사'}
-                    </Button>
-                  </td>
                 </tr>
               );
             })}
