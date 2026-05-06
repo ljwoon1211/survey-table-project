@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 
 import { addContactAttempt } from '@/actions/contact-actions';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,15 @@ export function ContactAttemptAddCard({
   const [resultCode, setResultCode] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // M2: 성공 메시지 2초 후 자동 fade
+  useEffect(() => {
+    if (!successMessage) return;
+    const t = setTimeout(() => setSuccessMessage(null), 2000);
+    return () => clearTimeout(t);
+  }, [successMessage]);
 
   function add() {
     if (!resultCode) {
@@ -38,6 +46,7 @@ export function ContactAttemptAddCard({
         });
         setResultCode(null);
         setNote('');
+        setSuccessMessage('회차 추가 완료');
       } catch (e) {
         setError((e as Error).message);
       }
@@ -53,6 +62,14 @@ export function ContactAttemptAddCard({
         {error && (
           <div role="alert" className="mb-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
             {error}
+          </div>
+        )}
+        {successMessage && (
+          <div
+            role="status"
+            className="mb-2 rounded border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700"
+          >
+            {successMessage}
           </div>
         )}
 

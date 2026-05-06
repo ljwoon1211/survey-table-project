@@ -1,6 +1,6 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 
 import { deleteContactAttempt } from '@/actions/contact-actions';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,14 @@ export function ContactAttemptHistoryCard({
   resultCodes,
 }: ContactAttemptHistoryCardProps) {
   const [isPending, startTransition] = useTransition();
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // M2: 성공 메시지 2초 후 자동 fade
+  useEffect(() => {
+    if (!successMessage) return;
+    const t = setTimeout(() => setSuccessMessage(null), 2000);
+    return () => clearTimeout(t);
+  }, [successMessage]);
 
   const codeLookup = new Map(resultCodes.map((c) => [c.code, c]));
 
@@ -44,6 +52,7 @@ export function ContactAttemptHistoryCard({
     startTransition(async () => {
       try {
         await deleteContactAttempt(surveyId, contactTargetId, id);
+        setSuccessMessage('회차 삭제 완료');
       } catch (e) {
         window.alert((e as Error).message);
       }
@@ -56,6 +65,14 @@ export function ContactAttemptHistoryCard({
         <h3 className="text-base font-semibold">컨택결과 (최근순)</h3>
         <span className="text-xs text-slate-400">{attempts.length}건</span>
       </div>
+      {successMessage && (
+        <div
+          role="status"
+          className="mx-5 mt-3 rounded border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700"
+        >
+          {successMessage}
+        </div>
+      )}
       <div>
         {attempts.length === 0 ? (
           <div className="px-5 py-6 text-center text-sm text-slate-400">아직 회차 기록이 없습니다.</div>

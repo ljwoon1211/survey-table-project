@@ -55,7 +55,15 @@ export function ContactDetailForm({
   );
   const [localScheme, setLocalScheme] = useState<ContactColumnScheme>(scheme);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // M2: 성공 메시지 2초 후 자동 fade
+  useEffect(() => {
+    if (!successMessage) return;
+    const t = setTimeout(() => setSuccessMessage(null), 2000);
+    return () => clearTimeout(t);
+  }, [successMessage]);
 
   const initialAttrs = useMemo(() => initial?.attrs ?? {}, [initial]);
   const initialMemo = initial?.memo ?? null;
@@ -157,6 +165,7 @@ export function ContactDetailForm({
         }
         // 저장 성공 → dirty reset (initial 동기화 효과를 위해 router.refresh)
         router.refresh();
+        setSuccessMessage('저장 완료');
       } catch (e) {
         setError((e as Error).message);
       }
@@ -187,6 +196,14 @@ export function ContactDetailForm({
       {error && (
         <div role="alert" className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
+        </div>
+      )}
+      {successMessage && (
+        <div
+          role="status"
+          className="rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700"
+        >
+          {successMessage}
         </div>
       )}
 
