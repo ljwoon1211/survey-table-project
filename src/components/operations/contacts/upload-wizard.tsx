@@ -89,6 +89,7 @@ export function UploadWizard({ surveyId }: UploadWizardProps) {
           },
           mergeKey: mapping.mergeKey,
           mergeKeyPolicy: mapping.mergeKeyPolicy,
+          selectedAttrsKeys: [], // Task 5 에서 토글 UI 로 교체 예정
           headerRow,
           sheetName,
         };

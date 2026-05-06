@@ -275,7 +275,7 @@ export interface ContactColumnDef {
   hidden?: boolean;
 }
 
-/** contact_uploads.mapping — 엑셀 업로드 매핑 결과 */
+/** contact_uploads.mapping — 엑셀 업로드 매핑 결과 (시나리오 B 단순화) */
 export interface ContactUploadMapping {
   /** 시스템 필드 → 엑셀 0-based 컬럼 인덱스. group 만 필수. */
   systemFields: {
@@ -286,15 +286,26 @@ export interface ContactUploadMapping {
     company?: number;
     phone?: number;
   };
-  /**
-   * mergeKey 가 'email' 이면 systemFields.email, 'biz' 면 .biz, 'email+biz' 면 둘 다 필수.
-   * 본 타입에서는 강제하지 않음 — B3 ingest 에서 Zod 등으로 검증.
-   */
-  mergeKey: 'email+biz' | 'email' | 'biz';
-  /** 머지키 정책: 'either'=한쪽이라도 있으면 매칭, 'both'=둘다 필수 */
-  mergeKeyPolicy: 'either' | 'both';
+  /** 사용자가 컨택리스트에 표시하기로 토글한 attrs 키 (헤더명) 목록. 나머지는 hidden 으로 자동 등록. */
+  selectedAttrsKeys: string[];
+  /** 자동 감지된 시스템 필드 (UI 표시용 — 사용자가 수동 조정 가능). */
+  autoDetected?: {
+    email?: number;
+    biz?: number;
+    phone?: number;
+    group?: number;
+  };
   /** 1-based, 디폴트 1 */
   headerRow: number;
   /** 사용자가 선택한 시트 이름 (디폴트 첫 시트) */
   sheetName: string;
+  /**
+   * @deprecated 시나리오 B 에서 머지 제거 — backward compat 용 optional.
+   * 본 슬라이스 후속에서는 무시됨.
+   */
+  mergeKey?: 'email+biz' | 'email' | 'biz';
+  /**
+   * @deprecated 시나리오 B 에서 머지 제거 — backward compat 용 optional.
+   */
+  mergeKeyPolicy?: 'either' | 'both';
 }
