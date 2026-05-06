@@ -217,3 +217,115 @@ export const getContactColumnScheme = cache(
     return (row?.contactColumns as ContactColumnScheme | null) ?? null;
   },
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 컨택 단건 편집 (slice 3 detail page) — 0016 마이그레이션 활용
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { contactAttempts } from '@/db/schema';
+import {
+  CONTACT_METHOD_LABEL,
+  DEFAULT_RESULT_CODES,
+  type ContactMethod,
+  type ContactResultCode,
+} from '@/db/schema/schema-types';
+
+export interface ContactDetailRow {
+  id: string;
+  surveyId: string;
+  resid: number;
+  groupValue: string | null;
+  email: string | null;
+  bizNumber: string | null;
+  attrs: Record<string, string>;
+  memo: string | null;
+  contactMethod: ContactMethod | null;
+  inviteToken: string;
+  respondedAt: Date | null;
+  responseId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ContactAttemptRow {
+  id: string;
+  attemptNo: number;
+  resultCode: string;
+  note: string | null;
+  createdAt: Date;
+}
+
+export interface ContactDetailResult {
+  contact: ContactDetailRow;
+  attempts: ContactAttemptRow[];
+}
+
+/**
+ * 컨택 단건 편집 페이지용 — 컨택 본체 + 회차 이력 (최근순).
+ * 본인 survey 의 컨택만 조회 (surveyId guard 호출자가 책임).
+ */
+export async function getContactDetailById(
+  id: string,
+): Promise<ContactDetailResult | null> {
+  const [contact] = await db
+    .select({
+      id: contactTargets.id,
+      surveyId: contactTargets.surveyId,
+      resid: contactTargets.resid,
+      groupValue: contactTargets.groupValue,
+      email: contactTargets.email,
+      bizNumber: contactTargets.bizNumber,
+      attrs: contactTargets.attrs,
+      memo: contactTargets.memo,
+      contactMethod: contactTargets.contactMethod,
+      inviteToken: contactTargets.inviteToken,
+      respondedAt: contactTargets.respondedAt,
+      responseId: contactTargets.responseId,
+      createdAt: contactTargets.createdAt,
+      updatedAt: contactTargets.updatedAt,
+    })
+    .from(contactTargets)
+    .where(eq(contactTargets.id, id))
+    .limit(1);
+
+  if (!contact) return null;
+
+  const attempts = await db
+    .select({
+      id: contactAttempts.id,
+      attemptNo: contactAttempts.attemptNo,
+      resultCode: contactAttempts.resultCode,
+      note: contactAttempts.note,
+      createdAt: contactAttempts.createdAt,
+    })
+    .from(contactAttempts)
+    .where(eq(contactAttempts.contactTargetId, id))
+    .orderBy(desc(contactAttempts.attemptNo));
+
+  return {
+    contact: {
+      ...contact,
+      attrs: (contact.attrs ?? {}) as Record<string, string>,
+      contactMethod: contact.contactMethod as ContactMethod | null,
+    },
+    attempts,
+  };
+}
+
+/**
+ * 결과코드 조회 — surveys.contact_result_codes 가 NULL 이면 DEFAULT_RESULT_CODES 반환.
+ * RSC dedupe 위해 React.cache 적용.
+ */
+export const getContactResultCodes = cache(
+  async (surveyId: string): Promise<ContactResultCode[]> => {
+    const [row] = await db
+      .select({ codes: surveys.contactResultCodes })
+      .from(surveys)
+      .where(eq(surveys.id, surveyId))
+      .limit(1);
+    const codes = (row?.codes as ContactResultCode[] | null) ?? null;
+    return codes ?? DEFAULT_RESULT_CODES;
+  },
+);
+
+export { CONTACT_METHOD_LABEL };
