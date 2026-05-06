@@ -94,6 +94,17 @@ export const contactAttemptsRelations = relations(contactAttempts, ({ one }) => 
   }),
 }));
 
+// surveyResponses 의 reverse relation. 순환 import 회피 위해
+// surveys.ts 가 아닌 contacts.ts 에서 정의.
+// drizzle 은 같은 schema namespace 안의 relations 를 모두 머지하므로 OK.
+// (relations.js extractTablesRelationalConfig 가 relationName 키로 머지 — 검증 완료.)
+export const surveyResponsesContactRelations = relations(surveyResponses, ({ one }) => ({
+  contactTarget: one(contactTargets, {
+    fields: [surveyResponses.contactTargetId],
+    references: [contactTargets.id],
+  }),
+}));
+
 // 타입 export
 export type ContactUpload = typeof contactUploads.$inferSelect;
 export type NewContactUpload = typeof contactUploads.$inferInsert;

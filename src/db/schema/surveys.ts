@@ -174,6 +174,8 @@ export const surveyResponses = pgTable('survey_responses', {
   totalSeconds: integer('total_seconds'),
 
   // 컨택 매칭 (slice 3 — 0014 마이그레이션)
+  // FK 는 0014 마이그레이션의 ALTER TABLE 로 생성됨 (순환 참조 회피).
+  // drizzle 에서 .references() 추가하지 말 것 — contacts.ts 와 순환 import 발생.
   contactTargetId: uuid('contact_target_id'),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

@@ -263,11 +263,13 @@ export interface ContactColumnDef {
   key: string;
   /** 표 헤더 라벨 (사용자 편집 가능) */
   label: string;
-  /**
-   * 'attrs.<key>' | 'system.resid' | 'system.contact_result' |
-   * 'system.email_count' | 'system.web' | 'system.contact_owner'
-   */
-  source: string;
+  source:
+    | `attrs.${string}`
+    | 'system.resid'
+    | 'system.contact_result'
+    | 'system.email_count'
+    | 'system.web'
+    | 'system.contact_owner';
   order: number;
   /** 숨김 (운영 컬럼 일부는 hide 불가 — UI 가드) */
   hidden?: boolean;
@@ -284,6 +286,10 @@ export interface ContactUploadMapping {
     company?: number;
     phone?: number;
   };
+  /**
+   * mergeKey 가 'email' 이면 systemFields.email, 'biz' 면 .biz, 'email+biz' 면 둘 다 필수.
+   * 본 타입에서는 강제하지 않음 — B3 ingest 에서 Zod 등으로 검증.
+   */
   mergeKey: 'email+biz' | 'email' | 'biz';
   /** 머지키 정책: 'either'=한쪽이라도 있으면 매칭, 'both'=둘다 필수 */
   mergeKeyPolicy: 'either' | 'both';
