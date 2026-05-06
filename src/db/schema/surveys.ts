@@ -2,6 +2,7 @@ import { relations } from 'drizzle-orm';
 import { boolean, integer, jsonb, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 
 import type {
+  ContactColumnScheme,
   DynamicRowGroupConfig,
   HeaderCell,
   PageVisit,
@@ -34,6 +35,9 @@ export const surveys = pgTable('surveys', {
   endDate: timestamp('end_date', { withTimezone: true }),
   maxResponses: integer('max_responses'),
   thankYouMessage: text('thank_you_message').default('응답해주셔서 감사합니다!').notNull(),
+
+  // 컨택리스트 표시 컬럼 스킴 (slice 3 — 0014 마이그레이션)
+  contactColumns: jsonb('contact_columns').$type<ContactColumnScheme>(),
 
   // 버전 관리
   status: text('status').notNull().default('draft'), // 'draft' | 'published' | 'closed'
@@ -168,6 +172,9 @@ export const surveyResponses = pgTable('survey_responses', {
   pageVisits: jsonb('page_visits').default([]).$type<PageVisit[]>(),
   lastActivityAt: timestamp('last_activity_at', { withTimezone: true }).defaultNow().notNull(),
   totalSeconds: integer('total_seconds'),
+
+  // 컨택 매칭 (slice 3 — 0014 마이그레이션)
+  contactTargetId: uuid('contact_target_id'),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => ({

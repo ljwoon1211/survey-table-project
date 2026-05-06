@@ -1,0 +1,103 @@
+import { relations } from 'drizzle-orm';
+import { integer, jsonb, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+
+import { surveys, surveyResponses } from './surveys';
+import type { ContactUploadMapping } from './schema-types';
+
+export const contactUploads = pgTable('contact_uploads', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  surveyId: uuid('survey_id')
+    .notNull()
+    .references(() => surveys.id, { onDelete: 'cascade' }),
+  filename: text('filename').notNull(),
+  uploadedRows: integer('uploaded_rows').notNull().default(0),
+  mergedRows: integer('merged_rows').notNull().default(0),
+  errorRows: integer('error_rows').notNull().default(0),
+  mapping: jsonb('mapping').$type<ContactUploadMapping>().notNull(),
+  uploadedBy: uuid('uploaded_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const contactTargets = pgTable(
+  'contact_targets',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    surveyId: uuid('survey_id')
+      .notNull()
+      .references(() => surveys.id, { onDelete: 'cascade' }),
+    resid: integer('resid').notNull(),
+    groupValue: text('group_value'),
+    email: text('email'),
+    bizNumber: text('biz_number'),
+    inviteToken: uuid('invite_token').defaultRandom().notNull(),
+    attrs: jsonb('attrs').$type<Record<string, string>>().notNull().default({}),
+    uploadId: uuid('upload_id').references(() => contactUploads.id, { onDelete: 'set null' }),
+    respondedAt: timestamp('responded_at', { withTimezone: true }),
+    responseId: uuid('response_id').references(() => surveyResponses.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    surveyResidUnique: unique('contact_targets_survey_resid_unique').on(table.surveyId, table.resid),
+    inviteTokenUnique: unique('contact_targets_invite_token_unique').on(table.inviteToken),
+  }),
+);
+
+export const contactAttempts = pgTable(
+  'contact_attempts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    contactTargetId: uuid('contact_target_id')
+      .notNull()
+      .references(() => contactTargets.id, { onDelete: 'cascade' }),
+    attemptNo: integer('attempt_no').notNull(),
+    resultCode: text('result_code').notNull(),
+    note: text('note'),
+    createdBy: uuid('created_by'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    targetNoUnique: unique('contact_attempts_target_no_unique').on(table.contactTargetId, table.attemptNo),
+  }),
+);
+
+// ─────────── relations ───────────
+
+export const contactUploadsRelations = relations(contactUploads, ({ one, many }) => ({
+  survey: one(surveys, {
+    fields: [contactUploads.surveyId],
+    references: [surveys.id],
+  }),
+  targets: many(contactTargets),
+}));
+
+export const contactTargetsRelations = relations(contactTargets, ({ one, many }) => ({
+  survey: one(surveys, {
+    fields: [contactTargets.surveyId],
+    references: [surveys.id],
+  }),
+  upload: one(contactUploads, {
+    fields: [contactTargets.uploadId],
+    references: [contactUploads.id],
+  }),
+  response: one(surveyResponses, {
+    fields: [contactTargets.responseId],
+    references: [surveyResponses.id],
+  }),
+  attempts: many(contactAttempts),
+}));
+
+export const contactAttemptsRelations = relations(contactAttempts, ({ one }) => ({
+  target: one(contactTargets, {
+    fields: [contactAttempts.contactTargetId],
+    references: [contactTargets.id],
+  }),
+}));
+
+// 타입 export
+export type ContactUpload = typeof contactUploads.$inferSelect;
+export type NewContactUpload = typeof contactUploads.$inferInsert;
+export type ContactTarget = typeof contactTargets.$inferSelect;
+export type NewContactTarget = typeof contactTargets.$inferInsert;
+export type ContactAttempt = typeof contactAttempts.$inferSelect;
+export type NewContactAttempt = typeof contactAttempts.$inferInsert;

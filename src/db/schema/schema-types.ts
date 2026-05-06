@@ -245,3 +245,50 @@ export interface QuestionData {
   displayCondition?: QuestionConditionGroup;
   rankingConfig?: RankingConfig;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 컨택 (contact_targets·contact_uploads) 관련 JSONB 타입
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** surveys.contact_columns — 컨택리스트 표시 컬럼 스킴 (메타데이터) */
+export interface ContactColumnScheme {
+  version: number;
+  /** 엑셀 헤더 행 (1-based, 디폴트 1) */
+  headerRow: number;
+  columns: ContactColumnDef[];
+}
+
+export interface ContactColumnDef {
+  /** attrs 의 키 또는 system 식별자 */
+  key: string;
+  /** 표 헤더 라벨 (사용자 편집 가능) */
+  label: string;
+  /**
+   * 'attrs.<key>' | 'system.resid' | 'system.contact_result' |
+   * 'system.email_count' | 'system.web' | 'system.contact_owner'
+   */
+  source: string;
+  order: number;
+  /** 숨김 (운영 컬럼 일부는 hide 불가 — UI 가드) */
+  hidden?: boolean;
+}
+
+/** contact_uploads.mapping — 엑셀 업로드 매핑 결과 */
+export interface ContactUploadMapping {
+  /** 시스템 필드 → 엑셀 0-based 컬럼 인덱스. group 만 필수. */
+  systemFields: {
+    group: number;
+    email?: number;
+    biz?: number;
+    name?: number;
+    company?: number;
+    phone?: number;
+  };
+  mergeKey: 'email+biz' | 'email' | 'biz';
+  /** 머지키 정책: 'either'=한쪽이라도 있으면 매칭, 'both'=둘다 필수 */
+  mergeKeyPolicy: 'either' | 'both';
+  /** 1-based, 디폴트 1 */
+  headerRow: number;
+  /** 사용자가 선택한 시트 이름 (디폴트 첫 시트) */
+  sheetName: string;
+}
