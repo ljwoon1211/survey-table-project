@@ -34,6 +34,8 @@ export const contactTargets = pgTable(
     uploadId: uuid('upload_id').references(() => contactUploads.id, { onDelete: 'set null' }),
     respondedAt: timestamp('responded_at', { withTimezone: true }),
     responseId: uuid('response_id').references(() => surveyResponses.id, { onDelete: 'set null' }),
+    memo: text('memo'),
+    contactMethod: text('contact_method'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
