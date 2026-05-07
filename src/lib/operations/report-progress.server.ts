@@ -121,6 +121,7 @@ export async function getProgressRows(args: GetProgressRowsArgs): Promise<Progre
 
   // 정렬 표현식 — outer SELECT scope 에서 inner subquery alias 참조.
   // meta:<key> 는 inner alias `meta_<idx>` 로 매핑. 매칭 실패 시 responseRate 폴백.
+  // SORT_COL_MAP 화이트리스트 외 값은 모두 responseRate 로 강제 (defense-in-depth).
   let sortExpr;
   if (sort.startsWith('meta:')) {
     const key = sort.slice(5);
@@ -130,7 +131,8 @@ export async function getProgressRows(args: GetProgressRowsArgs): Promise<Progre
         ? sql.raw(`meta_${idx}`)
         : sql.raw(SORT_COL_MAP.responseRate);
   } else {
-    sortExpr = sql.raw(SORT_COL_MAP[sort as Exclude<ProgressSortKey, `meta:${string}`>]);
+    const mapped = SORT_COL_MAP[sort as Exclude<ProgressSortKey, `meta:${string}`>];
+    sortExpr = sql.raw(mapped ?? SORT_COL_MAP.responseRate);
   }
   const dirSql = dir === 'asc' ? sql.raw('ASC') : sql.raw('DESC');
 
