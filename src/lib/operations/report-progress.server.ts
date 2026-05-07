@@ -6,7 +6,7 @@ import { db } from '@/db';
 import { surveys } from '@/db/schema/surveys';
 import type { ProgressColumnScheme } from '@/db/schema/schema-types';
 
-import type { ProgressRow, ProgressSortKey, SortDir } from './report-progress';
+import type { ProgressRow, ProgressSortKey, SortDir, ProgressTotals } from './report-progress';
 
 const EMPTY_SCHEME: ProgressColumnScheme = { version: 1, columns: [] };
 
@@ -115,4 +115,32 @@ export async function getProgressRows(args: GetProgressRowsArgs): Promise<Progre
 
 function escapeLiteral(s: string): string {
   return `'${s.replaceAll("'", "''")}'`;
+}
+
+/**
+ * 페이지네이션 무시 합계 — "총 N개 그룹 · 리스트 합계 X / 완료 Y".
+ * group_count 는 NULL 그룹도 1로 카운트.
+ */
+export async function getProgressTotals(surveyId: string, q: string): Promise<ProgressTotals> {
+  const qLike = q.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+  const result = await db.execute(sql`
+    SELECT
+      COUNT(DISTINCT COALESCE(ct.group_value, '(미분류)'))::int AS group_count,
+      COUNT(*)::int AS list_total,
+      COUNT(*) FILTER (
+        WHERE EXISTS (SELECT 1 FROM survey_responses sr
+                      WHERE sr.contact_target_id = ct.id AND sr.is_completed = true)
+           OR EXISTS (SELECT 1 FROM contact_attempts ca
+                      WHERE ca.contact_target_id = ct.id AND ca.result_code = '1.조사완료')
+      )::int AS completed_total
+    FROM contact_targets ct
+    WHERE ct.survey_id = ${surveyId}
+      AND (${q} = '' OR COALESCE(ct.group_value, '(미분류)') ILIKE '%' || ${qLike} || '%')
+  `);
+  const r = (result as unknown as Array<Record<string, unknown>>)[0] ?? {};
+  return {
+    groupCount: Number(r.group_count ?? 0),
+    listTotal: Number(r.list_total ?? 0),
+    completedTotal: Number(r.completed_total ?? 0),
+  };
 }
