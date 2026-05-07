@@ -22,38 +22,49 @@ interface Props {
 
 const ATTRS_PREFIX = 'attrs.';
 
+/**
+ * 컨택리스트 attrs 풀 + initialScheme 머지.
+ *
+ * - 컨택리스트의 모든 `attrs.<key>` 를 풀로 추출 (사용자 편집 order 정렬).
+ * - initialScheme 에 같은 key 가 존재하면 기존 값(label/order/hidden) 사용.
+ * - 매칭 없으면 디폴트 hidden=true, 라벨은 컨택리스트 라벨.
+ * - contactScheme 에서 사라진 키(고아)는 결과에 포함되지 않음 → save 후 자동 정리.
+ */
+function hydrateColumns(
+  contactScheme: ContactColumnScheme | null,
+  initialScheme: ProgressColumnScheme,
+): ProgressColumnDef[] {
+  const attrsPool = (contactScheme?.columns ?? [])
+    .filter((c) => c.source.startsWith(ATTRS_PREFIX))
+    .slice()
+    .sort((a, b) => a.order - b.order)
+    .map((c) => ({
+      key: c.source.slice(ATTRS_PREFIX.length),
+      contactLabel: c.label,
+    }));
+  const existingMap = new Map(initialScheme.columns.map((c) => [c.key, c]));
+
+  const merged = attrsPool.map((p, i): ProgressColumnDef => {
+    const existing = existingMap.get(p.key);
+    if (existing) return existing;
+    return {
+      key: p.key,
+      label: p.contactLabel,
+      order: i, // 컨택리스트 풀 순서를 디폴트로
+      hidden: true,
+    };
+  });
+
+  return merged.sort((a, b) => a.order - b.order);
+}
+
 export function ProgressColumnEditor({ surveyId, initialScheme, contactScheme }: Props) {
   const router = useRouter();
 
-  // 컨택리스트의 모든 attrs.<key> 를 풀로 추출 + initialScheme 의 기존 설정과 머지.
-  // 매칭됨 → 기존 값(label/order/hidden) 사용. 매칭 없음 → 디폴트 hidden=true, 라벨은 컨택리스트 라벨.
-  // contactScheme 에서 사라진 키(고아)는 표에 노출하지 않음 → save 후 자동 정리.
-  const hydratedColumns = useMemo<ProgressColumnDef[]>(() => {
-    // 컨택리스트의 사용자 편집 order 따라 attrsPool 정렬 — 입력 배열 순서 의존 X.
-    const attrsPool = (contactScheme?.columns ?? [])
-      .filter((c) => c.source.startsWith(ATTRS_PREFIX))
-      .slice()
-      .sort((a, b) => a.order - b.order)
-      .map((c) => ({
-        key: c.source.slice(ATTRS_PREFIX.length),
-        contactLabel: c.label,
-        contactOrder: c.order,
-      }));
-    const existingMap = new Map(initialScheme.columns.map((c) => [c.key, c]));
-
-    const merged = attrsPool.map((p, i): ProgressColumnDef => {
-      const existing = existingMap.get(p.key);
-      if (existing) return existing;
-      return {
-        key: p.key,
-        label: p.contactLabel,
-        order: i, // 컨택리스트 풀 순서를 디폴트로
-        hidden: true,
-      };
-    });
-
-    return merged.sort((a, b) => a.order - b.order);
-  }, [contactScheme, initialScheme]);
+  const hydratedColumns = useMemo<ProgressColumnDef[]>(
+    () => hydrateColumns(contactScheme, initialScheme),
+    [contactScheme, initialScheme],
+  );
 
   const [columns, setColumns] = useState<ProgressColumnDef[]>(hydratedColumns);
   const [error, setError] = useState<string | null>(null);
