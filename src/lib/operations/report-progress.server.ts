@@ -48,9 +48,14 @@ const SORT_COL_MAP: Record<Exclude<ProgressSortKey, `meta:${string}`>, string> =
  *
  * NULL group_value 는 '(미분류)' 라벨로 표시.
  *
- * SECURITY: metaKeys 는 progress_columns 에서 가져온 사용자 입력 — SQL injection
- * 방지를 위해 문자열 escape 필수. attrs JSONB 키는 한글·공백 허용이므로
- * `quote_ident` 가 아닌 literal escape (작은따옴표 두 번) 사용.
+ * 구현 노트: PostgreSQL 은 ORDER BY 절의 expression 안에서 SELECT alias 를
+ * 참조할 수 없음 (`ORDER BY (completed_count / list_count)` 같은 형태는
+ * unknown column 에러). 그래서 GROUP BY 집계를 inner subquery 로 감싸고
+ * outer SELECT 의 ORDER BY 가 inner alias 를 일반 컬럼처럼 참조하도록 함.
+ *
+ * SECURITY: metaKeys 는 progress_columns 에서 가져온 사용자 입력. attrs JSONB
+ * 키는 parameter binding 으로 안전. sortExpr 는 whitelist 또는 inner alias
+ * 참조 (meta_0..meta_N) 만 raw 임베드 — 사용자 입력이 SQL 에 직접 박히지 않음.
  */
 export async function getProgressRows(args: GetProgressRowsArgs): Promise<ProgressRow[]> {
   const { surveyId, q, page, size, sort, dir, metaKeys } = args;
@@ -71,29 +76,40 @@ export async function getProgressRows(args: GetProgressRowsArgs): Promise<Progre
       sql``,
     );
 
-  // 정렬 표현식. whitelist 후 raw 사용 (column 이름은 binding 불가).
-  const sortExpr = sort.startsWith('meta:')
-    ? sql.raw(`MIN(ct.attrs->>${escapeLiteral(sort.slice(5))})`)
-    : sql.raw(SORT_COL_MAP[sort as Exclude<ProgressSortKey, `meta:${string}`>]);
+  // 정렬 표현식 — outer SELECT scope 에서 inner subquery alias 참조.
+  // meta:<key> 는 inner alias `meta_<idx>` 로 매핑. 매칭 실패 시 responseRate 폴백.
+  let sortExpr;
+  if (sort.startsWith('meta:')) {
+    const key = sort.slice(5);
+    const idx = metaKeys.indexOf(key);
+    sortExpr =
+      idx >= 0
+        ? sql.raw(`meta_${idx}`)
+        : sql.raw(SORT_COL_MAP.responseRate);
+  } else {
+    sortExpr = sql.raw(SORT_COL_MAP[sort as Exclude<ProgressSortKey, `meta:${string}`>]);
+  }
   const dirSql = dir === 'asc' ? sql.raw('ASC') : sql.raw('DESC');
 
   const result = await db.execute(sql`
-    SELECT
-      COALESCE(ct.group_value, '(미분류)') AS group_label,
-      ct.group_value AS group_value_raw,
-      COUNT(*)::int AS list_count,
-      COUNT(*) FILTER (
-        WHERE EXISTS (SELECT 1 FROM survey_responses sr
-                      WHERE sr.contact_target_id = ct.id AND sr.is_completed = true)
-           OR EXISTS (SELECT 1 FROM contact_attempts ca
-                      WHERE ca.contact_target_id = ct.id AND ca.result_code = '1.조사완료')
-      )::int AS completed_count
-      ${metaKeys.length > 0 ? sql`, ${metaSelectSql}` : sql``}
-    FROM contact_targets ct
-    WHERE ct.survey_id = ${surveyId}
-      AND (${q} = '' OR COALESCE(ct.group_value, '(미분류)') ILIKE '%' || ${qLike} || '%')
-    GROUP BY ct.group_value
-    ORDER BY ${sortExpr} ${dirSql} NULLS LAST, ct.group_value NULLS LAST
+    SELECT * FROM (
+      SELECT
+        COALESCE(ct.group_value, '(미분류)') AS group_label,
+        ct.group_value AS group_value_raw,
+        COUNT(*)::int AS list_count,
+        COUNT(*) FILTER (
+          WHERE EXISTS (SELECT 1 FROM survey_responses sr
+                        WHERE sr.contact_target_id = ct.id AND sr.is_completed = true)
+             OR EXISTS (SELECT 1 FROM contact_attempts ca
+                        WHERE ca.contact_target_id = ct.id AND ca.result_code = '1.조사완료')
+        )::int AS completed_count
+        ${metaKeys.length > 0 ? sql`, ${metaSelectSql}` : sql``}
+      FROM contact_targets ct
+      WHERE ct.survey_id = ${surveyId}
+        AND (${q} = '' OR COALESCE(ct.group_value, '(미분류)') ILIKE '%' || ${qLike} || '%')
+      GROUP BY ct.group_value
+    ) sub
+    ORDER BY ${sortExpr} ${dirSql} NULLS LAST, group_value_raw NULLS LAST
     LIMIT ${size} OFFSET ${offset}
   `);
 
@@ -111,10 +127,6 @@ export async function getProgressRows(args: GetProgressRowsArgs): Promise<Progre
       meta,
     };
   });
-}
-
-function escapeLiteral(s: string): string {
-  return `'${s.replaceAll("'", "''")}'`;
 }
 
 /**
