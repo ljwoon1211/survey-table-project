@@ -114,7 +114,6 @@ export default async function ReportProgressPage({ params, searchParams }: PageP
         <>
           <ProgressFilterBar initialQuery={q} groupLabel={groupLabel} />
           <ProgressTable
-            surveyId={surveyId}
             rows={rows}
             totals={totals}
             metaColumns={visibleColumns}

@@ -18,7 +18,6 @@ import type { ProgressColumnDef } from '@/db/schema/schema-types';
 import { numberFormatter } from '@/lib/operations/format';
 
 interface Props {
-  surveyId: string;
   rows: ProgressRow[];
   totals: ProgressTotals;
   metaColumns: ProgressColumnDef[];
