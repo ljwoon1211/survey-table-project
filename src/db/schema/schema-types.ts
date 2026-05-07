@@ -275,6 +275,21 @@ export interface ContactColumnDef {
   hidden?: boolean;
 }
 
+/** surveys.progress_columns — 진척률 표 (Report 탭) 그룹 메타 컬럼 픽커 */
+export interface ProgressColumnScheme {
+  version: number;
+  columns: ProgressColumnDef[];
+}
+
+export interface ProgressColumnDef {
+  /** attrs 키 (예: '개최 월', '개최기간'). source 는 항상 attrs.<key> — system.* 제외. */
+  key: string;
+  /** 표 헤더 라벨 (사용자 편집 가능). 컨택리스트 라벨과 별도. */
+  label: string;
+  order: number;
+  hidden?: boolean;
+}
+
 /** contact_uploads.mapping — 엑셀 업로드 매핑 결과 (시나리오 B 단순화) */
 export interface ContactUploadMapping {
   /** 시스템 필드 → 엑셀 0-based 컬럼 인덱스. group 만 필수. */

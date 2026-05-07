@@ -7,6 +7,7 @@ import type {
   DynamicRowGroupConfig,
   HeaderCell,
   PageVisit,
+  ProgressColumnScheme,
   QuestionConditionGroup,
   QuestionData,
   QuestionOption,
@@ -42,6 +43,9 @@ export const surveys = pgTable('surveys', {
 
   // 결과코드 사용자 정의 (NULL = DEFAULT_RESULT_CODES 폴백, slice 3 — 0016 마이그레이션)
   contactResultCodes: jsonb('contact_result_codes').$type<ContactResultCode[]>(),
+
+  // 진척률 표 표시 컬럼 픽커 (NULL = 4개 고정 컬럼만, slice 4 — 0017 마이그레이션)
+  progressColumns: jsonb('progress_columns').$type<ProgressColumnScheme>(),
 
   // 버전 관리
   status: text('status').notNull().default('draft'), // 'draft' | 'published' | 'closed'
