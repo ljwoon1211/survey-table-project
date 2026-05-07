@@ -120,6 +120,13 @@
       "when": 1778600000000,
       "tag": "0016_contacts_detail",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1778700000000,
+      "tag": "0017_add_progress_columns",
+      "breakpoints": true
     }
   ]
 }
