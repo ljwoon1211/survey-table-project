@@ -12,6 +12,7 @@ import { contactTargets } from '@/db/schema';
 import type { ProgressSortKey, SortDir } from '@/lib/operations/report-progress';
 import {
   getProgressColumnScheme,
+  getProgressGroupLabel,
   getProgressRows,
   getProgressTotals,
 } from '@/lib/operations/report-progress.server';
@@ -19,7 +20,7 @@ import {
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: '현황 - 전시회별 진척률',
+  title: '현황 - 그룹별 진척률',
 };
 
 interface PageProps {
@@ -67,7 +68,10 @@ export default async function ReportProgressPage({ params, searchParams }: PageP
   const size = 20;
   const dir: SortDir = sp.dir === 'asc' ? 'asc' : 'desc';
 
-  const scheme = await getProgressColumnScheme(surveyId);
+  const [scheme, groupLabel] = await Promise.all([
+    getProgressColumnScheme(surveyId),
+    getProgressGroupLabel(surveyId),
+  ]);
   const visibleColumns = scheme.columns
     .filter((c) => !c.hidden)
     .sort((a, b) => a.order - b.order);
@@ -92,7 +96,7 @@ export default async function ReportProgressPage({ params, searchParams }: PageP
     <main className="mx-auto max-w-7xl px-6 py-8">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">전시회별 진척률</h2>
+          <h2 className="text-xl font-bold text-gray-900">{groupLabel}별 진척률</h2>
           <p className="text-sm text-slate-500">모집단 명단의 그룹 컬럼 기준 자동 집계</p>
         </div>
         <Button asChild variant="outline">
@@ -104,12 +108,13 @@ export default async function ReportProgressPage({ params, searchParams }: PageP
         <ProgressEmptyCard surveyId={surveyId} />
       ) : (
         <>
-          <ProgressFilterBar initialQuery={q} />
+          <ProgressFilterBar initialQuery={q} groupLabel={groupLabel} />
           <ProgressTable
             surveyId={surveyId}
             rows={rows}
             totals={totals}
             metaColumns={visibleColumns}
+            groupLabel={groupLabel}
             page={page}
             size={size}
             sort={sort}

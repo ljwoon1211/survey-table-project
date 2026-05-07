@@ -3,8 +3,9 @@ import 'server-only';
 import { eq, sql } from 'drizzle-orm';
 
 import { db } from '@/db';
+import { contactTargets } from '@/db/schema/contacts';
 import { surveys } from '@/db/schema/surveys';
-import type { ProgressColumnScheme } from '@/db/schema/schema-types';
+import type { ContactColumnScheme, ProgressColumnScheme } from '@/db/schema/schema-types';
 
 import type { ProgressRow, ProgressSortKey, SortDir, ProgressTotals } from './report-progress';
 
@@ -21,6 +22,48 @@ export async function getProgressColumnScheme(surveyId: string): Promise<Progres
     .limit(1);
   const scheme = rows[0]?.progressColumns;
   return scheme ?? EMPTY_SCHEME;
+}
+
+/**
+ * 그룹 매핑된 attrs 키의 라벨 추출 (컨택리스트 라벨 우선).
+ *
+ * 휴리스틱: 첫 contact_target 의 attrs 안에서 value === group_value 인 key 를 찾고,
+ * contact_columns 에서 그 attrs.<key> 의 사용자 편집 라벨 사용.
+ *
+ * 못 찾으면 '그룹' fallback. 컨택 0건 / group_value NULL only 케이스도 동일.
+ *
+ * 시나리오 B 정책 ("엑셀 18개 헤더 모두 attrs 적재") 하에서 거의 항상 동작.
+ * 단, 같은 value 가 두 attrs 키에 우연히 들어있으면 첫 번째 key 의 라벨 — fragile.
+ */
+export async function getProgressGroupLabel(surveyId: string): Promise<string> {
+  // 첫 contact_target 의 attrs 와 group_value
+  const rows = await db
+    .select({
+      attrs: contactTargets.attrs,
+      groupValue: contactTargets.groupValue,
+    })
+    .from(contactTargets)
+    .where(
+      sql`${contactTargets.surveyId} = ${surveyId} AND ${contactTargets.groupValue} IS NOT NULL`,
+    )
+    .limit(1);
+
+  if (rows.length === 0) return '그룹';
+  const { attrs, groupValue } = rows[0];
+  if (!attrs || groupValue == null) return '그룹';
+
+  const groupAttrsKey = Object.entries(attrs).find(([, v]) => v === groupValue)?.[0];
+  if (!groupAttrsKey) return '그룹';
+
+  // contact_columns 에서 라벨 lookup
+  const surveyRow = await db
+    .select({ contactColumns: surveys.contactColumns })
+    .from(surveys)
+    .where(eq(surveys.id, surveyId))
+    .limit(1);
+  const scheme = surveyRow[0]?.contactColumns as ContactColumnScheme | null | undefined;
+  const col = scheme?.columns.find((c) => c.source === `attrs.${groupAttrsKey}`);
+  return col?.label ?? groupAttrsKey;
 }
 
 interface GetProgressRowsArgs {

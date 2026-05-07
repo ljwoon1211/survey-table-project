@@ -22,6 +22,7 @@ interface Props {
   rows: ProgressRow[];
   totals: ProgressTotals;
   metaColumns: ProgressColumnDef[];
+  groupLabel: string;
   page: number;
   size: number;
   sort: ProgressSortKey;
@@ -52,6 +53,7 @@ export function ProgressTable({
   rows,
   totals,
   metaColumns,
+  groupLabel,
   page,
   size,
   sort,
@@ -76,7 +78,7 @@ export function ProgressTable({
     });
   };
 
-  // 4 fixed (전시회명/리스트수/완료/응답률) + N meta
+  // 4 fixed (그룹 라벨/리스트수/완료/응답률) + N meta
   const colSpan = 4 + metaColumns.length;
 
   return (
@@ -85,7 +87,7 @@ export function ProgressTable({
         <thead className="bg-slate-50 text-slate-700">
           <tr>
             <Th sort={sort} dir={dir} colKey="groupLabel" align="left" onClick={handleSortClick}>
-              전시회명
+              {groupLabel}
             </Th>
             {metaColumns.map((c) => (
               <Th
