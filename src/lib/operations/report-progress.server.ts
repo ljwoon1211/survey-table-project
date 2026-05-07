@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { cache } from 'react';
 import { eq, sql } from 'drizzle-orm';
 
 import { db } from '@/db';
@@ -40,16 +41,21 @@ function escapeLikePattern(s: string): string {
 
 /**
  * `surveys.progress_columns` 가져오기. NULL → 빈 스킴 (4개 고정 컬럼만).
+ *
+ * `cache()` 로 RSC pass dedupe — 동일 surveyId 로 다중 RSC 가 호출해도
+ * 1회 query. slice 3 의 `getContactColumnScheme` 와 동일한 패턴.
  */
-export async function getProgressColumnScheme(surveyId: string): Promise<ProgressColumnScheme> {
-  const rows = await db
-    .select({ progressColumns: surveys.progressColumns })
-    .from(surveys)
-    .where(eq(surveys.id, surveyId))
-    .limit(1);
-  const scheme = rows[0]?.progressColumns;
-  return scheme ?? EMPTY_SCHEME;
-}
+export const getProgressColumnScheme = cache(
+  async (surveyId: string): Promise<ProgressColumnScheme> => {
+    const rows = await db
+      .select({ progressColumns: surveys.progressColumns })
+      .from(surveys)
+      .where(eq(surveys.id, surveyId))
+      .limit(1);
+    const scheme = rows[0]?.progressColumns;
+    return scheme ?? EMPTY_SCHEME;
+  },
+);
 
 /**
  * 그룹 매핑된 attrs 키의 라벨 추출 (컨택리스트 라벨 우선).
@@ -61,8 +67,10 @@ export async function getProgressColumnScheme(surveyId: string): Promise<Progres
  *
  * 시나리오 B 정책 ("엑셀 18개 헤더 모두 attrs 적재") 하에서 거의 항상 동작.
  * 단, 같은 value 가 두 attrs 키에 우연히 들어있으면 첫 번째 key 의 라벨 — fragile.
+ *
+ * `cache()` 로 RSC pass dedupe — header / 표 등 다중 RSC 동시 호출 가능성 대비.
  */
-export async function getProgressGroupLabel(surveyId: string): Promise<string> {
+export const getProgressGroupLabel = cache(async (surveyId: string): Promise<string> => {
   // 첫 contact_target 의 attrs 와 group_value
   const rows = await db
     .select({
@@ -91,7 +99,7 @@ export async function getProgressGroupLabel(surveyId: string): Promise<string> {
   const scheme = surveyRow[0]?.contactColumns as ContactColumnScheme | null | undefined;
   const col = scheme?.columns.find((c) => c.source === `attrs.${groupAttrsKey}`);
   return col?.label ?? groupAttrsKey;
-}
+});
 
 interface GetProgressRowsArgs {
   surveyId: string;
