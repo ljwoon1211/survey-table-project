@@ -29,8 +29,11 @@ export function ProgressColumnEditor({ surveyId, initialScheme, contactScheme }:
   // 매칭됨 → 기존 값(label/order/hidden) 사용. 매칭 없음 → 디폴트 hidden=true, 라벨은 컨택리스트 라벨.
   // contactScheme 에서 사라진 키(고아)는 표에 노출하지 않음 → save 후 자동 정리.
   const hydratedColumns = useMemo<ProgressColumnDef[]>(() => {
+    // 컨택리스트의 사용자 편집 order 따라 attrsPool 정렬 — 입력 배열 순서 의존 X.
     const attrsPool = (contactScheme?.columns ?? [])
       .filter((c) => c.source.startsWith(ATTRS_PREFIX))
+      .slice()
+      .sort((a, b) => a.order - b.order)
       .map((c) => ({
         key: c.source.slice(ATTRS_PREFIX.length),
         contactLabel: c.label,
