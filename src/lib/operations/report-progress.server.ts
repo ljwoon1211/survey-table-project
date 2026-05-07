@@ -56,6 +56,13 @@ export async function getProgressRows(args: GetProgressRowsArgs): Promise<Progre
   const { surveyId, q, page, size, sort, dir, metaKeys } = args;
   const offset = Math.max(0, (page - 1) * size);
 
+  // ILIKE wildcard escape (profiles.server.ts 와 동일 패턴). `${q} = ''`
+  // 단축 평가는 사용자 원본 비교라 escape 적용 X — ILIKE 패턴에만 적용.
+  const qLike = q
+    .replace(/\\/g, '\\\\')
+    .replace(/%/g, '\\%')
+    .replace(/_/g, '\\_');
+
   // 메타 키 SELECT 절 동적 생성. attrs JSONB 키는 parameter binding (안전).
   const metaSelectSql = metaKeys
     .map((k, i) => sql`MIN(ct.attrs->>${k}) AS ${sql.identifier(`meta_${i}`)}`)
@@ -84,7 +91,7 @@ export async function getProgressRows(args: GetProgressRowsArgs): Promise<Progre
       ${metaKeys.length > 0 ? sql`, ${metaSelectSql}` : sql``}
     FROM contact_targets ct
     WHERE ct.survey_id = ${surveyId}
-      AND (${q} = '' OR COALESCE(ct.group_value, '(미분류)') ILIKE '%' || ${q} || '%')
+      AND (${q} = '' OR COALESCE(ct.group_value, '(미분류)') ILIKE '%' || ${qLike} || '%')
     GROUP BY ct.group_value
     ORDER BY ${sortExpr} ${dirSql} NULLS LAST, ct.group_value NULLS LAST
     LIMIT ${size} OFFSET ${offset}
