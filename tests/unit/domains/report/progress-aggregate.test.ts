@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { toneFromRate, sortGroupRows, type ProgressRow } from '@/lib/operations/report-progress';
+import {
+  toneFromRate,
+  sortGroupRows,
+  paginate,
+  computeTotals,
+  type ProgressRow,
+} from '@/lib/operations/report-progress';
 
 describe('toneFromRate', () => {
   it('listCount=0 일 때 gray', () => {
@@ -49,5 +55,36 @@ describe('sortGroupRows', () => {
   it('meta:월 desc 는 04 > 03 > 01 > NULL', () => {
     const sorted = sortGroupRows(fixture, 'meta:월', 'desc');
     expect(sorted.map((r) => r.meta['월'])).toEqual(['04', '03', '01', null]);
+  });
+});
+
+describe('paginate', () => {
+  it('빈 배열은 빈 결과', () => {
+    expect(paginate([], 1, 20)).toEqual([]);
+  });
+  it('size=0 은 빈 결과 (방어)', () => {
+    expect(paginate([1, 2, 3], 1, 0)).toEqual([]);
+  });
+  it('첫 페이지', () => {
+    expect(paginate([1, 2, 3, 4, 5], 1, 2)).toEqual([1, 2]);
+  });
+  it('마지막 페이지', () => {
+    expect(paginate([1, 2, 3, 4, 5], 3, 2)).toEqual([5]);
+  });
+  it('페이지 초과', () => {
+    expect(paginate([1, 2, 3], 10, 2)).toEqual([]);
+  });
+});
+
+describe('computeTotals', () => {
+  it('빈 배열은 0 합계', () => {
+    expect(computeTotals([])).toEqual({ groupCount: 0, listTotal: 0, completedTotal: 0 });
+  });
+  it('fixture 합계 검증', () => {
+    expect(computeTotals(fixture)).toEqual({
+      groupCount: 4,
+      listTotal: 10 + 20 + 5 + 0,
+      completedTotal: 5 + 18 + 0 + 0,
+    });
   });
 });

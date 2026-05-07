@@ -88,3 +88,28 @@ function sortValue(row: ProgressRow, sort: ProgressSortKey): number | string | n
   }
   return null;
 }
+
+/** 클라이언트 페이지네이션 (server 는 SQL LIMIT/OFFSET). 합계 카드 / fallback 용도. */
+export function paginate<T>(rows: T[], page: number, size: number): T[] {
+  if (size <= 0) return [];
+  const start = (Math.max(1, page) - 1) * size;
+  return rows.slice(start, start + size);
+}
+
+export interface ProgressTotals {
+  groupCount: number;
+  listTotal: number;
+  completedTotal: number;
+}
+
+/** 푸터 합계 — "총 N개 그룹 · 리스트 합계 X / 완료 Y". */
+export function computeTotals(rows: ProgressRow[]): ProgressTotals {
+  return rows.reduce<ProgressTotals>(
+    (acc, r) => ({
+      groupCount: acc.groupCount + 1,
+      listTotal: acc.listTotal + r.listCount,
+      completedTotal: acc.completedTotal + r.completedCount,
+    }),
+    { groupCount: 0, listTotal: 0, completedTotal: 0 },
+  );
+}
