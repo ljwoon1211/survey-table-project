@@ -114,7 +114,6 @@ export default async function ReportProgressPage({ params, searchParams }: PageP
             rows={rows}
             totals={totals}
             metaColumns={visibleColumns}
-            groupLabel={groupLabel}
             page={page}
             size={size}
             sort={sort}

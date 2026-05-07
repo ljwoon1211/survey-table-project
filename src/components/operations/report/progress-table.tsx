@@ -22,7 +22,6 @@ interface Props {
   rows: ProgressRow[];
   totals: ProgressTotals;
   metaColumns: ProgressColumnDef[];
-  groupLabel: string;
   page: number;
   size: number;
   sort: ProgressSortKey;
@@ -46,6 +45,7 @@ function formatRate(completed: number, list: number): string {
  *
  * - 헤더 정렬은 URL search params 기반 (sort/dir/page).
  * - meta 컬럼은 surveys.progress_columns 스킴에 따라 동적으로 렌더링.
+ *   그룹 라벨 컬럼은 자동 노출하지 않음 — 컬럼 설정에서 hidden=false 한 키만 메타로 표시.
  * - 응답률은 임계값(toneFromRate)에 따라 색상 pill 로 표기.
  * - groupValueRaw=null('(미분류)') 도 안정적인 row key 유지.
  */
@@ -53,7 +53,6 @@ export function ProgressTable({
   rows,
   totals,
   metaColumns,
-  groupLabel,
   page,
   size,
   sort,
@@ -78,17 +77,14 @@ export function ProgressTable({
     });
   };
 
-  // 4 fixed (그룹 라벨/리스트수/완료/응답률) + N meta
-  const colSpan = 4 + metaColumns.length;
+  // 3 fixed (리스트수/완료/응답률) + N meta
+  const colSpan = 3 + metaColumns.length;
 
   return (
     <div className="overflow-hidden rounded border border-slate-200 bg-white">
       <table className="w-full text-sm">
         <thead className="bg-slate-50 text-slate-700">
           <tr>
-            <Th sort={sort} dir={dir} colKey="groupLabel" align="left" onClick={handleSortClick}>
-              {groupLabel}
-            </Th>
             {metaColumns.map((c) => (
               <Th
                 key={c.key}
@@ -137,7 +133,6 @@ export function ProgressTable({
             const rate = formatRate(r.completedCount, r.listCount);
             return (
               <tr key={r.groupValueRaw ?? '__null__'} className="hover:bg-slate-50">
-                <td className="px-3 py-2 text-slate-800">{r.groupLabel}</td>
                 {metaColumns.map((c) => (
                   <td key={c.key} className="px-3 py-2 text-slate-700">
                     {r.meta[c.key] ?? <span className="text-slate-300">—</span>}
