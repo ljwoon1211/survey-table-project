@@ -1,12 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { eq } from 'drizzle-orm';
-
 import { ProgressColumnEditor } from '@/components/operations/report/progress-column-editor';
 import { Button } from '@/components/ui/button';
-import { db } from '@/db';
-import { surveys } from '@/db/schema/surveys';
+import { getContactColumnScheme } from '@/lib/operations/contacts.server';
 import { getProgressColumnScheme } from '@/lib/operations/report-progress.server';
 
 export const dynamic = 'force-dynamic';
@@ -28,15 +25,10 @@ interface PageProps {
 export default async function ReportColumnsPage({ params }: PageProps) {
   const { id: surveyId } = await params;
 
-  const [scheme, contactSchemeRow] = await Promise.all([
+  const [scheme, contactScheme] = await Promise.all([
     getProgressColumnScheme(surveyId),
-    db
-      .select({ contactColumns: surveys.contactColumns })
-      .from(surveys)
-      .where(eq(surveys.id, surveyId))
-      .limit(1),
+    getContactColumnScheme(surveyId),
   ]);
-  const contactScheme = contactSchemeRow[0]?.contactColumns ?? null;
 
   return (
     <main className="mx-auto max-w-7xl px-6 py-8">
