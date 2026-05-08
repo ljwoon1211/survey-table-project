@@ -1,4 +1,4 @@
-import { Extension } from '@tiptap/core';
+import { type AnyExtension, Extension } from '@tiptap/core';
 import Bold from '@tiptap/extension-bold';
 import BulletList from '@tiptap/extension-bullet-list';
 import Document from '@tiptap/extension-document';
@@ -31,8 +31,9 @@ const MailVarTokenExtension = Extension.create({
   },
 });
 
-export function createMailEditorExtensions() {
-  return [
+export function createMailEditorExtensions(): AnyExtension[] {
+  // FontSize 는 자체 번들된 @tiptap/core 버전이 다르므로 AnyExtension 으로 캐스팅
+  const extensions: AnyExtension[] = [
     Document,
     Paragraph,
     Text,
@@ -41,7 +42,7 @@ export function createMailEditorExtensions() {
     Underline,
     Strike,
     TextStyle,
-    FontSize,
+    FontSize as unknown as AnyExtension,
     Heading.configure({ levels: [1, 2, 3] }),
     BulletList,
     OrderedList,
@@ -57,4 +58,5 @@ export function createMailEditorExtensions() {
     TableCell,
     MailVarTokenExtension,
   ];
+  return extensions;
 }
