@@ -33,9 +33,14 @@ export function MailTemplateEditor({ initialHtml, catalog, onChange }: Props) {
       },
     },
     onUpdate: ({ editor }) => {
+      force({});
       onChange(editor.isEmpty ? '' : editor.getHTML());
     },
     onSelectionUpdate: () => {
+      force({});
+    },
+    onTransaction: () => {
+      // mark 토글 등 셀렉션이 안 바뀌는 변경도 툴바 active 동기화
       force({});
     },
   });
@@ -50,9 +55,24 @@ export function MailTemplateEditor({ initialHtml, catalog, onChange }: Props) {
   if (!editor) return null;
 
   const onPickImage = () => {
-    // Phase C 에서 R2 업로드 통합 예정. 현재는 외부 URL prompt 로 검증 가능하게.
-    const url = window.prompt('이미지 URL');
-    if (url) editor.chain().focus().setImage({ src: url }).run();
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/jpeg,image/png,image/gif,image/webp';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const fd = new FormData();
+      fd.append('file', file);
+      try {
+        const res = await fetch('/api/upload/image', { method: 'POST', body: fd });
+        const json = (await res.json()) as { url?: string; error?: string };
+        if (!res.ok || !json.url) throw new Error(json.error ?? '이미지 업로드 실패');
+        editor.chain().focus().setImage({ src: json.url }).run();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : '이미지 업로드 실패');
+      }
+    };
+    input.click();
   };
 
   const onPickLink = () => {
