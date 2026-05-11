@@ -15,6 +15,7 @@ import {
 import { requireAuth } from '@/lib/auth';
 import { extractImageUrlsFromQuestions } from '@/lib/image-extractor';
 import { deleteImagesFromR2Server } from '@/lib/image-utils-server';
+import { promoteSurveyImages } from '@/lib/survey/survey-image-promote';
 import type {
   Question,
   QuestionGroup,
@@ -164,7 +165,10 @@ export async function saveSurveyDiff(payload: SurveyDiffPayload) {
 
       // 3b. Upsert (추가 + 수정)
       if (questionChanges.upserted.length > 0) {
-        const questionValues = questionChanges.upserted.map((question) => ({
+        // tmp/survey/ 이미지를 영구 prefix로 promote (R2 move + URL 치환)
+        const promotedQuestions = await promoteSurveyImages(questionChanges.upserted);
+
+        const questionValues = promotedQuestions.map((question) => ({
           id: question.id,
           surveyId,
           groupId: question.groupId || null,
@@ -430,7 +434,10 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
       }
 
       if (surveyData.questions.length > 0) {
-        const questionValues = surveyData.questions.map((question) => ({
+        // tmp/survey/ 이미지를 영구 prefix로 promote (R2 move + URL 치환)
+        const promotedQuestions = await promoteSurveyImages(surveyData.questions);
+
+        const questionValues = promotedQuestions.map((question) => ({
           id: question.id,
           surveyId,
           groupId: question.groupId || null,
