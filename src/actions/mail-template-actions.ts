@@ -138,6 +138,20 @@ export async function deleteMailTemplateAction(
 ): Promise<ActionResult> {
   await requireAuth();
 
+  // R2 cleanup을 위해 삭제 전 에셋 fetch
+  const oldRow = await db.query.mailTemplates.findFirst({
+    where: and(
+      eq(mailTemplates.id, templateId),
+      eq(mailTemplates.surveyId, surveyId),
+      isNull(mailTemplates.deletedAt),
+    ),
+    columns: { bodyHtml: true, attachments: true },
+  });
+
+  if (!oldRow) {
+    return { ok: false, error: '템플릿을 찾을 수 없습니다' };
+  }
+
   const result = await db
     .update(mailTemplates)
     .set({ deletedAt: new Date() })
@@ -152,6 +166,16 @@ export async function deleteMailTemplateAction(
 
   if (result.length === 0) {
     return { ok: false, error: '템플릿을 찾을 수 없습니다' };
+  }
+
+  // soft delete 성공 후 모든 에셋 R2 cleanup (실패해도 user에게 에러 노출 안 함)
+  const assets = extractMailTemplateAssets(oldRow);
+
+  if (assets.imageUrls.length > 0) {
+    deleteImagesFromR2Server(assets.imageUrls).catch(console.error);
+  }
+  if (assets.attachmentKeys.length > 0) {
+    deleteR2ObjectsByKey(assets.attachmentKeys).catch(console.error);
   }
 
   revalidatePath(`/admin/surveys/${surveyId}/operations/mail-templates`);
