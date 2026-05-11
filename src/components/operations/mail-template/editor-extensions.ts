@@ -20,9 +20,12 @@ import Text from '@tiptap/extension-text';
 import { TextStyle } from '@tiptap/extension-text-style';
 import Underline from '@tiptap/extension-underline';
 
+import { TableSelectOnBackspace } from '@/lib/tiptap/table-select-on-backspace';
+
 import { FontSize } from './font-size-mark';
 import { mailVarTokenPlugin } from './mail-var-token-plugin';
 import { TableCaption } from './table-caption';
+import { TrailingNode } from './trailing-node';
 import {
   parseTableAlign,
   tableAlignStyle,
@@ -123,6 +126,8 @@ export function createMailEditorExtensions(): AnyExtension[] {
     TableHeaderCompat,
     TableCellExtended,
     TableCaption,
+    TrailingNode,
+    TableSelectOnBackspace,
     MailVarTokenExtension,
   ];
   return extensions;

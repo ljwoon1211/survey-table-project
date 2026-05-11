@@ -602,6 +602,13 @@ html {
   outline-offset: 2px;
 }
 
+/* 표 NodeSelection 하이라이트 — Backspace/Delete 로 표 전체 선택 시 시각 피드백 */
+.ProseMirror table.ProseMirror-selectednode {
+  outline: 2px solid #007aff;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 /* prose 클래스에서 이미지 관련 스타일 오버라이드 */
 .prose img,
 .prose-sm img {

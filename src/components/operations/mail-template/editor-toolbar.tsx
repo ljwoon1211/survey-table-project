@@ -1,37 +1,22 @@
 'use client';
 
-import { Editor } from '@tiptap/react';
+import type { Editor } from '@tiptap/react';
 import {
-  AlignCenter,
-  AlignLeft,
-  AlignRight,
-  AlignVerticalJustifyCenter,
-  AlignVerticalJustifyEnd,
-  AlignVerticalJustifyStart,
   Bold,
-  Captions,
-  Columns,
   Image as ImageIcon,
   Italic,
   Link as LinkIcon,
   List,
   ListOrdered,
-  Merge,
-  Paintbrush,
   Redo,
-  Rows,
-  Split,
-  Trash2,
   Underline,
   Undo,
-  X,
 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-
 import { PopoverVariableMenu } from './popover-variable-menu';
+import { TableContextToolbar } from './table-context-toolbar';
 import { TableInsertMenu } from './table-insert-menu';
-import { toggleTableCaption } from './table-caption';
+import { Sep, ToolBtn } from './toolbar-primitives';
 import type { VariableDef } from './variable-catalog';
 
 interface Props {
@@ -40,6 +25,8 @@ interface Props {
   onPickImage: () => void;
   onPickLink: () => void;
 }
+
+const FONT_SIZES = [12, 14, 16, 18, 20, 24, 28, 32] as const;
 
 export function EditorToolbar({ editor, catalog, onPickImage, onPickLink }: Props) {
   const insertVar = (key: string) => {
@@ -50,15 +37,8 @@ export function EditorToolbar({ editor, catalog, onPickImage, onPickLink }: Prop
     editor.chain().focus().setFontSize(`${px}px`).run();
   };
 
+  // 표 안에 셀렉션이 있을 때만 표 컨텍스트 툴바 노출
   const tableActive = editor.can().deleteTable();
-  const captionActive = editor.isActive('tableCaption');
-
-  const currentTableAlign = (editor.getAttributes('table').align ?? 'left') as
-    | 'left' | 'center' | 'right';
-  const currentCellVAlign = (editor.getAttributes('tableCell').verticalAlign ?? 'top') as
-    | 'top' | 'middle' | 'bottom';
-  const currentCaptionAlign = (editor.getAttributes('tableCaption').align ?? 'center') as
-    | 'left' | 'center' | 'right';
 
   return (
     <div className="flex flex-wrap items-center gap-1 border-b border-gray-200 bg-gray-50/50 p-2">
@@ -90,7 +70,7 @@ export function EditorToolbar({ editor, catalog, onPickImage, onPickLink }: Prop
         defaultValue="14"
         aria-label="폰트 크기"
       >
-        {[12, 14, 16, 18, 20, 24, 28, 32].map((s) => (
+        {FONT_SIZES.map((s) => (
           <option key={s} value={s}>
             {s}px
           </option>
@@ -146,244 +126,7 @@ export function EditorToolbar({ editor, catalog, onPickImage, onPickLink }: Prop
         </ToolBtn>
       </div>
 
-      {tableActive && (
-        <div className="flex w-full flex-wrap items-center gap-1 border-t border-gray-200 pt-2">
-          {/* 행/열 그룹 */}
-          <ToolBtn title="열 추가 (뒤)" onClick={() => editor.chain().focus().addColumnAfter().run()}>
-            <Columns className="h-4 w-4" />
-          </ToolBtn>
-          <ToolBtn title="행 추가 (아래)" onClick={() => editor.chain().focus().addRowAfter().run()}>
-            <Rows className="h-4 w-4" />
-          </ToolBtn>
-          <ToolBtn
-            title="열 삭제"
-            disabled={!editor.can().deleteColumn()}
-            onClick={() => editor.chain().focus().deleteColumn().run()}
-            className="text-red-600 hover:bg-red-50"
-          >
-            <Columns className="h-4 w-4" />
-            <span className="text-xs">−</span>
-          </ToolBtn>
-          <ToolBtn
-            title="행 삭제"
-            disabled={!editor.can().deleteRow()}
-            onClick={() => editor.chain().focus().deleteRow().run()}
-            className="text-red-600 hover:bg-red-50"
-          >
-            <Rows className="h-4 w-4" />
-            <span className="text-xs">−</span>
-          </ToolBtn>
-
-          <Sep />
-
-          {/* 병합 그룹 */}
-          <ToolBtn
-            title="셀 병합"
-            disabled={!editor.can().mergeCells()}
-            onClick={() => editor.chain().focus().mergeCells().run()}
-          >
-            <Merge className="h-4 w-4" />
-          </ToolBtn>
-          <ToolBtn
-            title="셀 분할"
-            disabled={!editor.can().splitCell()}
-            onClick={() => editor.chain().focus().splitCell().run()}
-          >
-            <Split className="h-4 w-4" />
-          </ToolBtn>
-
-          <Sep />
-
-          {/* 셀 vertical-align */}
-          <ToolBtn
-            title="셀 위쪽"
-            active={currentCellVAlign === 'top'}
-            onClick={() =>
-              editor.chain().focus().updateAttributes('tableCell', { verticalAlign: 'top' }).run()
-            }
-          >
-            <AlignVerticalJustifyStart className="h-4 w-4" />
-          </ToolBtn>
-          <ToolBtn
-            title="셀 가운데"
-            active={currentCellVAlign === 'middle'}
-            onClick={() =>
-              editor.chain().focus().updateAttributes('tableCell', { verticalAlign: 'middle' }).run()
-            }
-          >
-            <AlignVerticalJustifyCenter className="h-4 w-4" />
-          </ToolBtn>
-          <ToolBtn
-            title="셀 아래쪽"
-            active={currentCellVAlign === 'bottom'}
-            onClick={() =>
-              editor.chain().focus().updateAttributes('tableCell', { verticalAlign: 'bottom' }).run()
-            }
-          >
-            <AlignVerticalJustifyEnd className="h-4 w-4" />
-          </ToolBtn>
-
-          <Sep />
-
-          {/* 표 정렬 */}
-          <ToolBtn
-            title="표 왼쪽"
-            active={currentTableAlign === 'left'}
-            onClick={() =>
-              editor.chain().focus().updateAttributes('table', { align: 'left' }).run()
-            }
-          >
-            <AlignLeft className="h-4 w-4" />
-          </ToolBtn>
-          <ToolBtn
-            title="표 가운데"
-            active={currentTableAlign === 'center'}
-            onClick={() =>
-              editor.chain().focus().updateAttributes('table', { align: 'center' }).run()
-            }
-          >
-            <AlignCenter className="h-4 w-4" />
-          </ToolBtn>
-          <ToolBtn
-            title="표 오른쪽"
-            active={currentTableAlign === 'right'}
-            onClick={() =>
-              editor.chain().focus().updateAttributes('table', { align: 'right' }).run()
-            }
-          >
-            <AlignRight className="h-4 w-4" />
-          </ToolBtn>
-
-          <Sep />
-
-          {/* 셀 배경 */}
-          <ToolBtn
-            title="셀 배경"
-            onClick={() =>
-              editor
-                .chain()
-                .focus()
-                .updateAttributes('tableCell', { backgroundColor: '#e5e7eb' })
-                .run()
-            }
-          >
-            <Paintbrush className="h-4 w-4" />
-          </ToolBtn>
-          <ToolBtn
-            title="셀 배경 제거"
-            className="text-red-600 hover:bg-red-50"
-            onClick={() =>
-              editor
-                .chain()
-                .focus()
-                .updateAttributes('tableCell', { backgroundColor: null })
-                .run()
-            }
-          >
-            <Paintbrush className="h-4 w-4" />
-            <X className="h-3 w-3" />
-          </ToolBtn>
-
-          <Sep />
-
-          {/* 캡션 토글 */}
-          <ToolBtn
-            title={captionActive ? '캡션 제거' : '캡션 추가'}
-            active={captionActive}
-            onClick={() => toggleTableCaption(editor)}
-          >
-            <Captions className="h-4 w-4" />
-          </ToolBtn>
-
-          {/* 캡션 정렬 — 캡션 focus 시만 노출 */}
-          {captionActive && (
-            <>
-              <ToolBtn
-                title="캡션 왼쪽"
-                active={currentCaptionAlign === 'left'}
-                onClick={() =>
-                  editor
-                    .chain()
-                    .focus()
-                    .updateAttributes('tableCaption', { align: 'left' })
-                    .run()
-                }
-              >
-                <AlignLeft className="h-4 w-4" />
-              </ToolBtn>
-              <ToolBtn
-                title="캡션 가운데"
-                active={currentCaptionAlign === 'center'}
-                onClick={() =>
-                  editor
-                    .chain()
-                    .focus()
-                    .updateAttributes('tableCaption', { align: 'center' })
-                    .run()
-                }
-              >
-                <AlignCenter className="h-4 w-4" />
-              </ToolBtn>
-              <ToolBtn
-                title="캡션 오른쪽"
-                active={currentCaptionAlign === 'right'}
-                onClick={() =>
-                  editor
-                    .chain()
-                    .focus()
-                    .updateAttributes('tableCaption', { align: 'right' })
-                    .run()
-                }
-              >
-                <AlignRight className="h-4 w-4" />
-              </ToolBtn>
-            </>
-          )}
-
-          {/* 표 삭제 — 우측 분리 */}
-          <ToolBtn
-            title="표 삭제"
-            className="ml-auto text-red-600 hover:bg-red-50"
-            onClick={() => editor.chain().focus().deleteTable().run()}
-          >
-            <Trash2 className="h-4 w-4" />
-          </ToolBtn>
-        </div>
-      )}
+      {tableActive && <TableContextToolbar editor={editor} />}
     </div>
   );
-}
-
-function ToolBtn({
-  children,
-  onClick,
-  active,
-  disabled,
-  title,
-  className,
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  active?: boolean;
-  disabled?: boolean;
-  title?: string;
-  className?: string;
-}) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      className={`${active ? 'bg-gray-200' : ''} ${className ?? ''}`}
-    >
-      {children}
-    </Button>
-  );
-}
-
-function Sep() {
-  return <div className="h-6 w-px bg-gray-300" />;
 }

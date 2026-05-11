@@ -6,6 +6,9 @@ import { TableRow } from '@tiptap/extension-table-row';
 import StarterKit from '@tiptap/starter-kit';
 import ImageResize from 'tiptap-extension-resize-image';
 
+import { TableSelectOnBackspace } from '@/lib/tiptap/table-select-on-backspace';
+import { TrailingNode } from '@/lib/tiptap/trailing-node';
+
 
 // 배경색 속성 추가 함수
 const addBackgroundColorAttribute = () => ({
@@ -137,5 +140,7 @@ export function createEditorExtensions() {
     TableRow,
     TableCellWithBackground,
     TableHeaderWithBackground,
+    TrailingNode,
+    TableSelectOnBackspace,
   ];
 }

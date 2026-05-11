@@ -4,7 +4,7 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
 
 const VAR_TOKEN_RE = /\{\{[^}]+\}\}/g;
 
-export interface TokenRange {
+interface TokenRange {
   from: number;
   to: number;
 }
@@ -36,7 +36,7 @@ function buildDecorations(doc: PMNode): DecorationSet {
   return DecorationSet.create(doc, decorations);
 }
 
-export const mailVarTokenPluginKey = new PluginKey<DecorationSet>('mail-var-token');
+const mailVarTokenPluginKey = new PluginKey<DecorationSet>('mail-var-token');
 
 export const mailVarTokenPlugin = new Plugin<DecorationSet>({
   key: mailVarTokenPluginKey,
