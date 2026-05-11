@@ -1,8 +1,8 @@
 /**
- * 서버 사이드 이미지 삭제 유틸리티
- * 서버 액션에서 R2에 직접 접근하여 이미지를 삭제합니다.
+ * 서버 사이드 이미지/파일 삭제 유틸리티
+ * 서버 액션에서 R2에 직접 접근하여 이미지 및 파일을 삭제합니다.
  */
-import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { CopyObjectCommand, DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 // Cloudflare R2는 S3 호환 API를 사용합니다
 const r2Client = new S3Client({
@@ -77,4 +77,91 @@ export async function deleteImagesFromR2Server(urls: string[]): Promise<boolean>
   }
 
   return false;
+}
+
+/**
+ * R2 객체를 한 key에서 다른 key로 복사 + 원본 삭제 (move 동작).
+ * 단일 작업이라 트랜잭션 아님 — COPY 성공 후 DELETE 실패 시 원본 객체 남음 (lifecycle이 처리).
+ * @returns 성공 시 true, 실패 시 false
+ */
+export async function moveR2Object(srcKey: string, dstKey: string): Promise<boolean> {
+  const bucketName = process.env.CLOUDFLARE_R2_BUCKET;
+  if (!bucketName) return false;
+
+  try {
+    await r2Client.send(
+      new CopyObjectCommand({
+        Bucket: bucketName,
+        CopySource: `${bucketName}/${srcKey}`,
+        Key: dstKey,
+      }),
+    );
+    await r2Client
+      .send(new DeleteObjectCommand({ Bucket: bucketName, Key: srcKey }))
+      .catch(() => {
+        // DELETE 실패해도 COPY는 됐으니 OK. tmp/ lifecycle이 처리.
+      });
+    return true;
+  } catch (error) {
+    console.error(`R2 move 실패 ${srcKey} → ${dstKey}:`, error);
+    return false;
+  }
+}
+
+/**
+ * 여러 R2 객체 batch move.
+ * 실패한 src는 그대로 두고 (lifecycle 처리), 성공/실패 분리해 반환.
+ */
+export async function moveR2Objects(
+  pairs: Array<{ srcKey: string; dstKey: string }>,
+): Promise<{ movedKeys: Array<{ srcKey: string; dstKey: string }>; failed: string[] }> {
+  const movedKeys: Array<{ srcKey: string; dstKey: string }> = [];
+  const failed: string[] = [];
+
+  for (const pair of pairs) {
+    const ok = await moveR2Object(pair.srcKey, pair.dstKey);
+    if (ok) movedKeys.push(pair);
+    else failed.push(pair.srcKey);
+  }
+
+  return { movedKeys, failed };
+}
+
+/**
+ * R2 object key 목록으로 파일을 삭제합니다.
+ * URL이 아닌 key(예: "mail/<surveyId>/<uuid>.pdf")를 직접 받습니다.
+ * @param keys 삭제할 R2 object key 배열
+ * @returns 삭제 성공 여부 (부분 실패 시 경고 로그 후 true)
+ */
+export async function deleteR2ObjectsByKey(keys: string[]): Promise<boolean> {
+  if (!keys || keys.length === 0) {
+    return true;
+  }
+
+  const bucketName = process.env.CLOUDFLARE_R2_BUCKET;
+  if (!bucketName) {
+    console.error('Cloudflare R2 환경 변수가 설정되지 않았습니다.');
+    return false;
+  }
+
+  const failedKeys: string[] = [];
+
+  for (const key of keys) {
+    try {
+      const command = new DeleteObjectCommand({
+        Bucket: bucketName,
+        Key: key,
+      });
+      await r2Client.send(command);
+    } catch (error) {
+      console.error(`R2 파일 삭제 실패 (key: ${key}):`, error);
+      failedKeys.push(key);
+    }
+  }
+
+  if (failedKeys.length > 0) {
+    console.warn(`일부 R2 파일 삭제 실패: ${failedKeys.length}개`);
+  }
+
+  return true; // partial failure는 허용 — caller는 어쨌든 success 처리
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
 import {
@@ -12,7 +12,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import type { MailTemplate } from '@/db/schema/mail';
 
-import { MailTemplateEditor } from './mail-template-editor';
+import { MailTemplateEditor, type MailTemplateEditorHandle } from './mail-template-editor';
 import { MetaFields, type MetaFieldValues } from './meta-fields';
 import type { VariableDef } from './variable-catalog';
 
@@ -42,6 +42,7 @@ export function TemplateEditForm({ surveyId, fromDomain, catalog, template }: Pr
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const editorRef = useRef<MailTemplateEditorHandle>(null);
 
   const initial = useMemo(() => buildInitialState(template), [template]);
   const [state, setState] = useState<FormState>(initial);
@@ -100,6 +101,10 @@ export function TemplateEditForm({ surveyId, fromDomain, catalog, template }: Pr
 
   const onCancel = () => {
     if (isDirty && !confirm('변경사항이 저장되지 않습니다. 나가시겠습니까?')) return;
+    // 저장하지 않고 떠날 때 에디터에서 업로드한 orphan 이미지 R2 cleanup
+    editorRef.current?.cleanupOrphanImages().catch((err) => {
+      console.error('cancel 시 이미지 cleanup 실패:', err);
+    });
     router.back();
   };
 
@@ -117,6 +122,7 @@ export function TemplateEditForm({ surveyId, fromDomain, catalog, template }: Pr
             본문<span className="ml-0.5 text-red-500">*</span>
           </Label>
           <MailTemplateEditor
+            ref={editorRef}
             initialHtml={template?.bodyHtml ?? ''}
             catalog={catalog}
             onChange={(html) => setState((prev) => ({ ...prev, bodyHtml: html }))}
