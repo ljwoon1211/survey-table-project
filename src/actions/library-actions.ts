@@ -15,6 +15,7 @@ import {
 import { requireAuth } from '@/lib/auth';
 import { extractImageUrlsFromQuestion } from '@/lib/image-extractor';
 import { deleteImagesFromR2Server } from '@/lib/image-utils-server';
+import { promoteSurveyImages } from '@/lib/survey/survey-image-promote';
 import { generateId } from '@/lib/utils';
 import type { Question } from '@/types/survey';
 
@@ -34,8 +35,11 @@ export async function saveQuestion(
 ) {
   await requireAuth();
 
+  // tmp/survey/ 이미지를 영구 prefix로 promote (R2 move + URL 치환)
+  const [promotedQuestion] = await promoteSurveyImages([question]);
+
   const newSavedQuestion: NewSavedQuestion = {
-    question: question as unknown as NewSavedQuestion['question'],
+    question: promotedQuestion as unknown as NewSavedQuestion['question'],
     name: metadata.name,
     description: metadata.description,
     category: metadata.category,
@@ -62,11 +66,18 @@ export async function updateSavedQuestion(
 ) {
   await requireAuth();
 
+  // question이 포함된 경우 tmp/survey/ 이미지 promote
+  let promotedQuestion = updates.question;
+  if (updates.question) {
+    const [promoted] = await promoteSurveyImages([updates.question]);
+    promotedQuestion = promoted;
+  }
+
   const [updated] = await db
     .update(savedQuestions)
     .set({
       ...updates,
-      question: updates.question as unknown as NewSavedQuestion['question'],
+      question: promotedQuestion as unknown as NewSavedQuestion['question'],
       updatedAt: new Date(),
     })
     .where(eq(savedQuestions.id, id))

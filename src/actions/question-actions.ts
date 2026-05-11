@@ -10,6 +10,7 @@ import { NewQuestion, questions } from '@/db/schema';
 import { requireAuth } from '@/lib/auth';
 import { extractImageUrlsFromQuestion } from '@/lib/image-extractor';
 import { deleteImagesFromR2Server } from '@/lib/image-utils-server';
+import { promoteSurveyImages } from '@/lib/survey/survey-image-promote';
 import { generateId, isValidUUID } from '@/lib/utils';
 import type { Question, Question as QuestionType } from '@/types/survey';
 
@@ -96,7 +97,11 @@ export async function createQuestion(data: {
     spssMeasure: data.spssMeasure,
   };
 
-  const [question] = await db.insert(questions).values(newQuestion).returning();
+  // tmp/survey/ 이미지를 영구 prefix로 promote (R2 move + URL 치환)
+  const [promoted] = await promoteSurveyImages([newQuestion as unknown as Question]);
+  const questionToInsert = promoted as unknown as NewQuestion;
+
+  const [question] = await db.insert(questions).values(questionToInsert).returning();
 
   revalidatePath(`/admin/surveys/${data.surveyId}`);
   return question;
@@ -175,9 +180,13 @@ export async function updateQuestion(
   if (data.spssVarType !== undefined) allowed.spssVarType = data.spssVarType;
   if (data.spssMeasure !== undefined) allowed.spssMeasure = data.spssMeasure;
 
+  // tmp/survey/ 이미지를 영구 prefix로 promote (R2 move + URL 치환)
+  const [promotedAllowed] = await promoteSurveyImages([allowed as unknown as Question]);
+  const allowedToUpdate = promotedAllowed as unknown as Partial<NewQuestion>;
+
   const [updated] = await db
     .update(questions)
-    .set(allowed)
+    .set(allowedToUpdate)
     .where(eq(questions.id, questionId))
     .returning();
 
