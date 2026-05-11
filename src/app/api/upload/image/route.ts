@@ -89,10 +89,21 @@ export async function POST(request: NextRequest) {
       fileExtension = file.name.split('.').pop() || 'jpg';
     }
 
+    // kind 파라미터 검증 (mail | survey)
+    const KIND_VALUES = new Set(['mail', 'survey']);
+    const kindRaw = formData.get('kind');
+    const kind = typeof kindRaw === 'string' && KIND_VALUES.has(kindRaw) ? kindRaw : null;
+    if (!kind) {
+      return NextResponse.json(
+        { error: '잘못된 또는 누락된 kind 파라미터 (mail | survey)' },
+        { status: 400 },
+      );
+    }
+
     // 파일 이름 생성 (타임스탬프 + 랜덤 문자열)
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substring(2, 15);
-    const fileName = `images/${timestamp}-${randomString}.${fileExtension}`;
+    const fileName = `tmp/${kind}/${timestamp}-${randomString}.${fileExtension}`;
 
     // R2에 업로드
     const command = new PutObjectCommand({
