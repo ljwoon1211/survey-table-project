@@ -129,6 +129,7 @@ export const MailTemplateEditor = forwardRef<MailTemplateEditorHandle, Props>(
       if (!file) return;
       const fd = new FormData();
       fd.append('file', file);
+      fd.append('kind', 'mail');
       try {
         const res = await fetch('/api/upload/image', { method: 'POST', body: fd });
         const json = (await res.json()) as { url?: string; error?: string };

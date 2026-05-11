@@ -216,6 +216,7 @@ export function NoticeEditor({
       // FormData 생성
       const formData = new FormData();
       formData.append('file', optimizedFile);
+      formData.append('kind', 'survey');
 
       // 업로드 (진행률 추적)
       const xhr = new XMLHttpRequest();
