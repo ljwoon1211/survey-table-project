@@ -261,6 +261,61 @@ const preflightInputSchema = z.object({
   selectedContactIds: z.array(z.string().uuid()).max(10_000),
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 마법사 "필터 결과 전체 선택" 액션 — 현재 필터 조건에 해당하는 모든 contact id 반환.
+// 페이지네이션 없이 일괄 — 캠페인 최대 10000명 제약 안에서 안전. 더 큰 캠페인은 제한 메시지.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const candidateIdsInputSchema = z.object({
+  surveyId: z.string().uuid(),
+  filter: filterSnapshotSchema,
+});
+
+export async function fetchCandidateIdsAction(
+  raw: z.input<typeof candidateIdsInputSchema>,
+): Promise<ActionResult<{ ids: string[]; total: number; truncated: boolean }>> {
+  try {
+    await requireAuth();
+  } catch {
+    return { ok: false, error: '인증이 필요합니다.' };
+  }
+
+  const parsed = candidateIdsInputSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? '입력값이 올바르지 않습니다.' };
+  }
+  const { surveyId, filter } = parsed.data;
+
+  const { previewCampaignCandidates, countCampaignCandidates } = await import(
+    '@/lib/operations/campaigns.server'
+  );
+
+  const total = await countCampaignCandidates({ surveyId, filter });
+  const MAX_IDS = 10_000;
+  if (total > MAX_IDS) {
+    return {
+      ok: false,
+      error: `필터에 해당하는 수신자가 ${total.toLocaleString('ko-KR')}명입니다. 한 캠페인 최대 ${MAX_IDS.toLocaleString('ko-KR')}명 — 필터를 좁혀주세요.`,
+    };
+  }
+
+  // page=1, pageSize=total 로 한 번에 전체 페치
+  const result = await previewCampaignCandidates({
+    surveyId,
+    filter,
+    page: 1,
+    pageSize: Math.max(1, total),
+  });
+  return {
+    ok: true,
+    data: {
+      ids: result.rows.map((r) => r.id),
+      total,
+      truncated: false,
+    },
+  };
+}
+
 export async function previewCampaignPreflightAction(
   raw: z.input<typeof preflightInputSchema>,
 ): Promise<
