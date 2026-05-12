@@ -1,14 +1,15 @@
 'use server';
 
-import { and, eq, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { db } from '@/db';
-import { contactTargets } from '@/db/schema/contacts';
+import { contactPii, contactTargets } from '@/db/schema/contacts';
 import { mailCampaigns, mailRecipients, mailTemplates } from '@/db/schema/mail';
 import type { CampaignFilterSnapshot } from '@/db/schema/schema-types';
 import { requireAuth } from '@/lib/auth';
+import { decryptPii } from '@/lib/crypto/aes';
 import { inngest } from '@/lib/inngest/client';
 
 interface ActionResult<T = void> {
@@ -127,23 +128,45 @@ export async function createCampaignAction(
         throw new Error('캠페인 생성에 실패했습니다.');
       }
 
-      // d. valid contact 재페치
-      const validContacts = await tx
+      // d. valid contact 재페치 — contact_pii 에서 email cipher 까지 같이 가져옴.
+      //    한 컨택에 email 컬럼이 여러 개면 column_key 알파벳 순 첫 번째 사용 (앞에서 dedupe).
+      const piiJoined = await tx
         .select({
           id: contactTargets.id,
-          email: contactTargets.email,
+          columnKey: contactPii.columnKey,
+          cipher: contactPii.cipher,
           inviteToken: contactTargets.inviteToken,
         })
         .from(contactTargets)
+        .innerJoin(
+          contactPii,
+          and(
+            eq(contactPii.contactTargetId, contactTargets.id),
+            eq(contactPii.fieldType, 'email'),
+          ),
+        )
         .where(
           and(
             eq(contactTargets.surveyId, input.surveyId),
             inArray(contactTargets.id, input.contactTargetIds),
             isNull(contactTargets.unsubscribedAt),
-            isNotNull(contactTargets.email),
-            ne(contactTargets.email, ''),
           ),
-        );
+        )
+        .orderBy(asc(contactTargets.id), asc(contactPii.columnKey));
+
+      const seen = new Set<string>();
+      const validContacts: Array<{ id: string; email: string; inviteToken: string }> = [];
+      for (const r of piiJoined) {
+        if (seen.has(r.id)) continue; // 첫 email 컬럼만
+        try {
+          const email = decryptPii(r.cipher);
+          if (!email || !email.trim()) continue;
+          seen.add(r.id);
+          validContacts.push({ id: r.id, email, inviteToken: r.inviteToken });
+        } catch {
+          // 복호화 실패 행은 발송 대상에서 제외 (cipher 손상/키 미스매치)
+        }
+      }
 
       const validCount = validContacts.length;
       const skippedCount = input.contactTargetIds.length - validCount;
@@ -156,7 +179,7 @@ export async function createCampaignAction(
       const recipientRows = validContacts.map((c) => ({
         campaignId: campaign.id,
         contactTargetId: c.id,
-        emailSnapshot: c.email ?? '', // NOT NULL 가드 — ne(email, '') 로 사실상 비어있지 않음
+        emailSnapshot: c.email,
         inviteTokenSnapshot: c.inviteToken,
         status: 'queued' as const,
       }));

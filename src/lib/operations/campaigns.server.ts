@@ -1,10 +1,11 @@
 import 'server-only';
 
-import { and, desc, eq, inArray, isNotNull, isNull, ne, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql, type SQL } from 'drizzle-orm';
 
 import { db } from '@/db';
 import {
   contactAttempts,
+  contactPii,
   contactTargets,
   mailCampaigns,
   mailRecipients,
@@ -15,6 +16,11 @@ import type {
   MailAttachment,
 } from '@/db/schema/schema-types';
 import type { MailCampaignStatus, MailRecipientStatus } from '@/db/schema/mail';
+import {
+  findContactIdsByBlindIndex,
+  findContactIdsByPlainAcrossTypes,
+} from '@/lib/crypto/contact-pii-repo';
+import type { PiiFieldType } from '@/lib/crypto/pii-fields';
 import { maskEmail } from '@/lib/operations/contacts';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -302,12 +308,21 @@ export interface CampaignCandidatesResult {
   page: number;
 }
 
-function buildCandidateWhere(surveyId: string, filter: CampaignFilterSnapshot): SQL {
+// "이 컨택에 email PII 가 등록돼 있나" 정확검사. NULL/'' 무관 — contact_pii row 존재 자체가 기준.
+const HAS_EMAIL_PII = sql`EXISTS (
+  SELECT 1 FROM contact_pii cp
+  WHERE cp.contact_target_id = "contact_targets"."id"
+    AND cp.field_type = 'email'
+)`;
+
+async function buildCandidateWhere(
+  surveyId: string,
+  filter: CampaignFilterSnapshot,
+): Promise<SQL> {
   const parts: SQL[] = [
     eq(contactTargets.surveyId, surveyId),
     isNull(contactTargets.unsubscribedAt),
-    isNotNull(contactTargets.email),
-    ne(contactTargets.email, ''),
+    HAS_EMAIL_PII,
   ];
 
   if (filter.unrespondedOnly) {
@@ -322,19 +337,29 @@ function buildCandidateWhere(surveyId: string, filter: CampaignFilterSnapshot): 
     if (field === 'resid') {
       const n = parseInt(q, 10);
       parts.push(Number.isFinite(n) && n > 0 ? eq(contactTargets.resid, n) : sql`false`);
-    } else if (field === 'email') {
-      parts.push(sql`${contactTargets.email} ILIKE ${pattern}`);
-    } else if (field === 'biz') {
-      parts.push(sql`${contactTargets.bizNumber} ILIKE ${pattern}`);
+    } else if (field === 'email' || field === 'biz') {
+      // blind_index 정확 매치 (부분 일치 불가).
+      const fieldType: PiiFieldType = field === 'email' ? 'email' : 'biz_number';
+      const matchedIds = await findContactIdsByBlindIndex(surveyId, fieldType, q);
+      parts.push(
+        matchedIds.length > 0 ? inArray(contactTargets.id, matchedIds) : sql`false`,
+      );
     } else if (field === 'group') {
       parts.push(sql`${contactTargets.groupValue} ILIKE ${pattern}`);
     } else {
-      const orClause = or(
-        sql`${contactTargets.email} ILIKE ${pattern}`,
-        sql`${contactTargets.bizNumber} ILIKE ${pattern}`,
-        sql`${contactTargets.groupValue} ILIKE ${pattern}`,
+      // all — group_value 부분 일치 + 모든 PII 타입 정확 매치 합집합 (단일 SQL).
+      const piiMatchIds = await findContactIdsByPlainAcrossTypes(
+        surveyId,
+        ['email', 'mobile', 'phone', 'name', 'address', 'biz_number'],
+        q,
       );
-      if (orClause) parts.push(orClause);
+      const groupClause = sql`${contactTargets.groupValue} ILIKE ${pattern}`;
+      if (piiMatchIds.length > 0) {
+        const combined = or(groupClause, inArray(contactTargets.id, piiMatchIds));
+        if (combined) parts.push(combined);
+      } else {
+        parts.push(groupClause);
+      }
     }
   }
 
@@ -354,6 +379,38 @@ function buildCandidateWhere(surveyId: string, filter: CampaignFilterSnapshot): 
   return and(...parts)!;
 }
 
+/**
+ * contact_id 목록에 대해 첫 email PII 의 mask_hint 일괄 조회.
+ * 한 컨택에 여러 email 컬럼이 있으면 column_key 알파벳 순 첫 번째.
+ */
+async function fetchEmailMaskHints(contactIds: readonly string[]): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  if (contactIds.length === 0) return result;
+
+  const rows = await db
+    .select({
+      contactTargetId: contactPii.contactTargetId,
+      columnKey: contactPii.columnKey,
+      maskHint: contactPii.maskHint,
+    })
+    .from(contactPii)
+    .where(
+      and(
+        eq(contactPii.fieldType, 'email'),
+        inArray(contactPii.contactTargetId, [...contactIds]),
+      ),
+    )
+    .orderBy(asc(contactPii.contactTargetId), asc(contactPii.columnKey));
+
+  for (const r of rows) {
+    if (result.has(r.contactTargetId)) continue; // 첫 컬럼만
+    result.set(r.contactTargetId, r.maskHint ?? '');
+  }
+  return result;
+}
+
+const EMAIL_DASH = '—';
+
 export async function previewCampaignCandidates(args: {
   surveyId: string;
   filter: CampaignFilterSnapshot;
@@ -361,7 +418,7 @@ export async function previewCampaignCandidates(args: {
   pageSize?: number;
 }): Promise<CampaignCandidatesResult> {
   const pageSize = args.pageSize ?? DEFAULT_PAGE_SIZE;
-  const where = buildCandidateWhere(args.surveyId, args.filter);
+  const where = await buildCandidateWhere(args.surveyId, args.filter);
 
   const [countRow] = await db
     .select({ total: sql<number>`count(*)::int` })
@@ -382,7 +439,6 @@ export async function previewCampaignCandidates(args: {
     .select({
       id: contactTargets.id,
       resid: contactTargets.resid,
-      email: contactTargets.email,
       groupValue: contactTargets.groupValue,
       attrs: contactTargets.attrs,
       respondedAt: contactTargets.respondedAt,
@@ -394,12 +450,14 @@ export async function previewCampaignCandidates(args: {
     .limit(pageSize)
     .offset(offset);
 
+  const maskMap = await fetchEmailMaskHints(rows.map((r) => r.id));
+
   return {
     rows: rows.map((r) => ({
       id: r.id,
       resid: r.resid,
-      email: r.email ?? '',
-      emailMasked: maskEmail(r.email),
+      email: '', // candidate row 에서는 평문 비공개 — UI 는 emailMasked 만 표시
+      emailMasked: maskMap.get(r.id) || EMAIL_DASH,
       groupValue: r.groupValue,
       attrs: (r.attrs ?? {}) as Record<string, string>,
       respondedAt: r.respondedAt,
@@ -414,7 +472,7 @@ export async function countCampaignCandidates(args: {
   surveyId: string;
   filter: CampaignFilterSnapshot;
 }): Promise<number> {
-  const where = buildCandidateWhere(args.surveyId, args.filter);
+  const where = await buildCandidateWhere(args.surveyId, args.filter);
   const [countRow] = await db
     .select({ total: sql<number>`count(*)::int` })
     .from(contactTargets)
@@ -458,7 +516,6 @@ export async function listUnsubscribedContacts(args: {
     .select({
       id: contactTargets.id,
       resid: contactTargets.resid,
-      email: contactTargets.email,
       groupValue: contactTargets.groupValue,
       unsubscribedAt: contactTargets.unsubscribedAt,
     })
@@ -468,13 +525,15 @@ export async function listUnsubscribedContacts(args: {
     .limit(pageSize)
     .offset(offset);
 
+  const maskMap = await fetchEmailMaskHints(rows.map((r) => r.id));
+
   return {
     rows: rows
       .filter((r): r is typeof r & { unsubscribedAt: Date } => r.unsubscribedAt !== null)
       .map((r) => ({
         id: r.id,
         resid: r.resid,
-        emailMasked: maskEmail(r.email),
+        emailMasked: maskMap.get(r.id) || EMAIL_DASH,
         groupValue: r.groupValue,
         unsubscribedAt: r.unsubscribedAt,
       })),
@@ -501,11 +560,17 @@ export async function preflightRecipients(args: {
   if (args.selectedContactIds.length === 0) {
     return { validIds: [], unsubscribedIds: [], emailMissingIds: [], notFoundIds: [] };
   }
+  // contact_targets + email PII 존재 여부를 한 쿼리로 — LEFT JOIN 후 cipher NULL 여부 판단.
+  // 한 컨택에 email 컬럼이 여러 개 있어도 EXISTS 만 보므로 dedupe 불필요 (한 행이라도 있으면 valid).
   const rows = await db
     .select({
       id: contactTargets.id,
-      email: contactTargets.email,
       unsubscribedAt: contactTargets.unsubscribedAt,
+      hasEmail: sql<boolean>`EXISTS (
+        SELECT 1 FROM contact_pii cp
+        WHERE cp.contact_target_id = "contact_targets"."id"
+          AND cp.field_type = 'email'
+      )`.as('has_email'),
     })
     .from(contactTargets)
     .where(
@@ -524,7 +589,7 @@ export async function preflightRecipients(args: {
     found.add(r.id);
     if (r.unsubscribedAt !== null) {
       unsubscribedIds.push(r.id);
-    } else if (!r.email || r.email.trim() === '') {
+    } else if (!r.hasEmail) {
       emailMissingIds.push(r.id);
     } else {
       validIds.push(r.id);

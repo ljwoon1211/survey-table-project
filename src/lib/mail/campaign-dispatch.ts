@@ -73,7 +73,9 @@ export async function dispatchCampaignChunk(
   const fromDomain = process.env.RESEND_FROM_DOMAIN;
   if (!fromDomain) throw new Error('RESEND_FROM_DOMAIN 환경변수가 설정되지 않았습니다.');
 
-  // recipients + contact_targets join — queued 상태만 처리 (재실행/retry 시 이미 처리된 row 건너뜀)
+  // recipients + contact_targets join — queued 상태만 처리 (재실행/retry 시 이미 처리된 row 건너뜀).
+  // 발송용 이메일은 mail_recipients.emailSnapshot 평문값을 그대로 사용 — campaign 생성 시점에
+  // contact_pii cipher 복호화해 snapshot 으로 박아둔 값. 발송 시 재복호화 불필요.
   const rows = await db
     .select({
       recipientId: mailRecipients.id,
@@ -81,7 +83,6 @@ export async function dispatchCampaignChunk(
       inviteToken: contactTargets.inviteToken,
       unsubscribeToken: contactTargets.unsubscribeToken,
       attrs: contactTargets.attrs,
-      contactEmail: contactTargets.email,
     })
     .from(mailRecipients)
     .innerJoin(contactTargets, eq(mailRecipients.contactTargetId, contactTargets.id))
@@ -114,7 +115,7 @@ export async function dispatchCampaignChunk(
         bodyHtml: campaign.bodyHtmlSnapshot,
         fromName: campaign.fromNameSnapshot,
         contactAttrs: row.attrs,
-        contactEmail: row.contactEmail,
+        contactEmail: row.emailSnapshot,
         inviteUrl,
       });
 

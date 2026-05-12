@@ -1,12 +1,13 @@
 'use server';
 
-import { eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 
 import * as Sentry from '@sentry/nextjs';
 
 import { db } from '@/db';
-import { contactTargets } from '@/db/schema/contacts';
+import { contactPii, contactTargets } from '@/db/schema/contacts';
+import { decryptPii } from '@/lib/crypto/aes';
 import { UUID_RE } from '@/lib/mail/constants';
 
 export interface UnsubscribeResult {
@@ -28,17 +29,39 @@ export async function unsubscribeByToken(token: string): Promise<UnsubscribeResu
   }
 
   try {
-    const [existing] = await db
+    // contact_targets + contact_pii(email) LEFT JOIN — 이메일은 마스킹/표시용으로만 사용.
+    // 한 컨택에 email 컬럼이 여러 개면 column_key 알파벳 순 첫 번째.
+    const rows = await db
       .select({
+        id: contactTargets.id,
         unsubscribedAt: contactTargets.unsubscribedAt,
-        email: contactTargets.email,
+        cipher: contactPii.cipher,
+        columnKey: contactPii.columnKey,
       })
       .from(contactTargets)
+      .leftJoin(
+        contactPii,
+        and(
+          eq(contactPii.contactTargetId, contactTargets.id),
+          eq(contactPii.fieldType, 'email'),
+        ),
+      )
       .where(eq(contactTargets.unsubscribeToken, token))
+      .orderBy(asc(contactPii.columnKey))
       .limit(1);
 
+    const existing = rows[0];
     if (!existing) {
       return { ok: false, email: null, alreadyUnsubscribed: false };
+    }
+
+    let email: string | null = null;
+    if (existing.cipher) {
+      try {
+        email = decryptPii(existing.cipher);
+      } catch {
+        // 복호화 실패 시 email 노출 안 함 — 페이지가 이메일 없는 fallback 메시지 표시.
+      }
     }
 
     const alreadyUnsubscribed = existing.unsubscribedAt !== null;
@@ -48,7 +71,7 @@ export async function unsubscribeByToken(token: string): Promise<UnsubscribeResu
         .set({ unsubscribedAt: new Date() })
         .where(eq(contactTargets.unsubscribeToken, token));
     }
-    return { ok: true, email: existing.email, alreadyUnsubscribed };
+    return { ok: true, email, alreadyUnsubscribed };
   } catch (err) {
     Sentry.captureException(err, {
       tags: { operation: 'unsubscribe_by_token' },
