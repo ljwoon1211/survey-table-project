@@ -146,7 +146,7 @@ export function TemplateEditForm({ surveyId, fromDomain, catalog, template, curr
         // 다음 저장은 update 경로로 가도록 함.
         const newId = (result.data as { id: string }).id;
         router.replace(
-          `/admin/surveys/${surveyId}/operations/mail-templates/${newId}/edit`,
+          `/admin/surveys/${surveyId}/operations/mail/templates/${newId}/edit`,
         );
       } else {
         // 기존 템플릿 수정 → server fetch 만 갱신, URL/페이지 그대로 유지.

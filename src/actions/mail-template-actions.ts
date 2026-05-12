@@ -118,7 +118,7 @@ export async function createMailTemplateAction(
     })
     .returning({ id: mailTemplates.id });
 
-  revalidatePath(`/admin/surveys/${surveyId}/operations/mail-templates`);
+  revalidatePath(`/admin/surveys/${surveyId}/operations/mail/templates`);
   // promote 된 영구 key 를 클라이언트로 돌려줘 state 동기화 — 저장 직후 발송에서
   // stale tmp prefix 로 R2 download 시도하는 사고 차단.
   return { ok: true, data: { id: row.id, attachments } };
@@ -198,8 +198,8 @@ export async function updateMailTemplateAction(
     extractMailTemplateAssets({ bodyHtml, attachments }),
   );
 
-  revalidatePath(`/admin/surveys/${surveyId}/operations/mail-templates`);
-  revalidatePath(`/admin/surveys/${surveyId}/operations/mail-templates/${templateId}/edit`);
+  revalidatePath(`/admin/surveys/${surveyId}/operations/mail/templates`);
+  revalidatePath(`/admin/surveys/${surveyId}/operations/mail/templates/${templateId}/edit`);
   return { ok: true, data: { attachments } };
 }
 
@@ -247,6 +247,6 @@ export async function deleteMailTemplateAction(
     deleteR2ObjectsByKey(assets.attachmentKeys).catch(console.error);
   }
 
-  revalidatePath(`/admin/surveys/${surveyId}/operations/mail-templates`);
+  revalidatePath(`/admin/surveys/${surveyId}/operations/mail/templates`);
   return { ok: true };
 }
