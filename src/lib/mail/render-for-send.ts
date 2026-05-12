@@ -33,3 +33,34 @@ export function renderForTestSend(input: Input): PreviewResult {
     mode: 'send',
   });
 }
+
+interface CampaignSendInput {
+  subject: string;
+  bodyHtml: string;
+  fromName: string;
+  contactAttrs: Record<string, string>;
+  contactEmail: string | null;
+  /** 실제 invite URL — baseUrl + /survey/{surveyId}?invite={inviteToken}. 호출자가 빌드해서 전달. */
+  inviteUrl: string;
+}
+
+/**
+ * 캠페인(단체 발송) 본문 치환. test 와 달리:
+ *   - invite_link 가 실제 컨택 inviteToken URL 로 치환됨 (sandbox 아님)
+ *   - mode='send' 로 missing/empty 강조 없이 빈 문자열 치환
+ *
+ * 수신거부 링크는 본문이 아닌 MailWrapper footer 가 채우므로 여기서는 처리하지 않음.
+ */
+export function renderForCampaignSend(input: CampaignSendInput): PreviewResult {
+  return renderMailPreview({
+    subject: input.subject,
+    bodyHtml: input.bodyHtml,
+    fromName: input.fromName,
+    sample: {
+      attrs: input.contactAttrs,
+      email: input.contactEmail,
+      inviteUrl: input.inviteUrl,
+    },
+    mode: 'send',
+  });
+}
