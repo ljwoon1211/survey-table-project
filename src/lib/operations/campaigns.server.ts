@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, or, sql, type SQL } from 'drizzle-orm';
 
 import { db } from '@/db';
 import {
@@ -175,7 +175,7 @@ export async function getCampaignDetail(cid: string): Promise<CampaignDetail | n
         and(
           eq(mailRecipients.campaignId, cid),
           isNotNull(contactTargets.unsubscribedAt),
-          sql`${mailRecipients.status} <> 'skipped_unsubscribed'`,
+          ne(mailRecipients.status, 'skipped_unsubscribed'),
         ),
       )
       .then((rows) => rows[0]?.count ?? 0)
