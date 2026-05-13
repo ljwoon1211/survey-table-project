@@ -154,7 +154,10 @@ export interface CampaignDetail {
 }
 
 export async function getCampaignDetail(cid: string): Promise<CampaignDetail | null> {
-  const [campaignRows, unsubRows] = await Promise.all([
+  // count 쿼리는 부수 정보 — 실패해도 페이지 전체를 죽이지 않도록 0 fallback.
+  // skipped_unsubscribed 상태는 발송 시도조차 없었으므로 "발송 대상 중 수신거부 응답"
+  // 의미에서 제외 — 등록 시점 스킵은 skippedUnsubscribedCount(목록 카드)가 별도 표현.
+  const [campaignRows, currentUnsubscribedCount] = await Promise.all([
     db
       .select({
         campaign: mailCampaigns,
@@ -172,8 +175,11 @@ export async function getCampaignDetail(cid: string): Promise<CampaignDetail | n
         and(
           eq(mailRecipients.campaignId, cid),
           isNotNull(contactTargets.unsubscribedAt),
+          sql`${mailRecipients.status} <> 'skipped_unsubscribed'`,
         ),
-      ),
+      )
+      .then((rows) => rows[0]?.count ?? 0)
+      .catch(() => 0),
   ]);
   const row = campaignRows[0];
   if (!row) return null;
@@ -202,7 +208,7 @@ export async function getCampaignDetail(cid: string): Promise<CampaignDetail | n
     complainedCount: c.complainedCount,
     failedCount: c.failedCount,
     skippedUnsubscribedCount: c.skippedUnsubscribedCount,
-    currentUnsubscribedCount: unsubRows[0]?.count ?? 0,
+    currentUnsubscribedCount,
     startedAt: c.startedAt,
     completedAt: c.completedAt,
     createdAt: c.createdAt,

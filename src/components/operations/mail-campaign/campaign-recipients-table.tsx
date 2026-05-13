@@ -162,7 +162,9 @@ export function CampaignRecipientsTable({
                         >
                           {tone.label}
                         </span>
-                        {r.unsubscribedAt && (
+                        {/* status='skipped_unsubscribed' 는 이미 status badge 가 "수신거부" 라 중복 노출 회피.
+                            발송 후 본인이 footer 링크로 해지한 경우에만 별도 badge 노출. */}
+                        {r.unsubscribedAt && r.status !== 'skipped_unsubscribed' && (
                           <span
                             className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600"
                             title={`수신거부 ${formatDateTime(r.unsubscribedAt)}`}
