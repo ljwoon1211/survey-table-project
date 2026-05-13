@@ -57,6 +57,8 @@ export function OperationsTabStrip({ surveyId }: OperationsTabStripProps) {
   const mailBase = `${operationsBase}/mail`;
   const mailCampaignsHref = `${mailBase}/campaigns`;
   const mailTemplatesHref = `${mailBase}/templates`;
+  // 비용 정산은 인스턴스 전체 단위라 글로벌 페이지로 라우팅.
+  const mailCostHref = '/admin/billing/mail-cost';
   const isMailCampaignsActive = pathname.startsWith(mailCampaignsHref);
   const isMailTemplatesActive = pathname.startsWith(mailTemplatesHref);
   const isMailActive = isMailCampaignsActive || isMailTemplatesActive;
@@ -151,6 +153,9 @@ export function OperationsTabStrip({ surveyId }: OperationsTabStripProps) {
               </SubLink>
               <SubLink href={mailTemplatesHref} active={isMailTemplatesActive}>
                 템플릿
+              </SubLink>
+              <SubLink href={mailCostHref} active={false}>
+                비용 정산
               </SubLink>
             </NavigationMenuContent>
           </NavigationMenuItem>
