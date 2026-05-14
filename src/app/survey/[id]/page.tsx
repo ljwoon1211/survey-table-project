@@ -17,8 +17,11 @@ import {
   recordStepVisit,
   resumeOrCreateResponse,
 } from '@/actions/response-actions';
+import { lookupContactAttrs } from '@/actions/contact-attrs-actions';
+import { InviteRequiredScreen } from '@/components/survey-response/invite-required-screen';
 import { MobileBottomNav } from '@/components/survey-response/mobile-bottom-nav';
 import { QuestionInput } from '@/components/survey-response/question-input';
+import { ContactAttrsProvider } from '@/lib/survey/contact-attrs-context';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -112,6 +115,10 @@ export default function SurveyResponsePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadedSurvey, setLoadedSurvey] = useState<Survey | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // attrs 토큰 prefill — invite 매칭 시 contact_targets.attrs 로드
+  const [contactAttrs, setContactAttrs] = useState<Record<string, string>>({});
+  // requireInviteToken=true 설문에 invite 없이 접근 시 차단
+  const [showInviteRequired, setShowInviteRequired] = useState(false);
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [responses, setResponses] = useState<ResponsesMap>({});
@@ -182,6 +189,21 @@ export default function SurveyResponsePage() {
         } else {
           setLoadedSurvey(result.survey);
           setVersionId(result.versionId);
+
+          // requireInviteToken 체크 + attrs 로드
+          if (result.survey.settings.requireInviteToken && !inviteToken) {
+            setShowInviteRequired(true);
+          } else if (inviteToken) {
+            const attrs = await lookupContactAttrs(surveyId, inviteToken);
+            if (attrs) {
+              setContactAttrs(attrs);
+            } else if (result.survey.settings.requireInviteToken) {
+              // 토큰 무효 + requireInviteToken → 차단
+              setShowInviteRequired(true);
+            }
+            // 토큰 무효 + requireInviteToken=false → 기존 amber alert (inviteIsInvalid)
+            // 만 노출. attrs 는 빈 Record 유지.
+          }
         }
       } catch (error) {
         console.error('설문 로딩 오류:', error);
@@ -684,6 +706,11 @@ export default function SurveyResponsePage() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [hasResponses, isCompleted]);
 
+  // 차단 화면 — requireInviteToken=true 인데 invite 없거나 무효
+  if (showInviteRequired) {
+    return <InviteRequiredScreen />;
+  }
+
   // 로딩 중
   if (isLoading) {
     return (
@@ -775,7 +802,8 @@ export default function SurveyResponsePage() {
   const showRequiredHighlight = highlightQuestionIds.size > 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <ContactAttrsProvider attrs={contactAttrs}>
+      <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
       <div className="border-b border-gray-200 bg-white">
         <div className={`${containerMaxWidth} mx-auto px-4 py-4 transition-all duration-300 md:px-6`}>
@@ -904,7 +932,8 @@ export default function SurveyResponsePage() {
           onNext={handleNext}
         />
       )}
-    </div>
+      </div>
+    </ContactAttrsProvider>
   );
 }
 
