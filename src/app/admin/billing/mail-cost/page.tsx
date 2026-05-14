@@ -1,7 +1,6 @@
-import Link from 'next/link';
+import { Receipt } from 'lucide-react';
 
-import { ArrowLeft, Receipt } from 'lucide-react';
-
+import { BackButton } from '@/components/operations/mail-cost/back-button';
 import { BillingPeriodsDialog } from '@/components/operations/mail-cost/billing-periods-dialog';
 import {
   CostDisclaimer,
@@ -9,7 +8,6 @@ import {
 } from '@/components/operations/mail-cost/cost-disclaimer';
 import { CycleSelector } from '@/components/operations/mail-cost/cycle-selector';
 import { CycleSummaryTable } from '@/components/operations/mail-cost/cycle-summary-table';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { computeCycleBreakdown } from '@/lib/operations/mail-billing.server';
 
@@ -30,12 +28,7 @@ export default async function GlobalMailCostPage({ searchParams }: Props) {
       <nav className="border-b border-gray-200 bg-white px-6 py-4">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/admin/surveys">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                설문 목록
-              </Button>
-            </Link>
+            <BackButton />
             <div className="h-6 w-px bg-gray-300" />
             <div className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-blue-500" />
