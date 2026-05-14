@@ -317,6 +317,8 @@ export interface Question {
   requiresAcknowledgment?: boolean; // 이해했다는 체크 필요 여부
   // 단답형(text) 타입용
   placeholder?: string; // 입력 필드 placeholder
+  // 단답형 prefill 템플릿 — {{attrs_key}} 포함 가능. (0022 마이그레이션)
+  defaultValueTemplate?: string | null;
   // 테이블 검증 규칙 (테이블 타입 전용)
   tableValidationRules?: TableValidationRule[];
   // 동적 행 그룹 설정 (테이블 타입 전용)
@@ -354,6 +356,8 @@ export interface SurveySettings {
   endDate?: Date;
   maxResponses?: number;
   thankYouMessage: string;
+  // 컨택 attrs 토큰 — invite token 강제 (0022 마이그레이션)
+  requireInviteToken?: boolean;
 }
 
 // 기타 옵션 입력값 처리를 위한 타입

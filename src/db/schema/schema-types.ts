@@ -110,6 +110,8 @@ export interface TableCell {
   optionsColumns?: number;
   placeholder?: string;
   inputMaxLength?: number;
+  // input 셀 prefill 템플릿 — {{attrs_key}} 포함 가능.
+  defaultValueTemplate?: string;
   minSelections?: number;
   maxSelections?: number;
   rowspan?: number;
