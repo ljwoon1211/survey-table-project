@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 
 import { db } from '@/db';
 import { surveyResponses, surveys } from '@/db/schema';
+import { requireAuth } from '@/lib/auth';
 import {
   generateSummaryWorkbook,
   generateVariableMapWorkbook,
@@ -27,6 +28,8 @@ export async function GET(
   { params }: { params: Promise<{ surveyId: string }> },
 ) {
   try {
+    await requireAuth();
+
     const { surveyId } = await params;
     const type = request.nextUrl.searchParams.get('type') as ExportType | null;
 
@@ -122,6 +125,9 @@ export async function GET(
       },
     });
   } catch (error) {
+    if (error instanceof Error && error.message === '인증이 필요합니다.') {
+      return NextResponse.json({ error: '권한 없음' }, { status: 401 });
+    }
     console.error('Export Error:', error);
     return NextResponse.json(
       { error: '데이터 내보내기 중 오류가 발생했습니다.' },
