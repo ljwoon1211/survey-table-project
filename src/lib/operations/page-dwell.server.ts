@@ -1,36 +1,43 @@
 import 'server-only';
 
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 import { db } from '@/db';
-import {
-  surveyResponses,
-  surveys,
-  surveyVersions,
-} from '@/db/schema';
-import type { PageVisit } from '@/db/schema/schema-types';
+import { surveys, surveyVersions } from '@/db/schema';
 
-import { shapePageDwell, type DwellOutput } from './page-dwell';
+import {
+  buildCanonicalSteps,
+  formatPageDwell,
+  type DwellOutput,
+  type DwellStats,
+} from './page-dwell';
 
 /** 빈 결과 — published version이 없거나 snapshot이 비어있을 때. */
 const EMPTY_OUTPUT: DwellOutput = { pages: [] };
+
+/** 양쪽 트리밍 비율 — page-dwell.ts 의 DEFAULT_TRIM 과 동일. */
+const TRIM = 0.025;
 
 /**
  * 단일 설문의 페이지별 체류시간 분포를 반환한다 (서버 전용).
  *
  * 처리 단계:
- *   A) surveys.currentVersionId → surveyVersions.snapshot 로드.
- *      - 없으면 EMPTY_OUTPUT (drop-funnel과 동일).
- *   B) status IN ('completed', 'drop') 응답들의 pageVisits만 조회.
- *      page_visits가 빈 배열인 행은 SQL 단계에서 사전 제외 → 페이로드 절감.
- *   C) shapePageDwell에 위임.
+ *   A) surveys.currentVersionId → surveyVersions.snapshot 로드 + 캐노니컬 step 빌드.
+ *   B) SQL window function 으로 stepId 별 trimmed 통계 직접 산출.
+ *      - LATERAL jsonb_array_elements 로 pageVisits 펼침 → 각 visit 1행.
+ *      - leftAt > enteredAt 필터로 미완료/잘못된 visit 제외.
+ *      - PARTITION BY step_id 의 ROW_NUMBER + COUNT 로 trim 범위 결정.
+ *      - AVG/STDDEV_SAMP FILTER 로 trimmed 평균 + 표본 SD 산출.
+ *   C) JS 측에서 캐노니컬 순서 보존 + n=0 step fallback (formatPageDwell).
  *
  * Notes:
- *   - in_progress는 leftAt이 비어 있을 가능성이 높아 의미 없는 데이터를 만든다 → 제외.
- *   - drop은 마지막 페이지의 leftAt이 비어 있을 수 있으나, 그 visit는 순수 함수에서 skip.
+ *   - in_progress 응답은 leftAt 누락이 잦아 통계 왜곡 → status IN ('completed', 'drop') 만 사용.
+ *   - drop 의 마지막 visit 는 leftAt 미설정 가능 → SQL WHERE 절이 자동 skip.
+ *   - SQL FILTER 조건은 page-dwell.ts 의 `trimmedStats` 와 동등:
+ *     JS slice(trimCount, n - trimCount) ⇔ SQL rn > trimCount AND rn <= n - trimCount.
  */
 export async function getPageDwell(surveyId: string): Promise<DwellOutput> {
-  // ── A) 현재 published snapshot 로드 ──────────────────────────────────────
+  // ── A) snapshot 로드 + 캐노니컬 step ─────────────────────────────────────
   const surveyRow = await db
     .select({ currentVersionId: surveys.currentVersionId })
     .from(surveys)
@@ -49,23 +56,71 @@ export async function getPageDwell(surveyId: string): Promise<DwellOutput> {
   const snapshot = versionRow[0]?.snapshot ?? null;
   if (!snapshot) return EMPTY_OUTPUT;
 
-  // ── B) 응답 pageVisits 조회 ──────────────────────────────────────────────
-  // jsonb_array_length로 빈 배열 사전 제외 (백필된 '[]' 행 다수 가정).
-  const rows = await db
-    .select({ pageVisits: surveyResponses.pageVisits })
-    .from(surveyResponses)
-    .where(
-      and(
-        eq(surveyResponses.surveyId, surveyId),
-        inArray(surveyResponses.status, ['completed', 'drop']),
-        sql`jsonb_array_length(${surveyResponses.pageVisits}) > 0`,
-      ),
-    );
+  const steps = buildCanonicalSteps(snapshot);
+  if (steps.length === 0) return EMPTY_OUTPUT;
 
-  // ── C) 순수 함수에 위임 ─────────────────────────────────────────────────
-  const responses: Array<{ pageVisits: PageVisit[] | null }> = rows.map((r) => ({
-    pageVisits: r.pageVisits ?? null,
-  }));
+  // ── B) SQL trimmed 통계 직접 산출 ────────────────────────────────────────
+  const rows = await db.execute(sql`
+    WITH dwell AS (
+      SELECT
+        visit->>'stepId' AS step_id,
+        EXTRACT(EPOCH FROM ((visit->>'leftAt')::timestamptz - (visit->>'enteredAt')::timestamptz)) AS seconds
+      FROM survey_responses sr,
+      LATERAL jsonb_array_elements(sr.page_visits) AS visit
+      WHERE sr.survey_id = ${surveyId}::uuid
+        AND sr.status IN ('completed', 'drop')
+        AND jsonb_array_length(sr.page_visits) > 0
+        AND visit->>'stepId' IS NOT NULL
+        AND visit->>'leftAt' IS NOT NULL
+        AND visit->>'leftAt' <> ''
+        AND visit->>'enteredAt' IS NOT NULL
+        AND (visit->>'leftAt')::timestamptz > (visit->>'enteredAt')::timestamptz
+    ),
+    ranked AS (
+      SELECT
+        step_id,
+        seconds,
+        ROW_NUMBER() OVER (PARTITION BY step_id ORDER BY seconds) AS rn,
+        COUNT(*) OVER (PARTITION BY step_id) AS total_n
+      FROM dwell
+    )
+    SELECT
+      step_id,
+      COUNT(*) FILTER (
+        WHERE rn > floor(total_n * ${TRIM}::float8)::int
+          AND rn <= total_n - floor(total_n * ${TRIM}::float8)::int
+      )::int AS n_trimmed,
+      AVG(seconds) FILTER (
+        WHERE rn > floor(total_n * ${TRIM}::float8)::int
+          AND rn <= total_n - floor(total_n * ${TRIM}::float8)::int
+      ) AS mean_seconds,
+      STDDEV_SAMP(seconds) FILTER (
+        WHERE rn > floor(total_n * ${TRIM}::float8)::int
+          AND rn <= total_n - floor(total_n * ${TRIM}::float8)::int
+      ) AS sd_seconds
+    FROM ranked
+    GROUP BY step_id
+  `);
 
-  return shapePageDwell({ responses, snapshot });
+  // ── C) statsMap 빌드 + formatPageDwell ─────────────────────────────────
+  const validStepIds = new Set(steps.map((s) => s.stepId));
+  const statsMap = new Map<string, DwellStats>();
+
+  for (const row of rows as unknown as Array<{
+    step_id: string;
+    n_trimmed: number | string;
+    mean_seconds: number | string | null;
+    sd_seconds: number | string | null;
+  }>) {
+    if (!validStepIds.has(row.step_id)) continue;
+    const n = Number(row.n_trimmed);
+    if (n === 0) continue;
+    statsMap.set(row.step_id, {
+      n,
+      mean: row.mean_seconds === null ? null : Number(row.mean_seconds),
+      sd: row.sd_seconds === null ? null : Number(row.sd_seconds),
+    });
+  }
+
+  return formatPageDwell(steps, statsMap);
 }

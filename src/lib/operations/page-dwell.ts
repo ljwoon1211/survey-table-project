@@ -107,12 +107,19 @@ export function trimmedStats(
 }
 
 /** 캐노니컬 순서로 정렬된 step 식별자 + 라벨 + 페이지 번호. */
-interface CanonicalStep {
+export interface CanonicalStep {
   stepId: string;
   label: string;
   position: number;
   /** 소속 페이지 번호 (1-based). group: order+1, table: 그룹 order+1 or null. */
   page: number | null;
+}
+
+/** trimmed mean + sample SD 단일 step 통계. */
+export interface DwellStats {
+  n: number;
+  mean: number | null;
+  sd: number | null;
 }
 
 /**
@@ -133,7 +140,7 @@ interface CanonicalStep {
  *   - 모든 질문이 ungrouped → 단일 'group:root' step + table들.
  *   - 어떤 그룹/하위그룹이 비어있어도 (자식이 모두 다른 곳에 있어도) group step은 만들지 않는다.
  */
-function buildCanonicalSteps(snapshot: SurveyVersionSnapshot): CanonicalStep[] {
+export function buildCanonicalSteps(snapshot: SurveyVersionSnapshot): CanonicalStep[] {
   const groups: QuestionGroupData[] = Array.isArray(snapshot.groups)
     ? snapshot.groups
     : [];
@@ -291,48 +298,61 @@ function buildCanonicalSteps(snapshot: SurveyVersionSnapshot): CanonicalStep[] {
 }
 
 /**
- * 응답들의 pageVisits를 받아 페이지별 체류시간 분포를 계산한다.
+ * 응답 raw pageVisits 를 stepId 별 trimmed 통계 Map 으로 집계.
  *
- * 절차:
- *   1. snapshot에서 캐노니컬 step 순서 빌드.
- *   2. 각 응답의 pageVisits를 순회하며 stepId별 체류시간(초) 집계.
- *      - leftAt 누락 / 잘못된 순서 / 비유한 값 → skip.
- *   3. 캐노니컬 순서대로 각 step에 대해 trimmedStats로 통계 산출.
- *      - n=0 step도 출력에 포함 (모든 stat null).
+ * - validStepIds 에 없는 stepId 는 무시 (legacy / version mismatch).
+ * - leftAt 누락 / leftAt ≤ enteredAt / 비유한 timestamp → skip.
+ * - 빈 step (n=0 이후) 은 결과 Map 에 포함하지 않음 — formatPageDwell 이 fallback 처리.
+ *
+ * 이 함수는 server SQL 집계와 동일 동작을 JS 로 재현하며,
+ * server 가 SQL window function 으로 같은 결과를 직접 산출하는 경우 호출되지 않음.
  */
-export function shapePageDwell(input: DwellInput): DwellOutput {
-  const trim = input.trim ?? DEFAULT_TRIM;
-  const steps = buildCanonicalSteps(input.snapshot);
-  if (steps.length === 0) return { pages: [] };
-
-  // stepId → 체류시간(초) 배열.
+export function aggregatePageDwell(
+  responses: DwellInput['responses'],
+  validStepIds: ReadonlySet<string>,
+  trim: number = DEFAULT_TRIM,
+): Map<string, DwellStats> {
   const buckets = new Map<string, number[]>();
-  for (const step of steps) {
-    buckets.set(step.stepId, []);
-  }
 
-  for (const resp of input.responses) {
+  for (const resp of responses) {
     const visits = resp.pageVisits;
     if (!Array.isArray(visits) || visits.length === 0) continue;
     for (const visit of visits) {
       if (!visit || typeof visit.stepId !== 'string') continue;
-      // snapshot에 없는 step은 무시 (legacy/version mismatch).
-      const bucket = buckets.get(visit.stepId);
-      if (!bucket) continue;
-      // leftAt 누락 → 미완료 visit, skip.
+      if (!validStepIds.has(visit.stepId)) continue;
       if (typeof visit.leftAt !== 'string' || !visit.leftAt) continue;
       const enteredMs = Date.parse(visit.enteredAt);
       const leftMs = Date.parse(visit.leftAt);
       if (!Number.isFinite(enteredMs) || !Number.isFinite(leftMs)) continue;
-      // 방어적: leftAt이 enteredAt보다 빠르면 skip.
       if (leftMs <= enteredMs) continue;
+      let bucket = buckets.get(visit.stepId);
+      if (!bucket) {
+        bucket = [];
+        buckets.set(visit.stepId, bucket);
+      }
       bucket.push((leftMs - enteredMs) / 1000);
     }
   }
 
+  const stats = new Map<string, DwellStats>();
+  for (const [stepId, values] of buckets) {
+    stats.set(stepId, trimmedStats(values, trim));
+  }
+  return stats;
+}
+
+/**
+ * 캐노니컬 step 순서 + stepId 별 통계 Map → DwellOutput.
+ *
+ * - statsMap 에 없는 stepId 는 n=0/mean=null/sd=null fallback 으로 출력에 포함
+ *   (snapshot 순서 보존 — 차트 x 축 구조).
+ */
+export function formatPageDwell(
+  steps: CanonicalStep[],
+  statsMap: Map<string, DwellStats>,
+): DwellOutput {
   const pages: DwellPage[] = steps.map((step) => {
-    const values = buckets.get(step.stepId) ?? [];
-    const stats = trimmedStats(values, trim);
+    const stats = statsMap.get(step.stepId) ?? { n: 0, mean: null, sd: null };
     return {
       stepId: step.stepId,
       label: step.label,
@@ -343,6 +363,20 @@ export function shapePageDwell(input: DwellInput): DwellOutput {
       sdSeconds: stats.sd,
     };
   });
-
   return { pages };
+}
+
+/**
+ * 응답들의 pageVisits 를 받아 페이지별 체류시간 분포를 계산한다.
+ *
+ * buildCanonicalSteps + aggregatePageDwell + formatPageDwell 합성. 기존 단위 테스트 호환 wrapper.
+ * server SQL 집계 경로는 aggregatePageDwell 을 우회하고 formatPageDwell 만 호출한다.
+ */
+export function shapePageDwell(input: DwellInput): DwellOutput {
+  const trim = input.trim ?? DEFAULT_TRIM;
+  const steps = buildCanonicalSteps(input.snapshot);
+  if (steps.length === 0) return { pages: [] };
+  const validStepIds = new Set(steps.map((s) => s.stepId));
+  const statsMap = aggregatePageDwell(input.responses, validStepIds, trim);
+  return formatPageDwell(steps, statsMap);
 }

@@ -110,38 +110,31 @@ const OTHERS_LABEL = '기타';
 const LEGACY_LABEL = '(legacy)';
 
 /**
- * 입력을 받아 깔때기 막대 배열을 생성한다.
+ * Drop 행 raw 데이터를 위치별 카운트로 집계한다.
  *
- * 처리 순서:
- *   1. snapshot 질문 id Set 구성 (라벨/페이지/위치 lookup용 Map과 함께).
- *   2. 각 drop을 순회하며 귀속 위치 결정:
- *      a. exposedQuestionIds가 정의되어 있고 lastQuestionId 미포함 → 제외 (continue).
- *      b. lastQuestionId가 null이거나 snapshot에 없으면 legacy 버킷.
- *      c. 그 외에는 dropCounts[lastQuestionId] += 1.
- *   3. 정상 위치 막대 후보 → dropCount DESC 정렬 → 상위 topN개 채택, 잔여는 '기타' 합산.
- *   4. 단독 막대들을 position ASC 로 재정렬 (sequential funnel 형태).
- *   5. position-based 진행률 계산.
- *   6. [정상 막대들(position ASC), 기타?, legacy?] 순으로 출력.
+ * - exposedQuestionIds 가 정의되어 있고 lastQuestionId 가 거기 없으면 *완전히* 제외 (어떤 버킷에도 들어가지 않음).
+ * - lastQuestionId 가 null 이거나 validQuestionIds 에 없으면 legacy 버킷.
+ * - 그 외에는 counts[lastQuestionId] += 1.
+ *
+ * 이 함수는 server SQL 집계와 동일 동작을 JS 로 재현하며, server 가 GROUP BY 로 같은 결과를
+ * 직접 산출하는 경우 호출되지 않는다 (formatDropFunnel 만 호출됨).
  */
-export function shapeDropFunnel(input: DropFunnelInput): DropFunnelOutput {
-  const { questions, drops } = input;
-  const topN = input.topN ?? DEFAULT_TOP_N;
-  const totalQuestions = questions.length;
+export interface AggregateDropsResult {
+  counts: Map<string, number>;
+  legacyCount: number;
+  totalDrops: number;
+}
 
-  // 1) 라벨/페이지/위치 lookup. snapshot 순서를 그대로 보존하기 위해 Map 사용.
-  const questionMap = new Map<string, FunnelQuestion>();
-  for (const q of questions) {
-    questionMap.set(q.id, q);
-  }
-
-  // 2) 위치별 dropCount 누적 + legacy/excluded 분류.
-  const dropCounts = new Map<string, number>();
+export function aggregateDrops(
+  drops: DropFunnelInput['drops'],
+  validQuestionIds: ReadonlySet<string>,
+): AggregateDropsResult {
+  const counts = new Map<string, number>();
   let legacyCount = 0;
   let totalDrops = 0;
 
   for (const drop of drops) {
-    // 2-a) exposure 필터: 정의되어 있고 last가 거기 없으면 *완전히* 제외.
-    //      (정의되지 않았다면 노출 정보 미상 → 판단 보류 → 정상 진행)
+    // exposure 필터: 정의되어 있고 last 가 거기 없으면 *완전히* 제외.
     if (
       drop.exposedQuestionIds !== null &&
       drop.lastQuestionId !== null &&
@@ -150,27 +143,43 @@ export function shapeDropFunnel(input: DropFunnelInput): DropFunnelOutput {
       continue;
     }
 
-    // 2-b) null 또는 snapshot에 없는 id → legacy.
-    if (drop.lastQuestionId === null || !questionMap.has(drop.lastQuestionId)) {
+    if (drop.lastQuestionId === null || !validQuestionIds.has(drop.lastQuestionId)) {
       legacyCount += 1;
       totalDrops += 1;
       continue;
     }
 
-    // 2-c) 정상 귀속.
-    dropCounts.set(
-      drop.lastQuestionId,
-      (dropCounts.get(drop.lastQuestionId) ?? 0) + 1,
-    );
+    counts.set(drop.lastQuestionId, (counts.get(drop.lastQuestionId) ?? 0) + 1);
     totalDrops += 1;
   }
 
-  // 3) 정상 막대 후보 생성. dropCount > 0 인 질문만 (Map.entries는 그 조건 자동 충족).
-  //    단독 막대 후보 선정은 dropCount DESC 기준 상위 topN.
-  const candidates = Array.from(dropCounts.entries()).map(([id, count]) => {
+  return { counts, legacyCount, totalDrops };
+}
+
+/** 이미 집계된 위치별 카운트를 받아 막대 배열(표시 형태)로 변환. */
+export interface FormatDropFunnelInput {
+  questions: FunnelQuestion[];
+  counts: Map<string, number>;
+  legacyCount: number;
+  totalDrops: number;
+  topN?: number;
+}
+
+export function formatDropFunnel(input: FormatDropFunnelInput): DropFunnelOutput {
+  const { questions, counts, legacyCount, totalDrops } = input;
+  const topN = input.topN ?? DEFAULT_TOP_N;
+  const totalQuestions = questions.length;
+
+  const questionMap = new Map<string, FunnelQuestion>();
+  for (const q of questions) {
+    questionMap.set(q.id, q);
+  }
+
+  // 정상 막대 후보 생성. dropCount > 0 인 질문만 (Map.entries 는 그 조건 자동 충족).
+  const candidates = Array.from(counts.entries()).map(([id, count]) => {
     const q = questionMap.get(id);
-    // questionMap.has 검증을 통과했으므로 q는 항상 정의됨 — 방어적 폴백.
     if (!q) {
+      // server 가 validQuestionIds 로 이미 거른 후 호출하므로 도달 가능성 낮음. 방어적 폴백.
       return { id, count, position: null, label: id, page: null as number | null };
     }
     return {
@@ -187,21 +196,19 @@ export function shapeDropFunnel(input: DropFunnelInput): DropFunnelOutput {
   const topCandidates = sortedByCount.slice(0, topN);
   const restCandidates = sortedByCount.slice(topN);
 
-  // 4) 단독 막대들을 position ASC 로 재정렬 (sequential funnel 형태).
+  // 단독 막대들을 position ASC 로 재정렬 (sequential funnel 형태).
   const topSorted = [...topCandidates].sort((a, b) => {
     const ap = a.position ?? Number.POSITIVE_INFINITY;
     const bp = b.position ?? Number.POSITIVE_INFINITY;
     return ap - bp;
   });
 
-  // 5) position-based 진행률 계산 헬퍼.
   const calcProgress = (position: number | null): number | null => {
     if (position === null) return null;
     if (totalQuestions === 0) return null;
     return (position / totalQuestions) * 100;
   };
 
-  // 6) 출력 구성.
   const bars: DropFunnelBar[] = topSorted.map((c) => ({
     questionId: c.id,
     label: c.label,
@@ -235,4 +242,22 @@ export function shapeDropFunnel(input: DropFunnelInput): DropFunnelOutput {
   }
 
   return { bars, totalDrops };
+}
+
+/**
+ * 입력을 받아 깔때기 막대 배열을 생성한다.
+ *
+ * aggregateDrops + formatDropFunnel 합성. 기존 단위 테스트 호환 wrapper.
+ * server SQL 집계 경로는 aggregateDrops 를 우회하고 formatDropFunnel 만 호출한다.
+ */
+export function shapeDropFunnel(input: DropFunnelInput): DropFunnelOutput {
+  const validQuestionIds = new Set(input.questions.map((q) => q.id));
+  const aggregated = aggregateDrops(input.drops, validQuestionIds);
+  return formatDropFunnel({
+    questions: input.questions,
+    counts: aggregated.counts,
+    legacyCount: aggregated.legacyCount,
+    totalDrops: aggregated.totalDrops,
+    topN: input.topN,
+  });
 }

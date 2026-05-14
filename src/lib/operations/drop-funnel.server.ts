@@ -1,40 +1,22 @@
 import 'server-only';
 
-import { and, eq, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 import { db } from '@/db';
-import {
-  responseAnswers,
-  surveyResponses,
-  surveys,
-  surveyVersions,
-} from '@/db/schema';
+import { surveys, surveyVersions } from '@/db/schema';
 import type {
   QuestionGroupData,
   SurveyVersionSnapshot,
 } from '@/db/schema/schema-types';
 
 import {
-  shapeDropFunnel,
-  type DropFunnelInput,
+  formatDropFunnel,
   type DropFunnelOutput,
   type FunnelQuestion,
 } from './drop-funnel';
 
 /** 빈 결과 — published version 없거나 snapshot이 비어있을 때. */
 const EMPTY_OUTPUT: DropFunnelOutput = { bars: [], totalDrops: 0 };
-
-/**
- * jsonb -> 'exposedQuestionIds' 의 결과(unknown)를 string[] 또는 null로 좁힌다.
- *
- * - 배열이고 모든 원소가 string이면 그대로 반환.
- * - 그 외 (null, 객체, 빈 키, 다른 타입 섞인 배열) → null (= 노출 정보 미상).
- */
-function toStringArray(value: unknown): string[] | null {
-  if (!Array.isArray(value)) return null;
-  if (!value.every((v): v is string => typeof v === 'string')) return null;
-  return value;
-}
 
 /**
  * snapshot의 questions를 깔때기용 FunnelQuestion[]으로 변환.
@@ -114,17 +96,16 @@ function buildFunnelQuestions(
  * 단일 설문의 Drop funnel 데이터를 반환한다 (서버 전용).
  *
  * 처리 단계:
- *   A) surveys.currentVersionId → surveyVersions.snapshot에서 질문 순서 추출.
- *   B) drop 세션의 마지막 답변 질문(`response_answers.created_at` 최댓값) + exposedQuestionIds 수집.
- *   C) 순수 함수 `shapeDropFunnel` 에 위임해 막대 배열 생성.
+ *   A) surveys.currentVersionId → surveyVersions.snapshot 에서 질문 순서 추출.
+ *   B) SQL CTE 로 drop 세션의 마지막 답변 위치별 COUNT 집계.
+ *      - DISTINCT ON 으로 응답 1건당 가장 최근 answer 만 선택 (answer 0건이면 NULL).
+ *      - exposedQuestionIds 필터: array 이고 lastQuestionId 가 거기 없으면 *제외*.
+ *      - 마지막 GROUP BY 가 위치별 COUNT 산출 → 응답 N rows → 위치 M rows 축소.
+ *   C) JS 측에서 validQuestionIds 비교로 legacy 분류 → formatDropFunnel 에 위임.
  *
  * Edge case:
  *   - currentVersionId 없음 / snapshot.questions 비어있음 → 빈 결과.
- *   - drop 세션 0건이어도 순수 함수가 빈 bars를 반환하므로 자연스럽게 처리된다.
- *
- * 진행률 의미:
- *   `cumulativeProgressPct`는 도달자 비율이 아니라 *질문 위치 비율* (position / totalQuestions × 100)
- *   이므로 reachedCounts / totalStarted 쿼리는 더 이상 필요 없다.
+ *   - drop 세션 0건이어도 formatDropFunnel 이 빈 bars 를 반환.
  */
 export async function getDropFunnel(surveyId: string): Promise<DropFunnelOutput> {
   // ── A) 현재 published snapshot 로드 ──────────────────────────────────────
@@ -147,39 +128,53 @@ export async function getDropFunnel(surveyId: string): Promise<DropFunnelOutput>
   const questions = buildFunnelQuestions(snapshot);
   if (questions.length === 0) return EMPTY_OUTPUT;
 
-  // ── B) drop 세션의 마지막 답변 + exposure 메타데이터 ─────────────────────
-  // DISTINCT ON (sr.id) + ORDER BY sr.id, ra.created_at DESC NULLS LAST 로
-  // 응답 1건당 가장 최근 answer 1행만 선택. answer 0건인 drop은 LEFT JOIN으로 NULL 보존.
-  // - exposedQuestionIds 는 jsonb -> 'exposedQuestionIds' 결과를 그대로 받아 런타임 검사로 좁힌다.
-  const dropRows = await db
-    .selectDistinctOn([surveyResponses.id], {
-      responseId: surveyResponses.id,
-      lastQuestionId: responseAnswers.questionId,
-      exposedQuestionIdsRaw: sql<unknown>`${surveyResponses.metadata} -> 'exposedQuestionIds'`,
-    })
-    .from(surveyResponses)
-    .leftJoin(responseAnswers, eq(responseAnswers.responseId, surveyResponses.id))
-    .where(
-      and(
-        eq(surveyResponses.surveyId, surveyId),
-        eq(surveyResponses.status, 'drop'),
-      ),
+  // ── B) SQL 위치별 COUNT 집계 ─────────────────────────────────────────────
+  // exposedQuestionIds 필터: shape 함수의 toStringArray 와 동등 — array 가 아닌 모든 형태는 필터 미적용.
+  // element type 검증 (모두 string) 은 JS 가 더 엄격하나 데이터 무결성이 보장되는 한 동일 결과.
+  const aggregateRows = await db.execute(sql`
+    WITH drop_lasts AS (
+      SELECT DISTINCT ON (sr.id)
+        sr.id AS response_id,
+        ra.question_id AS last_question_id,
+        sr.metadata -> 'exposedQuestionIds' AS exposed_raw
+      FROM survey_responses sr
+      LEFT JOIN response_answers ra ON ra.response_id = sr.id
+      WHERE sr.survey_id = ${surveyId}::uuid AND sr.status = 'drop'
+      ORDER BY sr.id, ra.created_at DESC NULLS LAST
+    ),
+    filtered AS (
+      SELECT last_question_id
+      FROM drop_lasts
+      WHERE NOT (
+        jsonb_typeof(exposed_raw) = 'array'
+        AND last_question_id IS NOT NULL
+        AND NOT (exposed_raw @> to_jsonb(last_question_id::text))
+      )
     )
-    .orderBy(
-      surveyResponses.id,
-      sql`${responseAnswers.createdAt} DESC NULLS LAST`,
-    );
+    SELECT last_question_id, COUNT(*)::int AS cnt
+    FROM filtered
+    GROUP BY last_question_id
+  `);
 
-  const drops: DropFunnelInput['drops'] = dropRows.map((r) => ({
-    responseId: r.responseId,
-    lastQuestionId: r.lastQuestionId,
-    // jsonb -> ... 결과: 배열이면 그대로, 다른 타입이면 (객체/숫자/문자열/null) 방어적으로 null.
-    exposedQuestionIds: toStringArray(r.exposedQuestionIdsRaw),
-  }));
+  // ── C) JS 분류: counts (정상 위치) vs legacyCount (snapshot 부재 / null) ──
+  const validQuestionIds = new Set(questions.map((q) => q.id));
+  const counts = new Map<string, number>();
+  let legacyCount = 0;
+  let totalDrops = 0;
 
-  // ── C) 순수 함수에 위임 ─────────────────────────────────────────────
-  return shapeDropFunnel({
-    questions,
-    drops,
-  });
+  for (const row of aggregateRows as unknown as Array<{
+    last_question_id: string | null;
+    cnt: number;
+  }>) {
+    const id = row.last_question_id;
+    const cnt = Number(row.cnt);
+    totalDrops += cnt;
+    if (id === null || !validQuestionIds.has(id)) {
+      legacyCount += cnt;
+    } else {
+      counts.set(id, cnt);
+    }
+  }
+
+  return formatDropFunnel({ questions, counts, legacyCount, totalDrops });
 }
