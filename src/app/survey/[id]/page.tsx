@@ -21,7 +21,8 @@ import { lookupContactAttrs } from '@/actions/contact-attrs-actions';
 import { InviteRequiredScreen } from '@/components/survey-response/invite-required-screen';
 import { MobileBottomNav } from '@/components/survey-response/mobile-bottom-nav';
 import { QuestionInput } from '@/components/survey-response/question-input';
-import { ContactAttrsProvider } from '@/lib/survey/contact-attrs-context';
+import { ContactAttrsProvider, useContactAttrs } from '@/lib/survey/contact-attrs-context';
+import { substituteTokens } from '@/lib/survey/substitute-tokens';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -961,6 +962,11 @@ function TableStepView({
   const q = step.question;
   const isHighlighted = highlightQuestionIds.has(q.id);
   const onChange = useCallback((value: unknown) => onResponse(q.id, value), [onResponse, q.id]);
+  const attrs = useContactAttrs();
+  const descriptionHtml = useMemo(
+    () => sanitizeRichHtml(substituteTokens(q.description ?? '', attrs)),
+    [q.description, attrs],
+  );
 
   return (
     <>
@@ -997,7 +1003,7 @@ function TableStepView({
             <div
               className="prose prose-sm max-h-[40vh] max-w-none overflow-auto leading-relaxed text-[13px] text-gray-500 [&_p]:min-h-[1.5em] [&_p]:leading-relaxed [&_table]:my-2 [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-200 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:px-3 [&_table_td]:py-1.5 [&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:bg-gray-50 [&_table_th]:px-3 [&_table_th]:py-1.5 [&_table_th]:font-semibold"
               style={{ WebkitOverflowScrolling: 'touch' }}
-              dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(q.description) }}
+              dangerouslySetInnerHTML={{ __html: descriptionHtml }}
             />
           )}
         </div>
@@ -1043,7 +1049,7 @@ function TableStepView({
                   <div
                     className="prose prose-base mt-3 max-h-[60vh] max-w-none overflow-auto text-base text-gray-600 [&_p]:min-h-[1.6em] [&_table]:my-2 [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-200 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:px-4 [&_table_td]:py-2 [&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:bg-gray-50 [&_table_th]:px-4 [&_table_th]:py-2 [&_table_th]:font-semibold"
                     style={{ WebkitOverflowScrolling: 'touch' }}
-                    dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(q.description) }}
+                    dangerouslySetInnerHTML={{ __html: descriptionHtml }}
                   />
                 )}
               </div>
@@ -1144,6 +1150,11 @@ function GroupStepItem({
     (value: unknown) => onResponse(q.id, value),
     [onResponse, q.id],
   );
+  const attrs = useContactAttrs();
+  const descriptionHtml = useMemo(
+    () => sanitizeRichHtml(substituteTokens(q.description ?? '', attrs)),
+    [q.description, attrs],
+  );
 
   return (
     <div className="py-5 first:pt-0 last:pb-0">
@@ -1183,7 +1194,7 @@ function GroupStepItem({
         {!isEmptyHtml(q.description) && (
           <div
             className="prose prose-sm ml-3 max-w-none text-xs text-gray-500 [&_p]:min-h-[1.3em] [&_table]:my-1.5 [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-200 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:px-2.5 [&_table_td]:py-1 [&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:bg-gray-50 [&_table_th]:px-2.5 [&_table_th]:py-1 [&_table_th]:font-semibold"
-            dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(q.description) }}
+            dangerouslySetInnerHTML={{ __html: descriptionHtml }}
           />
         )}
         <div id={`q-${q.id}`} className="mt-2 ml-3">

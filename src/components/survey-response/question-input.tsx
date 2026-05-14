@@ -6,6 +6,8 @@ import { InteractiveTableResponse } from '@/components/survey-builder/interactiv
 import { NoticeRenderer } from '@/components/survey-builder/notice-renderer';
 import { UserDefinedMultiLevelSelect } from '@/components/survey-builder/user-defined-multi-level-select';
 import { Input } from '@/components/ui/input';
+import { useContactAttrs } from '@/lib/survey/contact-attrs-context';
+import { substituteTokens } from '@/lib/survey/substitute-tokens';
 import { Question, QuestionOption, RankingAnswer } from '@/types/survey';
 import { getOptionsLayout } from '@/utils/options-layout';
 
@@ -47,6 +49,8 @@ export function QuestionInput({
   allResponses,
   allQuestions,
 }: QuestionInputProps) {
+  const attrs = useContactAttrs();
+
   switch (question.type) {
     case 'notice': {
       const noticeVal = value && typeof value === 'object' && 'agreed' in (value as Record<string, unknown>)
@@ -54,7 +58,7 @@ export function QuestionInput({
         : { agreed: typeof value === 'boolean' ? value : false };
       return (
         <NoticeRenderer
-          content={question.noticeContent || ''}
+          content={substituteTokens(question.noticeContent || '', attrs)}
           requiresAcknowledgment={question.requiresAcknowledgment}
           value={noticeVal.agreed}
           onChange={(v) =>
