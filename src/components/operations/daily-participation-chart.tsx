@@ -103,11 +103,14 @@ export function DailyParticipationChart({
 
   // day 모드는 weekOffset 기준 7개 슬라이스, hour 모드는 24버킷 그대로
   // weekOffset=0 → 마지막 7개, weekOffset=1 → 그 이전 7개, ...
+  // slice 결과가 7개 미만이면 좌측에 빈 날짜 슬롯을 채워 X축 윈도우를 일정하게 유지한다.
   const visibleData = useMemo(() => {
     if (mode !== 'day') return data;
     const end = data.length - RECENT_DAYS_LIMIT * weekOffset;
     const start = Math.max(0, end - RECENT_DAYS_LIMIT);
-    return data.slice(start, end);
+    const sliced = data.slice(start, end);
+    if (sliced.length === 0 || sliced.length >= RECENT_DAYS_LIMIT) return sliced;
+    return padLeftWithEmptyDays(sliced, RECENT_DAYS_LIMIT);
   }, [data, mode, weekOffset]);
 
   const totalDays = mode === 'day' ? data.length : 0;
@@ -239,6 +242,48 @@ interface ToggleButtonProps {
 function formatRangeLabel(bucket: string): string {
   const m = bucket.match(/^(\d{4})-(\d{2}-\d{2})$/);
   return m ? m[2] : bucket;
+}
+
+const KOREAN_WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const;
+
+/** 'YYYY-MM-DD' → 'MM-DD (요일)' — aggregate-daily.formatDayLabel 과 동일 로직. */
+function formatDayLabel(ymd: string): string {
+  const [, mm, dd] = ymd.split('-');
+  const date = new Date(`${ymd}T00:00:00Z`);
+  const weekday = KOREAN_WEEKDAYS[date.getUTCDay()];
+  return `${mm}-${dd} (${weekday})`;
+}
+
+/** 'YYYY-MM-DD' 에서 n일 뺀 'YYYY-MM-DD' 반환 (UTC 기준 — KST와 시차 보정 불요). */
+function subDaysIso(ymd: string, n: number): string {
+  const d = new Date(`${ymd}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - n);
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/**
+ * data 길이가 limit 미만이면 좌측에 count=0 더미 슬롯을 채워 [limit] 개로 맞춘다.
+ * data[0].bucket 기준으로 -1일, -2일, ... 빈 날짜 라벨을 만든다.
+ *
+ * data 가 비어 있으면 빈 배열 그대로 — 호출자가 EmptyState 로 분기해야 한다.
+ */
+function padLeftWithEmptyDays(
+  data: DailyBucket[],
+  limit: number,
+): DailyBucket[] {
+  if (data.length === 0 || data.length >= limit) return data;
+  const firstBucket = data[0].bucket;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(firstBucket)) return data;
+  const padCount = limit - data.length;
+  const padding: DailyBucket[] = [];
+  for (let i = padCount; i > 0; i--) {
+    const ymd = subDaysIso(firstBucket, i);
+    padding.push({ bucket: ymd, label: formatDayLabel(ymd), count: 0 });
+  }
+  return [...padding, ...data];
 }
 
 /**

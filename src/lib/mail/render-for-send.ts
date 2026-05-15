@@ -45,7 +45,7 @@ interface CampaignSendInput {
 }
 
 /**
- * 캠페인(단체 발송) 본문 치환. test 와 달리:
+ * 단체 메일(단체 발송) 본문 치환. test 와 달리:
  *   - invite_link 가 실제 컨택 inviteToken URL 로 치환됨 (sandbox 아님)
  *   - mode='send' 로 missing/empty 강조 없이 빈 문자열 치환
  *

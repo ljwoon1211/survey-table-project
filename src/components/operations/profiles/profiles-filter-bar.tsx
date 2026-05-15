@@ -34,7 +34,7 @@ const STATUS_OPTIONS: ReadonlyArray<{ value: StatusFilter; label: string }> = [
 ];
 
 /**
- * 응답자 목록 페이지 필터바.
+ * 응답 내역 페이지 필터바.
  *
  * - form submit 으로만 URL 갱신 (적용 버튼 또는 Enter)
  * - 기본값(all / 빈 문자열)은 URL 키 자체를 제거 → 깔끔한 URL

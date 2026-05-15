@@ -16,7 +16,7 @@ import {
 import { listResponsesForProfiles } from '@/lib/operations/profiles.server';
 
 export const metadata: Metadata = {
-  title: '현황 - 응답자 목록',
+  title: '현황 - 응답 내역',
 };
 
 interface PageProps {
@@ -32,7 +32,7 @@ interface PageProps {
 }
 
 /**
- * 운영 콘솔 응답자 목록 페이지.
+ * 운영 콘솔 응답 내역 페이지.
  *
  * 서버 페이지네이션 + URL state 동기화. 0건 케이스 분기:
  *  - 필터 활성 → ProfilesTable 의 "검색 결과가 없습니다" EmptyState
@@ -66,7 +66,7 @@ export default async function ProfilesPage({ params, searchParams }: PageProps) 
   return (
     <main className="mx-auto max-w-7xl px-6 py-8">
       <div className="mb-4">
-        <h2 className="text-xl font-bold text-gray-900">응답자 목록</h2>
+        <h2 className="text-xl font-bold text-gray-900">응답 내역</h2>
         <p className="text-sm text-slate-500">
           응답자별 세션 트래킹 — {total.toLocaleString('ko-KR')}건
         </p>

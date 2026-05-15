@@ -17,7 +17,7 @@ function campaign(id: string, billable: number, isoDate: string): AllocatorInput
 }
 
 describe('allocateCycleCosts', () => {
-  it('캠페인 0건이면 월정액만 비용', () => {
+  it('단체 메일 0건이면 월정액만 비용', () => {
     const r = allocateCycleCosts({ plan: PRO_50K, campaigns: [] });
     expect(r.totalBillable).toBe(0);
     expect(r.totalIncluded).toBe(0);

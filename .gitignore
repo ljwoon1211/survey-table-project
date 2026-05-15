@@ -54,3 +54,7 @@ scripts
 .superpowers
 .worktrees
 docs
+
+# local agent metadata
+.gstack
+.claude/settings.json

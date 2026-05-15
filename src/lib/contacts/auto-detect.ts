@@ -14,7 +14,7 @@ const PATTERNS = {
   phone: ['전화번호', '전화', '유선', '연락처', 'phone', 'tel'],
   name: ['이름', '성명', '담당자', 'name', 'contact name'],
   address: ['주소', '소재지', 'address'],
-  group: ['전시회명', '전시회', '캠페인'],
+  group: ['전시회명', '전시회', '단체 메일'],
 } as const;
 
 export interface AutoDetected {

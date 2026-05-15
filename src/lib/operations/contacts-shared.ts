@@ -29,7 +29,7 @@ export function extractSystemFieldKeys(scheme: ContactColumnScheme): SystemField
   for (const c of scheme.columns) {
     const k = attrsKeyOf(c.source);
     if (!k) continue;
-    if (!result.group && (k.includes('전시회') || k.includes('캠페인'))) result.group = k;
+    if (!result.group && (k.includes('전시회') || k.includes('단체 메일'))) result.group = k;
   }
   return result;
 }

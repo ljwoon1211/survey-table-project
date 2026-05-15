@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Bar, BarChart, CartesianGrid, LabelList, XAxis, YAxis } from 'recharts';
 
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,6 +18,13 @@ import type {
 import { numberFormatter } from '@/lib/operations/format';
 
 import { EmptyState } from './empty-state';
+
+/**
+ * 다른 운영 콘솔 차트 (페이지별 체류시간) 와 동일하게 막대가 적을 때 좌측 정렬되도록
+ * 최소 슬롯 수를 보장. 빈 슬롯은 X축 라벨도 없는 placeholder 행.
+ */
+const MIN_FUNNEL_SLOTS = 10;
+const PAD_QUESTION_ID_PREFIX = '__pad__';
 
 interface Props {
   data: DropFunnelOutput;
@@ -54,6 +62,10 @@ interface FunnelTickProps {
 function FunnelTick({ x = 0, y = 0, payload, bars }: FunnelTickProps) {
   const idx = payload?.index ?? 0;
   const bar = bars[idx];
+  // 패딩 슬롯은 라벨/페이지/진행률 모두 비워둔다 — 옅은 grid only.
+  if (bar?.questionId.startsWith(PAD_QUESTION_ID_PREFIX)) {
+    return null;
+  }
   const label = String(payload?.value ?? '');
   const pageText = bar?.page != null ? `page ${bar.page}` : '';
   const pctText =
@@ -91,6 +103,27 @@ function FunnelTick({ x = 0, y = 0, payload, bars }: FunnelTickProps) {
  *   bars 배열이 비어 있으면 EmptyState로 대체 (drop 응답이 없는 경우).
  */
 export function DropFunnel({ data }: Props) {
+  // 막대가 10개 미만이면 우측에 빈 슬롯을 채워 좌측 정렬을 보장한다.
+  // tooltip/라벨 모두 비워두는 placeholder — questionId 의 sentinel prefix 로 식별.
+  const visibleBars = useMemo<DropFunnelBar[]>(() => {
+    if (data.bars.length === 0 || data.bars.length >= MIN_FUNNEL_SLOTS) {
+      return data.bars;
+    }
+    const padCount = MIN_FUNNEL_SLOTS - data.bars.length;
+    const padding: DropFunnelBar[] = [];
+    for (let i = 0; i < padCount; i++) {
+      padding.push({
+        questionId: `${PAD_QUESTION_ID_PREFIX}${i}`,
+        label: '',
+        position: null,
+        page: null,
+        dropCount: 0,
+        cumulativeProgressPct: null,
+      });
+    }
+    return [...data.bars, ...padding];
+  }, [data.bars]);
+
   return (
     <Card>
       <CardContent className="px-5 py-4">
@@ -111,7 +144,7 @@ export function DropFunnel({ data }: Props) {
             className="aspect-auto h-72 w-full"
           >
             <BarChart
-              data={data.bars}
+              data={visibleBars}
               margin={{ top: 16, right: 8, bottom: 0, left: 0 }}
             >
               <CartesianGrid vertical={false} strokeDasharray="3 3" />

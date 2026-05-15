@@ -26,7 +26,7 @@ export interface ResolvedBulkAttachment {
 }
 
 /**
- * 캠페인 첨부 R2 다운로드 — dispatcher 가 캠페인 시작 시 1회만 호출해 N건 재사용.
+ * 단체 메일 첨부 R2 다운로드 — dispatcher 가 단체 메일 시작 시 1회만 호출해 N건 재사용.
  * 총합 한도 초과 시 발송 차단.
  */
 export async function resolveCampaignAttachments(
@@ -66,7 +66,7 @@ export interface BulkRecipientInput {
 }
 
 export interface BulkSendInput {
-  /** "{fromName} <{fromLocal}@{fromDomain}>" 형식. 캠페인 단위 동일. */
+  /** "{fromName} <{fromLocal}@{fromDomain}>" 형식. 단체 메일 단위 동일. */
   from: string;
   replyTo: string;
   attachments?: ResolvedBulkAttachment[];

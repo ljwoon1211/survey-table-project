@@ -33,18 +33,18 @@ const filterSnapshotSchema = z
 const createCampaignInputSchema = z.object({
   surveyId: z.string().uuid(),
   mailTemplateId: z.string().uuid(),
-  title: z.string().min(1, '캠페인 제목을 입력하세요.').max(200),
+  title: z.string().min(1, '메일 제목을 입력하세요.').max(200),
   contactTargetIds: z
     .array(z.string().uuid())
     .min(1, '수신자를 1명 이상 선택하세요.')
-    .max(10_000, '한 캠페인에 최대 10,000명까지 발송 가능합니다.'),
+    .max(10_000, '한 번에 최대 10,000명까지 발송 가능합니다.'),
   filterSnapshot: filterSnapshotSchema.optional(),
 });
 
 export type CreateCampaignInput = z.input<typeof createCampaignInputSchema>;
 
 /**
- * 캠페인 생성 + 발송 큐잉.
+ * 단체 메일 생성 + 발송 큐잉.
  *
  * 흐름:
  *  1. 입력 검증 + 인증
@@ -125,7 +125,7 @@ export async function createCampaignAction(
         })
         .returning({ id: mailCampaigns.id });
       if (!campaign) {
-        throw new Error('캠페인 생성에 실패했습니다.');
+        throw new Error('단체 메일 생성에 실패했습니다.');
       }
 
       // d. valid contact 재페치 — contact_pii 에서 email cipher 까지 같이 가져옴.
@@ -184,7 +184,7 @@ export async function createCampaignAction(
         status: 'queued' as const,
       }));
 
-      // 큰 캠페인 대비 chunk insert (Postgres parameter limit 65535 → 1 row ≈ 5 params → 안전마진 5000)
+      // 단체 메일 대비 chunk insert (Postgres parameter limit 65535 → 1 row ≈ 5 params → 안전마진 5000)
       const INSERT_CHUNK = 5_000;
       for (let i = 0; i < recipientRows.length; i += INSERT_CHUNK) {
         await tx.insert(mailRecipients).values(recipientRows.slice(i, i + INSERT_CHUNK));
@@ -208,12 +208,12 @@ export async function createCampaignAction(
       };
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : '캠페인 생성 중 오류가 발생했습니다.';
+    const message = err instanceof Error ? err.message : '단체 메일 생성 중 오류가 발생했습니다.';
     return { ok: false, error: message };
   }
 
   if (!result) {
-    return { ok: false, error: '캠페인 생성에 실패했습니다.' };
+    return { ok: false, error: '단체 메일 생성에 실패했습니다.' };
   }
 
   // 트랜잭션 commit 후 Inngest event emit. 실패 시 status='draft' 롤백.
@@ -231,7 +231,7 @@ export async function createCampaignAction(
       err instanceof Error ? err.message : '발송 큐 등록에 실패했습니다.';
     return {
       ok: false,
-      error: `캠페인은 저장됐지만 발송 큐 등록에 실패했습니다 — ${message}. Inngest dev 서버 가 실행 중인지 확인하세요.`,
+      error: `단체 메일은 저장됐지만 발송 큐 등록에 실패했습니다 — ${message}. Inngest dev 서버 가 실행 중인지 확인하세요.`,
     };
   }
 
@@ -240,8 +240,8 @@ export async function createCampaignAction(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 캠페인 취소 — status IN ('draft','queued') 일 때만.
-// 'sending' 진행 중 캠페인은 Inngest dispatcher 가 status='queued' 가드로 이미
+// 단체 메일 취소 — status IN ('draft','queued') 일 때만.
+// 'sending' 진행 중 단체 메일은 Inngest dispatcher 가 status='queued' 가드로 이미
 // 발송된 row 는 그대로 두고 미발송 row 만 영향. 단순화를 위해 sending 이후는 취소 불가.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -286,7 +286,7 @@ const preflightInputSchema = z.object({
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 마법사 "필터 결과 전체 선택" 액션 — 현재 필터 조건에 해당하는 모든 contact id 반환.
-// 페이지네이션 없이 일괄 — 캠페인 최대 10000명 제약 안에서 안전. 더 큰 캠페인은 제한 메시지.
+// 페이지네이션 없이 일괄 — 단체 메일 최대 10000명 제약 안에서 안전. 더 큰 단체 메일은 제한 메시지.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const candidateIdsInputSchema = z.object({
@@ -318,7 +318,7 @@ export async function fetchCandidateIdsAction(
   if (total > MAX_IDS) {
     return {
       ok: false,
-      error: `필터에 해당하는 수신자가 ${total.toLocaleString('ko-KR')}명입니다. 한 캠페인 최대 ${MAX_IDS.toLocaleString('ko-KR')}명 — 필터를 좁혀주세요.`,
+      error: `필터에 해당하는 수신자가 ${total.toLocaleString('ko-KR')}명입니다. 한 단체 메일당 최대 ${MAX_IDS.toLocaleString('ko-KR')}명 — 필터를 좁혀주세요.`,
     };
   }
 

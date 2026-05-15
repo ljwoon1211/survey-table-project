@@ -14,7 +14,7 @@ const TONE_CLASS: Record<StatusPillResult['tone'], string> = {
 };
 
 /**
- * 운영 콘솔 응답자 목록 — 상태 pill.
+ * 운영 콘솔 응답 내역 — 상태 pill.
  *
  * 6종 status 별 tone 색상 + in_progress 일 때 부속 텍스트(`5/50 · Q3`)를
  * pill 우측에 작게 노출한다. mapStatusPill 의 결과를 그대로 시각화.

@@ -1,5 +1,5 @@
 /**
- * 운영 콘솔 응답자 목록 페이지의 표시용 pure helper + 클라/서버 공용 타입.
+ * 운영 콘솔 응답 내역 페이지의 표시용 pure helper + 클라/서버 공용 타입.
  *
  * 'server-only' marker 는 `profiles.server.ts` 에만 둔다. 클라이언트 컴포넌트
  * (`profiles-filter-bar.tsx` 등) 가 import 해도 안전하도록 본 모듈은 DB/server-only
