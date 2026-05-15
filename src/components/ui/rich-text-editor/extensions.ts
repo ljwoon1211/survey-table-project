@@ -36,26 +36,24 @@ const VarTokenExtension = Extension.create({
 
 const ImageResizeWithProxy = ImageResize.extend({
   addAttributes() {
-    return {
-      ...this.parent?.(),
-      style: {
-        default: null,
-        parseHTML: (element: HTMLElement) => {
-          const style = element.getAttribute('style') || '';
-          if (style.includes('width') && !style.includes('max-width')) {
-            return `${style}; max-width: 100%;`;
-          }
-          return style || null;
-        },
-        renderHTML: (attributes: { style?: string | null }) => {
-          if (!attributes.style) return {};
-          if (attributes.style.includes('width') && !attributes.style.includes('max-width')) {
-            return { style: `${attributes.style}; max-width: 100%;` };
-          }
-          return { style: attributes.style };
-        },
-      },
-    };
+    return { ...this.parent?.() };
+  },
+  // 베이스 ImageResize 는 renderHTML 을 override 하지 않아 단순 <img> 만 출력한다.
+  // 그 결과 NodeView 의 wrapper/container DOM 이 미리보기·메일 발송 HTML 에 남지 않아
+  // 정렬과 크기 attr 가 사라진다. 여기서 wrapperStyle 을 img inline style 로 직렬화한다.
+  // wrapper 의 width 는 img 의 시각 크기를 결정하므로, container width 는 redundant 가 되어 drop.
+  // height 와 max-width 안전망만 보강.
+  renderHTML({ HTMLAttributes }) {
+    const wrapperStyle = (HTMLAttributes.wrapperStyle ?? '') as string;
+    const next: Record<string, unknown> = { ...HTMLAttributes };
+    delete next.wrapperStyle;
+    delete next.containerStyle;
+    const base = wrapperStyle.trim().replace(/;+$/, '');
+    const finalStyle = base
+      ? `${base}; height: auto; max-width: 100%;`
+      : 'height: auto; max-width: 100%;';
+    next.style = finalStyle;
+    return ['img', next];
   },
 });
 

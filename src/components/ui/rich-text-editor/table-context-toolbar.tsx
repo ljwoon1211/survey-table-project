@@ -91,8 +91,8 @@ export function TableContextToolbar({ editor }: Props) {
   };
 
   return (
-    <>
-      <Sep />
+    <div className="flex w-full flex-wrap items-center gap-1 border-t border-gray-200 pt-2 mt-1">
+      <span className="mr-1 text-xs font-medium text-gray-500">표</span>
       <ToolBtn onClick={() => editor.chain().focus().addColumnAfter().run()} title="열 추가">
         <Columns className="h-4 w-4" />
         <span className="text-xs">+</span>
@@ -145,6 +145,6 @@ export function TableContextToolbar({ editor }: Props) {
       >
         <Trash2 className="h-4 w-4 text-red-600" />
       </ToolBtn>
-    </>
+    </div>
   );
 }

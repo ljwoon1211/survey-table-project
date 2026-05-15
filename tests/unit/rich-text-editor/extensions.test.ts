@@ -175,5 +175,43 @@ describe('createUnifiedExtensions', () => {
       expect(editor.schema.nodes.image).toBeUndefined();
       editor.destroy();
     });
+
+    it('ImageResize renderHTML 은 wrapperStyle 을 img inline style 로 직렬화한다 (미리보기 일관성)', () => {
+      const exts = createUnifiedExtensions({ kind: 'survey' });
+      const editor = new Editor({
+        extensions: exts,
+        content: '<p><img src="x.png" /></p>',
+      });
+
+      let imagePos = -1;
+      editor.state.doc.descendants((node, pos) => {
+        if (node.type.name === 'imageResize' && imagePos === -1) imagePos = pos;
+        return true;
+      });
+      expect(imagePos).toBeGreaterThan(-1);
+
+      editor
+        .chain()
+        .setNodeSelection(imagePos)
+        .updateAttributes('imageResize', {
+          wrapperStyle:
+            'display: inline-block; float: left; vertical-align: top; box-sizing: border-box; padding-right: 4px; width: 25%;',
+        })
+        .run();
+
+      const html = editor.getHTML();
+      const styleMatch = html.match(/<img[^>]*style="([^"]+)"/);
+      expect(styleMatch).not.toBeNull();
+      const style = styleMatch![1];
+      expect(style).toMatch(/float:\s*left/);
+      expect(style).toMatch(/width:\s*25%/);
+      expect(style).toMatch(/box-sizing:\s*border-box/);
+      expect(style).toMatch(/max-width:\s*100%/);
+      // wrapperStyle / containerStyle 자체 attribute 는 HTML 에 남지 않아야 함
+      expect(html.toLowerCase()).not.toContain('wrapperstyle');
+      expect(html.toLowerCase()).not.toContain('containerstyle');
+
+      editor.destroy();
+    });
   });
 });
