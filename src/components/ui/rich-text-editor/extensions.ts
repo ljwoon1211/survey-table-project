@@ -1,5 +1,6 @@
 import { type AnyExtension, Extension } from '@tiptap/core';
-import { Plugin } from '@tiptap/pm/state';
+import { type Node as PMNode } from '@tiptap/pm/model';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import Link from '@tiptap/extension-link';
 import Strike from '@tiptap/extension-strike';
@@ -38,33 +39,44 @@ const VarTokenExtension = Extension.create({
 
 // TipTap Table extension 의 TableView NodeView 는 update 에서 attrs.style 을 재적용하지
 // 않고, this.parent 로 baseRenderer 를 가져오는 일반 패턴도 addNodeView 에 대해서는
-// undefined 라 wrap 이 불가능하다. 그래서 별도 ProseMirror plugin 이 매 state change
-// 마다 wrapper 의 style 을 Decoration 으로 직접 갱신한다 — flex + justify-content 로
-// inner table 을 정렬.
+// undefined 라 wrap 이 불가능하다. 그래서 별도 ProseMirror plugin 이 wrapper 에 flex +
+// justify-content Decoration 을 박아 inner table 을 정렬.
+//
+// 성능: plugin state 에 DecorationSet 을 캐시하고 tr.docChanged 시에만 재계산.
+// selection 만 변하는 transaction (커서 이동) 은 skip → 큰 문서 + 다수 table 환경에서
+// cell typing 시 풀스캔 부담을 줄인다.
+function buildTableAlignDecorations(doc: PMNode): DecorationSet {
+  const decorations: Decoration[] = [];
+  doc.descendants((node, pos) => {
+    if (node.type.name !== 'table') return;
+    const align = (node.attrs.align ?? 'left') as 'left' | 'center' | 'right';
+    const justify =
+      align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start';
+    decorations.push(
+      Decoration.node(pos, pos + node.nodeSize, {
+        style: `display: flex; justify-content: ${justify};`,
+      }),
+    );
+  });
+  return DecorationSet.create(doc, decorations);
+}
+
 const TableAlignDecoration = Extension.create({
   name: 'tableAlignDecoration',
   addProseMirrorPlugins() {
+    // 매 에디터 인스턴스마다 새 PluginKey — 두 에디터 동시 마운트 시 키 충돌 방지
+    const key = new PluginKey<DecorationSet>('table-align-decoration');
     return [
-      new Plugin({
+      new Plugin<DecorationSet>({
+        key,
+        state: {
+          init: (_config, { doc }) => buildTableAlignDecorations(doc),
+          apply: (tr, old) =>
+            tr.docChanged ? buildTableAlignDecorations(tr.doc) : old,
+        },
         props: {
-          decorations: (state) => {
-            const decorations: Decoration[] = [];
-            state.doc.descendants((node, pos) => {
-              if (node.type.name !== 'table') return;
-              const align = (node.attrs.align ?? 'left') as 'left' | 'center' | 'right';
-              const justify =
-                align === 'center'
-                  ? 'center'
-                  : align === 'right'
-                    ? 'flex-end'
-                    : 'flex-start';
-              decorations.push(
-                Decoration.node(pos, pos + node.nodeSize, {
-                  style: `display: flex; justify-content: ${justify};`,
-                }),
-              );
-            });
-            return DecorationSet.create(state.doc, decorations);
+          decorations(state) {
+            return key.getState(state);
           },
         },
       }),
