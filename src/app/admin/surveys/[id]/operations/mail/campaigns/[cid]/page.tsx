@@ -79,11 +79,12 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
   const statusBadge = STATUS_LABEL[campaign.status];
   const canCancel = campaign.status === 'queued' || campaign.status === 'draft';
 
-  // "이 캠페인 미응답자 재발송" 동선 — 같은 필터에 미응답 강제 추가
+  // "이 캠페인 미응답자 재발송" 동선 — 같은 필터에 미응답 강제 + 자동 전체 선택
   const reuseFilter = new URLSearchParams();
   if (campaign.filterSnapshot.q) reuseFilter.set('q', campaign.filterSnapshot.q);
   reuseFilter.set('unresponded', '1');
   reuseFilter.set('templateId', campaign.mailTemplateId ?? '');
+  reuseFilter.set('autoSelectAll', '1');
   const reuseHref = `/admin/surveys/${surveyId}/operations/mail/campaigns/new?${reuseFilter.toString()}`;
 
   return (

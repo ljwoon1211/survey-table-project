@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -141,6 +141,36 @@ export function CampaignWizard({
   function clearSelection() {
     setSelectedIds(new Set());
   }
+
+  // "미응답자 재발송" 진입 시 필터 결과 전체 자동 선택 (1회만)
+  const autoSelectedRef = useRef(false);
+  useEffect(() => {
+    if (autoSelectedRef.current) return;
+    if (searchParams?.get('autoSelectAll') !== '1') return;
+    autoSelectedRef.current = true;
+
+    const stripFlag = () => {
+      const next = new URLSearchParams(searchParams?.toString() ?? '');
+      next.delete('autoSelectAll');
+      router.replace(`?${next.toString()}`, { scroll: false });
+    };
+
+    if (candidates.total === 0) {
+      stripFlag();
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await fetchCandidateIdsAction({
+        surveyId,
+        filter: buildFilterSnapshot(currentFilter),
+      });
+      if (result.ok && result.data) {
+        setSelectedIds(new Set(result.data.ids));
+      }
+      stripFlag();
+    });
+  }, [searchParams, candidates.total, surveyId, currentFilter, router]);
 
   async function openConfirm() {
     if (selectedCount === 0) {
