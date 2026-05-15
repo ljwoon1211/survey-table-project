@@ -7,12 +7,14 @@ import { AlertCircle, Loader2, Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { optimizeImage, validateImageFile } from '@/lib/image-utils';
 
+import type { RichTextEditorKind } from './types';
+
 interface Props {
   open: boolean;
   onClose: () => void;
   onUploaded: (url: string) => void;
   /** 업로드 endpoint 에 보낼 kind 값 */
-  kind: 'mail' | 'survey';
+  kind: RichTextEditorKind;
 }
 
 export function ImageUploadModal({ open, onClose, onUploaded, kind }: Props) {
@@ -23,12 +25,16 @@ export function ImageUploadModal({ open, onClose, onUploaded, kind }: Props) {
   const [isUploading, setIsUploading] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const uploadAbortController = useRef<AbortController | null>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
 
   // open 변화 시 상태 리셋 (닫혔다가 다시 열릴 때 초기화)
+  // 진행 중인 XHR이 있으면 함께 abort — 닫힌 모달에서 onUploaded 가 발화되는 것을 막는다
   useEffect(() => {
     if (!open) {
+      if (xhrRef.current) {
+        xhrRef.current.abort();
+        xhrRef.current = null;
+      }
       setSelectedFile(null);
       setPreviewUrl(null);
       setUploadProgress(0);
@@ -93,10 +99,6 @@ export function ImageUploadModal({ open, onClose, onUploaded, kind }: Props) {
       xhrRef.current.abort();
       xhrRef.current = null;
     }
-    if (uploadAbortController.current) {
-      uploadAbortController.current.abort();
-      uploadAbortController.current = null;
-    }
     setSelectedFile(null);
     setPreviewUrl(null);
     setUploadError(null);
@@ -120,8 +122,6 @@ export function ImageUploadModal({ open, onClose, onUploaded, kind }: Props) {
     setIsUploading(true);
     setUploadProgress(0);
     setUploadError(null);
-
-    uploadAbortController.current = new AbortController();
 
     try {
       const optimizedBlob = await optimizeImage(selectedFile);
@@ -151,12 +151,23 @@ export function ImageUploadModal({ open, onClose, onUploaded, kind }: Props) {
 
       const uploadPromise = new Promise<string>((resolve, reject) => {
         handleLoad = () => {
-          if (xhr.status === 200) {
-            const response = JSON.parse(xhr.responseText);
-            resolve(response.url);
-          } else {
-            const errorResponse = JSON.parse(xhr.responseText);
-            reject(new Error(errorResponse.error || '업로드에 실패했습니다.'));
+          // 서버가 HTML 에러 페이지 등 비-JSON 본문을 반환할 수 있으므로 parse를 보호한다
+          try {
+            if (xhr.status === 200) {
+              const response = JSON.parse(xhr.responseText);
+              resolve(response.url);
+            } else {
+              let message = '업로드에 실패했습니다.';
+              try {
+                const errorResponse = JSON.parse(xhr.responseText);
+                if (errorResponse?.error) message = errorResponse.error;
+              } catch {
+                // 비-JSON 응답은 기본 메시지 사용
+              }
+              reject(new Error(message));
+            }
+          } catch {
+            reject(new Error('서버 응답을 처리할 수 없습니다.'));
           }
         };
         handleError = () => reject(new Error('네트워크 오류가 발생했습니다.'));
@@ -192,7 +203,6 @@ export function ImageUploadModal({ open, onClose, onUploaded, kind }: Props) {
       setUploadProgress(0);
     } finally {
       setIsUploading(false);
-      uploadAbortController.current = null;
     }
   }, [selectedFile, kind, onUploaded, onClose]);
 
