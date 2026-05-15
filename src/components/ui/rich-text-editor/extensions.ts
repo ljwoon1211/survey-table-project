@@ -140,10 +140,50 @@ export function createUnifiedExtensions(options: CreateUnifiedExtensionsOptions 
         align: {
           default: 'left' as HAlign,
           parseHTML: (el: HTMLElement) => parseTableAlign(el),
-          renderHTML: (attrs: { align?: HAlign }) => ({
-            style: tableAlignStyle((attrs.align ?? 'left') as HAlign),
-          }),
+          // 직렬화는 style attr 가 담당. align 은 isActive 매칭과 parse 추론용.
+          renderHTML: () => ({}),
         },
+        // NodeView (TableView) 는 node.attrs.style 을 table 에 적용한다.
+        // 이 attr 가 없으면 toolbar 의 정렬 변경이 편집기 시각에 반영되지 않는다.
+        style: {
+          default: null as string | null,
+          parseHTML: (el: HTMLElement) => el.getAttribute('style') || null,
+          renderHTML: (attrs: { style?: string | null }) =>
+            attrs.style ? { style: attrs.style } : {},
+        },
+      };
+    },
+    // TableView 는 update() 에서 attrs.style 을 재적용하지 않는다. 베이스 NodeView 를
+    // 래핑해 update 마다 inner table 의 style.cssText 를 다시 박는다.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    addNodeView(): any {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const baseRenderer = (this.parent as any)?.();
+      if (!baseRenderer) return null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (props: any) => {
+        const view = baseRenderer(props);
+        const wrapper = view.dom as HTMLElement;
+        const applyStyle = (style: string | null | undefined) => {
+          const table = wrapper.querySelector('table') as HTMLElement | null;
+          if (!table) return;
+          if (style) table.style.cssText = style;
+          else table.removeAttribute('style');
+        };
+        applyStyle(props.node.attrs.style as string | null);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const originalUpdate = view.update?.bind(view) as
+          | ((node: any, decorations: any, innerDecorations: any) => boolean)
+          | undefined;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        view.update = (newNode: any, decorations: any, innerDecorations: any) => {
+          const handled = originalUpdate
+            ? originalUpdate(newNode, decorations, innerDecorations)
+            : true;
+          if (handled) applyStyle(newNode.attrs.style as string | null);
+          return handled;
+        };
+        return view;
       };
     },
   });

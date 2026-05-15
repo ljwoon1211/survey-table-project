@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 
+import { tableAlignStyle, type HAlign } from './table-attrs-helpers';
 import { Sep, ToolBtn } from './toolbar-primitives';
 
 interface Props {
@@ -58,8 +59,13 @@ export function TableContextToolbar({ editor }: Props) {
     editor.chain().focus().updateAttributes('tableHeader', { backgroundColor: color }).run();
   };
 
-  const setTableAlign = (align: 'left' | 'center' | 'right') => {
-    editor.chain().focus().updateAttributes('table', { align }).run();
+  const setTableAlign = (align: HAlign) => {
+    // align 은 isActive 매칭용, style 은 NodeView 가 보고 inner table 에 inline 적용
+    editor
+      .chain()
+      .focus()
+      .updateAttributes('table', { align, style: tableAlignStyle(align) })
+      .run();
   };
 
   const equalizeColumnWidths = () => {
