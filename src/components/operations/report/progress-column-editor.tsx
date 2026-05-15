@@ -23,11 +23,11 @@ interface Props {
 const ATTRS_PREFIX = 'attrs.';
 
 /**
- * 컨택리스트 attrs 풀 + initialScheme 머지.
+ * 조사 대상 목록 attrs 풀 + initialScheme 머지.
  *
- * - 컨택리스트의 모든 `attrs.<key>` 를 풀로 추출 (사용자 편집 order 정렬).
+ * - 조사 대상 목록의 모든 `attrs.<key>` 를 풀로 추출 (사용자 편집 order 정렬).
  * - initialScheme 에 같은 key 가 존재하면 기존 값(label/order/hidden) 사용.
- * - 매칭 없으면 디폴트 hidden=true, 라벨은 컨택리스트 라벨.
+ * - 매칭 없으면 디폴트 hidden=true, 라벨은 조사 대상 목록 라벨.
  * - contactScheme 에서 사라진 키(고아)는 결과에 포함되지 않음 → save 후 자동 정리.
  */
 function hydrateColumns(
@@ -50,7 +50,7 @@ function hydrateColumns(
     return {
       key: p.key,
       label: p.contactLabel,
-      order: i, // 컨택리스트 풀 순서를 디폴트로
+      order: i, // 조사 대상 목록 풀 순서를 디폴트로
       hidden: true,
     };
   });
@@ -120,7 +120,7 @@ export function ProgressColumnEditor({ surveyId, initialScheme, contactScheme }:
             {columns.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-6 text-center text-slate-400">
-                  컨택리스트에 attrs 컬럼이 없습니다. 먼저 엑셀을 업로드하거나 컨택리스트 컬럼 설정을 확인하세요.
+                  조사 대상 목록에 attrs 컬럼이 없습니다. 먼저 엑셀을 업로드하거나 조사 대상 목록 컬럼 설정을 확인하세요.
                 </td>
               </tr>
             )}

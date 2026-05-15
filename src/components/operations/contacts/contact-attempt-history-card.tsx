@@ -46,7 +46,7 @@ export function ContactAttemptHistoryCard({
   return (
     <div className="rounded-lg border bg-white">
       <div className="flex items-center justify-between border-b px-5 py-3">
-        <h3 className="text-base font-semibold">컨택결과 (최근순)</h3>
+        <h3 className="text-base font-semibold">회차 결과 (최근순)</h3>
         <span className="text-xs text-slate-400">{attempts.length}건</span>
       </div>
       {successMessage && (

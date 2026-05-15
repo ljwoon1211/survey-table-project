@@ -9,7 +9,7 @@ import {
 } from '@/lib/operations/contacts.server';
 
 export const metadata: Metadata = {
-  title: '현황 - 컨택 추가',
+  title: '현황 - 조사 대상 추가',
 };
 
 interface PageProps {
@@ -28,8 +28,8 @@ export default async function ContactNewPage({ params }: PageProps) {
   return (
     <main className="mx-auto max-w-7xl px-6 py-6">
       <div className="mb-4">
-        <h2 className="text-xl font-bold text-gray-900">컨택 추가</h2>
-        <p className="text-sm text-slate-500">새 컨택을 직접 추가합니다.</p>
+        <h2 className="text-xl font-bold text-gray-900">조사 대상 추가</h2>
+        <p className="text-sm text-slate-500">새 조사 대상을 직접 추가합니다.</p>
       </div>
 
       <ContactDetailForm

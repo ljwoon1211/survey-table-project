@@ -105,7 +105,7 @@ function computeCell(col: ContactColumnDef, row: ContactsRow): {
 }
 
 /**
- * 컨택리스트 표.
+ * 조사 대상 목록 표.
  *
  * 컬럼 스킴(ContactColumnScheme) 기반 동적 헤더/셀 렌더 + 응답 완료 행 강조.
  * - attrs.* source: row.attrs[키] 표시 (이메일/사업자번호는 마스킹)

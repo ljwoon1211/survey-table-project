@@ -182,7 +182,7 @@ export function CampaignWizard({
       return;
     }
     if (!title.trim()) {
-      alert('캠페인 제목을 입력하세요.');
+      alert('단체 메일 제목을 입력하세요.');
       return;
     }
     startTransition(async () => {
@@ -214,7 +214,7 @@ export function CampaignWizard({
         filterSnapshot: buildFilterSnapshot(currentFilter),
       });
       if (!result.ok || !result.data) {
-        alert(result.error ?? '캠페인 생성 실패');
+        alert(result.error ?? '단체 메일 생성 실패');
         return;
       }
       router.push(
@@ -247,7 +247,7 @@ export function CampaignWizard({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="title">캠페인 제목</Label>
+            <Label htmlFor="title">단체 메일 제목</Label>
             <Input
               id="title"
               value={title}
@@ -289,7 +289,7 @@ export function CampaignWizard({
         </div>
 
         <p className="text-xs text-slate-500">
-          수신거부자(unsubscribed_at IS NOT NULL) 및 이메일 누락 컨택은 자동으로 제외됩니다.
+          수신거부자(unsubscribed_at IS NOT NULL) 및 이메일 누락 조사 대상은 자동으로 제외됩니다.
         </p>
       </Card>
 
@@ -451,7 +451,7 @@ export function CampaignWizard({
               ) : null}
               {preflightSummary.notFound > 0 ? (
                 <div className="text-slate-500">
-                  컨택 삭제로 제외: {preflightSummary.notFound.toLocaleString('ko-KR')}명
+                  조사 대상 삭제로 제외: {preflightSummary.notFound.toLocaleString('ko-KR')}명
                 </div>
               ) : null}
             </div>

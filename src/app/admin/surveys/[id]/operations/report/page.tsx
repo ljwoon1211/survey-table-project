@@ -56,7 +56,7 @@ function parseSort(s: string | undefined, metaKeys: string[]): ProgressSortKey {
  * 운영 콘솔 진척률 페이지.
  *
  * - server component: searchParams (q/page/sort/dir) 를 읽어 server adapter 호출.
- * - 컨택 0건이면 무거운 집계 SQL 을 건너뛰고 ProgressEmptyCard 만 렌더.
+ * - 조사 대상 0건이면 무거운 집계 SQL 을 건너뛰고 ProgressEmptyCard 만 렌더.
  * - meta 컬럼은 surveys.progress_columns 스킴(visible+order) 기준 동적 결정.
  */
 export default async function ReportProgressPage({ params, searchParams }: PageProps) {
@@ -82,7 +82,7 @@ export default async function ReportProgressPage({ params, searchParams }: PageP
   const metaKeys = visibleColumns.map((c) => c.key).filter((k) => k.length > 0);
   const sort = parseSort(sp.sort, metaKeys);
 
-  // 컨택 0건 빠른 검출 — getProgressTotals 보다 훨씬 가벼움.
+  // 조사 대상 0건 빠른 검출 — getProgressTotals 보다 훨씬 가벼움.
   const [{ ct }] = await db
     .select({ ct: sql<number>`count(*)::int` })
     .from(contactTargets)

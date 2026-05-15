@@ -23,7 +23,7 @@ export function UnsubscribedSegment({ surveyId, rows, total, page, pageSize }: P
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-slate-900">수신거부자 명단</h2>
           <p className="mt-1 text-sm text-slate-500">
-            모든 캠페인에서 자동으로 제외됩니다. 총 {total.toLocaleString('ko-KR')}명.
+            모든 단체 메일에서 자동으로 제외됩니다. 총 {total.toLocaleString('ko-KR')}명.
           </p>
         </div>
       </div>
@@ -31,7 +31,7 @@ export function UnsubscribedSegment({ surveyId, rows, total, page, pageSize }: P
       {rows.length === 0 ? (
         <Card className="border-dashed">
           <div className="px-6 py-10 text-center text-sm text-slate-500">
-            아직 수신거부 처리된 컨택이 없습니다.
+            아직 수신거부 처리된 조사 대상이 없습니다.
           </div>
         </Card>
       ) : (

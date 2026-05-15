@@ -38,7 +38,7 @@ export function ContactsPageClient({
           size="sm"
           onClick={() => router.push(`/admin/surveys/${surveyId}/operations/contacts/new`)}
         >
-          + 컨택 추가
+          + 조사 대상 추가
         </Button>
       </div>
 

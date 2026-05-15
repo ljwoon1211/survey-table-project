@@ -30,7 +30,7 @@ interface ContactDetailFormProps {
   scheme: ContactColumnScheme;
   resultCodes: ContactResultCode[];
   systemFieldKeys?: { group?: string };
-  /** 편집 모드: 기존 컨택 정보. 신규 모드: undefined. */
+  /** 편집 모드: 기존 조사 대상 정보. 신규 모드: undefined. */
   initial?: {
     id: string;
     resid: number;
@@ -149,7 +149,7 @@ export function ContactDetailForm({
 
   function remove() {
     if (!isEdit || !initial) return;
-    if (!window.confirm('이 컨택을 삭제하시겠습니까? (응답이 있으면 응답은 보존, 매칭만 끊김)')) return;
+    if (!window.confirm('이 조사 대상을 삭제하시겠습니까? (응답이 있으면 응답은 보존, 매칭만 끊김)')) return;
     setError(null);
     startTransition(async () => {
       try {
@@ -335,7 +335,7 @@ export function ContactDetailForm({
             </>
           ) : (
             <div className="rounded-lg border bg-slate-50 p-5 text-sm text-slate-500">
-              컨택을 먼저 저장하면 회차 기록을 추가할 수 있습니다.
+              조사 대상을 먼저 저장하면 회차 기록을 추가할 수 있습니다.
             </div>
           )}
 

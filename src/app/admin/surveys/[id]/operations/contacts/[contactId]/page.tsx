@@ -11,7 +11,7 @@ import {
 } from '@/lib/operations/contacts.server';
 
 export const metadata: Metadata = {
-  title: '현황 - 컨택 단건 편집',
+  title: '현황 - 조사 대상 단건 편집',
 };
 
 interface PageProps {
@@ -39,7 +39,7 @@ export default async function ContactDetailPage({ params }: PageProps) {
     <main className="mx-auto max-w-7xl px-6 py-6">
       <div className="mb-4">
         <h2 className="text-xl font-bold text-gray-900">
-          컨택 단건 편집 — resid {detail.contact.resid}
+          조사 대상 단건 편집 — resid {detail.contact.resid}
         </h2>
         <p className="text-sm text-slate-500">
           {groupLabel}

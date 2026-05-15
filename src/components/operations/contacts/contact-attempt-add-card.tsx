@@ -53,7 +53,7 @@ export function ContactAttemptAddCard({
   return (
     <div className="rounded-lg border bg-white">
       <div className="border-b bg-red-50 px-5 py-3">
-        <h3 className="text-base font-semibold text-red-700">컨택결과 추가</h3>
+        <h3 className="text-base font-semibold text-red-700">회차 결과 추가</h3>
       </div>
       <div className="px-5 py-4">
         {error && (
@@ -101,7 +101,7 @@ export function ContactAttemptAddCard({
         />
 
         <Button onClick={add} disabled={isPending} className="mt-2 w-full justify-center">
-          {isPending ? '추가 중…' : '+ 컨택결과 추가'}
+          {isPending ? '추가 중…' : '+ 회차 결과 추가'}
         </Button>
       </div>
     </div>

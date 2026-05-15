@@ -109,7 +109,7 @@ export function MailPreviewDialog({
     }
   }, [open, currentUserEmail]);
 
-  // 다이얼로그 열릴 때마다 fresh 하게 컨택 샘플 fetch
+  // 다이얼로그 열릴 때마다 fresh 하게 조사 대상 샘플 fetch
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -118,7 +118,7 @@ export function MailPreviewDialog({
       .then((res) => {
         if (cancelled) return;
         if (!res.ok) {
-          setFetchState({ status: 'error', error: res.error ?? '샘플 컨택을 불러오지 못했습니다' });
+          setFetchState({ status: 'error', error: res.error ?? '샘플 조사 대상을 불러오지 못했습니다' });
           return;
         }
         setFetchState({ status: 'ready', sample: res.data ?? null });
@@ -127,7 +127,7 @@ export function MailPreviewDialog({
         if (cancelled) return;
         setFetchState({
           status: 'error',
-          error: err instanceof Error ? err.message : '샘플 컨택을 불러오지 못했습니다',
+          error: err instanceof Error ? err.message : '샘플 조사 대상을 불러오지 못했습니다',
         });
       });
     return () => {
@@ -216,9 +216,9 @@ export function MailPreviewDialog({
           <DialogDescription>
             {isReady
               ? isEmpty
-                ? '샘플 컨택이 없습니다. 모든 변수가 (없는 키)로 표시됩니다.'
-                : `첫 번째 컨택 (resid #${fetchState.sample!.resid}) 데이터로 변수를 치환했습니다.`
-              : '컨택 샘플을 불러오는 중...'}
+                ? '샘플 조사 대상이 없습니다. 모든 변수가 (없는 키)로 표시됩니다.'
+                : `첫 번째 조사 대상 (resid #${fetchState.sample!.resid}) 데이터로 변수를 치환했습니다.`
+              : '조사 대상 샘플을 불러오는 중...'}
           </DialogDescription>
         </DialogHeader>
 
@@ -226,7 +226,7 @@ export function MailPreviewDialog({
           {fetchState.status === 'loading' && (
             <div className="flex items-center justify-center gap-2 px-6 py-12 text-sm text-gray-500">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>샘플 컨택을 불러오는 중...</span>
+              <span>샘플 조사 대상을 불러오는 중...</span>
             </div>
           )}
 
@@ -234,7 +234,7 @@ export function MailPreviewDialog({
             <div className="m-6 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
               <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
               <div>
-                <div className="font-medium">샘플 컨택을 불러오지 못했습니다</div>
+                <div className="font-medium">샘플 조사 대상을 불러오지 못했습니다</div>
                 <div className="mt-0.5 text-xs">{fetchState.error}</div>
               </div>
             </div>
@@ -245,7 +245,7 @@ export function MailPreviewDialog({
               {isEmpty && (
                 <div className="flex items-start gap-2 border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-900">
                   <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-                  <span>이 설문에 등록된 컨택이 없어 모든 변수가 (없는 키)로 표시됩니다.</span>
+                  <span>이 설문에 등록된 조사 대상이 없어 모든 변수가 (없는 키)로 표시됩니다.</span>
                 </div>
               )}
 

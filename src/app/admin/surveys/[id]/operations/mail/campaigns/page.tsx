@@ -39,9 +39,9 @@ export default async function MailCampaignsListPage({ params, searchParams }: Pr
       <section className="space-y-3">
         <div className="flex items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">메일 캠페인</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">단체 발송</h1>
             <p className="mt-1 text-sm text-gray-500">
-              컨택리스트로 단체 발송한 회차와 발송 현황을 관리합니다. 총{' '}
+              조사 대상 목록으로 단체 발송한 회차와 발송 현황을 관리합니다. 총{' '}
               {campaigns.total.toLocaleString('ko-KR')}건.
             </p>
           </div>

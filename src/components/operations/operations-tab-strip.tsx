@@ -19,10 +19,10 @@ interface OperationsTabStripProps {
 /**
  * 현황 콘솔 상단 탭 스트립.
  *
- * - "Field work" trigger hover/click → `응답 현황` / `응답자 목록` 드롭다운
- * - "보고서" 는 단일 페이지 링크 (`/operations/report`)
- * - "컨택" trigger hover/click → `컨택리스트` / `리스트 업로드` / `컬럼 설정` / `결과코드 설정` 드롭다운
- * - "메일" trigger → `캠페인` / `템플릿` 드롭다운 (수신거부자는 캠페인 페이지 하단 세그먼트)
+ * - "실사 현황" trigger hover/click → `응답 현황` / `응답 내역` 드롭다운
+ * - "진척 보고" 는 단일 페이지 링크 (`/operations/report`)
+ * - "조사 대상" trigger hover/click → `조사 대상 목록` / `조사 대상 업로드` / `컬럼 설정` / `결과코드 설정` 드롭다운
+ * - "메일" trigger → `템플릿` / `단체 발송` / `비용 정산` 드롭다운 (수신거부자는 단체 발송 페이지 하단 세그먼트)
  * - shadcn NavigationMenu primitive 가 hover/click/키보드 표준을 처리하며
  *   Trigger 의 ChevronDown 이 내장돼 있어 caret 마크업은 별도로 그리지 않는다.
  */
@@ -82,14 +82,14 @@ export function OperationsTabStrip({ surveyId }: OperationsTabStripProps) {
                   : 'border-transparent text-slate-500 hover:text-slate-900',
               )}
             >
-              Field work
+              실사 현황
             </NavigationMenuTrigger>
             <NavigationMenuContent className="min-w-[180px] p-1">
               <SubLink href={overviewHref} active={isOverviewActive}>
                 응답 현황
               </SubLink>
               <SubLink href={profilesHref} active={isProfilesActive}>
-                응답자 목록
+                응답 내역
               </SubLink>
             </NavigationMenuContent>
           </NavigationMenuItem>
@@ -105,7 +105,7 @@ export function OperationsTabStrip({ surveyId }: OperationsTabStripProps) {
                   : 'border-transparent text-slate-500 hover:text-slate-900',
               )}
             >
-              보고서
+              진척 보고
             </Link>
           </NavigationMenuItem>
 
@@ -118,14 +118,14 @@ export function OperationsTabStrip({ surveyId }: OperationsTabStripProps) {
                   : 'border-transparent text-slate-500 hover:text-slate-900',
               )}
             >
-              컨택
+              조사 대상
             </NavigationMenuTrigger>
             <NavigationMenuContent className="min-w-[180px] p-1">
               <SubLink href={contactsHref} active={isContactsRootActive}>
-                컨택리스트
+                조사 대상 목록
               </SubLink>
               <SubLink href={contactsUploadHref} active={isContactsUploadActive}>
-                리스트 업로드
+                조사 대상 업로드
               </SubLink>
               <SubLink href={contactsColumnsHref} active={isContactsColumnsActive}>
                 컬럼 설정
@@ -148,11 +148,11 @@ export function OperationsTabStrip({ surveyId }: OperationsTabStripProps) {
               메일
             </NavigationMenuTrigger>
             <NavigationMenuContent className="min-w-[180px] p-1">
-              <SubLink href={mailCampaignsHref} active={isMailCampaignsActive}>
-                캠페인
-              </SubLink>
               <SubLink href={mailTemplatesHref} active={isMailTemplatesActive}>
                 템플릿
+              </SubLink>
+              <SubLink href={mailCampaignsHref} active={isMailCampaignsActive}>
+                단체 발송
               </SubLink>
               <SubLink href={mailCostHref} active={false}>
                 비용 정산
