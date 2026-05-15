@@ -51,7 +51,6 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
       editorProps: {
         attributes: {
           class: `${PROSE_BASE} ${editorClassName ?? ''}`,
-          style: `min-height: ${minHeight}px`,
           ...(placeholder ? { 'data-placeholder': placeholder } : {}),
         },
       },
@@ -109,10 +108,14 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
           const res = await fetch('/api/upload/image', { method: 'POST', body: fd });
           const json = (await res.json()) as { url?: string; error?: string };
           if (!res.ok || !json.url) throw new Error(json.error ?? '이미지 업로드 실패');
+          // 업로드 도중 호스트가 언마운트되어 editor 가 destroy 됐을 수 있다
+          if (editor.isDestroyed) return;
           imageTracker.trackUpload(json.url);
           editor.chain().focus().setImage({ src: json.url }).run();
         } catch (err) {
-          alert(err instanceof Error ? err.message : '이미지 업로드 실패');
+          if (!editor.isDestroyed) {
+            alert(err instanceof Error ? err.message : '이미지 업로드 실패');
+          }
         }
       };
       input.click();
@@ -131,16 +134,19 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
           onPickImage={onPickImage}
           onPickLink={onPickLink}
         />
-        <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 260px)' }}>
+        <div
+          className="overflow-y-auto max-h-[calc(100vh-260px)]"
+          style={{ minHeight: `${minHeight}px` }}
+        >
           <EditorContent editor={editor} />
         </div>
         <ImageUploadModal
           open={showModal}
           onClose={() => setShowModal(false)}
           onUploaded={(url) => {
+            setShowModal(false);
             imageTracker.trackUpload(url);
             editor.chain().focus().setImage({ src: url }).run();
-            setShowModal(false);
           }}
           kind={kind}
         />
