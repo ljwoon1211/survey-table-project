@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Send } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
+import { formatDateTimeKst } from '@/lib/date-formatters';
 import type { CampaignRow } from '@/lib/operations/campaigns.server';
 
 interface Props {
@@ -21,17 +22,6 @@ const STATUS_LABEL: Record<CampaignRow['status'], { label: string; tone: string 
   partial: { label: '부분 완료', tone: 'bg-orange-100 text-orange-700' },
   cancelled: { label: '취소됨', tone: 'bg-rose-100 text-rose-700' },
 };
-
-function formatDateTime(date: Date | null) {
-  if (!date) return '—';
-  return new Intl.DateTimeFormat('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-}
 
 function num(n: number) {
   if (n === 0) return <span className="text-slate-300">0</span>;
@@ -121,9 +111,9 @@ export function CampaignsList({ surveyId, rows, total, page, pageSize }: Props) 
                       {status.label}
                     </span>
                   </td>
-                  <td className="px-3 py-3 text-xs text-slate-500">{formatDateTime(r.createdAt)}</td>
+                  <td className="px-3 py-3 text-xs text-slate-500">{formatDateTimeKst(r.createdAt)}</td>
                   <td className="px-3 py-3 text-xs text-slate-500">
-                    {formatDateTime(r.startedAt)}
+                    {formatDateTimeKst(r.startedAt)}
                   </td>
                 </tr>
               );

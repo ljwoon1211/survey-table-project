@@ -9,6 +9,7 @@ import {
   type MailCampaignStatus,
   type MailRecipientStatus,
 } from '@/db/schema/mail';
+import { formatDateTimeKst } from '@/lib/date-formatters';
 import {
   getCampaignDetail,
   listCampaignRecipients,
@@ -40,17 +41,6 @@ function parseStatus(value: string | undefined): MailRecipientStatus | 'all' {
   return (mailRecipientStatusValues as readonly string[]).includes(value)
     ? (value as MailRecipientStatus)
     : 'all';
-}
-
-function formatDateTime(date: Date | null) {
-  if (!date) return '—';
-  return new Intl.DateTimeFormat('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
 }
 
 export default async function CampaignDetailPage({ params, searchParams }: Props) {
@@ -144,9 +134,9 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
         </div>
 
         <dl className="grid grid-cols-2 gap-4 border-t border-slate-200 pt-4 text-sm sm:grid-cols-4">
-          <Meta label="등록일시" value={formatDateTime(campaign.createdAt)} />
-          <Meta label="발송 시작" value={formatDateTime(campaign.startedAt)} />
-          <Meta label="발송 완료" value={formatDateTime(campaign.completedAt)} />
+          <Meta label="등록일시" value={formatDateTimeKst(campaign.createdAt)} />
+          <Meta label="발송 시작" value={formatDateTimeKst(campaign.startedAt)} />
+          <Meta label="발송 완료" value={formatDateTimeKst(campaign.completedAt)} />
           <Meta label="제목 (메일)" value={campaign.subjectSnapshot} />
         </dl>
       </Card>

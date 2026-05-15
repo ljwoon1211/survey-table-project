@@ -4,22 +4,13 @@ import { Mail } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import type { MailTemplate } from '@/db/schema/mail';
+import { formatDateTimeKst } from '@/lib/date-formatters';
 
 import { DeleteTemplateButton } from './delete-template-button';
 
 interface Props {
   surveyId: string;
   templates: MailTemplate[];
-}
-
-function formatUpdatedAt(date: Date) {
-  return new Intl.DateTimeFormat('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
 }
 
 export function MailTemplateList({ surveyId, templates }: Props) {
@@ -68,7 +59,7 @@ export function MailTemplateList({ surveyId, templates }: Props) {
                 </Link>
               </td>
               <td className="max-w-md truncate px-6 py-4 text-gray-600">{t.subject || '—'}</td>
-              <td className="px-6 py-4 text-gray-500">{formatUpdatedAt(new Date(t.updatedAt))}</td>
+              <td className="px-6 py-4 text-gray-500">{formatDateTimeKst(t.updatedAt)}</td>
               <td className="px-4 py-4 text-right">
                 <DeleteTemplateButton
                   surveyId={surveyId}

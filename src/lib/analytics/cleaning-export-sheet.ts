@@ -12,6 +12,7 @@
  */
 import ExcelJS from 'exceljs';
 
+import { formatDateTimeKst } from '@/lib/date-formatters';
 import type {
   CheckboxOption,
   Question,
@@ -100,8 +101,8 @@ export function buildIndexSheet(
 
     addRow(ws, [
       resp.id,
-      startedAt?.toLocaleString('ko-KR') ?? '',
-      completedAt?.toLocaleString('ko-KR') ?? '',
+      startedAt ? formatDateTimeKst(startedAt) : '',
+      completedAt ? formatDateTimeKst(completedAt) : '',
       durationSec,
       resp.isCompleted ? '완료' : '미완료',
       resp.userAgent ?? '',

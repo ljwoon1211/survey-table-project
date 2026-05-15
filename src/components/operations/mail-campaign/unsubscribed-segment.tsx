@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
+import { formatDateTimeKst } from '@/lib/date-formatters';
 import type { UnsubscribedContactRow } from '@/lib/operations/campaigns.server';
 
 import { UnsubscribedRevertButton } from './unsubscribed-revert-button';
@@ -11,16 +12,6 @@ interface Props {
   total: number;
   page: number;
   pageSize: number;
-}
-
-function formatDate(date: Date) {
-  return new Intl.DateTimeFormat('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
 }
 
 export function UnsubscribedSegment({ surveyId, rows, total, page, pageSize }: Props) {
@@ -66,7 +57,7 @@ export function UnsubscribedSegment({ surveyId, rows, total, page, pageSize }: P
                     <td className="px-4 py-3 text-slate-900">{r.emailMasked}</td>
                     <td className="px-4 py-3 text-slate-600">{r.groupValue ?? '—'}</td>
                     <td className="px-4 py-3 text-xs text-slate-500">
-                      {formatDate(r.unsubscribedAt)}
+                      {formatDateTimeKst(r.unsubscribedAt)}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <UnsubscribedRevertButton

@@ -98,10 +98,12 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
             <p className="mt-1 text-lg font-bold text-gray-900">
               {summary.lastResponseAt
                 ? new Date(summary.lastResponseAt).toLocaleDateString('ko-KR', {
+                    timeZone: 'Asia/Seoul',
                     month: 'short',
                     day: 'numeric',
                     hour: '2-digit',
                     minute: '2-digit',
+                    hour12: false,
                   })
                 : '-'}
             </p>

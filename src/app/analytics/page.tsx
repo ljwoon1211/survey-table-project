@@ -89,6 +89,7 @@ export default async function AnalyticsListPage() {
                       <div>
                         <p className="text-sm font-medium text-gray-900">
                           {new Date(survey.createdAt).toLocaleDateString('ko-KR', {
+                            timeZone: 'Asia/Seoul',
                             month: 'short',
                             day: 'numeric',
                           })}
