@@ -28,7 +28,7 @@ export const getVariableCatalog = cache(
               key: 'invite_link',
               label: '응답 페이지 링크',
               category: 'system',
-              description: '컨택별 inviteToken 으로 자동 빌드',
+              description: '조사 대상별 inviteToken 으로 자동 빌드',
             },
           ]
         : [];

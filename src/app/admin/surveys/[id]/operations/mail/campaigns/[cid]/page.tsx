@@ -71,7 +71,7 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
   const statusBadge = STATUS_LABEL[campaign.status];
   const canCancel = campaign.status === 'queued' || campaign.status === 'draft';
 
-  // "이 캠페인 미응답자 재발송" 동선 — 같은 필터에 미응답 강제 + 자동 전체 선택
+  // "이 단체 메일 미응답자 재발송" 동선 — 같은 필터에 미응답 강제 + 자동 전체 선택
   const reuseFilter = new URLSearchParams();
   if (campaign.filterSnapshot.q) reuseFilter.set('q', campaign.filterSnapshot.q);
   reuseFilter.set('unresponded', '1');
@@ -156,7 +156,7 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
           <Counter
             label="수신거부"
             value={campaign.currentUnsubscribedCount}
-            hint="이 캠페인 발송 대상 중 현재 수신거부 상태인 인원 (발송 후 해지 포함)"
+            hint="단체 메일 발송 대상 중 현재 수신거부 상태인 인원 (발송 후 해지 포함)"
           />
         </div>
       </Card>

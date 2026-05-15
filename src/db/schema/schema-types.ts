@@ -94,15 +94,15 @@ export interface TableCell {
   imageUrl?: string;
   videoUrl?: string;
   type:
-    | 'text'
-    | 'image'
-    | 'video'
-    | 'checkbox'
-    | 'radio'
-    | 'select'
-    | 'input'
-    | 'ranking'
-    | 'ranking_opt';
+  | 'text'
+  | 'image'
+  | 'video'
+  | 'checkbox'
+  | 'radio'
+  | 'select'
+  | 'input'
+  | 'ranking'
+  | 'ranking_opt';
   checkboxOptions?: CheckboxOption[];
   radioOptions?: RadioOption[];
   radioGroupName?: string;
@@ -268,13 +268,13 @@ export interface ContactColumnDef {
   /** 표 헤더 라벨 (사용자 편집 가능) */
   label: string;
   source:
-    | `attrs.${string}`
-    | 'system.resid'
-    | 'system.contact_result'
-    | 'system.email_count'
-    | 'system.web'
-    | 'system.contact_owner'
-    | `pii.${string}`;
+  | `attrs.${string}`
+  | 'system.resid'
+  | 'system.contact_result'
+  | 'system.email_count'
+  | 'system.web'
+  | 'system.contact_owner'
+  | `pii.${string}`;
   order: number;
   /** 숨김 (운영 컬럼 일부는 hide 불가 — UI 가드) */
   hidden?: boolean;
@@ -362,19 +362,19 @@ export interface ContactResultCode {
  * mockup §6 의 결과코드 라디오 그대로.
  */
 export const DEFAULT_RESULT_CODES: ContactResultCode[] = [
-  { code: '1.조사완료',     label: '1.조사완료',     order: 1,  tone: 'green' },
-  { code: '2.재통화예약',   label: '2.재통화예약',   order: 2,  tone: 'blue' },
-  { code: '3.비수신',       label: '3.비수신',       order: 3,  tone: 'slate' },
-  { code: '4.부재',         label: '4.부재',         order: 4,  tone: 'slate' },
-  { code: '5.출장',         label: '5.출장',         order: 5,  tone: 'slate' },
-  { code: '6.거절',         label: '6.거절',         order: 6,  tone: 'rose' },
-  { code: '7.결번·번호오류', label: '7.결번·번호오류', order: 7,  tone: 'rose' },
-  { code: '8.중복',         label: '8.중복',         order: 8,  tone: 'slate' },
-  { code: '9.전시회미참가', label: '9.전시회미참가', order: 9,  tone: 'slate' },
-  { code: '10.메일발송',    label: '10.메일발송',    order: 10, tone: 'blue' },
-  { code: '11.기타',        label: '11.기타',        order: 11, tone: 'amber' },
-  { code: '12.담당자퇴사',  label: '12.담당자퇴사',  order: 12, tone: 'rose' },
-  { code: '수신거부',       label: '수신거부',       order: 13, tone: 'rose' },
+  { code: '1.조사완료', label: '1.조사완료', order: 1, tone: 'green' },
+  { code: '2.재통화예약', label: '2.재통화예약', order: 2, tone: 'blue' },
+  { code: '3.비수신', label: '3.비수신', order: 3, tone: 'slate' },
+  { code: '4.부재', label: '4.부재', order: 4, tone: 'slate' },
+  { code: '5.출장', label: '5.출장', order: 5, tone: 'slate' },
+  { code: '6.거절', label: '6.거절', order: 6, tone: 'rose' },
+  { code: '7.결번·번호오류', label: '7.결번·번호오류', order: 7, tone: 'rose' },
+  { code: '8.중복', label: '8.중복', order: 8, tone: 'slate' },
+  { code: '9.전시회미참가', label: '9.전시회미참가', order: 9, tone: 'slate' },
+  { code: '10.메일발송', label: '10.메일발송', order: 10, tone: 'blue' },
+  { code: '11.기타', label: '11.기타', order: 11, tone: 'amber' },
+  { code: '12.담당자퇴사', label: '12.담당자퇴사', order: 12, tone: 'rose' },
+  { code: '수신거부', label: '수신거부', order: 13, tone: 'rose' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -391,12 +391,12 @@ export interface MailAttachment {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 메일 캠페인 (mail_campaigns) 관련 JSONB 타입
+// 메일 단체 메일 (mail_campaigns) 관련 JSONB 타입
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * mail_campaigns.filter_snapshot — 마법사 ②단계 필터 조건 보존.
- * 캠페인 사후 "이 캠페인 미응답자 재발송" 동선에서 prefill 용으로 활용.
+ * 단체 메일 사후 "이 단체 메일 미응답자 재발송" 동선에서 prefill 용으로 활용.
  */
 export interface CampaignFilterSnapshot {
   /** 검색 필드 */
@@ -409,7 +409,7 @@ export interface CampaignFilterSnapshot {
   resultCodes?: string[];
   /** 그룹값 필터 */
   groupValues?: string[];
-  /** "발송 후 N일 경과 캠페인의 미오픈자 재발송" 동선 (?from=<cid>&unopenedAfterDays=7) */
+  /** "발송 후 N일 경과 단체 메일의 미오픈자 재발송" 동선 (?from=<cid>&unopenedAfterDays=7) */
   unopenedFromCampaignId?: string;
   unopenedAfterDays?: number;
 }

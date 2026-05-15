@@ -31,7 +31,7 @@ interface UploadWizardProps {
 interface MappingState {
   /** 분류 기준 컬럼 인덱스 (선택사항 — null 가능) */
   groupCol: number | null;
-  /** 컨택리스트에 표시할 헤더 set */
+  /** 조사 대상 목록에 표시할 헤더 set */
   selectedAttrs: Set<string>;
   /** 사용자 편집 라벨 (헤더명 → 라벨) */
   labelOverrides: Record<string, string>;
@@ -176,7 +176,7 @@ export function UploadWizard({ surveyId, existingContactsCount }: UploadWizardPr
     <Card>
       <CardHeader>
         <CardTitle className="text-base">
-          엑셀 컨택 업로드 —{' '}
+          엑셀 조사 대상 업로드 —{' '}
           {step === 'file' ? '1/3 파일' : step === 'mapping' ? '2/3 컬럼 설정' : '3/3 결과'}
         </CardTitle>
       </CardHeader>
@@ -396,7 +396,7 @@ export function UploadWizard({ surveyId, existingContactsCount }: UploadWizardPr
               <div className="mt-2 space-y-1 text-xs text-slate-500">
                 <div>개인정보로 지정된 컬럼은 암호화되어 별도 테이블에 저장됩니다.</div>
                 <div>
-                  분류 기준: 같은 값을 가진 행끼리 그룹으로 묶입니다 (예: 전시회명·캠페인명).
+                  분류 기준: 같은 값을 가진 행끼리 그룹으로 묶입니다 (예: 전시회명·단체 메일).
                   {mapping.groupCol != null && (
                     <>
                       {' '}
@@ -416,14 +416,14 @@ export function UploadWizard({ surveyId, existingContactsCount }: UploadWizardPr
             {existingContactsCount > 0 && (
               <div role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-sm">
                 <div className="mb-2 font-semibold text-red-800">
-                  ⚠ 기존 컨택 {existingContactsCount.toLocaleString('ko-KR')}건이 통째로 교체됩니다
+                  ⚠ 기존 조사 대상 {existingContactsCount.toLocaleString('ko-KR')}건이 통째로 교체됩니다
                 </div>
                 <ul className="ml-4 list-disc space-y-1 text-red-700">
-                  <li>기존 컨택 행 모두 삭제 후 신규 명단으로 교체</li>
-                  <li>각 컨택의 회차 기록 (contact_attempts) 도 함께 삭제됨</li>
-                  <li>각 컨택의 암호화된 개인정보도 함께 삭제됨</li>
+                  <li>기존 조사 대상 행 모두 삭제 후 신규 명단으로 교체</li>
+                  <li>각 조사 대상의 회차 기록 (contact_attempts) 도 함께 삭제됨</li>
+                  <li>각 조사 대상의 암호화된 개인정보도 함께 삭제됨</li>
                   <li>이미 발송된 초대 링크 모두 무효화</li>
-                  <li>응답 본체는 보존되지만 컨택 매칭이 끊겨 익명 응답으로 표시됨</li>
+                  <li>응답 본체는 보존되지만 조사 대상 매칭이 끊겨 익명 응답으로 표시됨</li>
                 </ul>
                 <label className="mt-3 flex items-center gap-2 text-red-800">
                   <Checkbox
@@ -469,7 +469,7 @@ export function UploadWizard({ surveyId, existingContactsCount }: UploadWizardPr
                   router.push(`/admin/surveys/${surveyId}/operations/contacts`)
                 }
               >
-                컨택리스트 보기
+                조사 대상 목록 보기
               </Button>
               <Button
                 variant="outline"

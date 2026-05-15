@@ -19,7 +19,8 @@ export interface UnsubscribeResult {
 }
 
 /**
- * 캠페인 페이지(목록 + 상세 [cid]) 캐시 즉시 무효화.
+ * 단체 메일
+단체 메일 페이지(목록 + 상세 [cid]) 캐시 즉시 무효화.
  * admin 이 다른 탭에서 보고 있을 때 새로고침 없이 badge/카운터 반영.
  */
 function revalidateCampaignsForSurvey(surveyId: string): void {
@@ -30,7 +31,8 @@ function revalidateCampaignsForSurvey(surveyId: string): void {
 }
 
 /**
- * unsubscribed_at = NULL 로 되돌리고 캠페인 페이지 캐시 무효화.
+ * unsubscribed_at = NULL 로 되돌리고 단체 메일
+단체 메일 페이지 캐시 무효화.
  * where 절로 admin(id+surveyId) / form action(token) 두 호출자 공유.
  * 매칭 행이 없으면 null 반환 — 호출자가 에러 처리 또는 silent 통과 결정.
  */
@@ -189,7 +191,7 @@ export interface AdminRevertUnsubscribeResult {
 }
 
 /**
- * 운영자(admin)가 캠페인 페이지에서 직접 수신거부를 해제.
+ * 운영자(admin)가 단체 메일 페이지에서 직접 수신거부를 해제.
  *
  * 보안:
  *   - requireAuth 로 인증 게이트

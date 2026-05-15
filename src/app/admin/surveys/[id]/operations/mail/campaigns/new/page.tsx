@@ -34,7 +34,7 @@ export default async function NewCampaignPage({ params, searchParams }: Props) {
         <div className="rounded-lg border border-dashed border-slate-300 bg-white p-12 text-center">
           <h1 className="text-lg font-semibold text-slate-900">먼저 메일 템플릿을 만드세요.</h1>
           <p className="mt-2 text-sm text-slate-500">
-            캠페인을 보내려면 발송할 메일 템플릿이 1개 이상 필요합니다.
+            단체 메일을 보내려면 발송할 메일 템플릿이 1개 이상 필요합니다.
           </p>
           <Link
             href={`/admin/surveys/${surveyId}/operations/mail/templates/new`}
@@ -74,9 +74,9 @@ export default async function NewCampaignPage({ params, searchParams }: Props) {
           href={`/admin/surveys/${surveyId}/operations/mail/campaigns`}
           className="text-sm text-slate-500 hover:text-slate-700"
         >
-          ← 캠페인 목록
+          ← 단체 발송
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-gray-900">새 캠페인</h1>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-gray-900">새 단체 메일</h1>
         <p className="mt-1 text-sm text-gray-500">
           템플릿을 고르고, 수신자를 필터링한 뒤, 명단을 확정해 발송을 시작합니다.
         </p>

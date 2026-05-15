@@ -26,7 +26,7 @@ import { maskEmail } from '@/lib/operations/contacts';
 const DEFAULT_PAGE_SIZE = 20;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 캠페인 list (메인 페이지)
+// 단체 메일 list (메인 페이지)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface CampaignRow {
@@ -111,7 +111,7 @@ export async function listCampaignsForSurvey(args: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 캠페인 detail
+// 단체 메일 detail
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface CampaignDetail {
@@ -138,13 +138,13 @@ export interface CampaignDetail {
   complainedCount: number;
   failedCount: number;
   /**
-   * 발송 등록 시점에 자동 제외된 컨택 수 (atomic delta — 캠페인 목록 카드에서 사용).
-   * 캠페인 상세에는 currentUnsubscribedCount(live query)를 노출.
+   * 발송 등록 시점에 자동 제외된 컨택 수 (atomic delta — 단체 메일 목록 카드에서 사용).
+   * 단체 메일 상세에는 currentUnsubscribedCount(live query)를 노출.
    */
   skippedUnsubscribedCount: number;
   /**
-   * 이 캠페인 발송 대상 중 *현재* 수신거부 상태인 인원.
-   * 발송 후 수신자가 footer 링크로 해지한 경우까지 포함 — 캠페인 결과 분석용.
+   * 이 단체 메일 발송 대상 중 *현재* 수신거부 상태인 인원.
+   * 발송 후 수신자가 footer 링크로 해지한 경우까지 포함 — 단체 메일 결과 분석용.
    */
   currentUnsubscribedCount: number;
   startedAt: Date | null;
@@ -216,7 +216,7 @@ export async function getCampaignDetail(cid: string): Promise<CampaignDetail | n
   };
 }
 
-// 캠페인 detail 의 recipients 목록 (status 필터 + email 검색 + 페이지네이션)
+// 단체 메일 detail 의 recipients 목록 (status 필터 + email 검색 + 페이지네이션)
 export interface CampaignRecipientRow {
   id: string;
   contactTargetId: string;
@@ -318,7 +318,7 @@ export async function listCampaignRecipients(args: {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 마법사 ②/③ 단계 — 수신자 후보 미리보기
-// 컨택 페이지의 listContactsForSurvey 와 비슷하지만 캠페인 발송 가능 조건 강제:
+// 컨택 페이지의 listContactsForSurvey 와 비슷하지만 단체 메일 발송 가능 조건 강제:
 //   - unsubscribed_at IS NULL
 //   - email IS NOT NULL AND email != ''
 // + 옵션 필터 (미응답자 / 결과코드 / 그룹값 / 검색)
@@ -514,7 +514,7 @@ export async function countCampaignCandidates(args: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 수신거부자 명단 (캠페인 페이지 하단 세그먼트)
+// 수신거부자 명단 (단체 메일 페이지 하단 세그먼트)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface UnsubscribedContactRow {

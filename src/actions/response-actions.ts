@@ -548,13 +548,13 @@ export async function completeResponse(
         ...(validatedResponses ? { questionResponses: validatedResponses } : {}),
         ...((data?.exposedQuestionIds || data?.exposedRowIds)
           ? {
-              metadata: {
-                ...(data?.exposedQuestionIds
-                  ? { exposedQuestionIds: data.exposedQuestionIds }
-                  : {}),
-                ...(data?.exposedRowIds ? { exposedRowIds: data.exposedRowIds } : {}),
-              },
-            }
+            metadata: {
+              ...(data?.exposedQuestionIds
+                ? { exposedQuestionIds: data.exposedQuestionIds }
+                : {}),
+              ...(data?.exposedRowIds ? { exposedRowIds: data.exposedRowIds } : {}),
+            },
+          }
           : {}),
       })
       .where(eq(surveyResponses.id, responseId))
@@ -647,7 +647,7 @@ export async function clearAllResponses() {
  * - 없으면 `x-real-ip` fallback
  * - 둘 다 비어 있으면 null
  *
- * 운영자 콘솔의 응답자 목록 페이지에서 회사·사무실 단위 그룹화에 사용한다.
+ * 운영자 콘솔의 응답 내역 페이지에서 회사·사무실 단위 그룹화에 사용한다.
  * 표시는 `formatIpMask` 로 끝 옥텟 마스킹.
  */
 function extractClientIp(xff: string | null, xri: string | null): string | null {

@@ -1,12 +1,12 @@
 /**
- * 사이클 내 캠페인을 발송 순으로 정렬해 사이클 한도 안에서 포함분/초과분으로 분배한다.
+ * 사이클 내 단체 메일을 발송 순으로 정렬해 사이클 한도 안에서 포함분/초과분으로 분배한다.
  *
  * 핵심 정책:
- *  - 캠페인 정렬: `startedAt ASC`. 같은 시각이면 `campaignId` 사전순.
+ *  - 단체 메일 정렬: `startedAt ASC`. 같은 시각이면 `campaignId` 사전순.
  *  - 누적 한도까지는 포함분(0원), 그 이후는 초과분 (per-1K KRW 단가).
  *  - 라운딩: 사이클 총 초과비 = round(sum(overage_count * per1k) / 1000) 을 먼저 확정 → 회차별 round 후
  *    sum(회차) 와 사이클 총 사이의 차이를 마지막 회차가 흡수. 회차 합 ≡ 사이클 합 보장.
- *  - 빈 캠페인 입력은 비용 0.
+ *  - 빈 단체 메일 입력은 비용 0.
  */
 
 export interface AllocatorInputCampaign {
@@ -28,14 +28,14 @@ export interface AllocatedCampaign extends AllocatorInputCampaign {
   includedCount: number;
   /** 한도 초과 인원수. */
   overageCount: number;
-  /** 이 캠페인이 부담하는 초과 비용 (원). */
+  /** 이 단체 메일이 부담하는 초과 비용 (원). */
   costKrw: number;
   /** 평균 단가 = costKrw / billableCount (billableCount=0 이면 0). */
   averageUnitPriceKrw: number;
 }
 
 export interface CycleAllocation {
-  /** 사이클 내 모든 캠페인의 청구 대상 합. */
+  /** 사이클 내 모든 단체 메일의 청구 대상 합. */
   totalBillable: number;
   /** 포함분 인원수 합 (≤ plan.includedEmails). */
   totalIncluded: number;

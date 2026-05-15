@@ -171,7 +171,7 @@ export default function SurveyResponsePage() {
               surveyId = dbSurvey.id;
             } else {
               // UUID 형태지만 private_token 매칭 실패 — surveys.id 로 직접 시도.
-              // 메일 캠페인/컨택 응답 링크가 surveys.id 직접 URL을 사용하므로 호환 필요.
+              // 단체 메일/컨택 응답 링크가 surveys.id 직접 URL을 사용하므로 호환 필요.
               surveyId = value;
             }
             break;

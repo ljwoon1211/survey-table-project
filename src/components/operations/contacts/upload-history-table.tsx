@@ -18,7 +18,7 @@ export function UploadHistoryTable({ surveyId, rows }: UploadHistoryTableProps) 
         <CardContent className="px-5 py-4">
           <EmptyState
             message="업로드 이력이 없습니다"
-            description="엑셀 파일을 업로드해 컨택 명단을 적재하세요."
+            description="엑셀 파일을 업로드해 조사 대상 명단을 적재하세요."
           />
           <div className="mt-4 flex justify-center">
             <Button asChild>

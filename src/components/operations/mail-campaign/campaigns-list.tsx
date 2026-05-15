@@ -41,7 +41,7 @@ export function CampaignsList({ surveyId, rows, total, page, pageSize }: Props) 
             href={`/admin/surveys/${surveyId}/operations/mail/campaigns/new`}
             className="mt-3 text-sm font-medium text-blue-500 hover:text-blue-600"
           >
-            첫 캠페인 만들기 →
+            첫 단체 메일 만들기 →
           </Link>
         </div>
       </Card>
@@ -76,46 +76,87 @@ export function CampaignsList({ surveyId, rows, total, page, pageSize }: Props) 
               const errors = r.bouncedCount + r.failedCount + r.complainedCount;
               const inflight = r.queuedCount + r.sentCount;
               const status = STATUS_LABEL[r.status];
+              const detailHref = `/admin/surveys/${surveyId}/operations/mail/campaigns/${r.id}`;
               return (
                 <tr
                   key={r.id}
                   className="border-b border-gray-100 text-sm last:border-b-0 hover:bg-gray-50/50"
                 >
-                  <td className="px-3 py-3 font-mono text-xs text-slate-600">#{r.runNumber}</td>
-                  <td className="px-3 py-3 font-medium text-gray-900">
-                    <Link
-                      href={`/admin/surveys/${surveyId}/operations/mail/campaigns/${r.id}`}
-                      className="hover:text-blue-500"
-                    >
-                      {r.title}
+                  <td className="font-mono text-xs text-slate-600">
+                    <Link href={detailHref} className="block px-3 py-3">
+                      #{r.runNumber}
                     </Link>
-                    {r.templateName ? (
-                      <div className="text-xs text-slate-500">템플릿: {r.templateName}</div>
-                    ) : null}
                   </td>
-                  <td className="px-3 py-3 text-right tabular-nums">{num(r.recipientCount)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums text-emerald-700">
-                    {num(success)}
+                  <td className="font-medium text-gray-900">
+                    <Link href={detailHref} className="block px-3 py-3">
+                      {r.title}
+                      {r.templateName ? (
+                        <div className="text-xs text-slate-500">템플릿: {r.templateName}</div>
+                      ) : null}
+                    </Link>
                   </td>
-                  <td className="px-3 py-3 text-right tabular-nums">{num(r.openedCount)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">{num(r.deliveredCount)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums text-rose-600">{num(errors)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums text-blue-600">{num(inflight)}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">
-                    {num(r.skippedUnsubscribedCount)}
+                  <td>
+                    <Link href={detailHref} className="block px-3 py-3 text-right tabular-nums">
+                      {num(r.recipientCount)}
+                    </Link>
                   </td>
-                  <td className="px-3 py-3">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${status.tone}`}
+                  <td>
+                    <Link
+                      href={detailHref}
+                      className="block px-3 py-3 text-right tabular-nums text-emerald-700"
                     >
-                      {status.label}
-                    </span>
+                      {num(success)}
+                    </Link>
                   </td>
-                  <td className="px-3 py-3 text-xs text-slate-500">
-                    <LocalDateTime value={r.createdAt} />
+                  <td>
+                    <Link href={detailHref} className="block px-3 py-3 text-right tabular-nums">
+                      {num(r.openedCount)}
+                    </Link>
                   </td>
-                  <td className="px-3 py-3 text-xs text-slate-500">
-                    <LocalDateTime value={r.startedAt} />
+                  <td>
+                    <Link href={detailHref} className="block px-3 py-3 text-right tabular-nums">
+                      {num(r.deliveredCount)}
+                    </Link>
+                  </td>
+                  <td>
+                    <Link
+                      href={detailHref}
+                      className="block px-3 py-3 text-right tabular-nums text-rose-600"
+                    >
+                      {num(errors)}
+                    </Link>
+                  </td>
+                  <td>
+                    <Link
+                      href={detailHref}
+                      className="block px-3 py-3 text-right tabular-nums text-blue-600"
+                    >
+                      {num(inflight)}
+                    </Link>
+                  </td>
+                  <td>
+                    <Link href={detailHref} className="block px-3 py-3 text-right tabular-nums">
+                      {num(r.skippedUnsubscribedCount)}
+                    </Link>
+                  </td>
+                  <td>
+                    <Link href={detailHref} className="block px-3 py-3">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${status.tone}`}
+                      >
+                        {status.label}
+                      </span>
+                    </Link>
+                  </td>
+                  <td className="text-xs text-slate-500">
+                    <Link href={detailHref} className="block px-3 py-3">
+                      <LocalDateTime value={r.createdAt} />
+                    </Link>
+                  </td>
+                  <td className="text-xs text-slate-500">
+                    <Link href={detailHref} className="block px-3 py-3">
+                      <LocalDateTime value={r.startedAt} />
+                    </Link>
                   </td>
                 </tr>
               );

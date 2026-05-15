@@ -45,30 +45,38 @@ export function MailTemplateList({ surveyId, templates }: Props) {
           </tr>
         </thead>
         <tbody>
-          {templates.map((t) => (
-            <tr
-              key={t.id}
-              className="border-b border-gray-100 text-sm last:border-b-0 hover:bg-gray-50/50"
-            >
-              <td className="px-6 py-4 font-medium text-gray-900">
-                <Link
-                  href={`/admin/surveys/${surveyId}/operations/mail/templates/${t.id}/edit`}
-                  className="hover:text-blue-500"
-                >
-                  {t.name}
-                </Link>
-              </td>
-              <td className="max-w-md truncate px-6 py-4 text-gray-600">{t.subject || '—'}</td>
-              <td className="px-6 py-4 text-gray-500"><LocalDateTime value={t.updatedAt} /></td>
-              <td className="px-4 py-4 text-right">
-                <DeleteTemplateButton
-                  surveyId={surveyId}
-                  templateId={t.id}
-                  templateName={t.name}
-                />
-              </td>
-            </tr>
-          ))}
+          {templates.map((t) => {
+            const editHref = `/admin/surveys/${surveyId}/operations/mail/templates/${t.id}/edit`;
+            return (
+              <tr
+                key={t.id}
+                className="border-b border-gray-100 text-sm last:border-b-0 hover:bg-gray-50/50"
+              >
+                <td className="font-medium text-gray-900">
+                  <Link href={editHref} className="block px-6 py-4">
+                    {t.name}
+                  </Link>
+                </td>
+                <td className="max-w-md text-gray-600">
+                  <Link href={editHref} className="block truncate px-6 py-4">
+                    {t.subject || '—'}
+                  </Link>
+                </td>
+                <td className="text-gray-500">
+                  <Link href={editHref} className="block px-6 py-4">
+                    <LocalDateTime value={t.updatedAt} />
+                  </Link>
+                </td>
+                <td className="px-4 py-4 text-right">
+                  <DeleteTemplateButton
+                    surveyId={surveyId}
+                    templateId={t.id}
+                    templateName={t.name}
+                  />
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </Card>

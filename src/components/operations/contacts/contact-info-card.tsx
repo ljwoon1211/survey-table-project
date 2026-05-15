@@ -137,7 +137,7 @@ export function ContactInfoCard({
                 )}
               </div>
               {onColumnToggle && (
-                <div className="flex shrink-0 items-center gap-1" title="컨택리스트 헤더로 표시">
+                <div className="flex shrink-0 items-center gap-1" title="조사 대상 목록 헤더로 표시">
                   <Switch
                     checked={!def.col.hidden}
                     onCheckedChange={(checked) => onColumnToggle(def.key, !checked)}

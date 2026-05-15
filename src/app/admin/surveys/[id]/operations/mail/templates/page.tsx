@@ -20,7 +20,7 @@ export default async function MailTemplatesListPage({ params }: Props) {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-gray-900">메일 템플릿</h1>
           <p className="mt-1 text-sm text-gray-500">
-            컨택리스트에 발송할 메일 템플릿을 관리합니다.
+            조사 대상 목록에 발송할 메일 템플릿을 관리합니다.
           </p>
         </div>
         <Button asChild>

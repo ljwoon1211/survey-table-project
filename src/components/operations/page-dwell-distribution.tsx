@@ -26,6 +26,7 @@ import type { DwellOutput, DwellPage } from '@/lib/operations/page-dwell';
 import { EmptyState } from './empty-state';
 
 const DWELL_PAGE_SIZE = 10;
+const PAD_STEP_ID_PREFIX = '__pad__';
 
 /** 같은 label 이 여러 번 등장할 때 occurrence index 표기용 동그라미 숫자. */
 const OCCURRENCE_GLYPHS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'];
@@ -61,6 +62,10 @@ interface DwellTickProps {
 function DwellTick({ x = 0, y = 0, payload, pages }: DwellTickProps) {
   const idx = payload?.index ?? 0;
   const page = pages[idx];
+  // 패딩 슬롯은 라벨/페이지 모두 비워둔다 — 옅은 grid only.
+  if (page?.stepId.startsWith(PAD_STEP_ID_PREFIX)) {
+    return null;
+  }
   const label = String(payload?.value ?? '');
   const pageText = page?.page != null ? `페이지 ${page.page}` : '';
 
@@ -126,9 +131,25 @@ export function PageDwellDistribution({ data, pageOffset }: Props) {
   }, [data.pages]);
 
   // 현재 offset 에 해당하는 step 슬라이스 (n=0 제외 후 기준).
+  // 슬라이스가 10개 미만이면 우측에 빈 슬롯을 채워 좌측 정렬을 보장한다.
   const visiblePages = useMemo(() => {
     const start = pageOffset * DWELL_PAGE_SIZE;
-    return filteredPages.slice(start, start + DWELL_PAGE_SIZE);
+    const sliced = filteredPages.slice(start, start + DWELL_PAGE_SIZE);
+    if (sliced.length === 0 || sliced.length >= DWELL_PAGE_SIZE) return sliced;
+    const padCount = DWELL_PAGE_SIZE - sliced.length;
+    const padding: DwellPage[] = [];
+    for (let i = 0; i < padCount; i++) {
+      padding.push({
+        stepId: `${PAD_STEP_ID_PREFIX}${i}`,
+        label: '',
+        position: 0,
+        page: null,
+        n: 0,
+        meanSeconds: null,
+        sdSeconds: null,
+      });
+    }
+    return [...sliced, ...padding];
   }, [filteredPages, pageOffset]);
 
   const totalPages = filteredPages.length;

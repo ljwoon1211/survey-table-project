@@ -47,7 +47,7 @@ function orderExpr(col: AnyColumn | SQL, direction: SortDir): SQL {
 }
 
 /**
- * 응답자 목록 페이지의 메인 어댑터.
+ * 응답 내역 페이지의 메인 어댑터.
  *
  * 핵심 설계:
  * - **순번(idx)** 은 surveyId 단위의 절대 row_number (started_at desc 기준).

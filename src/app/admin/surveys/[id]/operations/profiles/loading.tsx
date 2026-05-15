@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 
 /**
- * 응답자 목록 페이지 streaming 중 표시되는 skeleton.
+ * 응답 내역 페이지 streaming 중 표시되는 skeleton.
  * 8행 placeholder + 헤더 라인. 실제 폭은 그리드와 일치 안 해도 OK.
  */
 export default function Loading() {

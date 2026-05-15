@@ -8,8 +8,8 @@ import {
 } from '@tanstack/react-table';
 import { useMemo } from 'react';
 
+import { LocalDateTime } from '@/components/ui/local-date-time';
 import { useSearchParamsMutator } from '@/hooks/use-search-params-mutator';
-import { formatLocalDateTime } from '@/lib/date-formatters';
 import { cn } from '@/lib/utils';
 import { formatPlatformKo } from '@/lib/operations/parse-ua';
 import {
@@ -53,9 +53,6 @@ interface Props {
   questions: ReadonlyArray<QuestionMeta>;
 }
 
-// formatDateTime — 브라우저 timezone 으로 표시. ko-KR 'YYYY. MM. DD. HH:mm'.
-const formatDateTime = formatLocalDateTime;
-
 interface DisplayRow {
   id: string;
   idx: number;
@@ -63,15 +60,16 @@ interface DisplayRow {
   platformKo: string;
   browser: string;
   pill: StatusPillResult;
-  startedAtText: string;
-  completedAtText: string;
+  startedAt: Date;
+  completedAt: Date | null;
+  isInProgress: boolean;
   totalTimeText: string;
 }
 
 const meta = (align: CellAlign, sortable: boolean): ColumnMeta => ({ align, sortable });
 
 /**
- * 응답자 목록 테이블. 9 컬럼 + URL state sort/pagination + 검색 결과 EmptyState.
+ * 응답 내역 테이블. 9 컬럼 + URL state sort/pagination + 검색 결과 EmptyState.
  */
 export function ProfilesTable({ rows, total, page, pageSize, sort, dir, questions }: Props) {
   const pushParams = useSearchParamsMutator();
@@ -110,9 +108,9 @@ export function ProfilesTable({ rows, total, page, pageSize, sort, dir, question
           platformKo: formatPlatformKo(r.platform),
           browser: r.browser ?? 'Other',
           pill,
-          startedAtText: formatDateTime(r.startedAt),
-          completedAtText:
-            r.status === 'in_progress' ? '진행 중' : formatDateTime(r.completedAt),
+          startedAt: r.startedAt,
+          completedAt: r.completedAt,
+          isInProgress: r.status === 'in_progress',
           totalTimeText: formatTotalTime(r.totalSeconds, r.status),
         };
       }),
@@ -125,7 +123,7 @@ export function ProfilesTable({ rows, total, page, pageSize, sort, dir, question
       {
         id: 'group',
         accessorFn: () => '공개링크',
-        header: '컨택그룹',
+        header: '조사 대상 그룹',
         meta: meta('left', false),
       },
       { id: 'ip', accessorKey: 'ipMasked', header: '접속IP', meta: meta('left', true) },
@@ -145,14 +143,21 @@ export function ProfilesTable({ rows, total, page, pageSize, sort, dir, question
       },
       {
         id: 'startedAt',
-        accessorKey: 'startedAtText',
+        accessorKey: 'startedAt',
         header: '시작일시',
+        cell: ({ row }) => <LocalDateTime value={row.original.startedAt} />,
         meta: meta('left', true),
       },
       {
         id: 'completedAt',
-        accessorKey: 'completedAtText',
+        accessorKey: 'completedAt',
         header: '종료일시',
+        cell: ({ row }) =>
+          row.original.isInProgress ? (
+            '진행 중'
+          ) : (
+            <LocalDateTime value={row.original.completedAt} />
+          ),
         meta: meta('left', true),
       },
       {

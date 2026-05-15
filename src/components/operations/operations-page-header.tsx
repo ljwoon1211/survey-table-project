@@ -15,7 +15,7 @@ interface Props {
  * 운영 콘솔 공통 페이지 헤더.
  *
  * `/admin/surveys/[id]/operations/*` 라우트의 layout 에서 한 번만 마운트되어
- * 모든 하위 페이지(현황/응답자 목록/보고서/컨택)가 동일한 상단을 공유한다.
+ * 모든 하위 페이지(현황/응답 내역/보고서/조사 대상)가 동일한 상단을 공유한다.
  */
 export function OperationsPageHeader({ surveyId, surveyTitle }: Props) {
   return (
