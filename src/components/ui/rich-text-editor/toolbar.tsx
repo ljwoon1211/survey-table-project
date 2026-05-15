@@ -7,9 +7,6 @@ import {
   AlignLeft,
   AlignRight,
   Bold,
-  Heading1,
-  Heading2,
-  Heading3,
   Image as ImageIcon,
   Italic,
   Link as LinkIcon,
@@ -46,7 +43,6 @@ export function Toolbar({ editor, variableCatalog, onPickImage, onPickLink }: Pr
       if (!editor) {
         return {
           bold: false, italic: false, underline: false, strike: false,
-          h1: false, h2: false, h3: false,
           bulletList: false, orderedList: false,
           alignLeft: true, alignCenter: false, alignRight: false, alignJustify: false,
           canUndo: false, canRedo: false,
@@ -58,9 +54,6 @@ export function Toolbar({ editor, variableCatalog, onPickImage, onPickLink }: Pr
         italic: editor.isActive('italic'),
         underline: editor.isActive('underline'),
         strike: editor.isActive('strike'),
-        h1: editor.isActive('heading', { level: 1 }),
-        h2: editor.isActive('heading', { level: 2 }),
-        h3: editor.isActive('heading', { level: 3 }),
         bulletList: editor.isActive('bulletList'),
         orderedList: editor.isActive('orderedList'),
         alignLeft: editor.isActive({ textAlign: 'left' }),
@@ -99,18 +92,6 @@ export function Toolbar({ editor, variableCatalog, onPickImage, onPickLink }: Pr
       >
         {FONT_SIZES.map((sz) => <option key={sz} value={sz}>{sz}px</option>)}
       </select>
-
-      <Sep />
-
-      <ToolBtn active={s.h1} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} title="제목1">
-        <Heading1 className="h-4 w-4" />
-      </ToolBtn>
-      <ToolBtn active={s.h2} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} title="제목2">
-        <Heading2 className="h-4 w-4" />
-      </ToolBtn>
-      <ToolBtn active={s.h3} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} title="제목3">
-        <Heading3 className="h-4 w-4" />
-      </ToolBtn>
 
       <Sep />
 
