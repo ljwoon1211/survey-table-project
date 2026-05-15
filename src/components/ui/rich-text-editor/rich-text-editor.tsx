@@ -16,8 +16,10 @@ const PROSE_BASE =
   '[&_ul]:list-disc [&_ul]:pl-6 [&_ul]:my-2 ' +
   '[&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:my-2 ' +
   '[&_li]:my-0.5 [&_li>p]:my-0 ' +
-  // 테이블 폭은 셀 콘텐츠에 맞춰 자동. 사용자가 의도한 크기 그대로 표시.
-  '[&_table]:my-2 [&_table]:table-auto [&_table]:border [&_table]:border-gray-300 ' +
+  // 테이블 폭은 셀 콘텐츠에 맞춰 자동. prose 기본 width 100% 를 !w-auto 로 override —
+  // 표 정렬(TableAlignDecoration) 이 wrapper flex 로 동작하려면 table 폭이 wrapper 보다
+  // 작아야 시각 효과가 보인다.
+  '[&_table]:my-2 [&_table]:!w-auto [&_table]:table-auto [&_table]:border [&_table]:border-gray-300 ' +
   '[&_table_td]:border [&_table_td]:border-gray-300 [&_table_td]:px-2 [&_table_td]:py-1 [&_table_td]:h-12 ' +
   '[&_table_th]:border [&_table_th]:border-gray-300 [&_table_th]:px-2 [&_table_th]:py-1 [&_table_th]:h-12 ' +
   '[&_table_td_p]:m-0 [&_table_th_p]:m-0 ' +

@@ -1,4 +1,6 @@
 import { type AnyExtension, Extension } from '@tiptap/core';
+import { Plugin } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import Link from '@tiptap/extension-link';
 import Strike from '@tiptap/extension-strike';
 import { Table } from '@tiptap/extension-table';
@@ -31,6 +33,42 @@ const VarTokenExtension = Extension.create({
   name: 'varToken',
   addProseMirrorPlugins() {
     return [createVarTokenPlugin()];
+  },
+});
+
+// TipTap Table extension 의 TableView NodeView 는 update 에서 attrs.style 을 재적용하지
+// 않고, this.parent 로 baseRenderer 를 가져오는 일반 패턴도 addNodeView 에 대해서는
+// undefined 라 wrap 이 불가능하다. 그래서 별도 ProseMirror plugin 이 매 state change
+// 마다 wrapper 의 style 을 Decoration 으로 직접 갱신한다 — flex + justify-content 로
+// inner table 을 정렬.
+const TableAlignDecoration = Extension.create({
+  name: 'tableAlignDecoration',
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        props: {
+          decorations: (state) => {
+            const decorations: Decoration[] = [];
+            state.doc.descendants((node, pos) => {
+              if (node.type.name !== 'table') return;
+              const align = (node.attrs.align ?? 'left') as 'left' | 'center' | 'right';
+              const justify =
+                align === 'center'
+                  ? 'center'
+                  : align === 'right'
+                    ? 'flex-end'
+                    : 'flex-start';
+              decorations.push(
+                Decoration.node(pos, pos + node.nodeSize, {
+                  style: `display: flex; justify-content: ${justify};`,
+                }),
+              );
+            });
+            return DecorationSet.create(state.doc, decorations);
+          },
+        },
+      }),
+    ];
   },
 });
 
@@ -140,50 +178,12 @@ export function createUnifiedExtensions(options: CreateUnifiedExtensionsOptions 
         align: {
           default: 'left' as HAlign,
           parseHTML: (el: HTMLElement) => parseTableAlign(el),
-          // 직렬화는 style attr 가 담당. align 은 isActive 매칭과 parse 추론용.
-          renderHTML: () => ({}),
+          // 미리보기 / 저장 HTML 에는 table inline style 로 margin auto 박는다.
+          // 편집기 시각은 별도 TableAlignDecoration plugin 이 wrapper 에 flex 로 처리.
+          renderHTML: (attrs: { align?: HAlign }) => ({
+            style: tableAlignStyle((attrs.align ?? 'left') as HAlign),
+          }),
         },
-        // NodeView (TableView) 는 node.attrs.style 을 table 에 적용한다.
-        // 이 attr 가 없으면 toolbar 의 정렬 변경이 편집기 시각에 반영되지 않는다.
-        style: {
-          default: null as string | null,
-          parseHTML: (el: HTMLElement) => el.getAttribute('style') || null,
-          renderHTML: (attrs: { style?: string | null }) =>
-            attrs.style ? { style: attrs.style } : {},
-        },
-      };
-    },
-    // TableView 는 update() 에서 attrs.style 을 재적용하지 않는다. 베이스 NodeView 를
-    // 래핑해 update 마다 inner table 의 style.cssText 를 다시 박는다.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    addNodeView(): any {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const baseRenderer = (this.parent as any)?.();
-      if (!baseRenderer) return null;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (props: any) => {
-        const view = baseRenderer(props);
-        const wrapper = view.dom as HTMLElement;
-        const applyStyle = (style: string | null | undefined) => {
-          const table = wrapper.querySelector('table') as HTMLElement | null;
-          if (!table) return;
-          if (style) table.style.cssText = style;
-          else table.removeAttribute('style');
-        };
-        applyStyle(props.node.attrs.style as string | null);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const originalUpdate = view.update?.bind(view) as
-          | ((node: any, decorations: any, innerDecorations: any) => boolean)
-          | undefined;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        view.update = (newNode: any, decorations: any, innerDecorations: any) => {
-          const handled = originalUpdate
-            ? originalUpdate(newNode, decorations, innerDecorations)
-            : true;
-          if (handled) applyStyle(newNode.attrs.style as string | null);
-          return handled;
-        };
-        return view;
       };
     },
   });
@@ -231,5 +231,6 @@ export function createUnifiedExtensions(options: CreateUnifiedExtensionsOptions 
     TrailingNode,
     TableSelectOnBackspace,
     VarTokenExtension,
+    TableAlignDecoration,
   ];
 }

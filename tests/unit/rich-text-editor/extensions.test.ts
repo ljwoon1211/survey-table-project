@@ -176,6 +176,39 @@ describe('createUnifiedExtensions', () => {
       editor.destroy();
     });
 
+    it('TableAlignDecoration 은 wrapper 에 flex justify-content 를 박는다', () => {
+      const exts = createUnifiedExtensions({ kind: 'survey' });
+      const editor = new Editor({
+        extensions: exts,
+        content: '<table><tbody><tr><td>x</td></tr></tbody></table>',
+      });
+
+      editor.chain().focus().updateAttributes('table', { align: 'center' }).run();
+      const wrapper = editor.view.dom.querySelector('.tableWrapper') as HTMLElement | null;
+      expect(wrapper).not.toBeNull();
+      expect(wrapper!.getAttribute('style') ?? '').toMatch(/justify-content:\s*center/);
+
+      editor.chain().focus().updateAttributes('table', { align: 'right' }).run();
+      expect(wrapper!.getAttribute('style') ?? '').toMatch(/justify-content:\s*flex-end/);
+
+      editor.destroy();
+    });
+
+    it('align attr 의 renderHTML 은 미리보기 / 저장 HTML 에 table margin auto 를 박는다', () => {
+      const exts = createUnifiedExtensions({ kind: 'survey' });
+      const editor = new Editor({
+        extensions: exts,
+        content: '<table><tbody><tr><td>x</td></tr></tbody></table>',
+      });
+
+      editor.chain().focus().updateAttributes('table', { align: 'center' }).run();
+      const html = editor.getHTML();
+      // 브라우저 / jsdom 에 따라 0 이 0px 로 정규화될 수 있다
+      expect(html).toMatch(/<table[^>]*style="[^"]*margin:\s*0(?:px)?\s+auto/);
+
+      editor.destroy();
+    });
+
     it('ImageResize renderHTML 은 wrapperStyle 을 img inline style 로 직렬화한다 (미리보기 일관성)', () => {
       const exts = createUnifiedExtensions({ kind: 'survey' });
       const editor = new Editor({
