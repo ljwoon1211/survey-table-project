@@ -1,14 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import { eq, sql } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 
 import { ProgressEmptyCard } from '@/components/operations/report/progress-empty-card';
 import { ProgressFilterBar } from '@/components/operations/report/progress-filter-bar';
 import { ProgressTable } from '@/components/operations/report/progress-table';
 import { Button } from '@/components/ui/button';
 import { db } from '@/db';
-import { contactTargets, surveys } from '@/db/schema';
+import { contactTargets } from '@/db/schema';
+import { getContactColumnScheme } from '@/lib/operations/contacts.server';
 import type { ProgressSortKey, SortDir } from '@/lib/operations/report-progress';
 import {
   getProgressColumnScheme,
@@ -75,9 +76,12 @@ export default async function ReportProgressPage({ params, searchParams }: PageP
   const size = 20;
   const dir: SortDir = sp.dir === 'asc' ? 'asc' : 'desc';
 
-  const [scheme, groupLabel] = await Promise.all([
+  // contactScheme 은 pii blindIndex 계산용 piiType 매핑에 필요. getContactColumnScheme 가
+  // cache() 로 RSC pass dedupe 되어 있어 getProgressGroupLabel 내부 lookup 과 같은 query 를 공유한다.
+  const [scheme, groupLabel, contactScheme] = await Promise.all([
     getProgressColumnScheme(surveyId),
     getProgressGroupLabel(surveyId),
+    getContactColumnScheme(surveyId),
   ]);
   const visibleColumns = scheme.columns
     .filter((c) => !c.hidden)
@@ -85,14 +89,6 @@ export default async function ReportProgressPage({ params, searchParams }: PageP
   // metaKeys 에서 빈 문자열 방어 — `attrs->>''` 는 SQL legal 이지만 의미 없음.
   const metaKeys = visibleColumns.map((c) => c.key).filter((k) => k.length > 0);
   const sort = parseSort(sp.sort, metaKeys);
-
-  // contactColumns 로드 — pii 면 blindIndex 계산용 piiType 함께 가져옴.
-  const surveyRow = await db
-    .select({ contactColumns: surveys.contactColumns })
-    .from(surveys)
-    .where(eq(surveys.id, surveyId))
-    .limit(1);
-  const contactScheme = surveyRow[0]?.contactColumns ?? null;
 
   // 후보: system.resid + attrs.* + pii.* 만. 그 외 system.* 은 이번 슬라이스 제외.
   const columnCandidates: ColumnCandidate[] = (contactScheme?.columns ?? [])
