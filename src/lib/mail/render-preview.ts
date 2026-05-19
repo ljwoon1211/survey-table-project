@@ -91,27 +91,43 @@ function renderInlineText(s: string, sample: PreviewSample | null, mode: RenderM
   });
 }
 
-/** body HTML 용 — 태그/텍스트 영역 분리 처리 */
+/** body HTML 용 — 태그/텍스트 영역 분리 처리.
+ *  anchor depth 를 추적해 텍스트 영역의 {{invite_link}} 자동 a 태그 변환이
+ *  이미 사용자가 감싼 anchor 안에서 nested anchor 를 만들지 않도록 한다. */
 function renderBodyHtml(html: string, sample: PreviewSample | null, mode: RenderMode): string {
   if (!html) return '';
   const out: string[] = [];
   let lastIndex = 0;
+  let anchorDepth = 0;
   TAG_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = TAG_RE.exec(html)) !== null) {
     if (m.index > lastIndex) {
-      out.push(renderTextSegment(html.slice(lastIndex, m.index), sample, mode));
+      out.push(renderTextSegment(html.slice(lastIndex, m.index), sample, mode, anchorDepth > 0));
     }
-    out.push(renderTagSegment(m[0], sample, mode));
+    const tag = m[0];
+    out.push(renderTagSegment(tag, sample, mode));
+    if (/^<a\b/i.test(tag)) anchorDepth++;
+    else if (/^<\/a\s*>/i.test(tag)) anchorDepth = Math.max(0, anchorDepth - 1);
     lastIndex = m.index + m[0].length;
   }
   if (lastIndex < html.length) {
-    out.push(renderTextSegment(html.slice(lastIndex), sample, mode));
+    out.push(renderTextSegment(html.slice(lastIndex), sample, mode, anchorDepth > 0));
   }
   return out.join('');
 }
 
-function renderTextSegment(text: string, sample: PreviewSample | null, mode: RenderMode): string {
+/** 텍스트 영역의 {{invite_link}} 를 클릭 가능한 a 태그로 자동 변환할 때 사용할 인라인 스타일.
+ *  메일 클라이언트(Gmail/Outlook) 호환을 위해 inline style 로 색·밑줄을 박는다. */
+const AUTO_LINK_ATTRS =
+  'target="_blank" rel="noopener noreferrer" style="color:#2563eb;text-decoration:underline;"';
+
+function renderTextSegment(
+  text: string,
+  sample: PreviewSample | null,
+  mode: RenderMode,
+  insideAnchor: boolean,
+): string {
   // 텍스트 영역: 토큰 외 문자열은 이미 HTML 본문 안의 텍스트 노드이므로 추가 escape 불필요.
   // 단, preview 모드에서만 missing/empty span 으로 inline 강조 처리.
   return text.replace(TOKEN_RE, (_, rawKey: string) => {
@@ -119,6 +135,13 @@ function renderTextSegment(text: string, sample: PreviewSample | null, mode: Ren
     const r = resolveKey(key, sample);
     if (r.kind === 'missing') return mode === 'send' ? '' : missingSpan(key);
     if (r.kind === 'empty') return mode === 'send' ? '' : emptySpan(key);
+    // invite_link 가 plain text 로 본문에 들어왔을 때 — 사용자가 변수 메뉴를 거치지 않고
+    // 직접 타이핑·붙여넣기 한 경우 — 메일 클라이언트가 클릭 가능한 링크로 인식하도록
+    // 자동으로 a 태그로 감싼다. 이미 사용자가 a 태그로 감쌌으면 (변수 메뉴 케이스 등)
+    // nested anchor 가 되지 않도록 insideAnchor 일 때는 plain text 치환.
+    if (key === 'invite_link' && !insideAnchor) {
+      return `<a href="${escapeAttr(r.text)}" ${AUTO_LINK_ATTRS}>${escapeHtml(r.text)}</a>`;
+    }
     return escapeHtml(r.text);
   });
 }
