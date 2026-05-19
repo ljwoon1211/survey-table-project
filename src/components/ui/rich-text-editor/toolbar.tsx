@@ -14,7 +14,6 @@ import {
   ListOrdered,
   Redo,
   Strikethrough,
-  Table as TableIcon,
   Underline,
   Undo,
 } from 'lucide-react';
@@ -24,6 +23,7 @@ import { findTableAtSelection } from '@/lib/tiptap/find-table';
 import { ImageContextToolbar } from './image-context-toolbar';
 import { PopoverVariableMenu } from './popover-variable-menu';
 import { TableContextToolbar } from './table-context-toolbar';
+import { TableInsertMenu } from './table-insert-menu';
 import { Sep, ToolBtn } from './toolbar-primitives';
 import type { VariableDef } from './types';
 
@@ -121,19 +121,33 @@ export function Toolbar({ editor, variableCatalog, onPickImage, onPickLink }: Pr
 
       <ToolBtn onClick={onPickImage} title="이미지"><ImageIcon className="h-4 w-4" /></ToolBtn>
       <ToolBtn onClick={onPickLink} title="링크"><LinkIcon className="h-4 w-4" /></ToolBtn>
-      <ToolBtn
-        onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-        title="표 삽입"
-      >
-        <TableIcon className="h-4 w-4" />
-      </ToolBtn>
+      <TableInsertMenu editor={editor} />
 
       {variableCatalog && variableCatalog.length > 0 && (
         <>
           <Sep />
           <PopoverVariableMenu
             catalog={variableCatalog}
-            onPick={(key) => editor.chain().focus().insertContent(`{{${key}}}`).run()}
+            onPick={(key) => {
+              const token = `{{${key}}}`;
+              // invite_link 는 클릭 가능한 a 태그로 감싸야 메일 클라이언트가 확실히 링크로 렌더한다.
+              // href·텍스트 양쪽 모두 발송 시 sample.inviteUrl 로 치환됨 (render-preview.ts).
+              if (key === 'invite_link') {
+                editor
+                  .chain()
+                  .focus()
+                  .insertContent([
+                    {
+                      type: 'text',
+                      text: token,
+                      marks: [{ type: 'link', attrs: { href: token } }],
+                    },
+                  ])
+                  .run();
+                return;
+              }
+              editor.chain().focus().insertContent(token).run();
+            }}
           />
         </>
       )}
