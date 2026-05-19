@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState, useTransition } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,7 @@ interface ColumnCandidate {
 }
 
 interface Props {
+  surveyId: string;
   initialSource: string | null;
   initialValue: string;
   columnCandidates: ColumnCandidate[];
@@ -34,15 +36,22 @@ function placeholderFor(source: string | null): string {
 /**
  * 진척 보고 단일 검색바.
  *
- * - 컬럼 select + 값 input + [검색]/[초기화] 한 줄
+ * - 컬럼 select + 값 input + [검색] + [컬럼 설정] 한 줄
  * - 한 번에 한 컬럼만 검색 (다중 AND 없음)
  * - URL ?col=&q= 두 파라미터 직렬화
  * - 빈 input + [검색] = 필터 해제 (URL 키 둘 다 삭제)
  * - source 에 따라 input placeholder 자동 변경
  *
  * pii.* 컬럼은 백엔드에서 blindIndex 정확 일치 매칭 — 사용자에게는 "(정확 일치)" 마커.
+ *
+ * 높이는 SelectTrigger 기준 h-10 으로 통일.
  */
-export function ProgressFilterBar({ initialSource, initialValue, columnCandidates }: Props) {
+export function ProgressFilterBar({
+  surveyId,
+  initialSource,
+  initialValue,
+  columnCandidates,
+}: Props) {
   const [source, setSource] = useState<string | null>(initialSource);
   const [value, setValue] = useState<string>(initialValue);
   const [, startTransition] = useTransition();
@@ -68,18 +77,6 @@ export function ProgressFilterBar({ initialSource, initialValue, columnCandidate
           p.set('col', source);
           p.set('q', trimmed);
         }
-        p.delete('page');
-      });
-    });
-  };
-
-  const handleReset = () => {
-    setSource(null);
-    setValue('');
-    startTransition(() => {
-      pushParams((p) => {
-        p.delete('col');
-        p.delete('q');
         p.delete('page');
       });
     });
@@ -118,11 +115,12 @@ export function ProgressFilterBar({ initialSource, initialValue, columnCandidate
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder={placeholderFor(source)}
-        className="max-w-xs"
+        className="h-10 max-w-xs"
       />
 
       <Button
         type="submit"
+        className="h-10"
         disabled={
           columnCandidates.length === 0 ||
           (!source && value.trim().length > 0)
@@ -130,8 +128,8 @@ export function ProgressFilterBar({ initialSource, initialValue, columnCandidate
       >
         검색
       </Button>
-      <Button type="button" variant="outline" onClick={handleReset}>
-        초기화
+      <Button asChild variant="outline" className="ml-auto h-10">
+        <Link href={`/admin/surveys/${surveyId}/operations/report/columns`}>컬럼 설정</Link>
       </Button>
     </form>
   );

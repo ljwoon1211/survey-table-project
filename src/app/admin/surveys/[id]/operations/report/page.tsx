@@ -1,12 +1,10 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 
 import { sql } from 'drizzle-orm';
 
 import { ProgressEmptyCard } from '@/components/operations/report/progress-empty-card';
 import { ProgressFilterBar } from '@/components/operations/report/progress-filter-bar';
 import { ProgressTable } from '@/components/operations/report/progress-table';
-import { Button } from '@/components/ui/button';
 import { db } from '@/db';
 import { contactTargets } from '@/db/schema';
 import { getContactColumnScheme } from '@/lib/operations/contacts.server';
@@ -123,14 +121,9 @@ export default async function ReportProgressPage({ params, searchParams }: PageP
 
   return (
     <main className="mx-auto max-w-7xl px-6 py-8">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-gray-900">{groupLabel}별 진척률</h2>
-          <p className="text-sm text-slate-500">모집단 명단의 그룹 컬럼 기준 자동 집계</p>
-        </div>
-        <Button asChild variant="outline">
-          <Link href={`/admin/surveys/${surveyId}/operations/report/columns`}>⚙ 컬럼 설정</Link>
-        </Button>
+      <div className="mb-4">
+        <h2 className="text-xl font-bold text-gray-900">{groupLabel}별 진척률</h2>
+        <p className="text-sm text-slate-500">모집단 명단의 그룹 컬럼 기준 자동 집계</p>
       </div>
 
       {isEmpty ? (
@@ -138,6 +131,7 @@ export default async function ReportProgressPage({ params, searchParams }: PageP
       ) : (
         <>
           <ProgressFilterBar
+            surveyId={surveyId}
             initialSource={condition?.source ?? null}
             // idlist 모드는 FilterCondition 에 value 없음(ranges 만) — rawQ 로 원본 입력값 복원
             initialValue={condition && condition.mode !== 'idlist' ? condition.value : (rawQ ?? '')}
