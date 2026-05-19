@@ -2,14 +2,10 @@ import 'server-only';
 
 import { blindIndex } from '@/lib/crypto/blind';
 import type { PiiFieldType } from '@/lib/crypto/pii-fields';
+import { parseIdListInput, type NumRange } from './range-list';
 
-const INT32_MAX = 2147483647;
-const ID_LIST_REGEX = /^\s*\d+(\s*-\s*\d+)?(\s*,\s*\d+(\s*-\s*\d+)?)*\s*$/;
-
-export interface NumRange {
-  from: number;
-  to: number;
-}
+export type { NumRange } from './range-list';
+export { parseIdListInput } from './range-list';
 
 export type FilterCondition =
   | { source: 'system.resid'; mode: 'idlist'; ranges: NumRange[] }
@@ -21,38 +17,6 @@ export interface ColumnCandidate {
   source: string;
   label: string;
   piiType?: PiiFieldType;
-}
-
-export function parseIdListInput(input: string): NumRange[] | null {
-  if (!ID_LIST_REGEX.test(input)) return null;
-  const tokens = input.split(',').map((t) => t.trim());
-  const ranges: NumRange[] = [];
-  for (const token of tokens) {
-    if (token.length === 0) return null;
-    const parts = token.split('-').map((p) => p.trim());
-    if (parts.length === 1) {
-      const n = Number(parts[0]);
-      if (!Number.isInteger(n) || n > INT32_MAX || n < 1) return null;
-      ranges.push({ from: n, to: n });
-    } else if (parts.length === 2) {
-      const a = Number(parts[0]);
-      const b = Number(parts[1]);
-      if (
-        !Number.isInteger(a) ||
-        !Number.isInteger(b) ||
-        a > INT32_MAX ||
-        b > INT32_MAX ||
-        a < 1 ||
-        b < 1
-      ) {
-        return null;
-      }
-      ranges.push({ from: Math.min(a, b), to: Math.max(a, b) });
-    } else {
-      return null;
-    }
-  }
-  return ranges;
 }
 
 export function placeholderFor(source: string | null): string {
