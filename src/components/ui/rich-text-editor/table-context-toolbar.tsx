@@ -5,6 +5,9 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
+  AlignVerticalJustifyCenter,
+  AlignVerticalJustifyEnd,
+  AlignVerticalJustifyStart,
   Columns,
   Equal,
   Merge,
@@ -15,7 +18,7 @@ import {
   X,
 } from 'lucide-react';
 
-import { type HAlign } from './table-attrs-helpers';
+import { type HAlign, type VAlign } from './table-attrs-helpers';
 import { Sep, ToolBtn } from './toolbar-primitives';
 
 interface Props {
@@ -35,6 +38,7 @@ export function TableContextToolbar({ editor }: Props) {
           canDeleteColumn: false,
           canDeleteRow: false,
           tableAlign: 'left' as 'left' | 'center' | 'right',
+          cellVAlign: 'top' as VAlign,
         };
       }
       const tableAlign: 'left' | 'center' | 'right' = editor.isActive('table', {
@@ -44,12 +48,17 @@ export function TableContextToolbar({ editor }: Props) {
         : editor.isActive('table', { align: 'right' })
           ? 'right'
           : 'left';
+      // td / th 어느 쪽에 있든 같은 verticalAlign attr 를 본다.
+      const cellVAlign = (editor.getAttributes('tableCell').verticalAlign
+        ?? editor.getAttributes('tableHeader').verticalAlign
+        ?? 'top') as VAlign;
       return {
         canMerge: editor.can().mergeCells(),
         canSplit: editor.can().splitCell(),
         canDeleteColumn: editor.can().deleteColumn(),
         canDeleteRow: editor.can().deleteRow(),
         tableAlign,
+        cellVAlign,
       };
     },
   });
@@ -57,6 +66,11 @@ export function TableContextToolbar({ editor }: Props) {
   const setCellBg = (color: string | null) => {
     editor.chain().focus().updateAttributes('tableCell', { backgroundColor: color }).run();
     editor.chain().focus().updateAttributes('tableHeader', { backgroundColor: color }).run();
+  };
+
+  const setCellVAlign = (v: VAlign) => {
+    editor.chain().focus().updateAttributes('tableCell', { verticalAlign: v }).run();
+    editor.chain().focus().updateAttributes('tableHeader', { verticalAlign: v }).run();
   };
 
   const setTableAlign = (align: HAlign) => {
@@ -159,6 +173,28 @@ export function TableContextToolbar({ editor }: Props) {
           <Paintbrush className="h-4 w-4 text-red-600" />
           <X className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 text-red-600" />
         </div>
+      </ToolBtn>
+      <Sep />
+      <ToolBtn
+        active={s.cellVAlign === 'top'}
+        onClick={() => setCellVAlign('top')}
+        title="셀 위 정렬"
+      >
+        <AlignVerticalJustifyStart className="h-4 w-4" />
+      </ToolBtn>
+      <ToolBtn
+        active={s.cellVAlign === 'middle'}
+        onClick={() => setCellVAlign('middle')}
+        title="셀 가운데 정렬"
+      >
+        <AlignVerticalJustifyCenter className="h-4 w-4" />
+      </ToolBtn>
+      <ToolBtn
+        active={s.cellVAlign === 'bottom'}
+        onClick={() => setCellVAlign('bottom')}
+        title="셀 아래 정렬"
+      >
+        <AlignVerticalJustifyEnd className="h-4 w-4" />
       </ToolBtn>
       <Sep />
       <ToolBtn onClick={equalizeColumnWidths} title="열 너비 균등 분배">
