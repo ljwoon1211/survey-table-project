@@ -234,4 +234,19 @@ describe('parseClausesFromUrl - 다중 조건', () => {
     expect(result[1].condition.source).toBe('attrs.지역');
     expect(result[1].op).toBe('OR');
   });
+
+  it('URL 첫 절이 drop 되어도 출력 첫 절의 op 는 null', () => {
+    // col[0] 는 화이트리스트 위반으로 drop → 통과한 col[1] 이 결과의 첫 절이 됨.
+    // URL 인덱스 기준이 아니라 출력 인덱스 기준으로 op=null 이 부여되어야 한다.
+    const result = parseClausesFromUrl(
+      ['attrs.unknown', 'attrs.지역'],
+      ['x', '서울'],
+      ['', 'OR'],
+      candidates,
+      resultCodes,
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0].op).toBeNull();
+    expect(result[0].condition.source).toBe('attrs.지역');
+  });
 });

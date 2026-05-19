@@ -4,9 +4,6 @@ import { blindIndex } from '@/lib/crypto/blind';
 import type { PiiFieldType } from '@/lib/crypto/pii-fields';
 import { parseIdListInput, type NumRange } from './range-list';
 
-export type { NumRange } from './range-list';
-export { parseIdListInput } from './range-list';
-
 export type FilterCondition =
   | { source: 'system.resid'; mode: 'idlist'; ranges: NumRange[] }
   | { source: 'system.resid'; mode: 'text'; value: string }
