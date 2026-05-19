@@ -373,6 +373,7 @@ UI 컴포넌트는 단위 테스트 X — 수동 dogfooding.
 6. **pii blindIndex 컬럼 매칭** — `pp.column_key` 는 정확 일치 필요. 한글 attrs 라벨에서 한글 변형 매칭 불가 (db 저장된 key 그대로 사용)
 7. **그룹 내 attrs/pii 불일치 시 진척률 분모 의미 시프트** — 정상 업로드(전시회 단위 = 동일 attrs)에서는 무관
 8. **북마크된 기존 `?q=` URL 깨짐** — main 의 단일 q 검색은 의미가 비슷하지만 새 디자인은 `col` 도 필요. `?q=` 만 있는 기존 URL은 `col` 없음으로 필터 무시 → 전체 조회로 폴백 (페이지 안 깨짐)
+9. **`contact_pii` 복합 인덱스 누락** — pii.* EXISTS 서브쿼리가 `(contact_target_id, column_key, blind_index)` 복합 인덱스를 필요로 한다. 현재 마이그레이션은 `idx_contact_pii_target(contact_target_id)` + `idx_contact_pii_field_blind(field_type, blind_index)` 만 있어 컨택 1만+ 시점 느려질 수 있음. 그 시점에 복합 인덱스 추가 검토
 
 ### 미커밋 작업 분리 (작업 시작 시점)
 

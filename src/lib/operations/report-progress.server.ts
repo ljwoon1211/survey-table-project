@@ -69,10 +69,14 @@ function buildFilterSql(condition: FilterCondition | null) {
   if (condition.source.startsWith('attrs.')) {
     const key = condition.source.slice('attrs.'.length);
     const escaped = escapeLikePattern(condition.value);
+    // attrs key 도 parameter binding ($1) — PostgreSQL ->> 연산자는 텍스트 파라미터 수용.
     return sql`ct.attrs->>${key} ILIKE '%' || ${escaped} || '%'`;
   }
 
   if (condition.source.startsWith('pii.') && condition.mode === 'exact') {
+    // pii.* 는 FilterCondition 타입상 항상 mode === 'exact' (Known Limitation §4-1).
+    // mode 가드는 TS narrowing 용도 — startsWith 만으로는 union 좁히기가 안 된다.
+    // 미래 pii 부분일치 모드 등이 추가되면 이 분기를 명시적으로 처리해야 한다.
     const columnKey = condition.source.slice('pii.'.length);
     return sql`EXISTS (
       SELECT 1 FROM contact_pii pp
@@ -82,7 +86,9 @@ function buildFilterSql(condition: FilterCondition | null) {
     )`;
   }
 
-  return sql`TRUE`; // 알 수 없는 source — 페이지 깨짐 방지
+  // 알 수 없는 source — FilterCondition 타입 확장 후 이 함수 업데이트 누락된 경우의 safety net.
+  // FALSE 로 두면 결과가 비어 즉시 인지된다 (TRUE 면 전체 조회로 silent fail).
+  return sql`FALSE`;
 }
 
 /**
