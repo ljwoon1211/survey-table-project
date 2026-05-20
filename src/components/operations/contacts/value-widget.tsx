@@ -32,7 +32,7 @@ export function ValueWidget({ source, value, onChange, resultCodeOptions, inputI
         <SelectTrigger id={inputId} className="w-[260px] h-10">
           <SelectValue placeholder="결과코드 선택" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="max-h-72">
           {resultCodeOptions.map((rc) => (
             <SelectItem key={rc.code} value={rc.code}>
               {rc.label}

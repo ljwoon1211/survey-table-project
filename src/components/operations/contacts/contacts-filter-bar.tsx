@@ -148,7 +148,7 @@ export function ContactsFilterBar({
           <SelectTrigger id="contacts-first-source" className="h-10 w-[180px] shrink-0">
             <SelectValue placeholder="컬럼 선택" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-72">
             {columnCandidates.map((c) => (
               <SelectItem key={c.source} value={c.source}>
                 {c.label}

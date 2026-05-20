@@ -94,7 +94,7 @@ export function ProgressFilterBar({
         <SelectTrigger id="filter-column" className="w-[180px] shrink-0">
           <SelectValue placeholder="컬럼 선택" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="max-h-72">
           {columnCandidates.map((c) => (
             <SelectItem key={c.source} value={c.source}>
               {c.label}
