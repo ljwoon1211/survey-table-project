@@ -60,7 +60,10 @@ export function ClauseRow({
       </Select>
       <Select
         value={clause.source}
-        onValueChange={(s) => onChange({ ...clause, source: s, value: '' })}
+        onValueChange={(s) =>
+          // system.web 은 boolean dropdown 의 기본값 'true' 로 초기화 (빈 value 면 silent drop 함정).
+          onChange({ ...clause, source: s, value: s === 'system.web' ? 'true' : '' })
+        }
       >
         <SelectTrigger className="h-10 w-[180px]">
           <SelectValue placeholder="컬럼 선택" />

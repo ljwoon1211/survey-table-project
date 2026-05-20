@@ -112,8 +112,11 @@ export function ContactsFilterBar({
   };
 
   const addClause = () => {
-    const firstCandidate = columnCandidates[0]?.source ?? '';
-    setExtraClauses((cs) => [...cs, { op: 'AND', source: firstCandidate, value: '' }]);
+    if (columnCandidates.length === 0) return;
+    const firstCandidate = columnCandidates[0].source;
+    // system.web 은 boolean dropdown 의 기본값 'true' 로 초기화 (빈 value 면 silent drop 함정).
+    const initialValue = firstCandidate === 'system.web' ? 'true' : '';
+    setExtraClauses((cs) => [...cs, { op: 'AND', source: firstCandidate, value: initialValue }]);
     setAdvancedOpen(true);
   };
 
@@ -136,7 +139,14 @@ export function ContactsFilterBar({
         <label htmlFor="contacts-first-source" className="sr-only">
           검색 컬럼
         </label>
-        <Select value={firstSource} onValueChange={(v) => setFirstSource(v)}>
+        <Select
+          value={firstSource}
+          onValueChange={(v) => {
+            setFirstSource(v);
+            // source 변경 시 이전 mode 의 value 는 의미 없음. system.web 은 boolean 기본값 'true'.
+            setFirstValue(v === 'system.web' ? 'true' : '');
+          }}
+        >
           <SelectTrigger id="contacts-first-source" className="h-10 w-[180px] shrink-0">
             <SelectValue placeholder="컬럼 선택" />
           </SelectTrigger>
