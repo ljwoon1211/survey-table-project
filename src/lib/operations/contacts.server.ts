@@ -88,7 +88,9 @@ function buildClauseSql(cond: FilterCondition): SQL {
           ? sql`"contact_targets".resid = ${r.from}`
           : sql`"contact_targets".resid BETWEEN ${r.from} AND ${r.to}`,
       );
-      return sql.join(conds, sql` OR `);
+      // 자체 괄호 — 외부 AND 결합 (eq(surveyId) 또는 다중 절) 시 PG AND>OR 우선순위로
+      // 인한 cross-survey 누락/누출 방지.
+      return sql`(${sql.join(conds, sql` OR `)})`;
     }
     return sql`FALSE`;
   }
@@ -112,9 +114,10 @@ function buildClauseSql(cond: FilterCondition): SQL {
   if (cond.source.startsWith('pii.') && cond.mode === 'exact') {
     if (!cond.blindIndex) return sql`FALSE`;
     const columnKey = cond.source.slice('pii.'.length);
+    // contact_pii 도 id 컬럼이 있어 unquoted id 는 pp.id 로 해석된다 — 반드시 큰따옴표 사용.
     return sql`EXISTS (
       SELECT 1 FROM contact_pii pp
-      WHERE pp.contact_target_id = "contact_targets".id
+      WHERE pp.contact_target_id = "contact_targets"."id"
         AND pp.column_key = ${columnKey}
         AND pp.blind_index = ${cond.blindIndex}
     )`;
@@ -130,11 +133,12 @@ function buildClauseSql(cond: FilterCondition): SQL {
  */
 function buildContactsFilterSql(clauses: FilterClause[]): SQL {
   if (clauses.length === 0) return sql`TRUE`;
-  let expr: SQL = buildClauseSql(clauses[0].condition);
+  // 첫 절도 괄호로 감싸 buildClauseSql 의 결과가 내부 OR 체인이어도 외부 AND 와 안전하게 결합.
+  let expr: SQL = sql`(${buildClauseSql(clauses[0].condition)})`;
   for (let i = 1; i < clauses.length; i++) {
     const next = buildClauseSql(clauses[i].condition);
     const op = clauses[i].op === 'OR' ? sql.raw('OR') : sql.raw('AND');
-    expr = sql`(${expr}) ${op} (${next})`;
+    expr = sql`${expr} ${op} (${next})`;
   }
   return expr;
 }
