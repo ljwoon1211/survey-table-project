@@ -38,10 +38,10 @@ interface Props {
 }
 
 /**
- * 조사 대상 다중 조건 필터.
+ * 조사 대상 필터 (다중 절 AND/OR 결합).
  *
  * - 단순 검색바 = 첫 절 (op=null)
- * - [▼ 다중 조건] 클릭 시 두 번째 이후 절 패널 펼침
+ * - [▼ 필터] 클릭 시 두 번째 이후 절 패널 펼침
  * - 활성 조건 2개 이상이면 자동 펼침
  * - URL ?col[]=&q[]=&op[]= multi-value 직렬화
  * - 빈 value 절은 [검색] 시 silent drop
@@ -186,7 +186,7 @@ export function ContactsFilterBar({
           className="h-10"
           onClick={() => setAdvancedOpen(!advancedOpen)}
         >
-          {advancedOpen ? '▲' : '▼'} 다중 조건
+          {advancedOpen ? '▲' : '▼'} 필터
           {extraClauses.length > 0 && (
             <Badge variant="secondary" className="ml-2">
               {extraClauses.length}
