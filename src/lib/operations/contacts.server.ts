@@ -1,15 +1,13 @@
 import 'server-only';
 import { cache } from 'react';
 
-import { and, asc, desc, eq, ilike, inArray, or, sql, type AnyColumn, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, sql, type AnyColumn, type SQL } from 'drizzle-orm';
 
 import { db } from '@/db';
 import { contactTargets, contactUploads, surveys } from '@/db/schema';
 import type { ContactColumnScheme } from '@/db/schema/schema-types';
 import {
   decryptForTarget,
-  findContactIdsByBlindIndex,
-  findContactIdsByPlainAcrossTypes,
   getMaskHintsForTargets,
 } from '@/lib/crypto/contact-pii-repo';
 import type { PiiFieldType } from '@/lib/crypto/pii-fields';
@@ -18,13 +16,17 @@ import {
   attrsSortKey,
   type ContactsSortDir,
   type ContactsSortKey,
-  type NormalizedContactListArgs,
 } from './contacts';
+import type { FilterClause, FilterCondition } from './contacts-filters.server';
 
-export type ListContactsArgs = NormalizedContactListArgs & {
+export interface ListContactsArgs {
   surveyId: string;
+  clauses: FilterClause[];
+  page: number;
+  sort: ContactsSortKey;
+  dir: ContactsSortDir;
   pageSize: number;
-};
+}
 
 export interface ContactsRow {
   id: string;
@@ -48,6 +50,95 @@ export interface ListContactsResult {
   page: number;
 }
 
+// 최신 회차의 result_code / attempt_no — 같은 subquery 모양을 SELECT/WHERE 양쪽에서 사용.
+// PG planner 가 동일 correlated subquery 를 dedupe 하며, idx_contact_attempts_target
+// (contact_target_id, attempt_no DESC) INCLUDE (result_code) 가 index-only scan 보장.
+// outer correlation 은 명시적 qualifier 필수 — Drizzle 의 sql template literal 안에서
+// ${contactTargets.id} 는 unqualified "id" 로 렌더되어 inner contact_attempts.id 와
+// 충돌 (둘 다 id 컬럼 보유) → 항상 NULL. "contact_targets"."id" 직접 박는다.
+const latestResultCodeExpr = sql<string | null>`(
+  SELECT result_code FROM contact_attempts
+  WHERE contact_target_id = "contact_targets"."id"
+  ORDER BY attempt_no DESC LIMIT 1
+)`;
+const latestAttemptNoExpr = sql<number | null>`(
+  SELECT attempt_no FROM contact_attempts
+  WHERE contact_target_id = "contact_targets"."id"
+  ORDER BY attempt_no DESC LIMIT 1
+)`;
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
+/**
+ * 단일 절 SQL. cond.source 와 mode 별로 분기.
+ *
+ * SECURITY: cond.source 는 호출자에서 contactColumns 화이트리스트 검증 끝난 값만
+ * 전달된다고 가정. value/from/to/blindIndex/key 모두 parameter binding 으로 안전.
+ *
+ * pii.* 평문 미노출 (사전 계산된 blindIndex 만 SQL 에 진입).
+ */
+function buildClauseSql(cond: FilterCondition): SQL {
+  if (cond.source === 'system.resid') {
+    if (cond.mode === 'idlist') {
+      if (!cond.ranges || cond.ranges.length === 0) return sql`FALSE`;
+      const conds = cond.ranges.map((r) =>
+        r.from === r.to
+          ? sql`"contact_targets".resid = ${r.from}`
+          : sql`"contact_targets".resid BETWEEN ${r.from} AND ${r.to}`,
+      );
+      return sql.join(conds, sql` OR `);
+    }
+    return sql`FALSE`;
+  }
+
+  if (cond.source === 'system.contact_result' && cond.mode === 'enum') {
+    return sql`${latestResultCodeExpr} = ${cond.value}`;
+  }
+
+  if (cond.source === 'system.web' && cond.mode === 'boolean') {
+    return cond.value === 'true'
+      ? sql`"contact_targets".responded_at IS NOT NULL`
+      : sql`"contact_targets".responded_at IS NULL`;
+  }
+
+  if (cond.source.startsWith('attrs.') && cond.mode === 'text') {
+    const key = cond.source.slice('attrs.'.length);
+    const escaped = escapeLikePattern(cond.value);
+    return sql`"contact_targets".attrs->>${key} ILIKE '%' || ${escaped} || '%'`;
+  }
+
+  if (cond.source.startsWith('pii.') && cond.mode === 'exact') {
+    if (!cond.blindIndex) return sql`FALSE`;
+    const columnKey = cond.source.slice('pii.'.length);
+    return sql`EXISTS (
+      SELECT 1 FROM contact_pii pp
+      WHERE pp.contact_target_id = "contact_targets".id
+        AND pp.column_key = ${columnKey}
+        AND pp.blind_index = ${cond.blindIndex}
+    )`;
+  }
+
+  return sql`FALSE`;
+}
+
+/**
+ * 절 배열 → WHERE 절. 좌→우 평가, 각 절 (...) 괄호로 우선순위 모호함 제거.
+ *
+ * 빈 배열 → TRUE (전체 조회).
+ */
+function buildContactsFilterSql(clauses: FilterClause[]): SQL {
+  if (clauses.length === 0) return sql`TRUE`;
+  let expr: SQL = buildClauseSql(clauses[0].condition);
+  for (let i = 1; i < clauses.length; i++) {
+    const next = buildClauseSql(clauses[i].condition);
+    const op = clauses[i].op === 'OR' ? sql.raw('OR') : sql.raw('AND');
+    expr = sql`(${expr}) ${op} (${next})`;
+  }
+  return expr;
+}
+
 function orderExpr(col: AnyColumn | SQL, direction: ContactsSortDir): SQL {
   return direction === 'asc'
     ? sql`${col} ASC NULLS LAST`
@@ -59,7 +150,7 @@ function orderExpr(col: AnyColumn | SQL, direction: ContactsSortDir): SQL {
  *
  * 핵심:
  * - contact_targets 베이스 + 최신 contact_attempts (correlated subquery) 조인
- * - 검색 (qfield='all'/'resid'/'email'/'group'/'biz') + resultCode 필터
+ * - FilterClause[] 기반 다중 조건 필터 (buildContactsFilterSql)
  * - page 클램프 (profiles.server.ts 패턴)
  * - PII 마스킹 (email/biz)
  *
@@ -69,69 +160,11 @@ function orderExpr(col: AnyColumn | SQL, direction: ContactsSortDir): SQL {
 export async function listContactsForSurvey(
   args: ListContactsArgs,
 ): Promise<ListContactsResult> {
-  const { surveyId, page, pageSize, q, qfield, resultCode, sort, dir } = args;
-
-  // 최신 회차의 result_code / attempt_no — 같은 subquery 모양을 SELECT/WHERE 양쪽에서 사용.
-  // PG planner 가 동일 correlated subquery 를 dedupe 하며, idx_contact_attempts_target
-  // (contact_target_id, attempt_no DESC) INCLUDE (result_code) 가 index-only scan 보장.
-  // outer correlation 은 명시적 qualifier 필수 — Drizzle 의 sql template literal 안에서
-  // ${contactTargets.id} 는 unqualified "id" 로 렌더되어 inner contact_attempts.id 와
-  // 충돌 (둘 다 id 컬럼 보유) → 항상 NULL. "contact_targets"."id" 직접 박는다.
-  const latestResultCodeExpr = sql<string | null>`(
-    SELECT result_code FROM contact_attempts
-    WHERE contact_target_id = "contact_targets"."id"
-    ORDER BY attempt_no DESC LIMIT 1
-  )`;
-  const latestAttemptNoExpr = sql<number | null>`(
-    SELECT attempt_no FROM contact_attempts
-    WHERE contact_target_id = "contact_targets"."id"
-    ORDER BY attempt_no DESC LIMIT 1
-  )`;
+  const { surveyId, page, pageSize, clauses, sort, dir } = args;
 
   const whereParts: SQL[] = [eq(contactTargets.surveyId, surveyId)];
 
-  const trimmed = q.normalize('NFC').trim();
-  if (trimmed.length > 0) {
-    if (qfield === 'resid') {
-      const n = parseInt(trimmed, 10);
-      whereParts.push(Number.isFinite(n) && n > 0 ? eq(contactTargets.resid, n) : sql`false`);
-    } else if (qfield === 'email' || qfield === 'biz') {
-      // PII 검색: blind_index 정확 매치. 부분 일치 불가 — UI placeholder 로 안내.
-      const fieldType: PiiFieldType = qfield === 'email' ? 'email' : 'biz_number';
-      const matchedIds = await findContactIdsByBlindIndex(surveyId, fieldType, trimmed);
-      whereParts.push(matchedIds.length > 0 ? inArray(contactTargets.id, matchedIds) : sql`false`);
-    } else {
-      const escaped = trimmed
-        .replace(/\\/g, '\\\\')
-        .replace(/%/g, '\\%')
-        .replace(/_/g, '\\_');
-      const pattern = `%${escaped}%`;
-
-      if (qfield === 'group') {
-        whereParts.push(ilike(contactTargets.groupValue, pattern));
-      } else {
-        // all — group_value 부분 일치 + 모든 PII 타입 정확 매치 합집합.
-        // 단일 SQL 로 묶어 round-trip 1회 (이전 구현은 타입별 6번).
-        const piiMatchIds = await findContactIdsByPlainAcrossTypes(
-          surveyId,
-          ['email', 'mobile', 'phone', 'name', 'address', 'biz_number'],
-          trimmed,
-        );
-        const groupClause = ilike(contactTargets.groupValue, pattern);
-        if (piiMatchIds.length > 0) {
-          const piiClause = inArray(contactTargets.id, piiMatchIds);
-          const combined = or(groupClause, piiClause);
-          if (combined) whereParts.push(combined);
-        } else {
-          whereParts.push(groupClause);
-        }
-      }
-    }
-  }
-
-  if (resultCode !== 'all') {
-    whereParts.push(sql`${latestResultCodeExpr} = ${resultCode}`);
-  }
+  whereParts.push(buildContactsFilterSql(clauses));
 
   const whereClause = and(...whereParts)!;
 
