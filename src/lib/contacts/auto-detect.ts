@@ -12,7 +12,7 @@ const PATTERNS = {
   biz: ['사업자등록번호', '사업자번호', '사업자', 'biz'],
   mobile: ['휴대폰번호', '휴대폰', '핸드폰', '모바일', 'mobile', 'cell'],
   phone: ['전화번호', '전화', '유선', '연락처', 'phone', 'tel'],
-  name: ['이름', '성명', '담당자', 'name', 'contact name'],
+  name: ['이름', '성명', '담당자', '대표자명', '대표이사', '대표자', '대표', 'name', 'contact name'],
   address: ['주소', '소재지', 'address'],
   group: ['전시회명', '전시회', '단체 메일'],
 } as const;

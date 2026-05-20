@@ -46,6 +46,13 @@ describe('detectPiiType', () => {
     expect(detectPiiType('담당자 휴대폰번호')).toBe('mobile');
   });
 
+  it('대표자/대표/대표이사/대표자명 → name 매칭', () => {
+    expect(detectPiiType('대표자')).toBe('name');
+    expect(detectPiiType('대표')).toBe('name');
+    expect(detectPiiType('대표이사')).toBe('name');
+    expect(detectPiiType('대표자명')).toBe('name');
+  });
+
   it('PII 키워드 없으면 undefined', () => {
     expect(detectPiiType('연번')).toBeUndefined();
     expect(detectPiiType('전시회명')).toBeUndefined();
