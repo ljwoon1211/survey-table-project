@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { NumericComparison } from '@/types/survey';
+import { isPartialNumericInput, parseNumericInput } from '@/utils/numeric-input';
 
 interface NumericComparisonEditorProps {
   value?: NumericComparison;
@@ -48,10 +49,10 @@ export function NumericComparisonEditor({
 
   const emitOperator = useCallback(
     (newOp: NumericComparison['operator']) => {
-      const num = parseFloat(rawInput);
+      const parsed = parseNumericInput(rawInput);
       onChange({
         operator: newOp,
-        comparand: { kind: 'literal', value: Number.isFinite(num) ? num : 0 },
+        comparand: { kind: 'literal', value: parsed ?? 0 },
       });
     },
     [rawInput, onChange],
@@ -59,15 +60,14 @@ export function NumericComparisonEditor({
 
   const handleValueChange = useCallback(
     (raw: string) => {
-      // 빈/부호만/소수점만 진행 중 상태 허용 (응답자 입력과 동일한 정규식 패턴)
-      if (!/^-?\d*\.?\d*$/.test(raw)) return;
+      // 부분 입력 상태('-', '.', '-.', '')도 raw 만 보존하고 emit 은 skip.
+      if (!isPartialNumericInput(raw)) return;
       setRawInput(raw);
-      const num = parseFloat(raw);
-      // 유효한 finite number 일 때만 부모에게 emit. 부분 입력 상태('-', '.', '-.', '') 는 raw 만 보존.
-      if (Number.isFinite(num)) {
+      const parsed = parseNumericInput(raw);
+      if (parsed !== null) {
         onChange({
           operator,
-          comparand: { kind: 'literal', value: num },
+          comparand: { kind: 'literal', value: parsed },
         });
       }
     },

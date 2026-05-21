@@ -5,6 +5,7 @@ import React, { useCallback, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { useContactAttrs } from '@/lib/survey/contact-attrs-context';
 import { substituteTokens } from '@/lib/survey/substitute-tokens';
+import { isPartialNumericInput } from '@/utils/numeric-input';
 
 import { CellContentLayout } from './cell-content-layout';
 import type { InteractiveCellProps } from './types';
@@ -34,11 +35,8 @@ export const InputCell = React.memo(function InputCell({
 
   const handleChange = useCallback(
     (value: string) => {
-      if (isNumberMode) {
-        // 부분 입력 상태(빈 문자열, '-', '.', '-.' 등)도 허용. 자동 0 prepend 안 함.
-        if (!/^-?\d*\.?\d*$/.test(value)) {
-          return; // 유효하지 않은 문자는 거부, 기존 값 유지
-        }
+      if (isNumberMode && !isPartialNumericInput(value)) {
+        return; // 유효하지 않은 문자는 거부, 기존 값 유지. 자동 0 prepend 안 함.
       }
       onUpdateValue(value);
     },
@@ -58,7 +56,6 @@ export const InputCell = React.memo(function InputCell({
           className="w-full text-base"
           disabled={isPrefilled}
           data-prefilled={isPrefilled || undefined}
-          data-input-type={isNumberMode ? 'number' : undefined}
         />
 
         {cell.inputMaxLength && !isPrefilled && (

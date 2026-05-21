@@ -11,17 +11,18 @@ import {
   TableRow,
   TableValidationRule,
 } from '@/types/survey';
+import { parseNumericInput } from './numeric-input';
 
 /**
  * input(number) 셀 값에 대해 숫자 비교 연산자를 평가합니다.
- * 파싱 실패(NaN) 시 항상 false 를 반환합니다.
+ * 파싱 실패 시 항상 false 를 반환합니다.
  */
 function evaluateNumericComparison(
   cellValue: string,
   numericComparison: NumericComparison,
 ): boolean {
-  const left = parseFloat(cellValue.trim());
-  if (Number.isNaN(left)) return false;
+  const left = parseNumericInput(cellValue);
+  if (left === null) return false;
   if (numericComparison.comparand.kind !== 'literal') return false;
   const right = numericComparison.comparand.value;
   switch (numericComparison.operator) {
