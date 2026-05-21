@@ -1,6 +1,25 @@
+import { nanoid } from 'nanoid';
 import { generateId } from '@/lib/utils';
 import { getMaxSpssCode } from '@/utils/option-code-generator';
+import { generateOtherOptionFields } from '@/lib/option-text-migration';
 import { Question, QuestionOption, SelectLevel } from '@/types/survey';
+
+/**
+ * "+ 텍스트 옵션 추가" 버튼이 호출하는 헬퍼.
+ * allowTextInput=true 옵션을 마지막에 append.
+ * 코드/변수번호는 기존 옵션 수 기준 자동 부여 (사용자가 빌더에서 수정 가능).
+ */
+export function createTextInputOption(existingOptions: QuestionOption[]): QuestionOption {
+  const fields = generateOtherOptionFields(existingOptions.length);
+  return {
+    id: nanoid(10),
+    label: '',
+    value: fields.optionCode,
+    optionCode: fields.optionCode,
+    spssNumericCode: fields.spssNumericCode,
+    allowTextInput: true,
+  };
+}
 
 export const OTHER_OPTION_ID = 'other-option';
 export const OTHER_OPTION_LABEL = '기타';
