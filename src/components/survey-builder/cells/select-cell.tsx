@@ -4,8 +4,6 @@ import React, { useCallback } from 'react';
 
 import { ChevronDown } from 'lucide-react';
 
-import { Input } from '@/components/ui/input';
-
 import { CellContentLayout } from './cell-content-layout';
 import type { InteractiveCellProps } from './types';
 
@@ -17,18 +15,7 @@ export const SelectCell = React.memo(function SelectCell({
 }: InteractiveCellProps) {
   const handleSelectChange = useCallback(
     (optionId: string) => {
-      if (optionId === 'other-option') {
-        onUpdateValue({ optionId, otherValue: '', hasOther: true });
-      } else {
-        onUpdateValue(optionId);
-      }
-    },
-    [onUpdateValue],
-  );
-
-  const handleOtherInput = useCallback(
-    (otherValue: string) => {
-      onUpdateValue({ optionId: 'other-option', otherValue, hasOther: true });
+      onUpdateValue(optionId);
     },
     [onUpdateValue],
   );
@@ -41,16 +28,10 @@ export const SelectCell = React.memo(function SelectCell({
     );
   }
 
-  const selectedValue =
-    typeof cellResponse === 'object' && (cellResponse as { optionId?: string })?.optionId
-      ? (cellResponse as { optionId: string }).optionId
-      : (cellResponse as string) || '';
-
-  const isOtherSelected = selectedValue === 'other-option';
-  const otherValue =
-    typeof cellResponse === 'object' && (cellResponse as { otherValue?: string })?.otherValue
-      ? (cellResponse as { otherValue: string }).otherValue
-      : '';
+  const selectedValue = (cellResponse as string) || '';
+  const selectedOption = cell.selectOptions.find(
+    (opt) => (opt.value ?? opt.id) === selectedValue,
+  );
 
   return (
     <CellContentLayout content={cell.content} position={cell.textPosition}>
@@ -63,7 +44,7 @@ export const SelectCell = React.memo(function SelectCell({
           >
             <option value="">선택하세요</option>
             {cell.selectOptions.map((option) => (
-              <option key={option.id} value={option.id}>
+              <option key={option.id} value={option.value ?? option.id}>
                 {option.label}
               </option>
             ))}
@@ -71,13 +52,8 @@ export const SelectCell = React.memo(function SelectCell({
           <ChevronDown className="pointer-events-none absolute top-1/2 right-2 h-4 w-4 -translate-y-1/2 text-gray-400" />
         </div>
 
-        {isOtherSelected && (
-          <Input
-            placeholder="기타 내용 입력..."
-            value={otherValue}
-            onChange={(e) => handleOtherInput(e.target.value)}
-            className="h-8 text-xs"
-          />
+        {selectedOption?.allowTextInput && (
+          <p className="text-xs text-muted-foreground italic">(상세 기재: ___)</p>
         )}
       </div>
     </CellContentLayout>

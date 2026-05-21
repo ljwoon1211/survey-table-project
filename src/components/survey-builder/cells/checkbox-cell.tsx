@@ -2,8 +2,6 @@
 
 import React, { useCallback } from 'react';
 
-import { Input } from '@/components/ui/input';
-
 import { CellOptionsContainer } from './cell-options-container';
 import type { InteractiveCellProps } from './types';
 
@@ -23,12 +21,7 @@ export const CheckboxCell = React.memo(function CheckboxCell({
 
   const canSelect = useCallback(
     (optionKey: string) => {
-      const isChecked = cellResponseArray.some((item) => {
-        if (typeof item === 'object' && item !== null && 'optionId' in item) {
-          return (item as { optionId: string }).optionId === optionKey;
-        }
-        return item === optionKey;
-      });
+      const isChecked = cellResponseArray.includes(optionKey);
       return isChecked || !isMaxReached;
     },
     [cellResponseArray, isMaxReached],
@@ -36,45 +29,18 @@ export const CheckboxCell = React.memo(function CheckboxCell({
 
   const handleCheckboxChange = useCallback(
     (optionId: string, checked: boolean) => {
-      const current = (Array.isArray(cellResponse) ? cellResponse : []) as (
-        | string
-        | { optionId: string; otherValue?: string; hasOther?: boolean }
-      )[];
-      let updated: typeof current;
-      const isOther = optionId === 'other-option';
+      const current = (Array.isArray(cellResponse) ? cellResponse : []) as string[];
+      let updated: string[];
 
       if (checked) {
         if (maxSelections !== undefined && maxSelections > 0 && current.length >= maxSelections) return;
-        updated = isOther
-          ? [...current, { optionId, otherValue: '', hasOther: true }]
-          : [...current, optionId];
+        updated = [...current, optionId];
       } else {
-        updated = current.filter((item) => {
-          if (typeof item === 'object' && item !== null && 'optionId' in item) {
-            return (item as { optionId: string }).optionId !== optionId;
-          }
-          return item !== optionId;
-        });
+        updated = current.filter((item) => item !== optionId);
       }
       onUpdateValue(updated);
     },
     [cellResponse, maxSelections, onUpdateValue],
-  );
-
-  const handleOtherInput = useCallback(
-    (optionId: string, otherValue: string) => {
-      if (!Array.isArray(cellResponse)) return;
-      const updated = (
-        cellResponse as (string | { optionId: string; otherValue?: string })[]
-      ).map((item) => {
-        if (typeof item === 'object' && item !== null && 'optionId' in item && item.optionId === optionId) {
-          return { ...item, otherValue };
-        }
-        return item;
-      });
-      onUpdateValue(updated);
-    },
-    [cellResponse, onUpdateValue],
   );
 
   if (!cell.checkboxOptions || cell.checkboxOptions.length === 0) {
@@ -104,58 +70,34 @@ export const CheckboxCell = React.memo(function CheckboxCell({
     <CellOptionsContainer cell={cell} footer={footer}>
       {cell.checkboxOptions.map((option) => {
         const optionKey = option.value ?? option.id;
-        const isChecked = cellResponseArray.some((item) => {
-          if (typeof item === 'object' && item !== null && 'optionId' in item) {
-            return (item as { optionId: string }).optionId === optionKey;
-          }
-          return item === optionKey;
-        });
-
-        const otherValue =
-          (
-            cellResponseArray.find(
-              (item) =>
-                typeof item === 'object' &&
-                item !== null &&
-                'optionId' in item &&
-                (item as { optionId: string }).optionId === optionKey,
-            ) as { optionId: string; otherValue?: string } | undefined
-          )?.otherValue || '';
-
+        const isChecked = cellResponseArray.includes(optionKey);
         const disabled = !canSelect(optionKey);
 
         return (
-          <div key={option.id} className="space-y-1">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id={`${cell.id}-${option.id}`}
-                checked={isChecked}
-                disabled={disabled}
-                onChange={(e) => handleCheckboxChange(optionKey, e.target.checked)}
-                className={`rounded border-gray-300 text-blue-600 focus:ring-blue-500 ${
-                  disabled ? 'cursor-not-allowed opacity-50' : ''
-                }`}
-              />
-              <label
-                htmlFor={`${cell.id}-${option.id}`}
-                className={`text-base select-none ${
-                  disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
-                }`}
-              >
-                {option.label}
-              </label>
-            </div>
-            {optionKey === 'other-option' && isChecked && (
-              <div className="ml-6">
-                <Input
-                  placeholder="기타 내용 입력..."
-                  value={otherValue}
-                  onChange={(e) => handleOtherInput(optionKey, e.target.value)}
-                  className="h-8 text-xs"
-                />
-              </div>
-            )}
+          <div key={option.id} className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id={`${cell.id}-${option.id}`}
+              checked={isChecked}
+              disabled={disabled}
+              onChange={(e) => handleCheckboxChange(optionKey, e.target.checked)}
+              className={`rounded border-gray-300 text-blue-600 focus:ring-blue-500 ${
+                disabled ? 'cursor-not-allowed opacity-50' : ''
+              }`}
+            />
+            <label
+              htmlFor={`${cell.id}-${option.id}`}
+              className={`text-base select-none ${
+                disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+              }`}
+            >
+              {option.label}
+              {option.allowTextInput && (
+                <span className="ml-2 text-xs text-muted-foreground italic">
+                  (상세 기재: ___)
+                </span>
+              )}
+            </label>
           </div>
         );
       })}

@@ -3,8 +3,6 @@
 import React, { useCallback } from 'react';
 import { flushSync } from 'react-dom';
 
-import { Input } from '@/components/ui/input';
-
 import { CellOptionsContainer } from './cell-options-container';
 import type { InteractiveCellProps } from './types';
 
@@ -17,39 +15,14 @@ export const RadioCell = React.memo(function RadioCell({
 }: InteractiveCellProps) {
   const handleRadioChange = useCallback(
     (optionId: string) => {
-      const isCurrentlySelected = (() => {
-        if (typeof cellResponse === 'object' && cellResponse !== null && 'optionId' in (cellResponse as Record<string, unknown>)) {
-          return (cellResponse as { optionId: string }).optionId === optionId;
-        }
-        return cellResponse === optionId;
-      })();
+      const isCurrentlySelected = cellResponse === optionId;
 
       if (isCurrentlySelected) {
         flushSync(() => onUpdateValue(''));
         return;
       }
 
-      const isOther = optionId === 'other-option';
-      flushSync(() =>
-        onUpdateValue(isOther ? { optionId, otherValue: '', hasOther: true } : optionId),
-      );
-    },
-    [cellResponse, onUpdateValue],
-  );
-
-  const handleOtherInput = useCallback(
-    (optionId: string, otherValue: string) => {
-      if (
-        typeof cellResponse === 'object' &&
-        cellResponse !== null &&
-        'optionId' in (cellResponse as Record<string, unknown>) &&
-        (cellResponse as { optionId: string }).optionId === optionId
-      ) {
-        onUpdateValue({
-          ...(cellResponse as { optionId: string; otherValue?: string }),
-          otherValue,
-        });
-      }
+      flushSync(() => onUpdateValue(optionId));
     },
     [cellResponse, onUpdateValue],
   );
@@ -66,48 +39,30 @@ export const RadioCell = React.memo(function RadioCell({
     <CellOptionsContainer cell={cell}>
       {cell.radioOptions.map((option) => {
         const optionKey = option.value ?? option.id;
-        const isSelected = (() => {
-          if (typeof cellResponse === 'object' && cellResponse !== null && 'optionId' in (cellResponse as Record<string, unknown>)) {
-            return (cellResponse as { optionId: string }).optionId === optionKey;
-          }
-          return cellResponse === optionKey;
-        })();
-
-        const otherValue =
-          typeof cellResponse === 'object' &&
-          (cellResponse as { optionId: string; otherValue?: string })?.optionId === optionKey
-            ? (cellResponse as { otherValue?: string }).otherValue || ''
-            : '';
+        const isSelected = cellResponse === optionKey;
 
         return (
-          <div key={option.id} className="space-y-1">
-            <div className="flex items-center gap-2">
-              <input
-                type="radio"
-                id={`${cell.id}-${option.id}`}
-                name={groupName ?? `${cell.id}-radio`}
-                checked={isSelected}
-                onChange={() => {}}
-                onClick={() => handleRadioChange(optionKey)}
-                className="cursor-pointer border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <label
-                htmlFor={`${cell.id}-${option.id}`}
-                className="cursor-pointer text-base select-none"
-              >
-                {option.label}
-              </label>
-            </div>
-            {optionKey === 'other-option' && isSelected && (
-              <div className="ml-6">
-                <Input
-                  placeholder="기타 내용 입력..."
-                  value={otherValue}
-                  onChange={(e) => handleOtherInput(optionKey, e.target.value)}
-                  className="h-8 text-xs"
-                />
-              </div>
-            )}
+          <div key={option.id} className="flex items-center gap-2">
+            <input
+              type="radio"
+              id={`${cell.id}-${option.id}`}
+              name={groupName ?? `${cell.id}-radio`}
+              checked={isSelected}
+              onChange={() => {}}
+              onClick={() => handleRadioChange(optionKey)}
+              className="cursor-pointer border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <label
+              htmlFor={`${cell.id}-${option.id}`}
+              className="cursor-pointer text-base select-none"
+            >
+              {option.label}
+              {option.allowTextInput && (
+                <span className="ml-2 text-xs text-muted-foreground italic">
+                  (상세 기재: ___)
+                </span>
+              )}
+            </label>
           </div>
         );
       })}

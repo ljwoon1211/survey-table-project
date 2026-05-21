@@ -20,7 +20,6 @@ export const RankingCell = React.memo(function RankingCell({
   const requestedPositions = Math.max(1, config?.positions ?? 3);
   const positions = Math.min(requestedPositions, Math.max(options.length, 1));
   const allowDuplicates = config?.allowDuplicateRanks === true;
-  const allowOther = cell.allowOtherOption === true;
 
   const answers = useMemo<RankingAnswer[]>(
     () => parseRankingAnswers(cellResponse),
@@ -43,7 +42,7 @@ export const RankingCell = React.memo(function RankingCell({
           options={options}
           positions={positions}
           allowDuplicates={allowDuplicates}
-          allowOther={allowOther}
+          allowOther={false}
           onChange={(next) => onUpdateValue(next)}
           columns={cell.optionsColumns}
           compact
