@@ -38,7 +38,9 @@ export interface SPSSExportColumn {
     | 'ranking-other'
     | 'radio-group'
     | 'table-cell-ranking'
-    | 'table-cell-ranking-other';
+    | 'table-cell-ranking-other'
+    | 'option-text'
+    | 'table-cell-option-text';
   optionIndex?: number;
   optionValue?: string;
   tableCellId?: string;
@@ -60,6 +62,8 @@ export interface SPSSExportColumn {
   radioGroupCellValueMap?: Record<string, number>;
   // 숫자값 → SPSS VALUE LABEL 라벨 (옵션 라벨 우선, 없으면 행/열 라벨 폴백)
   radioGroupValueLabels?: Record<number, string>;
+  // option-text / table-cell-option-text 전용: 옵션 id (응답 데이터 조회용)
+  optionId?: string;
 }
 
 /**
@@ -106,6 +110,18 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
           optionIndex: i,
           optionValue: opt.value,
         });
+        // allowTextInput 옵션마다 STRING 사이드카 텍스트 변수 생성
+        if (opt.allowTextInput) {
+          const varNumber = opt.optionCode ?? String(i + 1);
+          columns.push({
+            spssVarName: `${q.questionCode}_${varNumber}_text`,
+            questionText: q.title,
+            optionLabel: `${opt.label} (텍스트)`,
+            questionId: q.id,
+            type: 'option-text',
+            optionId: opt.id,
+          });
+        }
       }
       // 기타 옵션이 있으면 기타 텍스트 컬럼 추가
       if (q.allowOtherOption) {
@@ -129,6 +145,23 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
         questionId: q.id,
         type: 'single',
       });
+      // allowTextInput 옵션마다 STRING 사이드카 텍스트 변수 생성
+      if (q.options) {
+        for (let i = 0; i < q.options.length; i++) {
+          const opt = q.options[i];
+          if (opt.allowTextInput) {
+            const varNumber = opt.optionCode ?? String(i + 1);
+            columns.push({
+              spssVarName: `${q.questionCode}_${varNumber}_text`,
+              questionText: q.title,
+              optionLabel: `${opt.label} (텍스트)`,
+              questionId: q.id,
+              type: 'option-text',
+              optionId: opt.id,
+            });
+          }
+        }
+      }
       // 기타 옵션이 있으면 기타 텍스트 컬럼 추가
       if (q.allowOtherOption) {
         const otherCode = getOtherOptionCode(q.options);
@@ -253,6 +286,19 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
                 cellSpssVarType: cell.spssVarType,
                 cellSpssMeasure: cell.spssMeasure,
               });
+              // allowTextInput 옵션마다 STRING 사이드카 텍스트 변수 생성
+              if (opt.allowTextInput) {
+                const varNumber = opt.optionCode ?? String(optIdx + 1);
+                columns.push({
+                  spssVarName: `${varName}_${varNumber}_text`,
+                  questionText: q.title,
+                  optionLabel: `${opt.label} (텍스트)`,
+                  questionId: q.id,
+                  type: 'table-cell-option-text',
+                  tableCellId: cell.id,
+                  optionId: opt.id,
+                });
+              }
             }
           } else {
             // radio/select/input: 기존 로직
@@ -273,6 +319,41 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
               cellSpssVarType: cell.spssVarType,
               cellSpssMeasure: cell.spssMeasure,
             });
+
+            // radio/select 셀의 allowTextInput 옵션마다 STRING 사이드카 텍스트 변수 생성
+            if (cell.type === 'radio' && cell.radioOptions) {
+              for (let optIdx = 0; optIdx < cell.radioOptions.length; optIdx++) {
+                const opt = cell.radioOptions[optIdx];
+                if (opt.allowTextInput) {
+                  const varNumber = opt.optionCode ?? String(optIdx + 1);
+                  columns.push({
+                    spssVarName: `${varName}_${varNumber}_text`,
+                    questionText: q.title,
+                    optionLabel: `${opt.label} (텍스트)`,
+                    questionId: q.id,
+                    type: 'table-cell-option-text',
+                    tableCellId: cell.id,
+                    optionId: opt.id,
+                  });
+                }
+              }
+            } else if (cell.type === 'select' && cell.selectOptions) {
+              for (let optIdx = 0; optIdx < cell.selectOptions.length; optIdx++) {
+                const opt = cell.selectOptions[optIdx];
+                if (opt.allowTextInput) {
+                  const varNumber = opt.optionCode ?? String(optIdx + 1);
+                  columns.push({
+                    spssVarName: `${varName}_${varNumber}_text`,
+                    questionText: q.title,
+                    optionLabel: `${opt.label} (텍스트)`,
+                    questionId: q.id,
+                    type: 'table-cell-option-text',
+                    tableCellId: cell.id,
+                    optionId: opt.id,
+                  });
+                }
+              }
+            }
           }
         }
       }
@@ -558,6 +639,42 @@ export function buildDataRows(
           const tableAnswer = rawValue as Record<string, unknown>;
           const cellVal = tableAnswer[col.tableCellId];
           return transformRankingOtherText(cellVal, col.rankIndex);
+        }
+
+        case 'option-text': {
+          // allowTextInput 옵션 선택 시 사용자가 입력한 텍스트.
+          // Task 16 저장 구조: questionResponses.__optTexts__[questionId][optionId]
+          // 마이그레이션 호환(레거시): questionResponses[questionId].optionTexts[optionId]
+          if (!col.optionId) return null;
+          const sidecar = (sub.questionResponses as Record<string, unknown>).__optTexts__;
+          if (sidecar && typeof sidecar === 'object') {
+            const byQuestion = (sidecar as Record<string, Record<string, string>>)[col.questionId];
+            const sidecarText = byQuestion?.[col.optionId];
+            if (sidecarText) return sidecarText;
+          }
+          // 레거시 경로: questionResponses[questionId].optionTexts[optionId]
+          if (rawValue && typeof rawValue === 'object' && !Array.isArray(rawValue)) {
+            const perQ = rawValue as Record<string, unknown>;
+            if (perQ.optionTexts && typeof perQ.optionTexts === 'object') {
+              const legacyText = (perQ.optionTexts as Record<string, string>)[col.optionId];
+              if (legacyText) return legacyText;
+            }
+          }
+          return null;
+        }
+
+        case 'table-cell-option-text': {
+          // 테이블 셀 옵션의 allowTextInput 사이드카 텍스트.
+          // 저장 구조: questionResponses.__optTexts__[questionId][optionId]
+          if (!col.optionId) return null;
+          const sidecar = (sub.questionResponses as Record<string, unknown>).__optTexts__;
+          if (sidecar && typeof sidecar === 'object') {
+            const byQuestion = (sidecar as Record<string, Record<string, string>>)[col.questionId];
+            const sidecarText = byQuestion?.[col.optionId];
+            if (sidecarText) return sidecarText;
+          }
+          // 레거시 경로: 테이블 응답 객체 내부 optionTexts는 지원하지 않음 (신규 패턴만 사용)
+          return null;
         }
 
         case 'text':

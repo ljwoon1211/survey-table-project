@@ -1,12 +1,88 @@
 import type { Question, QuestionOption, TableCell, TableRow } from '@/types/survey';
 
-import { getOtherOptionCode } from '@/utils/option-code-generator';
 import {
   hasOtherRankingCell,
   resolveRankingOptions,
   toSpssValueLabelPairs,
 } from '@/utils/ranking-source';
 import { buildTableCellVarName, resolveRankVarName } from '@/utils/table-cell-code-generator';
+
+/**
+ * allowTextInput 옵션마다 STRING 변수 메타데이터를 생성한다.
+ * 변수명 규칙: {qVar}_{varNumber}_text
+ * varNumber = optionCode (있는 경우) 또는 1-based 인덱스
+ */
+function generateOptionTextVariables(
+  question: Question,
+): Array<{ name: string; type: 'STRING'; width: number; label: string }> {
+  const vars: Array<{ name: string; type: 'STRING'; width: number; label: string }> = [];
+  const qVar = question.questionCode ?? `Q${question.order}`;
+
+  for (let i = 0; i < (question.options ?? []).length; i++) {
+    const option = question.options![i];
+    if (!option.allowTextInput) continue;
+    const varNumber = option.optionCode ?? String(i + 1);
+    vars.push({
+      name: `${qVar}_${varNumber}_text`,
+      type: 'STRING',
+      width: 255,
+      label: `${question.title} - ${option.label} (텍스트)`,
+    });
+  }
+
+  return vars;
+}
+
+/**
+ * 테이블 셀의 옵션들에서 allowTextInput STRING 변수 메타데이터를 생성한다.
+ * 변수명 규칙: {cellVarName}_{varNumber}_text
+ */
+function generateCellOptionTextVariables(
+  cellVarName: string,
+  questionTitle: string,
+  options: Array<{ id: string; label: string; optionCode?: string; allowTextInput?: boolean }>,
+): Array<{ name: string; type: 'STRING'; width: number; label: string }> {
+  const vars: Array<{ name: string; type: 'STRING'; width: number; label: string }> = [];
+  for (let i = 0; i < options.length; i++) {
+    const opt = options[i];
+    if (!opt.allowTextInput) continue;
+    const varNumber = opt.optionCode ?? String(i + 1);
+    vars.push({
+      name: `${cellVarName}_${varNumber}_text`,
+      type: 'STRING',
+      width: 255,
+      label: `${questionTitle} - ${opt.label} (텍스트)`,
+    });
+  }
+  return vars;
+}
+
+/**
+ * 응답 데이터에서 옵션별 텍스트를 추출한다.
+ * - Task 16 저장 구조: questionResponses.__optTexts__[questionId][optionId]
+ * - 마이그레이션 호환(레거시): questionResponses[questionId].optionTexts[optionId]
+ */
+export function getOptionText(
+  qResponses: Record<string, unknown>,
+  questionId: string,
+  optionId: string,
+): string | undefined {
+  const sidecar = qResponses?.__optTexts__;
+  if (sidecar && typeof sidecar === 'object') {
+    const byQuestion = (sidecar as Record<string, Record<string, string>>)[questionId];
+    const sidecarText = byQuestion?.[optionId];
+    if (sidecarText) return sidecarText;
+  }
+  const perQuestion = qResponses?.[questionId];
+  if (perQuestion && typeof perQuestion === 'object' && !Array.isArray(perQuestion)) {
+    const legacyTexts = (perQuestion as Record<string, unknown>).optionTexts;
+    if (legacyTexts && typeof legacyTexts === 'object') {
+      const legacyText = (legacyTexts as Record<string, string>)[optionId];
+      if (legacyText) return legacyText;
+    }
+  }
+  return undefined;
+}
 
 /** SPSS 문자열 리터럴에서 작은따옴표를 이스케이프한다. */
 function esc(str: string): string {
@@ -82,9 +158,11 @@ export function generateVariableLabels(questions: Question[]): string {
       for (let i = 0; i < q.options.length; i++) {
         const opt = q.options[i];
         lines.push(`  ${q.questionCode}_${opt.optionCode ?? String(i + 1)} '${esc(q.title)} - ${i + 1}. ${esc(opt.label)}'`);
-      }
-      if (q.allowOtherOption) {
-        lines.push(`  ${q.questionCode}_${getOtherOptionCode(q.options)}_etc '${esc(q.title)} - 기타 입력'`);
+        // allowTextInput 옵션마다 STRING 사이드카 텍스트 변수 라벨 생성
+        if (opt.allowTextInput) {
+          const varNumber = opt.optionCode ?? String(i + 1);
+          lines.push(`  ${q.questionCode}_${varNumber}_text '${esc(q.title)} - ${esc(opt.label)} (텍스트)'`);
+        }
       }
     } else if (q.type === 'ranking') {
       // Case 1/2 공통 — 변수명 규칙 동일, Case 2 라벨 소스는 generateValueLabels 에서 다름
@@ -111,10 +189,34 @@ export function generateVariableLabels(questions: Question[]): string {
           }
         }
       }
+      // 테이블 셀의 allowTextInput 옵션마다 STRING 사이드카 텍스트 변수 라벨 생성
+      if (q.tableRowsData && q.tableColumns) {
+        for (const tRow of q.tableRowsData) {
+          for (let colIdx = 0; colIdx < q.tableColumns.length; colIdx++) {
+            const cell = tRow.cells[colIdx];
+            if (!cell) continue;
+            if (cell.isCustomCellCode === true && !cell.cellCode) continue;
+            const cellVarName = cell.cellCode
+              || buildTableCellVarName(q, tRow, colIdx, q.tableColumns, q.tableRowsData!);
+            const cellOpts =
+              cell.type === 'checkbox' ? cell.checkboxOptions
+              : cell.type === 'radio' ? cell.radioOptions
+              : cell.type === 'select' ? cell.selectOptions
+              : undefined;
+            if (!cellOpts) continue;
+            for (const v of generateCellOptionTextVariables(cellVarName, q.title, cellOpts)) {
+              lines.push(`  ${v.name} '${esc(v.label)}'`);
+            }
+          }
+        }
+      }
     } else {
       lines.push(`  ${q.questionCode} '${esc(q.title)}'`);
-      if ((q.type === 'radio' || q.type === 'select') && q.allowOtherOption) {
-        lines.push(`  ${q.questionCode}_${getOtherOptionCode(q.options)}_etc '${esc(q.title)} - 기타 입력'`);
+      // radio/select: allowTextInput 옵션마다 STRING 사이드카 텍스트 변수 라벨 생성
+      if ((q.type === 'radio' || q.type === 'select') && q.options) {
+        for (const v of generateOptionTextVariables(q)) {
+          lines.push(`  ${v.name} '${esc(v.label)}'`);
+        }
       }
     }
   }
@@ -220,16 +322,19 @@ export function generateVariableLevel(questions: Question[]): string {
 
     if (q.type === 'radio' || q.type === 'select') {
       nominal.push(q.questionCode);
-      if (q.allowOtherOption) {
-        scale.push(`${q.questionCode}_${getOtherOptionCode(q.options)}_etc`);
+      // allowTextInput 옵션 텍스트 변수 → SCALE
+      for (const v of generateOptionTextVariables(q)) {
+        scale.push(v.name);
       }
     } else if (q.type === 'checkbox' && q.options) {
       for (let i = 0; i < q.options.length; i++) {
         const opt = q.options[i];
         nominal.push(`${q.questionCode}_${opt.optionCode ?? String(i + 1)}`);
-      }
-      if (q.allowOtherOption) {
-        scale.push(`${q.questionCode}_${getOtherOptionCode(q.options)}_etc`);
+        // allowTextInput 옵션 텍스트 변수 → SCALE
+        if (opt.allowTextInput) {
+          const varNumber = opt.optionCode ?? String(i + 1);
+          scale.push(`${q.questionCode}_${varNumber}_text`);
+        }
       }
     } else if (q.type === 'ranking') {
       // Case 1/2 공통 변수 레벨
@@ -249,6 +354,27 @@ export function generateVariableLevel(questions: Question[]): string {
           ordinal.push(rankVar);
           if (info.allowOther) {
             scale.push(`${rankVar}_etc`);
+          }
+        }
+      }
+      // 테이블 셀의 allowTextInput 옵션 텍스트 변수 → SCALE
+      if (q.tableRowsData && q.tableColumns) {
+        for (const tRow of q.tableRowsData) {
+          for (let colIdx = 0; colIdx < q.tableColumns.length; colIdx++) {
+            const cell = tRow.cells[colIdx];
+            if (!cell) continue;
+            if (cell.isCustomCellCode === true && !cell.cellCode) continue;
+            const cellVarName = cell.cellCode
+              || buildTableCellVarName(q, tRow, colIdx, q.tableColumns, q.tableRowsData!);
+            const cellOpts =
+              cell.type === 'checkbox' ? cell.checkboxOptions
+              : cell.type === 'radio' ? cell.radioOptions
+              : cell.type === 'select' ? cell.selectOptions
+              : undefined;
+            if (!cellOpts) continue;
+            for (const v of generateCellOptionTextVariables(cellVarName, q.title, cellOpts)) {
+              scale.push(v.name);
+            }
           }
         }
       }

@@ -130,6 +130,9 @@ function buildLabel(col: SPSSExportColumn): string {
       return `${col.questionText} - ${col.optionLabel}`;
     case 'other-text':
       return `${col.questionText} - 기타 입력`;
+    case 'option-text':
+    case 'table-cell-option-text':
+      return `${col.questionText} - ${col.optionLabel}`;
     case 'notice-agree':
       return `${col.questionText} - 동의 여부`;
     case 'notice-date':
