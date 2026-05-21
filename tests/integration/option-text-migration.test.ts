@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   migrateQuestionOptions,
   migrateResponseValue,
+  migrateSnapshotQuestions,
   generateOtherOptionFields,
   type LegacyQuestionShape,
   type LegacyResponseShape,
@@ -192,6 +193,63 @@ describe('migrateResponseValue', () => {
     const result = migrateResponseValue(legacyResponse, {});
 
     expect(result.optionTexts).toBeUndefined();
+  });
+});
+
+describe('migrateSnapshotQuestions', () => {
+  it('migrates allowOtherOption inside snapshot question list', () => {
+    const snapshot = {
+      questions: [
+        {
+          id: 'q1',
+          allowOtherOption: true,
+          options: [{ id: 'o1', label: 'A', value: '1', optionCode: '1', spssNumericCode: 1 }],
+        },
+        {
+          id: 'q2',
+          allowOtherOption: false,
+          options: [{ id: 'o2', label: 'B', value: '1', optionCode: '1', spssNumericCode: 1 }],
+        },
+      ],
+    };
+
+    const result = migrateSnapshotQuestions(snapshot);
+
+    expect(result.questions[0].options).toHaveLength(2);
+    expect(result.questions[0].allowOtherOption).toBeUndefined();
+    expect(result.questions[1].options).toHaveLength(1);
+    expect(result.otherIdMappings['q1']).toBeDefined();
+    expect(result.otherIdMappings['q2']).toBeUndefined();
+  });
+
+  it('migrates table cell allowOtherOption', () => {
+    const snapshot = {
+      questions: [
+        {
+          id: 'q1',
+          type: 'table',
+          tableRowsData: [
+            {
+              id: 'r1',
+              cells: [
+                {
+                  id: 'c1',
+                  type: 'radio',
+                  allowOtherOption: true,
+                  radioOptions: [{ id: 'ro1', label: 'A', value: '1' }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = migrateSnapshotQuestions(snapshot);
+
+    const cell = result.questions[0].tableRowsData![0].cells[0];
+    expect(cell.radioOptions).toHaveLength(2);
+    expect(cell.allowOtherOption).toBeUndefined();
   });
 });
 

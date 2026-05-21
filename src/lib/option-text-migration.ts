@@ -131,6 +131,84 @@ export function migrateResponseValue(
   return result;
 }
 
+interface SnapshotQuestion extends LegacyQuestionShape {
+  type?: string;
+  tableRowsData?: Array<{
+    id: string;
+    cells: Array<{
+      id: string;
+      type?: string;
+      allowOtherOption?: boolean;
+      radioOptions?: QuestionOption[];
+      checkboxOptions?: QuestionOption[];
+      selectOptions?: QuestionOption[];
+    }>;
+  }>;
+}
+
+export interface MigratedSnapshot {
+  questions: SnapshotQuestion[];
+  /** questionId -> __other__ ID -> 새 옵션 ID */
+  otherIdMappings: Record<string, Record<string, string>>;
+}
+
+/**
+ * snapshot 전체(질문 리스트 + 테이블 셀)를 순회해 allowOtherOption 을 실제 옵션으로 변환.
+ * 입력 미변경(immutable). otherIdMappings 는 Task 6 runner 가 응답 데이터 치환에 사용.
+ */
+export function migrateSnapshotQuestions(snapshot: {
+  questions: SnapshotQuestion[];
+}): MigratedSnapshot {
+  const otherIdMappings: Record<string, Record<string, string>> = {};
+
+  const migrated = snapshot.questions.map(question => {
+    const updated: SnapshotQuestion = { ...question };
+
+    // 1. 질문 레벨 옵션 마이그레이션
+    if (question.allowOtherOption) {
+      const r = migrateQuestionOptions(question);
+      updated.options = r.options;
+      updated.allowOtherOption = undefined;
+      if (r.migratedOtherOptionId) {
+        otherIdMappings[question.id] = { '__other__': r.migratedOtherOptionId };
+      }
+    }
+
+    // 2. 테이블 셀 옵션 마이그레이션
+    if (question.tableRowsData) {
+      updated.tableRowsData = question.tableRowsData.map(row => ({
+        ...row,
+        cells: row.cells.map(cell => {
+          if (!cell.allowOtherOption) return cell;
+          const optionsField =
+            cell.type === 'checkbox' ? 'checkboxOptions' :
+            cell.type === 'radio' ? 'radioOptions' :
+            'selectOptions';
+          const existing = cell[optionsField] ?? [];
+          const fields = generateOtherOptionFields(existing.length);
+          const newOption: QuestionOption = {
+            id: nanoid(10),
+            label: '기타',
+            value: fields.optionCode,
+            optionCode: fields.optionCode,
+            spssNumericCode: fields.spssNumericCode,
+            allowTextInput: true,
+          };
+          return {
+            ...cell,
+            [optionsField]: [...existing, newOption],
+            allowOtherOption: undefined,
+          };
+        }),
+      }));
+    }
+
+    return updated;
+  });
+
+  return { questions: migrated, otherIdMappings };
+}
+
 /**
  * 제출 시점 helper -- 선택된 옵션의 텍스트만 남기고 미선택 텍스트는 drop.
  * 빌더에서 "선택 해제 시 텍스트 유지" 정책을 따르므로, 클라이언트 상태에서는 보존되고
