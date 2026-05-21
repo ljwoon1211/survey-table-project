@@ -460,7 +460,7 @@ export function QuestionBasicTab({
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <Label>
-              선택 옵션 <span className="text-red-500">*</span>
+              선택지 <span className="text-red-500">*</span>
             </Label>
             <div className="flex items-center space-x-4">
               {/* 조건부 분기 토글 */}
@@ -488,7 +488,7 @@ export function QuestionBasicTab({
                 className="flex items-center space-x-1"
               >
                 <Plus className="h-4 w-4" />
-                <span>옵션 추가</span>
+                <span>선택지</span>
               </Button>
               <Button
                 type="button"
@@ -507,7 +507,7 @@ export function QuestionBasicTab({
                 className="flex items-center space-x-1"
               >
                 <Plus className="h-4 w-4" />
-                <span>텍스트 옵션 추가</span>
+                <span>주관식 선택지</span>
               </Button>
             </div>
           </div>
@@ -547,9 +547,9 @@ export function QuestionBasicTab({
 
           {(formData.options?.length || 0) === 0 && (
             <div className="py-8 text-center text-gray-500">
-              <p className="mb-2">아직 옵션이 없습니다.</p>
+              <p className="mb-2">아직 선택지가 없습니다.</p>
               <Button type="button" variant="outline" onClick={addOption}>
-                첫 번째 옵션 추가
+                첫 번째 선택지 추가
               </Button>
             </div>
           )}
@@ -1053,7 +1053,7 @@ function SortableOptionItem({
       style={style}
       className="rounded-lg border border-gray-200 bg-white transition-shadow hover:shadow-sm"
     >
-      <div className="flex items-center space-x-2 p-3">
+      <div className="flex items-center space-x-2 px-3 py-1.5">
         <div
           className={isDragging ? 'cursor-grabbing' : 'cursor-grab'}
           {...attributes}
@@ -1067,18 +1067,18 @@ function SortableOptionItem({
             <Input
               value={option.label}
               onChange={(e) => updateOption(option.id, { label: e.target.value })}
-              placeholder={`옵션 ${index + 1}`}
-              className="border-none bg-transparent px-0 focus:border focus:border-blue-200 focus:bg-white"
+              placeholder={`선택지 ${index + 1}`}
+              className="h-8 border-none bg-transparent px-0 focus:border focus:border-blue-200 focus:bg-white"
             />
             {option.allowTextInput && (
-              <span className="shrink-0 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
-                텍스트 입력
+              <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700">
+                주관식
               </span>
             )}
           </div>
           {option.id === OTHER_OPTION_ID && (
-            <p className="mt-1 px-0 text-xs text-blue-600">
-              기타 옵션 (수정 가능)
+            <p className="mt-0.5 px-0 text-xs text-blue-600">
+              기타 선택지 (수정 가능)
             </p>
           )}
         </div>
@@ -1094,7 +1094,7 @@ function SortableOptionItem({
                 spssNumericCode: v ? parseInt(v, 10) : undefined,
               });
             }}
-            className="w-14 text-center text-xs placeholder:text-gray-300"
+            className="h-8 w-14 text-center text-xs placeholder:text-gray-300"
             placeholder={String(index + 1)}
           />
         </div>
@@ -1106,7 +1106,7 @@ function SortableOptionItem({
               optionCode: e.target.value,
               isCustomOptionCode: true,
             } as Partial<QuestionOption>)}
-            className="w-16 text-center text-xs"
+            className="h-8 w-16 text-center text-xs"
           />
         </div>
         {option.isCustomOptionCode && (
