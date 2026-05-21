@@ -5,6 +5,7 @@ import React, { useCallback, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { useContactAttrs } from '@/lib/survey/contact-attrs-context';
 import { substituteTokens } from '@/lib/survey/substitute-tokens';
+import { isPartialNumericInput } from '@/utils/numeric-input';
 
 import { CellContentLayout } from './cell-content-layout';
 import type { InteractiveCellProps } from './types';
@@ -29,9 +30,31 @@ export const InputCell = React.memo(function InputCell({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPrefilled, prefilledValue]);
 
+  // 숫자 모드 여부: inputType이 'number'일 때만 활성화
+  const isNumberMode = cell.inputType === 'number';
+
+  // 숫자 모드 + emptyDefault 정의 + 응답값 아예 미존재(undefined) → 첫 진입 시 초기값 자동 채움.
+  // 응답자가 backspace 로 빈 문자열로 만들면 cellResponse 가 '' 가 되어 재채움 되지 않음 (의도 보존).
+  useEffect(() => {
+    if (
+      !isPrefilled &&
+      isNumberMode &&
+      typeof cell.emptyDefault === 'number' &&
+      cellResponse === undefined
+    ) {
+      onUpdateValue(String(cell.emptyDefault));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cellResponse, isPrefilled, isNumberMode, cell.emptyDefault]);
+
   const handleChange = useCallback(
-    (value: string) => onUpdateValue(value),
-    [onUpdateValue],
+    (value: string) => {
+      if (isNumberMode && !isPartialNumericInput(value)) {
+        return; // 유효하지 않은 문자는 거부, 기존 값 유지. 자동 0 prepend 안 함.
+      }
+      onUpdateValue(value);
+    },
+    [onUpdateValue, isNumberMode],
   );
 
   return (
@@ -39,9 +62,10 @@ export const InputCell = React.memo(function InputCell({
       <div className="flex w-full flex-col space-y-1.5">
         <Input
           type="text"
+          inputMode={isNumberMode ? 'decimal' : undefined}
           value={textValue}
           onChange={(e) => handleChange(e.target.value)}
-          placeholder={cell.placeholder || '답변을 입력하세요...'}
+          placeholder={cell.placeholder || (isNumberMode ? '숫자만 입력하세요...' : '답변을 입력하세요...')}
           maxLength={cell.inputMaxLength}
           className="w-full text-base"
           disabled={isPrefilled}

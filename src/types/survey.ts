@@ -81,6 +81,15 @@ export interface TableValidationRule {
 // 질문 표시 조건 논리 타입
 export type ConditionLogicType = 'AND' | 'OR' | 'NOT';
 
+// 분기 조건 우변 (forward-compat union, 이번 구현은 'literal' 만 처리)
+export type ComparandRef = { kind: 'literal'; value: number };
+
+// 분기 조건 숫자 비교 (input + inputType='number' 셀 전용)
+export interface NumericComparison {
+  operator: '==' | '!=' | '>' | '<' | '>=' | '<=';
+  comparand: ComparandRef;
+}
+
 // 질문 표시 조건
 export interface QuestionCondition {
   id: string;
@@ -95,12 +104,14 @@ export interface QuestionCondition {
     cellColumnIndex?: number; // 체크할 열 인덱스
     checkType: 'any' | 'all' | 'none'; // any: 하나라도, all: 모두, none: 모두 아님
     expectedValues?: string[]; // 기대하는 값들 (checkbox, radio, select 옵션의 value)
+    numericComparison?: NumericComparison; // 신규
   };
   additionalConditions?: {
     cellColumnIndex: number; // 추가로 확인할 열 인덱스
     checkType: 'checkbox' | 'radio' | 'select' | 'input';
     rowIds?: string[]; // 특정 행만 확인 (없으면 메인 조건의 체크된 행 사용)
     expectedValues?: string[]; // 기대하는 값들
+    numericComparison?: NumericComparison; // 신규
   };
   logicType: ConditionLogicType; // 여러 조건 결합 시
   enabled?: boolean; // 조건 활성화 여부 (기본값: true)
@@ -170,6 +181,11 @@ export interface TableCell {
   inputMaxLength?: number; // 단문형 입력 필드 최대 길이
   // input 셀 prefill 템플릿 — {{attrs_key}} 포함 가능
   defaultValueTemplate?: string;
+  // input 셀 입력 모드 — 'number' 면 응답자가 숫자만 입력 가능. 미지정/'text' 면 기존 자유 입력.
+  inputType?: 'text' | 'number';
+  // 숫자 input 셀(inputType==='number')의 초기 prefill 값. 정의되어 있으면 응답자 첫 진입 시
+  // 자동으로 이 값이 입력란에 채워져 저장됨. 응답자가 backspace 로 지우면 빈 응답으로 저장 가능 (자동 재채움 X).
+  emptyDefault?: number;
   // 체크박스 선택 개수 제한 (체크박스 타입 셀 전용)
   minSelections?: number; // 최소 선택 개수
   maxSelections?: number; // 최대 선택 개수

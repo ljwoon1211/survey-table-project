@@ -1,6 +1,7 @@
 import {
   BranchRule,
   DynamicRowGroupConfig,
+  NumericComparison,
   Question,
   QuestionCondition,
   QuestionConditionGroup,
@@ -10,6 +11,30 @@ import {
   TableRow,
   TableValidationRule,
 } from '@/types/survey';
+import { parseNumericInput } from './numeric-input';
+
+/**
+ * input(number) 셀 값에 대해 숫자 비교 연산자를 평가합니다.
+ * 파싱 실패 시 항상 false 를 반환합니다.
+ */
+function evaluateNumericComparison(
+  cellValue: string,
+  numericComparison: NumericComparison,
+): boolean {
+  const left = parseNumericInput(cellValue);
+  if (left === null) return false;
+  if (numericComparison.comparand.kind !== 'literal') return false;
+  const right = numericComparison.comparand.value;
+  switch (numericComparison.operator) {
+    case '==': return left === right;
+    case '!=': return left !== right;
+    case '>': return left > right;
+    case '<': return left < right;
+    case '>=': return left >= right;
+    case '<=': return left <= right;
+    default: return false;
+  }
+}
 
 /**
  * 질문과 응답을 기반으로 적용할 분기 규칙을 찾습니다
@@ -1195,7 +1220,9 @@ function evaluateQuestionCondition(
         if (cellValue) {
           const strValue = String(cellValue).trim();
           if (strValue !== '') {
-            if (
+            if (additionalConditions.numericComparison) {
+              isChecked = evaluateNumericComparison(strValue, additionalConditions.numericComparison);
+            } else if (
               additionalConditions.expectedValues &&
               additionalConditions.expectedValues.length > 0
             ) {
@@ -1216,6 +1243,7 @@ function evaluateQuestionCondition(
 
   // 메인 조건 AND 추가 조건 (같은 행에서 두 조건을 모두 만족하는 행이 있어야 함)
   return mainConditionResult && additionalConditionResult;
+
 }
 
 /**
@@ -1274,6 +1302,7 @@ function checkTableCellCondition(
     cellColumnIndex?: number;
     checkType: 'any' | 'all' | 'none';
     expectedValues?: string[];
+    numericComparison?: NumericComparison;
   },
 ): { satisfied: boolean; checkedRows: string[] } {
   if (!tableConditions || !question.tableRowsData) {
@@ -1286,7 +1315,7 @@ function checkTableCellCondition(
 
   // 응답 데이터는 평면 구조: { "cell-id": value, ... }
   const tableResponse = response as Record<string, unknown>;
-  const { rowIds, cellColumnIndex, checkType, expectedValues } = tableConditions;
+  const { rowIds, cellColumnIndex, checkType, expectedValues, numericComparison } = tableConditions;
 
   // 체크된 행들 수집
   const checkedRows: string[] = [];
@@ -1374,7 +1403,9 @@ function checkTableCellCondition(
         typeof cellValue === 'string' &&
         cellValue.trim() !== ''
       ) {
-        if (expectedValues && expectedValues.length > 0) {
+        if (numericComparison) {
+          isChecked = evaluateNumericComparison(cellValue, numericComparison);
+        } else if (expectedValues && expectedValues.length > 0) {
           isChecked = expectedValues.includes(cellValue.trim());
         } else {
           isChecked = true;

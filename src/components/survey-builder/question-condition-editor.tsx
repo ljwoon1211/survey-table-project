@@ -19,7 +19,23 @@ import {
 } from '@/types/survey';
 import { getMergedRowIds, getRowMergeInfo } from '@/utils/table-merge-helpers';
 
+import { NumericComparisonEditor } from './numeric-comparison-editor';
 import { TableOptionSelector } from './table-option-selector';
+
+// 셀이 숫자 입력(input + inputType: 'number') 타입인지 판별하는 헬퍼
+// rowIds 의 첫 번째 행의 cellColumnIndex 번 셀을 기준으로 판단한다.
+function isNumericInputCell(
+  sourceQuestion: Question | undefined,
+  rowIds: string[],
+  cellColumnIndex: number | undefined,
+): boolean {
+  if (!sourceQuestion || cellColumnIndex === undefined) return false;
+  if (rowIds.length === 0) return false;
+  const row = sourceQuestion.tableRowsData?.find((r) => r.id === rowIds[0]);
+  if (!row) return false;
+  const cell = row.cells[cellColumnIndex];
+  return cell?.type === 'input' && cell.inputType === 'number';
+}
 
 interface QuestionConditionEditorProps {
   question: Question;
@@ -512,11 +528,33 @@ export const QuestionConditionEditor = forwardRef<
                               <p className="text-xs text-gray-500">0부터 시작 (0 = 첫 번째 열)</p>
                             </div>
 
-                            {/* 확인할 옵션 선택 (검증 규칙과 동일한 로직) */}
+                            {/* 확인할 옵션 선택 (숫자 셀이면 NumericComparisonEditor, 아니면 TableOptionSelector) */}
                             {condition.tableConditions?.rowIds &&
                               condition.tableConditions.rowIds.length > 0 &&
                               condition.tableConditions?.cellColumnIndex !== undefined &&
-                              sourceQuestion && (
+                              sourceQuestion &&
+                              (isNumericInputCell(
+                                sourceQuestion,
+                                condition.tableConditions.rowIds,
+                                condition.tableConditions.cellColumnIndex,
+                              ) ? (
+                                <NumericComparisonEditor
+                                  idPrefix={`numeric-${condition.id}`}
+                                  value={condition.tableConditions.numericComparison}
+                                  onChange={(nc) => {
+                                    updateCondition(condition.id, {
+                                      tableConditions: {
+                                        ...condition.tableConditions,
+                                        rowIds: condition.tableConditions?.rowIds || [],
+                                        checkType: condition.tableConditions?.checkType || 'any',
+                                        cellColumnIndex: condition.tableConditions?.cellColumnIndex,
+                                        expectedValues: undefined,
+                                        numericComparison: nc,
+                                      },
+                                    });
+                                  }}
+                                />
+                              ) : (
                                 <TableOptionSelector
                                   question={sourceQuestion}
                                   rowIds={condition.tableConditions.rowIds}
@@ -530,12 +568,13 @@ export const QuestionConditionEditor = forwardRef<
                                         checkType: condition.tableConditions?.checkType || 'any',
                                         cellColumnIndex: condition.tableConditions?.cellColumnIndex,
                                         expectedValues: values,
+                                        numericComparison: undefined,
                                       },
                                     });
                                   }}
                                   multipleRows={condition.tableConditions.rowIds.length > 1}
                                 />
-                              )}
+                              ))}
                           </>
                         )}
 
@@ -625,34 +664,57 @@ export const QuestionConditionEditor = forwardRef<
                                   </select>
                                 </div>
 
-                                {/* 추가 조건 확인할 옵션 선택 */}
-                                {condition.additionalConditions.checkType !== 'input' &&
+                                {/* 추가 조건 확인할 옵션 선택 (숫자 셀이면 NumericComparisonEditor, 아니면 TableOptionSelector) */}
+                                {condition.additionalConditions &&
                                   condition.additionalConditions.cellColumnIndex !== undefined &&
-                                  sourceQuestion && (
-                                    <TableOptionSelector
-                                      question={sourceQuestion}
-                                      rowIds={
-                                        (condition.tableConditions?.rowIds?.length ?? 0) > 0
-                                          ? (condition.tableConditions?.rowIds ?? [])
-                                          : sourceQuestion.tableRowsData?.map((r) => r.id) || []
-                                      }
-                                      colIndex={condition.additionalConditions.cellColumnIndex}
-                                      expectedValues={condition.additionalConditions.expectedValues}
-                                      onChange={(values) => {
-                                        updateCondition(condition.id, {
-                                          additionalConditions: {
-                                            ...condition.additionalConditions!,
-                                            expectedValues: values,
-                                          },
-                                        });
-                                      }}
-                                      helpText="선택한 옵션들 중 하나가 선택되었는지 확인합니다. 비워두면 아무거나 선택되었는지만 확인합니다."
-                                      multipleRows={
-                                        (condition.tableConditions?.rowIds?.length ?? 0) > 1 ||
-                                        (condition.tableConditions?.rowIds?.length ?? 0) === 0
-                                      }
-                                    />
-                                  )}
+                                  sourceQuestion &&
+                                  (() => {
+                                    const ac = condition.additionalConditions;
+                                    const effectiveRowIds =
+                                      (condition.tableConditions?.rowIds?.length ?? 0) > 0
+                                        ? (condition.tableConditions?.rowIds ?? [])
+                                        : sourceQuestion.tableRowsData?.map((r) => r.id) || [];
+                                    return isNumericInputCell(
+                                      sourceQuestion,
+                                      effectiveRowIds,
+                                      ac.cellColumnIndex,
+                                    ) ? (
+                                      <NumericComparisonEditor
+                                        idPrefix={`numeric-additional-${condition.id}`}
+                                        value={ac.numericComparison}
+                                        onChange={(nc) => {
+                                          updateCondition(condition.id, {
+                                            additionalConditions: {
+                                              ...ac,
+                                              expectedValues: undefined,
+                                              numericComparison: nc,
+                                            },
+                                          });
+                                        }}
+                                      />
+                                    ) : ac.checkType === 'input' ? null : (
+                                      <TableOptionSelector
+                                        question={sourceQuestion}
+                                        rowIds={effectiveRowIds}
+                                        colIndex={ac.cellColumnIndex}
+                                        expectedValues={ac.expectedValues}
+                                        onChange={(values) => {
+                                          updateCondition(condition.id, {
+                                            additionalConditions: {
+                                              ...ac,
+                                              expectedValues: values,
+                                              numericComparison: undefined,
+                                            },
+                                          });
+                                        }}
+                                        helpText="선택한 옵션들 중 하나가 선택되었는지 확인합니다. 비워두면 아무거나 선택되었는지만 확인합니다."
+                                        multipleRows={
+                                          (condition.tableConditions?.rowIds?.length ?? 0) > 1 ||
+                                          (condition.tableConditions?.rowIds?.length ?? 0) === 0
+                                        }
+                                      />
+                                    );
+                                  })()}
                               </div>
                             )}
                           </div>
