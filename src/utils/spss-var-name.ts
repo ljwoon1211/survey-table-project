@@ -1,4 +1,15 @@
 /**
+ * allowTextInput 옵션의 SPSS 사이드카 텍스트 변수명을 생성한다.
+ * 규칙: {baseVar}_{varNumber}_text
+ *
+ * @param baseVar - 질문 코드 또는 셀 변수명
+ * @param varNumber - 옵션 코드 (optionCode) 또는 1-based 인덱스 문자열
+ */
+export function buildOptionTextVarName(baseVar: string, varNumber: string): string {
+  return `${baseVar}_${varNumber}_text`;
+}
+
+/**
  * SPSS 변수명 규격에 맞게 정리한다.
  * - 영문/숫자/언더스코어/일부 특수문자(@$.#)만 허용
  * - 숫자로 시작하면 V 접두사 추가

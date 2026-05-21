@@ -6,6 +6,7 @@ import {
   toSpssValueLabelPairs,
 } from '@/utils/ranking-source';
 import { buildTableCellVarName, resolveRankVarName } from '@/utils/table-cell-code-generator';
+import { buildOptionTextVarName } from '@/utils/spss-var-name';
 
 /**
  * allowTextInput 옵션마다 STRING 변수 메타데이터를 생성한다.
@@ -23,7 +24,7 @@ function generateOptionTextVariables(
     if (!option.allowTextInput) continue;
     const varNumber = option.optionCode ?? String(i + 1);
     vars.push({
-      name: `${qVar}_${varNumber}_text`,
+      name: buildOptionTextVarName(qVar, varNumber),
       type: 'STRING',
       width: 255,
       label: `${question.title} - ${option.label} (텍스트)`,
@@ -48,7 +49,7 @@ function generateCellOptionTextVariables(
     if (!opt.allowTextInput) continue;
     const varNumber = opt.optionCode ?? String(i + 1);
     vars.push({
-      name: `${cellVarName}_${varNumber}_text`,
+      name: buildOptionTextVarName(cellVarName, varNumber),
       type: 'STRING',
       width: 255,
       label: `${questionTitle} - ${opt.label} (텍스트)`,
@@ -134,7 +135,7 @@ export function generateVariableLabels(questions: Question[]): string {
         // allowTextInput 옵션마다 STRING 사이드카 텍스트 변수 라벨 생성
         if (opt.allowTextInput) {
           const varNumber = opt.optionCode ?? String(i + 1);
-          lines.push(`  ${q.questionCode}_${varNumber}_text '${esc(q.title)} - ${esc(opt.label)} (텍스트)'`);
+          lines.push(`  ${buildOptionTextVarName(q.questionCode, varNumber)} '${esc(q.title)} - ${esc(opt.label)} (텍스트)'`);
         }
       }
     } else if (q.type === 'ranking') {
@@ -306,7 +307,7 @@ export function generateVariableLevel(questions: Question[]): string {
         // allowTextInput 옵션 텍스트 변수 → NOMINAL (STRING 변수는 NOMINAL)
         if (opt.allowTextInput) {
           const varNumber = opt.optionCode ?? String(i + 1);
-          nominal.push(`${q.questionCode}_${varNumber}_text`);
+          nominal.push(buildOptionTextVarName(q.questionCode, varNumber));
         }
       }
     } else if (q.type === 'ranking') {

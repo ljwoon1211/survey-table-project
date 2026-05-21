@@ -20,6 +20,7 @@ import { getOptionText } from '@/lib/option-text-read';
 import { getOtherOptionCode } from '@/utils/option-code-generator';
 import { hasOtherRankingCell, resolveRankingOptions } from '@/utils/ranking-source';
 import { buildTableCellVarName, resolveRankVarName } from '@/utils/table-cell-code-generator';
+import { buildOptionTextVarName } from '@/utils/spss-var-name';
 
 export interface SPSSExportColumn {
   spssVarName: string;
@@ -115,7 +116,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
         if (opt.allowTextInput) {
           const varNumber = opt.optionCode ?? String(i + 1);
           columns.push({
-            spssVarName: `${q.questionCode}_${varNumber}_text`,
+            spssVarName: buildOptionTextVarName(q.questionCode, varNumber),
             questionText: q.title,
             optionLabel: `${opt.label} (텍스트)`,
             questionId: q.id,
@@ -153,7 +154,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
           if (opt.allowTextInput) {
             const varNumber = opt.optionCode ?? String(i + 1);
             columns.push({
-              spssVarName: `${q.questionCode}_${varNumber}_text`,
+              spssVarName: buildOptionTextVarName(q.questionCode, varNumber),
               questionText: q.title,
               optionLabel: `${opt.label} (텍스트)`,
               questionId: q.id,
@@ -291,7 +292,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
               if (opt.allowTextInput) {
                 const varNumber = opt.optionCode ?? String(optIdx + 1);
                 columns.push({
-                  spssVarName: `${varName}_${varNumber}_text`,
+                  spssVarName: buildOptionTextVarName(varName, varNumber),
                   questionText: q.title,
                   optionLabel: `${opt.label} (텍스트)`,
                   questionId: q.id,
@@ -328,7 +329,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
                 if (opt.allowTextInput) {
                   const varNumber = opt.optionCode ?? String(optIdx + 1);
                   columns.push({
-                    spssVarName: `${varName}_${varNumber}_text`,
+                    spssVarName: buildOptionTextVarName(varName, varNumber),
                     questionText: q.title,
                     optionLabel: `${opt.label} (텍스트)`,
                     questionId: q.id,
@@ -344,7 +345,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
                 if (opt.allowTextInput) {
                   const varNumber = opt.optionCode ?? String(optIdx + 1);
                   columns.push({
-                    spssVarName: `${varName}_${varNumber}_text`,
+                    spssVarName: buildOptionTextVarName(varName, varNumber),
                     questionText: q.title,
                     optionLabel: `${opt.label} (텍스트)`,
                     questionId: q.id,
