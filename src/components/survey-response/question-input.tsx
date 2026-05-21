@@ -247,26 +247,16 @@ function CheckboxQuestion({
   value: unknown;
   onChange: (value: MultiChoiceResponse) => void;
 }) {
-  const [otherInputs, setOtherInputs] = useState<Record<string, string>>({});
+  const optionTexts = useSurveyResponseStore((s) => s.optionTexts[question.id] ?? {});
+  const setOptionText = useSurveyResponseStore((s) => s.setOptionText);
 
   const currentValues = useMemo<MultiChoiceResponse>(
     () => (Array.isArray(value) ? (value as MultiChoiceResponse) : []),
     [value],
   );
 
-  useEffect(() => {
-    const newOtherInputs: Record<string, string> = {};
-    currentValues.forEach((val) => {
-      if (isOtherChoiceValue(val)) {
-        newOtherInputs[val.selectedValue] = val.otherValue || '';
-      }
-    });
-    setOtherInputs(newOtherInputs);
-  }, [currentValues]);
-
-  const handleOptionChange = (optionValue: string, optionId: string, isChecked: boolean) => {
+  const handleOptionChange = (optionValue: string, isChecked: boolean) => {
     let newValues = [...currentValues];
-    const isOtherOption = optionId === 'other-option';
 
     if (isChecked) {
       const maxSelections = question.maxSelections;
@@ -277,15 +267,7 @@ function CheckboxQuestion({
         }
       }
 
-      if (isOtherOption) {
-        newValues.push({
-          selectedValue: optionValue,
-          otherValue: otherInputs[optionValue] || '',
-          hasOther: true,
-        });
-      } else {
-        newValues.push(optionValue);
-      }
+      newValues.push(optionValue);
     } else {
       newValues = newValues.filter((val) => {
         if (isOtherChoiceValue(val)) {
@@ -294,20 +276,6 @@ function CheckboxQuestion({
         return val !== optionValue;
       });
     }
-
-    onChange(newValues);
-  };
-
-  const handleOtherInputChange = (optionValue: string, inputValue: string) => {
-    const newOtherInputs = { ...otherInputs, [optionValue]: inputValue };
-    setOtherInputs(newOtherInputs);
-
-    const newValues = currentValues.map((val) => {
-      if (isOtherChoiceValue(val) && val.selectedValue === optionValue) {
-        return { ...val, otherValue: inputValue };
-      }
-      return val;
-    });
 
     onChange(newValues);
   };
@@ -351,7 +319,7 @@ function CheckboxQuestion({
                 id={`${question.id}-${option.id}`}
                 checked={checked}
                 disabled={disabled}
-                onChange={(e) => handleOptionChange(option.value, option.id, e.target.checked)}
+                onChange={(e) => handleOptionChange(option.value, e.target.checked)}
                 className={`h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 ${
                   disabled ? 'cursor-not-allowed opacity-50' : ''
                 }`}
@@ -364,17 +332,15 @@ function CheckboxQuestion({
               >
                 {option.label}
               </label>
-            </div>
-            {option.id === 'other-option' && checked && (
-              <div className="ml-7">
+              {option.allowTextInput && (
                 <Input
-                  placeholder="기타 내용을 입력하세요..."
-                  value={otherInputs[option.value] || ''}
-                  onChange={(e) => handleOtherInputChange(option.value, e.target.value)}
-                  className="w-full"
+                  value={optionTexts[option.id] ?? ''}
+                  onChange={(e) => setOptionText(question.id, option.id, e.target.value)}
+                  placeholder="상세 기재"
+                  className="max-w-xs"
                 />
-              </div>
-            )}
+              )}
+            </div>
           </div>
         );
       })}
