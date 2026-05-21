@@ -8,6 +8,7 @@ import { UserDefinedMultiLevelSelect } from '@/components/survey-builder/user-de
 import { Input } from '@/components/ui/input';
 import { useContactAttrs } from '@/lib/survey/contact-attrs-context';
 import { substituteTokens } from '@/lib/survey/substitute-tokens';
+import { useSurveyResponseStore } from '@/stores/survey-response-store';
 import { Question, QuestionOption, RankingAnswer } from '@/types/survey';
 import { getOptionsLayout } from '@/utils/options-layout';
 
@@ -22,12 +23,17 @@ interface QuestionInputProps {
 }
 
 // 타입 정의
+/**
+ * @deprecated allowTextInput 기반 인라인 입력으로 전환 중. Phase 7 cleanup 에서 제거 예정.
+ * checkbox/select 에서 하위 호환을 위해 임시 유지.
+ */
 export type OtherChoiceValue = {
   selectedValue: string;
   otherValue?: string;
   hasOther: true;
 };
 
+/** @deprecated OtherChoiceValue 와 함께 제거 예정. */
 export function isOtherChoiceValue(value: unknown): value is OtherChoiceValue {
   if (!value || typeof value !== 'object') return false;
   return (
@@ -171,48 +177,22 @@ function RadioQuestion({
   value: SingleChoiceResponse;
   onChange: (value: SingleChoiceResponse) => void;
 }) {
-  const [otherInput, setOtherInput] = useState('');
-
-  useEffect(() => {
-    if (isOtherChoiceValue(value) && value.otherValue) {
-      setOtherInput(value.otherValue);
-    }
-  }, [value]);
-
-  const handleOptionChange = (optionValue: string, optionId: string) => {
-    const isOtherOption = optionId === 'other-option';
-
-    if (isSelected(optionValue)) {
-      onChange(null);
-      return;
-    }
-
-    if (isOtherOption) {
-      onChange({
-        selectedValue: optionValue,
-        otherValue: otherInput,
-        hasOther: true,
-      });
-    } else {
-      onChange(optionValue);
-    }
-  };
-
-  const handleOtherInputChange = (inputValue: string) => {
-    setOtherInput(inputValue);
-    if (isOtherChoiceValue(value)) {
-      onChange({
-        ...value,
-        otherValue: inputValue,
-      });
-    }
-  };
+  const optionTexts = useSurveyResponseStore((s) => s.optionTexts[question.id] ?? {});
+  const setOptionText = useSurveyResponseStore((s) => s.setOptionText);
 
   const isSelected = (optionValue: string) => {
     if (isOtherChoiceValue(value)) {
       return value.selectedValue === optionValue;
     }
     return value === optionValue;
+  };
+
+  const handleOptionChange = (optionValue: string) => {
+    if (isSelected(optionValue)) {
+      onChange(null);
+      return;
+    }
+    onChange(optionValue);
   };
 
   const layout = getOptionsLayout(question.optionsColumns);
@@ -228,31 +208,29 @@ function RadioQuestion({
               name={question.id}
               value={option.value}
               checked={isSelected(option.value)}
-              onChange={() => handleOptionChange(option.value, option.id)}
-              onClick={() => handleOptionChange(option.value, option.id)}
+              onChange={() => handleOptionChange(option.value)}
+              onClick={() => handleOptionChange(option.value)}
               className="h-4 w-4 cursor-pointer border-gray-300 text-blue-600 focus:ring-blue-500"
             />
             <label
               htmlFor={`${question.id}-${option.id}`}
               onClick={(e) => {
                 e.preventDefault();
-                handleOptionChange(option.value, option.id);
+                handleOptionChange(option.value);
               }}
               className="flex-1 cursor-pointer text-base text-gray-700"
             >
               {option.label}
             </label>
-          </div>
-          {option.id === 'other-option' && isSelected(option.value) && (
-            <div className="ml-7">
+            {option.allowTextInput && (
               <Input
-                placeholder="기타 내용을 입력하세요..."
-                value={otherInput}
-                onChange={(e) => handleOtherInputChange(e.target.value)}
-                className="w-full"
+                value={optionTexts[option.id] ?? ''}
+                onChange={(e) => setOptionText(question.id, option.id, e.target.value)}
+                placeholder="상세 기재"
+                className="max-w-xs"
               />
-            </div>
-          )}
+            )}
+          </div>
         </div>
       ))}
     </div>
