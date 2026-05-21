@@ -54,7 +54,7 @@ import {
 } from '@/utils/table-cell-code-generator';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { generateId } from '@/lib/utils';
-import { parseNumericInput } from '@/utils/numeric-input';
+import { isPartialNumericInput, parseNumericInput } from '@/utils/numeric-input';
 import { getMaxSpssCode } from '@/utils/option-code-generator';
 import { hasExistingOtherRankingCell } from '@/utils/ranking-source';
 import {
@@ -904,7 +904,10 @@ export function CellContentModal({
                       type="text"
                       inputMode="decimal"
                       value={emptyDefaultRaw}
-                      onChange={(e) => setEmptyDefaultRaw(e.target.value)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (isPartialNumericInput(v)) setEmptyDefaultRaw(v);
+                      }}
                       disabled={!emptyDefaultEnabled}
                       className="h-8 w-24"
                       aria-label="초기값"
