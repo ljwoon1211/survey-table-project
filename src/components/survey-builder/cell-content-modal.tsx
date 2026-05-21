@@ -153,6 +153,7 @@ export function CellContentModal({
   const [inputDefaultValueTemplate, setInputDefaultValueTemplate] = useState(
     cell.defaultValueTemplate ?? '',
   );
+  const [inputType, setInputType] = useState<'text' | 'number'>(cell.inputType ?? 'text');
   const [minSelections, setMinSelections] = useState<number | undefined>(cell.minSelections);
   const [maxSelections, setMaxSelections] = useState<number | undefined>(cell.maxSelections);
 
@@ -220,6 +221,7 @@ export function CellContentModal({
       setInputPlaceholder(cell.placeholder || '');
       setInputMaxLength(cell.inputMaxLength || '');
       setInputDefaultValueTemplate(cell.defaultValueTemplate ?? '');
+      setInputType(cell.inputType ?? 'text');
       setMinSelections(cell.minSelections);
       setMaxSelections(cell.maxSelections);
       setRankingOptions(cell.rankingOptions || []);
@@ -320,6 +322,7 @@ export function CellContentModal({
           contentType === 'input' && inputDefaultValueTemplate.trim().length > 0
             ? inputDefaultValueTemplate.trim()
             : undefined,
+        inputType: contentType === 'input' ? inputType : undefined,
         // 체크박스 선택 개수 제한 (체크박스 타입 전용)
         minSelections: contentType === 'checkbox' ? minSelections : undefined,
         maxSelections: contentType === 'checkbox' ? maxSelections : undefined,
@@ -462,6 +465,7 @@ export function CellContentModal({
     setInputPlaceholder(cell.placeholder || '');
     setInputMaxLength(cell.inputMaxLength || '');
     setInputDefaultValueTemplate(cell.defaultValueTemplate ?? '');
+    setInputType(cell.inputType ?? 'text');
     setMinSelections(cell.minSelections);
     setMaxSelections(cell.maxSelections);
     setRankingOptions(cell.rankingOptions || []);
@@ -841,6 +845,25 @@ export function CellContentModal({
                     간단한 정보 수집에 적합합니다.
                   </p>
                 </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-start gap-3 rounded-md border border-gray-200 bg-gray-50 p-3">
+                <input
+                  type="checkbox"
+                  id="input-type-number"
+                  checked={inputType === 'number'}
+                  onChange={(e) => setInputType(e.target.checked ? 'number' : 'text')}
+                  className="mt-0.5 h-4 w-4"
+                />
+                <label htmlFor="input-type-number" className="flex-1 cursor-pointer text-sm">
+                  <span className="font-medium">숫자 입력</span>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    체크 시 응답자는 숫자만 입력할 수 있고, 분기 조건에서 비교 연산자 (=, ≠, ≥,
+                    ≤, &gt;, &lt;) 를 사용할 수 있습니다.
+                  </p>
+                </label>
               </div>
             </div>
 
