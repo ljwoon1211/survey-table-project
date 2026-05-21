@@ -172,7 +172,7 @@ export function buildGeneralQuestionsSheet(
       if (!shouldDisplayQuestion(q, allResponses, allQuestions, allGroups)) {
         row.push(UNEXPOSED_MARKER);
       } else if (gc.expanded) {
-        row.push(formatExpandedCellValue(gc.expanded, allResponses[q.id]));
+        row.push(formatExpandedCellValue(gc.expanded, allResponses[q.id], undefined, allResponses, q.id));
       } else {
         row.push(formatGeneralQuestionValue(q, allResponses[q.id]));
       }
@@ -367,7 +367,7 @@ export function buildWideTableSheet(
       if (isUnexposed) {
         dataRow.push(UNEXPOSED_MARKER);
       } else {
-        dataRow.push(formatExpandedCellValue(ec, tableResponse[wc.cell.id]));
+        dataRow.push(formatExpandedCellValue(ec, tableResponse[wc.cell.id], wc.cell, allResponses, question.id));
       }
     }
 

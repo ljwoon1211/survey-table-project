@@ -42,6 +42,30 @@ import {
 // Value Parsing Helpers
 // ============================================================
 
+/**
+ * __optTexts__ 사이드카(Task 16 저장 구조)와 레거시 optionTexts 경로에서
+ * 특정 옵션의 텍스트 값을 읽는다.
+ *
+ * - Task 16 저장: questionResponses.__optTexts__[questionId][optionId]
+ * - 레거시 저장:  questionResponses[questionId].optionTexts[optionId]
+ */
+function getOptionText(
+  qResponses: Record<string, unknown> | null | undefined,
+  questionId: string,
+  optionId: string,
+): string | undefined {
+  if (!qResponses) return undefined;
+  const sidecar = (qResponses as { __optTexts__?: Record<string, Record<string, string>> }).__optTexts__;
+  const fromSidecar = sidecar?.[questionId]?.[optionId];
+  if (fromSidecar) return fromSidecar;
+  const perQuestion = qResponses[questionId];
+  if (typeof perQuestion === 'object' && perQuestion !== null && 'optionTexts' in perQuestion) {
+    const legacyText = (perQuestion as { optionTexts?: Record<string, string> }).optionTexts?.[optionId];
+    if (legacyText) return legacyText;
+  }
+  return undefined;
+}
+
 /** id/value 기반 O(1) 옵션 검색용 Map 생성 */
 function buildOptionMap(options: OptionLike[]): Map<string, string> {
   const map = new Map<string, string>();
@@ -214,6 +238,8 @@ export function formatExpandedCellValue(
   expandedCol: ExpandedColumn,
   rawValue: unknown,
   actualCell?: TableCell,
+  qResponses?: Record<string, unknown>,
+  questionId?: string,
 ): string | number | null {
   switch (expandedCol.columnKind) {
     case 'label':
@@ -240,6 +266,31 @@ export function formatExpandedCellValue(
 
     case 'other-text': {
       if (rawValue === undefined || rawValue === null || rawValue === '') return null;
+
+      // allowTextInput 옵션 텍스트: __optTexts__ 사이드카에서 선택된 옵션들의 텍스트를 읽는다.
+      // cellId 는 일반 질문의 경우 question.id, 테이블 셀의 경우 cell.id 이다.
+      // questionId 파라미터가 전달된 경우 이를 우선 사용하고, 없으면 cellId 로 폴백한다.
+      const resolvedQuestionId = questionId ?? expandedCol.cellId;
+      if (resolvedQuestionId && qResponses) {
+        const cellForOpts = actualCell ?? expandedCol.cell;
+        const allowTextInputOpts = (cellForOpts.checkboxOptions ?? []).filter(
+          (o: CheckboxOption) => o.allowTextInput,
+        );
+        if (allowTextInputOpts.length > 0) {
+          const { selectedIds } = parseCheckboxRawValue(rawValue);
+          const selectedSet = new Set(selectedIds);
+          const texts: string[] = [];
+          for (const opt of allowTextInputOpts) {
+            // optionId 가 selectedIds 에 포함된 경우에만 텍스트를 읽는다.
+            if (!selectedSet.has(opt.id) && !selectedSet.has(opt.value)) continue;
+            const text = getOptionText(qResponses, resolvedQuestionId, opt.id);
+            if (text) texts.push(text);
+          }
+          if (texts.length > 0) return texts.join(', ');
+        }
+      }
+
+      // 레거시 fallback: otherValue 기반 기타 응답 (9 OtherChoiceValue 호환)
       const { otherText } = parseCheckboxRawValue(rawValue);
       return otherText ?? null;
     }
@@ -468,7 +519,14 @@ export function expandGeneralCheckboxQuestion(
 
   const opts = question.options;
   const qCode = question.questionCode ?? question.id;
-  const dummyCell = { id: question.id, type: 'checkbox' as const, content: '' };
+  // checkboxOptions 에 question.options 를 주입해두어야 formatExpandedCellValue 에서
+  // allowTextInput 옵션 텍스트를 읽을 때 올바른 옵션 목록을 참조할 수 있다.
+  const dummyCell = {
+    id: question.id,
+    type: 'checkbox' as const,
+    content: '',
+    checkboxOptions: opts as unknown as CheckboxOption[],
+  };
 
   const label: ExpandedColumn = {
     cell: dummyCell as TableCell,
@@ -733,7 +791,7 @@ export function buildSemiLongRows(
           measurementValues.push(null);
         } else {
           const rawVal = tableResponse[actualCell.id];
-          measurementValues.push(formatExpandedCellValue(ec, rawVal, actualCell));
+          measurementValues.push(formatExpandedCellValue(ec, rawVal, actualCell, allResponses, question.id));
 
           if (ec.columnKind === 'label' && ec.isVaryingOptions) {
             if (rawVal !== undefined && rawVal !== null && rawVal !== '') {
