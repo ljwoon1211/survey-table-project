@@ -39,6 +39,7 @@ import {
 import { parsesurveyIdentifier } from '@/lib/survey-url';
 import { isEmptyHtml } from '@/lib/utils';
 import { sanitizeRichHtml } from '@/lib/sanitize';
+import { filterOptionTextsForSubmission } from '@/lib/option-text-migration';
 
 import { useSurveyResponseStore } from '@/stores/survey-response-store';
 import { useShallow } from 'zustand/react/shallow';
@@ -656,8 +657,31 @@ export default function SurveyResponsePage() {
               .map((row) => row.id);
           });
 
+        // 제출 직전 — 미선택 옵션의 텍스트 drop 후 questionResponses에 병합.
+        // store의 optionTexts(key=option.id)와 responses value(=option.value)가 다르므로
+        // question.options 배열을 통해 value→id 변환 후 필터링.
+        // 기존 분석 파이프라인(value가 string/array라는 가정)을 보존하기 위해
+        // optionTexts는 "__optTexts__" 사이드카 key에 저장한다.
+        const storeOptTexts = useSurveyResponseStore.getState().optionTexts;
+        const filteredOptTexts: Record<string, Record<string, string>> = {};
+        for (const q of visibleQuestions) {
+          const qOptTexts = storeOptTexts[q.id];
+          if (!qOptTexts || Object.keys(qOptTexts).length === 0) continue;
+          const qValue = responses[q.id];
+          const filtered = filterOptionTextsForSubmission(qValue, qOptTexts, q.options);
+          if (filtered) {
+            filteredOptTexts[q.id] = filtered;
+          }
+        }
+        const questionResponsesWithTexts: Record<string, unknown> = {
+          ...responses,
+          ...(Object.keys(filteredOptTexts).length > 0
+            ? { __optTexts__: filteredOptTexts }
+            : {}),
+        };
+
         await completeResponse(effectiveResponseId, {
-          questionResponses: responses,
+          questionResponses: questionResponsesWithTexts,
           exposedQuestionIds,
           exposedRowIds,
         });

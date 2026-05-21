@@ -232,24 +232,47 @@ export function migrateSnapshotQuestions(snapshot: {
  * 제출 시점 helper -- 선택된 옵션의 텍스트만 남기고 미선택 텍스트는 drop.
  * 빌더에서 "선택 해제 시 텍스트 유지" 정책을 따르므로, 클라이언트 상태에서는 보존되고
  * 제출 직전 이 함수로 정리.
+ *
+ * @param value - 응답 value. radio/select 는 option.value (string), checkbox 는 option.value[],
+ *   ranking 은 RankingAnswer[]. optionTexts key 가 option.id 이고 value 가 option.value 인 경우
+ *   options 배열을 전달해야 정확한 매칭이 가능하다.
+ * @param optionTexts - questionId 단위 옵션 텍스트 (key = option.id)
+ * @param options - (선택) 질문의 options 배열. 전달 시 value(option.value) → id(option.id) 변환에 사용.
+ *   전달하지 않으면 value 를 직접 key 로 비교한다 (하위 호환).
  */
 export function filterOptionTextsForSubmission(
   value: unknown,
   optionTexts: Record<string, string> | undefined,
+  options?: { id: string; value: string }[],
 ): Record<string, string> | undefined {
   if (!optionTexts) return undefined;
 
-  const selectedIds = new Set<string>();
+  // value 에서 선택된 option.value 집합을 추출
+  const selectedValues = new Set<string>();
   if (typeof value === 'string') {
-    selectedIds.add(value);
+    selectedValues.add(value);
   } else if (Array.isArray(value)) {
     for (const v of value) {
       if (typeof v === 'string') {
-        selectedIds.add(v);
+        selectedValues.add(v);
       } else if (v && typeof v === 'object' && 'optionValue' in v) {
-        selectedIds.add((v as { optionValue: string }).optionValue);
+        selectedValues.add((v as { optionValue: string }).optionValue);
       }
     }
+  }
+
+  // options 배열이 있으면 option.value → option.id 맵을 빌드
+  // 없으면 value 를 그대로 key 로 사용 (하위 호환)
+  let selectedIds: Set<string>;
+  if (options && options.length > 0) {
+    selectedIds = new Set<string>();
+    for (const opt of options) {
+      if (selectedValues.has(opt.value)) {
+        selectedIds.add(opt.id);
+      }
+    }
+  } else {
+    selectedIds = selectedValues;
   }
 
   const filtered: Record<string, string> = {};
