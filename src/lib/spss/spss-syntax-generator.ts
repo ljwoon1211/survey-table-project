@@ -322,18 +322,18 @@ export function generateVariableLevel(questions: Question[]): string {
 
     if (q.type === 'radio' || q.type === 'select') {
       nominal.push(q.questionCode);
-      // allowTextInput 옵션 텍스트 변수 → SCALE
+      // allowTextInput 옵션 텍스트 변수 → NOMINAL (STRING 변수는 NOMINAL)
       for (const v of generateOptionTextVariables(q)) {
-        scale.push(v.name);
+        nominal.push(v.name);
       }
     } else if (q.type === 'checkbox' && q.options) {
       for (let i = 0; i < q.options.length; i++) {
         const opt = q.options[i];
         nominal.push(`${q.questionCode}_${opt.optionCode ?? String(i + 1)}`);
-        // allowTextInput 옵션 텍스트 변수 → SCALE
+        // allowTextInput 옵션 텍스트 변수 → NOMINAL (STRING 변수는 NOMINAL)
         if (opt.allowTextInput) {
           const varNumber = opt.optionCode ?? String(i + 1);
-          scale.push(`${q.questionCode}_${varNumber}_text`);
+          nominal.push(`${q.questionCode}_${varNumber}_text`);
         }
       }
     } else if (q.type === 'ranking') {
@@ -357,7 +357,7 @@ export function generateVariableLevel(questions: Question[]): string {
           }
         }
       }
-      // 테이블 셀의 allowTextInput 옵션 텍스트 변수 → SCALE
+      // 테이블 셀의 allowTextInput 옵션 텍스트 변수 → NOMINAL (STRING 변수는 NOMINAL)
       if (q.tableRowsData && q.tableColumns) {
         for (const tRow of q.tableRowsData) {
           for (let colIdx = 0; colIdx < q.tableColumns.length; colIdx++) {
@@ -373,7 +373,7 @@ export function generateVariableLevel(questions: Question[]): string {
               : undefined;
             if (!cellOpts) continue;
             for (const v of generateCellOptionTextVariables(cellVarName, q.title, cellOpts)) {
-              scale.push(v.name);
+              nominal.push(v.name);
             }
           }
         }
