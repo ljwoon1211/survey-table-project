@@ -113,9 +113,16 @@ export interface QuestionOption {
   id: string;
   label: string;
   value: string;
-  optionCode?: string; // ✨ 엑셀 내보내기용 옵션 코드 (예: "1", "01")
-  spssNumericCode?: number; // ✨ SPSS 숫자코드 (옵션 생성 시 할당, 순서 변경해도 유지)
+  optionCode?: string; // 엑셀 내보내기용 옵션 코드 (예: "1", "01")
+  spssNumericCode?: number; // SPSS 숫자코드 (옵션 생성 시 할당, 순서 변경해도 유지)
   isCustomOptionCode?: boolean; // 사용자가 수동 편집한 옵션코드인지 여부
+  /**
+   * 선택 시 사이드카 텍스트 입력 받기.
+   * 빌더의 "+ 텍스트 옵션 추가" 버튼으로 생성된 옵션은 true.
+   * SPSS export 시 `{questionVar}_{변수번호}_text` 라는 STRING 변수가 자동 생성됨.
+   */
+  allowTextInput?: boolean;
+  /** @deprecated Phase 7 cleanup 에서 제거. allowTextInput 사용. */
   hasOther?: boolean;
   // 조건부 분기
   branchRule?: BranchRule;
@@ -198,10 +205,17 @@ export interface CheckboxOption {
   id: string;
   label: string;
   value: string;
-  optionCode?: string; // ✨ 엑셀 내보내기용 옵션 코드
-  spssNumericCode?: number; // ✨ SPSS 숫자코드
+  optionCode?: string; // 엑셀 내보내기용 옵션 코드
+  spssNumericCode?: number; // SPSS 숫자코드
   isCustomOptionCode?: boolean; // 사용자가 수동 편집한 옵션코드인지 여부
   checked?: boolean;
+  /**
+   * 선택 시 사이드카 텍스트 입력 받기.
+   * 빌더의 "+ 텍스트 옵션 추가" 버튼으로 생성된 옵션은 true.
+   * SPSS export 시 `{questionVar}_{변수번호}_text` 라는 STRING 변수가 자동 생성됨.
+   */
+  allowTextInput?: boolean;
+  /** @deprecated Phase 7 cleanup 에서 제거. allowTextInput 사용. */
   hasOther?: boolean;
   // 조건부 분기
   branchRule?: BranchRule;
@@ -211,10 +225,17 @@ export interface RadioOption {
   id: string;
   label: string;
   value: string;
-  optionCode?: string; // ✨ 엑셀 내보내기용 옵션 코드
-  spssNumericCode?: number; // ✨ SPSS 숫자코드
+  optionCode?: string; // 엑셀 내보내기용 옵션 코드
+  spssNumericCode?: number; // SPSS 숫자코드
   isCustomOptionCode?: boolean; // 사용자가 수동 편집한 옵션코드인지 여부
   selected?: boolean;
+  /**
+   * 선택 시 사이드카 텍스트 입력 받기.
+   * 빌더의 "+ 텍스트 옵션 추가" 버튼으로 생성된 옵션은 true.
+   * SPSS export 시 `{questionVar}_{변수번호}_text` 라는 STRING 변수가 자동 생성됨.
+   */
+  allowTextInput?: boolean;
+  /** @deprecated Phase 7 cleanup 에서 제거. allowTextInput 사용. */
   hasOther?: boolean;
   // 조건부 분기
   branchRule?: BranchRule;
