@@ -45,7 +45,7 @@ import { RankingConfigEditorForQuestion } from './ranking-config-editor';
 import { SpssVariableEditor } from './spss-variable-editor';
 import { TablePreview } from './table-preview';
 import { UserDefinedMultiSelectPreview } from './user-defined-multi-select';
-import { OTHER_OPTION_ID, getParentLevelOptions } from './question-option-helpers';
+import { OTHER_OPTION_ID, createTextInputOption, getParentLevelOptions } from './question-option-helpers';
 
 interface QuestionBasicTabProps {
   question: Question;
@@ -68,7 +68,6 @@ interface QuestionBasicTabProps {
   addOption: () => void;
   updateOption: (optionId: string, updates: Partial<QuestionOption>) => void;
   removeOption: (optionId: string) => void;
-  handleOtherOptionToggle: (enabled: boolean) => void;
   // select level helpers
   addSelectLevel: () => void;
   updateSelectLevel: (levelId: string, updates: Partial<SelectLevel>) => void;
@@ -98,7 +97,6 @@ export function QuestionBasicTab({
   addOption,
   updateOption,
   removeOption,
-  handleOtherOptionToggle,
   addSelectLevel,
   updateSelectLevel,
   removeSelectLevel,
@@ -465,20 +463,6 @@ export function QuestionBasicTab({
               선택 옵션 <span className="text-red-500">*</span>
             </Label>
             <div className="flex items-center space-x-4">
-              {/* 기타 옵션 토글 — ranking 타입은 RankingConfigEditor 로 이관했으므로 숨김 */}
-              {question.type !== 'ranking' && (
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    id="allow-other-option"
-                    checked={formData.allowOtherOption || false}
-                    onCheckedChange={handleOtherOptionToggle}
-                    className="scale-75"
-                  />
-                  <Label htmlFor="allow-other-option" className="text-xs text-gray-600">
-                    기타 옵션 추가
-                  </Label>
-                </div>
-              )}
               {/* 조건부 분기 토글 */}
               <div className="flex items-center space-x-2">
                 <Switch
@@ -505,6 +489,25 @@ export function QuestionBasicTab({
               >
                 <Plus className="h-4 w-4" />
                 <span>옵션 추가</span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const newOption = createTextInputOption(formData.options ?? []);
+                  setFormData((prev) => ({
+                    ...prev,
+                    options: [...(prev.options ?? []), newOption],
+                  }));
+                  if (validationErrors.options) {
+                    setValidationErrors((prev) => ({ ...prev, options: '' }));
+                  }
+                }}
+                className="flex items-center space-x-1"
+              >
+                <Plus className="h-4 w-4" />
+                <span>텍스트 옵션 추가</span>
               </Button>
             </div>
           </div>
@@ -542,22 +545,6 @@ export function QuestionBasicTab({
             </SortableContext>
           </DndContext>
 
-          {/* 순위형(ranking) 전용 synthetic "기타" 엔트리 — options 배열에는 추가하지 않고 UI 표시만.
-              응답 UI 는 RankingDropdownStack 이 allowOtherOption 플래그로 드롭다운 마지막에 렌더. */}
-          {question?.type === 'ranking' && formData.allowOtherOption && (
-            <div className="flex items-center gap-2 rounded-md border border-dashed border-gray-300 bg-gray-50 p-3 text-sm text-gray-600">
-              <span className="flex-1 italic">
-                기타 (직접 입력)
-                <span className="ml-2 text-xs text-gray-400">
-                  — 응답 시 자유입력 필드가 나타납니다
-                </span>
-              </span>
-              <span className="text-xs text-gray-400">
-                위 &ldquo;기타 옵션 허용&rdquo; 토글로 제거
-              </span>
-            </div>
-          )}
-
           {(formData.options?.length || 0) === 0 && (
             <div className="py-8 text-center text-gray-500">
               <p className="mb-2">아직 옵션이 없습니다.</p>
@@ -567,16 +554,6 @@ export function QuestionBasicTab({
             </div>
           )}
 
-          {formData.allowOtherOption && question.type !== 'ranking' && (
-            <div className="rounded-lg bg-blue-50 p-3">
-              <p className="text-sm text-blue-700">
-                <strong>💡 기타 옵션이 활성화되었습니다.</strong>
-                <br />
-                마지막에 &ldquo;기타&rdquo; 선택지가 자동으로 추가되어 사용자가 직접
-                텍스트를 입력할 수 있습니다.
-              </p>
-            </div>
-          )}
         </div>
       )}
 
@@ -1086,15 +1063,22 @@ function SortableOptionItem({
         </div>
 
         <div className="flex-1">
-          <Input
-            value={option.label}
-            onChange={(e) => updateOption(option.id, { label: e.target.value })}
-            placeholder={`옵션 ${index + 1}`}
-            className="border-none bg-transparent px-0 focus:border focus:border-blue-200 focus:bg-white"
-          />
+          <div className="flex items-center gap-2">
+            <Input
+              value={option.label}
+              onChange={(e) => updateOption(option.id, { label: e.target.value })}
+              placeholder={`옵션 ${index + 1}`}
+              className="border-none bg-transparent px-0 focus:border focus:border-blue-200 focus:bg-white"
+            />
+            {option.allowTextInput && (
+              <span className="shrink-0 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-700">
+                텍스트 입력
+              </span>
+            )}
+          </div>
           {option.id === OTHER_OPTION_ID && (
             <p className="mt-1 px-0 text-xs text-blue-600">
-              🔹 기타 옵션 (수정 가능)
+              기타 옵션 (수정 가능)
             </p>
           )}
         </div>

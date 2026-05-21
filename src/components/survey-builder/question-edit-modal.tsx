@@ -468,7 +468,6 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
                 addOption={addOption}
                 updateOption={updateOption}
                 removeOption={removeOption}
-                handleOtherOptionToggle={handleOtherOptionToggle}
                 addSelectLevel={addSelectLevel}
                 updateSelectLevel={updateSelectLevel}
                 removeSelectLevel={removeSelectLevel}
