@@ -665,52 +665,43 @@ export const QuestionConditionEditor = forwardRef<
                                 </div>
 
                                 {/* 추가 조건 확인할 옵션 선택 (숫자 셀이면 NumericComparisonEditor, 아니면 TableOptionSelector) */}
-                                {condition.additionalConditions.cellColumnIndex !== undefined &&
+                                {condition.additionalConditions &&
+                                  condition.additionalConditions.cellColumnIndex !== undefined &&
                                   sourceQuestion &&
                                   (() => {
+                                    const ac = condition.additionalConditions;
                                     const effectiveRowIds =
                                       (condition.tableConditions?.rowIds?.length ?? 0) > 0
                                         ? (condition.tableConditions?.rowIds ?? [])
                                         : sourceQuestion.tableRowsData?.map((r) => r.id) || [];
-                                    const isNumeric = isNumericInputCell(
+                                    return isNumericInputCell(
                                       sourceQuestion,
                                       effectiveRowIds,
-                                      condition.additionalConditions.cellColumnIndex,
-                                    );
-
-                                    if (isNumeric) {
-                                      return (
-                                        <NumericComparisonEditor
-                                          idPrefix={`numeric-additional-${condition.id}`}
-                                          value={condition.additionalConditions.numericComparison}
-                                          onChange={(nc) => {
-                                            updateCondition(condition.id, {
-                                              additionalConditions: {
-                                                ...condition.additionalConditions!,
-                                                expectedValues: undefined,
-                                                numericComparison: nc,
-                                              },
-                                            });
-                                          }}
-                                        />
-                                      );
-                                    }
-
-                                    // input 셀(비수치) 은 옵션 셀렉터 없이 "값 있음" 으로만 처리
-                                    if (condition.additionalConditions.checkType === 'input') {
-                                      return null;
-                                    }
-
-                                    return (
+                                      ac.cellColumnIndex,
+                                    ) ? (
+                                      <NumericComparisonEditor
+                                        idPrefix={`numeric-additional-${condition.id}`}
+                                        value={ac.numericComparison}
+                                        onChange={(nc) => {
+                                          updateCondition(condition.id, {
+                                            additionalConditions: {
+                                              ...ac,
+                                              expectedValues: undefined,
+                                              numericComparison: nc,
+                                            },
+                                          });
+                                        }}
+                                      />
+                                    ) : ac.checkType === 'input' ? null : (
                                       <TableOptionSelector
                                         question={sourceQuestion}
                                         rowIds={effectiveRowIds}
-                                        colIndex={condition.additionalConditions.cellColumnIndex}
-                                        expectedValues={condition.additionalConditions.expectedValues}
+                                        colIndex={ac.cellColumnIndex}
+                                        expectedValues={ac.expectedValues}
                                         onChange={(values) => {
                                           updateCondition(condition.id, {
                                             additionalConditions: {
-                                              ...condition.additionalConditions!,
+                                              ...ac,
                                               expectedValues: values,
                                               numericComparison: undefined,
                                             },
