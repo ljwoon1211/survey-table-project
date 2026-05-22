@@ -113,7 +113,7 @@ export function ProgressColumnEditor({ surveyId, initialScheme, contactScheme }:
               <th className="px-3 py-2 text-left">순서</th>
               <th className="px-3 py-2 text-left">라벨</th>
               <th className="px-3 py-2 text-left">소스</th>
-              <th className="px-3 py-2 text-center">숨김</th>
+              <th className="px-3 py-2 text-center">표시</th>
             </tr>
           </thead>
           <tbody>
@@ -158,9 +158,9 @@ export function ProgressColumnEditor({ surveyId, initialScheme, contactScheme }:
                 <td className="px-3 py-2 font-mono text-xs text-slate-500">attrs.{c.key}</td>
                 <td className="px-3 py-2 text-center">
                   <Checkbox
-                    checked={!!c.hidden}
+                    checked={!c.hidden}
                     onCheckedChange={() => toggleHidden(i)}
-                    aria-label={`${c.label} 숨김`}
+                    aria-label={`${c.label} 표시`}
                   />
                 </td>
               </tr>
