@@ -119,13 +119,13 @@ export interface NumericComparison {
 }
 
 // 설문에 복사된 LUT 사본 (snapshot 시점 freeze)
+// LUT 자체는 키/값 구분 없이 columns + rows 만 보유. 어떤 컬럼이 키이고 어떤 컬럼이
+// 비교 값인지는 조건 에디터(RightOperand.lookup)에서 결정한다.
 export interface SurveyLookup {
   id: string; // nanoid
   name: string;
   sourceSavedLookupId?: string;
-  keyColumns: string[];
-  // 비교 결과로 노출 가능한 값 컬럼 후보 목록. 조건 우변에서 이 중 하나를 골라 비교.
-  valueColumns: string[];
+  columns: string[];
   rows: Array<Record<string, string | number>>;
 }
 
@@ -136,8 +136,7 @@ export interface SavedLookup {
   description?: string;
   category: string;
   tags: string[];
-  keyColumns: string[];
-  valueColumns: string[];
+  columns: string[];
   rows: Array<Record<string, string | number>>;
   usageCount: number;
   isPreset: boolean;
