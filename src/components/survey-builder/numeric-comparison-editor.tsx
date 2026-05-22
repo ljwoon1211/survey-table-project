@@ -4,8 +4,16 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { NumericComparison } from '@/types/survey';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import type {
+  LeftOperand,
+  NumericComparison,
+  RightOperand,
+} from '@/types/survey';
 import { isPartialNumericInput, parseNumericInput } from '@/utils/numeric-input';
+
+import { LeftOperandEditor } from './left-operand-editor';
+import { LookupComparandEditor } from './lookup-comparand-editor';
 
 interface NumericComparisonEditorProps {
   value?: NumericComparison;
@@ -22,9 +30,22 @@ const OPERATOR_OPTIONS: Array<{ value: NumericComparison['operator']; label: str
   { value: '<', label: '미만 (<)' },
 ];
 
-function comparandToRaw(value?: NumericComparison): string {
-  if (value?.comparand?.kind !== 'literal') return '';
-  return String(value.comparand.value);
+const emptyCellLeft = (): LeftOperand => ({ kind: 'cell', questionId: '', cellId: '' });
+
+/**
+ * 기존 (comparand 기반) 데이터를 새 (right 기반) 모델로 마이그레이션해서 반환.
+ * - right 있으면 그대로
+ * - comparand 만 있으면 literal 로 변환
+ * - 둘 다 없으면 literal 0
+ */
+function getRightOperand(value?: NumericComparison): RightOperand {
+  if (value?.right) return value.right;
+  if (value?.comparand) return { kind: 'literal', value: value.comparand.value };
+  return { kind: 'literal', value: 0 };
+}
+
+function literalToRaw(right: RightOperand): string {
+  return right.kind === 'literal' ? String(right.value) : '';
 }
 
 export function NumericComparisonEditor({
@@ -33,53 +54,78 @@ export function NumericComparisonEditor({
   idPrefix,
 }: NumericComparisonEditorProps) {
   const operator = value?.operator ?? '==';
+  const left: LeftOperand = value?.left ?? emptyCellLeft();
+  const right: RightOperand = getRightOperand(value);
 
-  // 사용자가 진행 중인 키 입력(예: '-', '.', '-.')을 그대로 보여주기 위해 내부 raw state 유지.
-  // value prop 이 외부에서 바뀌면 raw 도 동기화 (controlled-from-outside).
-  const [rawInput, setRawInput] = useState<string>(() => comparandToRaw(value));
+  // literal 입력 raw state — 부분 입력(`-`, `.`, `-.`) 보존용.
+  // value prop 이 외부에서 바뀌면 raw 도 동기화.
+  const [rawInput, setRawInput] = useState<string>(() => literalToRaw(right));
 
   useEffect(() => {
-    const synced = comparandToRaw(value);
-    // 부모가 emit 한 직후 자기 자신과 다시 sync 되는 잡음을 피하기 위해, 동일하면 skip.
-    if (synced !== rawInput) {
+    if (right.kind !== 'literal') return;
+    const synced = String(right.value);
+    if (parseNumericInput(rawInput) !== right.value) {
       setRawInput(synced);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value?.comparand?.kind === 'literal' ? value.comparand.value : null]);
+  }, [right.kind, right.kind === 'literal' ? right.value : null]);
 
-  const emitOperator = useCallback(
-    (newOp: NumericComparison['operator']) => {
-      const parsed = parseNumericInput(rawInput);
+  // 새 모델로 emit 할 때는 항상 right 사용 + comparand 비움 (마이그레이션).
+  const emit = useCallback(
+    (patch: Partial<NumericComparison>) => {
       onChange({
-        operator: newOp,
-        comparand: { kind: 'literal', value: parsed ?? 0 },
+        operator,
+        left,
+        right,
+        ...patch,
+        comparand: undefined,
       });
     },
-    [rawInput, onChange],
+    [operator, left, right, onChange],
   );
 
-  const handleValueChange = useCallback(
-    (raw: string) => {
-      // 부분 입력 상태('-', '.', '-.', '')도 raw 만 보존하고 emit 은 skip.
-      if (!isPartialNumericInput(raw)) return;
-      setRawInput(raw);
-      const parsed = parseNumericInput(raw);
-      if (parsed !== null) {
-        onChange({
-          operator,
-          comparand: { kind: 'literal', value: parsed },
-        });
-      }
-    },
-    [operator, onChange],
-  );
+  const emitOperator = (newOp: NumericComparison['operator']) => {
+    emit({ operator: newOp });
+  };
+
+  const emitLeft = (next: LeftOperand) => {
+    emit({ left: next });
+  };
+
+  const handleRightKindChange = (kind: 'literal' | 'lookup') => {
+    if (kind === right.kind) return;
+    if (kind === 'literal') {
+      const parsed = parseNumericInput(rawInput);
+      emit({ right: { kind: 'literal', value: parsed ?? 0 } });
+    } else {
+      emit({ right: { kind: 'lookup', surveyLookupId: '', keyMapping: [] } });
+    }
+  };
+
+  const handleLiteralChange = (raw: string) => {
+    if (!isPartialNumericInput(raw)) return;
+    setRawInput(raw);
+    const parsed = parseNumericInput(raw);
+    if (parsed !== null) {
+      emit({ right: { kind: 'literal', value: parsed } });
+    }
+  };
 
   return (
-    <div className="space-y-2 rounded-md border border-blue-200 bg-blue-50 p-3">
+    <div className="space-y-3 rounded-md border border-blue-200 bg-blue-50 p-3">
       <Label className="text-xs font-semibold tracking-wide text-blue-900">
         숫자 비교 조건
       </Label>
-      <div className="flex items-stretch gap-2">
+
+      <div className="space-y-1">
+        <Label className="text-xs text-slate-600">좌변 (응답값 또는 산술)</Label>
+        <LeftOperandEditor value={left} onChange={emitLeft} />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Label htmlFor={`${idPrefix}-operator`} className="text-xs text-slate-600">
+          비교
+        </Label>
         <select
           id={`${idPrefix}-operator`}
           value={operator}
@@ -93,18 +139,42 @@ export function NumericComparisonEditor({
             </option>
           ))}
         </select>
-        <Input
-          id={`${idPrefix}-value`}
-          type="text"
-          inputMode="decimal"
-          value={rawInput}
-          onChange={(e) => handleValueChange(e.target.value)}
-          placeholder="비교할 숫자"
-          className="flex-1"
-        />
       </div>
+
+      <div className="space-y-1">
+        <Label className="text-xs text-slate-600">우변</Label>
+        <Tabs
+          value={right.kind}
+          onValueChange={(v) => handleRightKindChange(v as 'literal' | 'lookup')}
+          className="mb-2"
+        >
+          <TabsList>
+            <TabsTrigger value="literal">직접 입력 값</TabsTrigger>
+            <TabsTrigger value="lookup">외부 데이터 룩업</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {right.kind === 'literal' && (
+          <Input
+            id={`${idPrefix}-value`}
+            type="text"
+            inputMode="decimal"
+            value={rawInput}
+            onChange={(e) => handleLiteralChange(e.target.value)}
+            placeholder="비교할 숫자"
+            className="flex-1"
+          />
+        )}
+        {right.kind === 'lookup' && (
+          <LookupComparandEditor
+            value={right}
+            onChange={(r) => emit({ right: r })}
+          />
+        )}
+      </div>
+
       <p className="text-xs text-slate-600">
-        응답값이 위 숫자와 비교됩니다. 응답자는 셀에 숫자만 입력할 수 있습니다.
+        응답값(또는 셀 산술 결과)이 위 비교 대상과 비교됩니다.
       </p>
     </div>
   );
