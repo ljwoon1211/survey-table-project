@@ -6,35 +6,64 @@ import {
   QuestionCondition,
   QuestionConditionGroup,
   QuestionGroup,
+  SurveyLookup,
   SurveyResponse,
   TableColumn,
   TableRow,
   TableValidationRule,
 } from '@/types/survey';
-import { parseNumericInput } from './numeric-input';
+import { evaluateComparisonWithFailSafe, type ComparisonResult } from '@/lib/lookup/evaluate-comparison';
+import type { LookupEvalCtx } from '@/lib/lookup/types';
+
+// numeric-input 의 parseNumericInput 는 evaluateComparisonWithFailSafe 내부 (evaluate-arith) 에서 사용.
 
 /**
- * input(number) 셀 값에 대해 숫자 비교 연산자를 평가합니다.
- * 파싱 실패 시 항상 false 를 반환합니다.
+ * 분기 평가 컨텍스트. displayCondition / BranchRule 의 우변에 LUT 룩업이 등장할 때,
+ * 응답 페이지나 빌더 미리보기 호출처에서 응답 전체 + 컨택 attrs + LUT 사본을 주입한다.
+ *
+ * - 응답 페이지: survey snapshot 의 lookups + ContactAttrsProvider 의 attrs + 누적 responses
+ * - 빌더 미리보기: currentSurvey.lookups + sample 컨택 attrs + testResponses
+ * - 미주입(undefined): lookup 우변이 평가 불가능 → fail-safe SHOW 동작 (의도된 안전 기본값)
  */
-function evaluateNumericComparison(
+export type BranchEvalCtx = {
+  responses: Record<string, Record<string, string | undefined>>;
+  contactAttrs: Record<string, string | undefined>;
+  lookups: SurveyLookup[];
+};
+
+const emptyBranchEvalCtx = (): BranchEvalCtx => ({
+  responses: {},
+  contactAttrs: {},
+  lookups: [],
+});
+
+/**
+ * NumericComparison 평가 진입점 (T16~).
+ * - `cmp.left` 미존재(legacy 데이터) 시 cellValue 를 "현재 평가 중인 셀" 로 wrap 하여 cell-impersonation.
+ * - fail-safe 적용된 ComparisonResult 반환. 단순 boolean 이 필요한 곳은 `.satisfied` 사용.
+ */
+export function evaluateNumericComparisonV2(
+  cmp: NumericComparison,
   cellValue: string,
-  numericComparison: NumericComparison,
-): boolean {
-  const left = parseNumericInput(cellValue);
-  if (left === null) return false;
-  // comparand 가 undefined 거나 literal 이 아니면 false (T16 에서 right 변종 합류)
-  if (!numericComparison.comparand || numericComparison.comparand.kind !== 'literal') return false;
-  const right = numericComparison.comparand.value;
-  switch (numericComparison.operator) {
-    case '==': return left === right;
-    case '!=': return left !== right;
-    case '>': return left > right;
-    case '<': return left < right;
-    case '>=': return left >= right;
-    case '<=': return left <= right;
-    default: return false;
+  ctx: BranchEvalCtx,
+): ComparisonResult {
+  if (!cmp.left) {
+    const fakeQ = '__current__';
+    const fakeC = '__current__';
+    const wrapped: NumericComparison = {
+      ...cmp,
+      left: { kind: 'cell', questionId: fakeQ, cellId: fakeC },
+    };
+    const evalCtx: LookupEvalCtx = {
+      ...ctx,
+      responses: {
+        ...ctx.responses,
+        [fakeQ]: { ...(ctx.responses[fakeQ] ?? {}), [fakeC]: cellValue },
+      },
+    };
+    return evaluateComparisonWithFailSafe(wrapped, evalCtx);
   }
+  return evaluateComparisonWithFailSafe(cmp, ctx);
 }
 
 /**
@@ -852,12 +881,14 @@ export function shouldDisplayGroup(
   allResponses: Record<string, unknown>,
   allQuestions: Question[],
   allGroups: QuestionGroup[],
+  ctx?: BranchEvalCtx,
 ): boolean {
+  const evalCtx = ctx ?? emptyBranchEvalCtx();
   // 1. 상위 그룹 조건 확인 (재귀)
   if (group.parentGroupId) {
     const parentGroup = allGroups.find((g) => g.id === group.parentGroupId);
     if (parentGroup) {
-      if (!shouldDisplayGroup(parentGroup, allResponses, allQuestions, allGroups)) {
+      if (!shouldDisplayGroup(parentGroup, allResponses, allQuestions, allGroups, evalCtx)) {
         return false; // 상위 그룹이 숨겨지면 하위 그룹도 숨김
       }
     }
@@ -873,7 +904,7 @@ export function shouldDisplayGroup(
   // 조건들을 평가 (enabled가 false인 조건은 제외)
   const results = conditions
     .filter((condition) => condition.enabled !== false)
-    .map((condition) => evaluateQuestionCondition(condition, allResponses, allQuestions));
+    .map((condition) => evaluateQuestionCondition(condition, allResponses, allQuestions, evalCtx));
 
   // 논리 타입에 따라 결과 결합
   switch (logicType) {
@@ -895,17 +926,19 @@ export function shouldDisplayRow(
   row: TableRow,
   allResponses: Record<string, unknown>,
   allQuestions: Question[],
+  ctx?: BranchEvalCtx,
 ): boolean {
   if (!row.displayCondition) {
     return true; // 조건이 없으면 표시
   }
+  const evalCtx = ctx ?? emptyBranchEvalCtx();
 
   const { conditions, logicType } = row.displayCondition;
 
   // 조건들을 평가 (enabled가 false인 조건은 제외)
   const results = conditions
     .filter((condition) => condition.enabled !== false)
-    .map((condition) => evaluateQuestionCondition(condition, allResponses, allQuestions));
+    .map((condition) => evaluateQuestionCondition(condition, allResponses, allQuestions, evalCtx));
 
   // 논리 타입에 따라 결과 결합
   switch (logicType) {
@@ -927,16 +960,18 @@ export function shouldDisplayColumn(
   column: TableColumn,
   allResponses: Record<string, unknown>,
   allQuestions: Question[],
+  ctx?: BranchEvalCtx,
 ): boolean {
   if (!column.displayCondition) {
     return true;
   }
+  const evalCtx = ctx ?? emptyBranchEvalCtx();
 
   const { conditions, logicType } = column.displayCondition;
 
   const results = conditions
     .filter((condition) => condition.enabled !== false)
-    .map((condition) => evaluateQuestionCondition(condition, allResponses, allQuestions));
+    .map((condition) => evaluateQuestionCondition(condition, allResponses, allQuestions, evalCtx));
 
   switch (logicType) {
     case 'AND':
@@ -957,16 +992,18 @@ export function shouldDisplayDynamicGroup(
   group: DynamicRowGroupConfig,
   allResponses: Record<string, unknown>,
   allQuestions: Question[],
+  ctx?: BranchEvalCtx,
 ): boolean {
   if (!group.displayCondition) {
     return true;
   }
+  const evalCtx = ctx ?? emptyBranchEvalCtx();
 
   const { conditions, logicType } = group.displayCondition;
 
   const results = conditions
     .filter((condition) => condition.enabled !== false)
-    .map((condition) => evaluateQuestionCondition(condition, allResponses, allQuestions));
+    .map((condition) => evaluateQuestionCondition(condition, allResponses, allQuestions, evalCtx));
 
   switch (logicType) {
     case 'AND':
@@ -990,12 +1027,14 @@ export function shouldDisplayQuestion(
   allResponses: Record<string, unknown>,
   allQuestions: Question[],
   allGroups?: QuestionGroup[],
+  ctx?: BranchEvalCtx,
 ): boolean {
+  const evalCtx = ctx ?? emptyBranchEvalCtx();
   // 1. 그룹 조건 확인
   if (allGroups && question.groupId) {
     const group = allGroups.find((g) => g.id === question.groupId);
     if (group) {
-      if (!shouldDisplayGroup(group, allResponses, allQuestions, allGroups)) {
+      if (!shouldDisplayGroup(group, allResponses, allQuestions, allGroups, evalCtx)) {
         return false; // 그룹이 숨겨지면 질문도 숨김
       }
     }
@@ -1011,7 +1050,7 @@ export function shouldDisplayQuestion(
   // 조건들을 평가 (enabled가 false인 조건은 제외)
   const results = conditions
     .filter((condition) => condition.enabled !== false)
-    .map((condition) => evaluateQuestionCondition(condition, allResponses, allQuestions));
+    .map((condition) => evaluateQuestionCondition(condition, allResponses, allQuestions, evalCtx));
 
   // 논리 타입에 따라 결과 결합
   switch (logicType) {
@@ -1033,6 +1072,7 @@ function evaluateQuestionCondition(
   condition: QuestionCondition,
   allResponses: Record<string, unknown>,
   allQuestions: Question[],
+  ctx: BranchEvalCtx,
 ): boolean {
   // enabled가 false면 false 반환
   if (condition.enabled === false) {
@@ -1061,6 +1101,7 @@ function evaluateQuestionCondition(
         sourceQuestion,
         sourceResponse,
         condition.tableConditions,
+        ctx,
       );
       mainConditionResult = result.satisfied;
       break;
@@ -1096,6 +1137,7 @@ function evaluateQuestionCondition(
       sourceQuestion,
       sourceResponse,
       condition.tableConditions,
+      ctx,
     );
     checkedRowsInTarget = result.checkedRows;
   }
@@ -1222,7 +1264,11 @@ function evaluateQuestionCondition(
           const strValue = String(cellValue).trim();
           if (strValue !== '') {
             if (additionalConditions.numericComparison) {
-              isChecked = evaluateNumericComparison(strValue, additionalConditions.numericComparison);
+              isChecked = evaluateNumericComparisonV2(
+                additionalConditions.numericComparison,
+                strValue,
+                ctx,
+              ).satisfied;
             } else if (
               additionalConditions.expectedValues &&
               additionalConditions.expectedValues.length > 0
@@ -1298,13 +1344,16 @@ function checkValueMatch(response: unknown, requiredValues: string[]): boolean {
 function checkTableCellCondition(
   question: Question,
   response: unknown,
-  tableConditions?: {
-    rowIds: string[];
-    cellColumnIndex?: number;
-    checkType: 'any' | 'all' | 'none';
-    expectedValues?: string[];
-    numericComparison?: NumericComparison;
-  },
+  tableConditions:
+    | {
+        rowIds: string[];
+        cellColumnIndex?: number;
+        checkType: 'any' | 'all' | 'none';
+        expectedValues?: string[];
+        numericComparison?: NumericComparison;
+      }
+    | undefined,
+  ctx: BranchEvalCtx,
 ): { satisfied: boolean; checkedRows: string[] } {
   if (!tableConditions || !question.tableRowsData) {
     return { satisfied: false, checkedRows: [] };
@@ -1405,7 +1454,7 @@ function checkTableCellCondition(
         cellValue.trim() !== ''
       ) {
         if (numericComparison) {
-          isChecked = evaluateNumericComparison(cellValue, numericComparison);
+          isChecked = evaluateNumericComparisonV2(numericComparison, cellValue, ctx).satisfied;
         } else if (expectedValues && expectedValues.length > 0) {
           isChecked = expectedValues.includes(cellValue.trim());
         } else {
