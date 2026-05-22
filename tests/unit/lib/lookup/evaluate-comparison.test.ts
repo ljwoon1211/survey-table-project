@@ -7,7 +7,7 @@ const LUT: SurveyLookup = {
   id: 'lut-1',
   name: 'avg',
   keyColumns: ['대륙'],
-  valueColumn: 'v',
+  valueColumns: ['v'],
   rows: [{ 대륙: '유럽', v: 1000 }],
 };
 
@@ -31,6 +31,7 @@ describe('evaluateComparisonWithFailSafe', () => {
         kind: 'lookup',
         surveyLookupId: 'lut-1',
         keyMapping: [{ lutKey: '대륙', attrsKey: '개최대륙' }],
+        valueColumn: 'v',
       },
     };
     const r = evaluateComparisonWithFailSafe(cmp, baseCtx);
@@ -52,6 +53,7 @@ describe('evaluateComparisonWithFailSafe', () => {
         kind: 'lookup',
         surveyLookupId: 'lut-1',
         keyMapping: [{ lutKey: '대륙', attrsKey: '개최대륙' }],
+        valueColumn: 'v',
       },
     };
     const r = evaluateComparisonWithFailSafe(cmp, baseCtx);
@@ -66,6 +68,7 @@ describe('evaluateComparisonWithFailSafe', () => {
         kind: 'lookup',
         surveyLookupId: 'lut-1',
         keyMapping: [{ lutKey: '대륙', attrsKey: '개최대륙' }],
+        valueColumn: 'v',
       },
     };
     const r = evaluateComparisonWithFailSafe(cmp, { ...baseCtx, contactAttrs: {} });

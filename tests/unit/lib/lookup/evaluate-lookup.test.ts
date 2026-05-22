@@ -7,11 +7,11 @@ const LUT: SurveyLookup = {
   id: 'lut-1',
   name: 'avg-airfare',
   keyColumns: ['대륙'],
-  valueColumn: '2026년도_적용액',
+  valueColumns: ['2026년도_적용액', '평균'],
   rows: [
-    { 대륙: '유럽', '2026년도_적용액': 2470000 },
-    { 대륙: '아시아', '2026년도_적용액': 800000 },
-    { 대륙: '북미', '2026년도_적용액': '2210000' }, // 문자열 숫자도 허용
+    { 대륙: '유럽', '2026년도_적용액': 2470000, 평균: 2243739 },
+    { 대륙: '아시아', '2026년도_적용액': 800000, 평균: 774110 },
+    { 대륙: '북미', '2026년도_적용액': '2210000', 평균: 2013052 }, // 문자열 숫자도 허용
   ],
 };
 
@@ -28,14 +28,26 @@ describe('evaluateRightOperand', () => {
     expect(r).toEqual({ ok: true, value: 100 });
   });
 
-  it('lookup: 정상 룩업', () => {
+  it('lookup: 정상 룩업 (첫 번째 값 컬럼)', () => {
     const op: RightOperand = {
       kind: 'lookup',
       surveyLookupId: 'lut-1',
       keyMapping: [{ lutKey: '대륙', attrsKey: '개최대륙' }],
+      valueColumn: '2026년도_적용액',
     };
     const r = evaluateRightOperand(op, ctx({ 개최대륙: '유럽' }));
     expect(r).toEqual({ ok: true, value: 2470000 });
+  });
+
+  it('lookup: 동일 LUT 에서 다른 값 컬럼 선택', () => {
+    const op: RightOperand = {
+      kind: 'lookup',
+      surveyLookupId: 'lut-1',
+      keyMapping: [{ lutKey: '대륙', attrsKey: '개최대륙' }],
+      valueColumn: '평균',
+    };
+    const r = evaluateRightOperand(op, ctx({ 개최대륙: '유럽' }));
+    expect(r).toEqual({ ok: true, value: 2243739 });
   });
 
   it('lookup: 문자열 숫자 값도 number 로 변환', () => {
@@ -43,6 +55,7 @@ describe('evaluateRightOperand', () => {
       kind: 'lookup',
       surveyLookupId: 'lut-1',
       keyMapping: [{ lutKey: '대륙', attrsKey: '개최대륙' }],
+      valueColumn: '2026년도_적용액',
     };
     const r = evaluateRightOperand(op, ctx({ 개최대륙: '북미' }));
     expect(r).toEqual({ ok: true, value: 2210000 });
@@ -53,6 +66,7 @@ describe('evaluateRightOperand', () => {
       kind: 'lookup',
       surveyLookupId: 'missing',
       keyMapping: [{ lutKey: '대륙', attrsKey: '개최대륙' }],
+      valueColumn: '2026년도_적용액',
     };
     const r = evaluateRightOperand(op, ctx({ 개최대륙: '유럽' }));
     expect(r).toEqual({ ok: false, reason: 'lookup-not-found' });
@@ -63,6 +77,7 @@ describe('evaluateRightOperand', () => {
       kind: 'lookup',
       surveyLookupId: 'lut-1',
       keyMapping: [{ lutKey: '대륙', attrsKey: '개최대륙' }],
+      valueColumn: '2026년도_적용액',
     };
     const r = evaluateRightOperand(op, ctx({}));
     expect(r).toEqual({ ok: false, reason: 'attrs-key-missing' });
@@ -73,6 +88,7 @@ describe('evaluateRightOperand', () => {
       kind: 'lookup',
       surveyLookupId: 'lut-1',
       keyMapping: [{ lutKey: '대륙', attrsKey: '개최대륙' }],
+      valueColumn: '2026년도_적용액',
     };
     const r = evaluateRightOperand(op, ctx({ 개최대륙: '남극' }));
     expect(r).toEqual({ ok: false, reason: 'lookup-row-not-matched' });
@@ -87,12 +103,35 @@ describe('evaluateRightOperand', () => {
       kind: 'lookup',
       surveyLookupId: 'lut-1',
       keyMapping: [{ lutKey: '대륙', attrsKey: '개최대륙' }],
+      valueColumn: '2026년도_적용액',
     };
     const r = evaluateRightOperand(op, {
       responses: {},
       contactAttrs: { 개최대륙: '유럽' },
       lookups: [lutNoValue],
     });
+    expect(r).toEqual({ ok: false, reason: 'lookup-value-missing' });
+  });
+
+  it('lookup: valueColumn 이 빈 문자열이면 lookup-value-missing', () => {
+    const op: RightOperand = {
+      kind: 'lookup',
+      surveyLookupId: 'lut-1',
+      keyMapping: [{ lutKey: '대륙', attrsKey: '개최대륙' }],
+      valueColumn: '',
+    };
+    const r = evaluateRightOperand(op, ctx({ 개최대륙: '유럽' }));
+    expect(r).toEqual({ ok: false, reason: 'lookup-value-missing' });
+  });
+
+  it('lookup: valueColumn 이 LUT 의 valueColumns 목록에 없으면 lookup-value-missing', () => {
+    const op: RightOperand = {
+      kind: 'lookup',
+      surveyLookupId: 'lut-1',
+      keyMapping: [{ lutKey: '대륙', attrsKey: '개최대륙' }],
+      valueColumn: '미등록컬럼',
+    };
+    const r = evaluateRightOperand(op, ctx({ 개최대륙: '유럽' }));
     expect(r).toEqual({ ok: false, reason: 'lookup-value-missing' });
   });
 });

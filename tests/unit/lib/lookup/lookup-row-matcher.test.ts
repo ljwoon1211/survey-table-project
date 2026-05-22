@@ -6,7 +6,7 @@ const SINGLE_KEY_LUT: SurveyLookup = {
   id: 'lut-1',
   name: 'avg-airfare',
   keyColumns: ['대륙'],
-  valueColumn: '2026년도_적용액',
+  valueColumns: ['2026년도_적용액'],
   rows: [
     { 대륙: '유럽', '2026년도_적용액': 2470000 },
     { 대륙: '아시아', '2026년도_적용액': 800000 },
@@ -17,7 +17,7 @@ const COMPOSITE_KEY_LUT: SurveyLookup = {
   id: 'lut-2',
   name: 'avg-airfare-by-class',
   keyColumns: ['대륙', '클래스'],
-  valueColumn: '평균',
+  valueColumns: ['평균'],
   rows: [
     { 대륙: '유럽', 클래스: '이코노미', 평균: 1500000 },
     { 대륙: '유럽', 클래스: '비즈', 평균: 3200000 },

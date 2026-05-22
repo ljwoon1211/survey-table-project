@@ -26,7 +26,14 @@ export function evaluateRightOperand(
   const row = findLookupRow(lookup, keys);
   if (!row) return { ok: false, reason: 'lookup-row-not-matched' };
 
-  const raw = row[lookup.valueColumn];
+  // 비교 시점에 우변에서 선택한 값 컬럼을 사용. 선택 안 됐거나(빈 문자열),
+  // LUT 의 valueColumns 목록에 없는 키면 fail-safe SHOW.
+  const valueColumn = op.valueColumn;
+  if (!valueColumn || !lookup.valueColumns.includes(valueColumn)) {
+    return { ok: false, reason: 'lookup-value-missing' };
+  }
+
+  const raw = row[valueColumn];
   if (raw === undefined || raw === null || raw === '') {
     return { ok: false, reason: 'lookup-value-missing' };
   }
