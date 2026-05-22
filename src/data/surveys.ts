@@ -188,6 +188,8 @@ export async function getSurveyWithDetails(surveyId: string): Promise<SurveyType
       thankYouMessage: survey.thankYouMessage,
       requireInviteToken: survey.requireInviteToken,
     },
+    lookups: survey.lookups ?? [],
+    contactColumns: survey.contactColumns ?? undefined,
     createdAt: survey.createdAt,
     updatedAt: survey.updatedAt,
   };

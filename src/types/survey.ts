@@ -1,3 +1,5 @@
+import type { ContactColumnScheme } from '@/db/schema/schema-types';
+
 export type QuestionType =
   | 'text'
   | 'textarea'
@@ -438,6 +440,8 @@ export interface Survey {
   questions: Question[];
   settings: SurveySettings;
   lookups?: SurveyLookup[]; // 설문에 복사된 LUT 사본 목록
+  // 컨택리스트 표시 컬럼 스킴 — 빌더에서 attrs 키 셀렉터·LUT 키 매핑 UI 가 참조.
+  contactColumns?: ContactColumnScheme;
   createdAt: Date;
   updatedAt: Date;
 }
