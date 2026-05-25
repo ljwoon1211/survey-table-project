@@ -385,6 +385,7 @@ export const QuestionConditionEditor = forwardRef<
                                 conditionType: e.target.value as
                                   | 'value-match'
                                   | 'table-cell-check'
+                                  | 'expression'
                                   | 'custom',
                               })
                             }
@@ -392,6 +393,11 @@ export const QuestionConditionEditor = forwardRef<
                           >
                             <option value="value-match">값 일치 (radio, select, checkbox)</option>
                             <option value="table-cell-check">테이블 셀 체크 확인</option>
+                            <optgroup label="준비 중">
+                              <option value="expression" disabled>
+                                장기 계산식
+                              </option>
+                            </optgroup>
                           </select>
                         </div>
                       )}
@@ -876,6 +882,12 @@ export const QuestionConditionEditor = forwardRef<
                             )}
                           </div>
                         )}
+
+                      {condition.conditionType === 'expression' && (
+                        <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+                          본 조건 타입은 다음 업데이트에서 제공됩니다.
+                        </div>
+                      )}
 
                       {/* 값 일치 조건 */}
                       {condition.conditionType === 'value-match' && (
