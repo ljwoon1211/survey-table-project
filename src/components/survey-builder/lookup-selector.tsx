@@ -14,20 +14,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
-import type { SavedLookup, SurveyLookup } from '@/types/survey';
 
 import { LookupEditModal } from './lookup-edit-modal';
-
-type LookupDraft = Pick<
-  SavedLookup,
-  'name' | 'description' | 'category' | 'tags' | 'columns' | 'rows'
->;
-
-const NONE_SENTINEL = '__none__';
+import { type LookupDraft, NONE_SENTINEL } from './lookup-shared';
 
 interface Props {
   value: string; // surveyLookupId — 빈 문자열이면 미선택
-  onChange: (id: string, lookup: SurveyLookup) => void;
+  /** 선택된 surveyLookupId. caller 는 store 의 currentSurvey.lookups 에서 직접 찾아 쓸 수 있음. */
+  onChange: (id: string) => void;
 }
 
 /**
@@ -51,7 +45,7 @@ export function LookupSelector({ value, onChange }: Props) {
     });
     setEditOpen(false);
     await refetchSurvey();
-    onChange(saved.id, saved);
+    onChange(saved.id);
   };
 
   return (
@@ -61,8 +55,7 @@ export function LookupSelector({ value, onChange }: Props) {
           value={value || NONE_SENTINEL}
           onValueChange={(v) => {
             if (v === NONE_SENTINEL) return;
-            const found = lookups.find((l) => l.id === v);
-            if (found) onChange(v, found);
+            if (lookups.some((l) => l.id === v)) onChange(v);
           }}
         >
           <SelectTrigger className="flex-1">

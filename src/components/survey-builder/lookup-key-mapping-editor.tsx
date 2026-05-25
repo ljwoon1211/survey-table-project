@@ -13,8 +13,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 
-const CUSTOM_SENTINEL = '__custom__';
-const NONE_SENTINEL = '__none__';
+import { CUSTOM_SENTINEL, NONE_SENTINEL } from './lookup-shared';
 
 interface Props {
   /** LUT 가 제공하는 모든 컬럼 (사용자가 키로 픽 가능한 후보) */

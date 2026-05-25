@@ -92,14 +92,85 @@ export async function createSavedLookupAction(
   return toSavedLookup(row);
 }
 
-// 보관함 LUT 수정
+// ========================
+// surveys.lookups 자동 동기화 헬퍼
+// ========================
 //
-// 보관함 마스터를 SoT 로 간주. 갱신 후 모든 설문의 lookups jsonb 에서 같은
-// sourceSavedLookupId 사본의 name/columns/rows 를 SQL 로 일괄 동기화.
-// (publish 된 설문의 snapshot 은 별도 freeze 되어 있어 응답자 화면에 영향 없음)
+// 보관함을 SoT 로 간주해 마스터가 수정/삭제되면 모든 설문의 lookups jsonb 사본이
+// 자동으로 따라가게 한다. 두 propagation 모두 영향받은 surveyId 를 반환하여
+// 호출처가 빌더 페이지 경로를 개별 revalidate 하도록 한다.
 //
-// 트랜잭션으로 묶어 마스터 update 와 propagation 의 부분 실패 방지. 영향받은
-// 모든 surveyId 를 returning 으로 받아 빌더 페이지 경로 개별 revalidate.
+// publish 된 설문의 snapshot 은 별도 freeze 되어 있어 응답자 화면에는 영향 없음.
+
+// trx 는 db.transaction(async (tx) => ...) 의 tx 와 동일 API. 정확한 타입을 명시하기 어려워
+// 동일 인터페이스(typeof db) 를 그대로 사용한다.
+type TxRunner = Pick<typeof db, 'execute' | 'delete'>;
+
+/** drizzle postgres-js 의 execute 반환은 array-like (rows). 안전하게 id 만 추출. */
+function extractSurveyIds(result: unknown): string[] {
+  if (!Array.isArray(result)) return [];
+  return (result as Array<{ id?: string }>)
+    .map((r) => r?.id)
+    .filter((id): id is string => typeof id === 'string');
+}
+
+/** 같은 sourceSavedLookupId 를 가진 surveys.lookups 사본의 name/columns/rows 를 일괄 갱신. */
+async function propagateSavedLookupUpdate(
+  trx: TxRunner,
+  savedLookupId: string,
+  next: { name: string; columns: string[]; rows: Array<Record<string, string | number>> },
+): Promise<string[]> {
+  const affected = await trx.execute<{ id: string }>(sql`
+    UPDATE surveys
+    SET lookups = (
+      SELECT jsonb_agg(
+        CASE
+          WHEN entry->>'sourceSavedLookupId' = ${savedLookupId}
+          THEN entry
+               || jsonb_build_object('name', ${next.name}::text)
+               || jsonb_build_object('columns', ${JSON.stringify(next.columns)}::jsonb)
+               || jsonb_build_object('rows', ${JSON.stringify(next.rows)}::jsonb)
+          ELSE entry
+        END
+      )
+      FROM jsonb_array_elements(lookups) entry
+    ),
+    updated_at = NOW()
+    WHERE lookups @> jsonb_build_array(jsonb_build_object('sourceSavedLookupId', ${savedLookupId}))
+    RETURNING id
+  `);
+  return extractSurveyIds(affected);
+}
+
+/** 같은 sourceSavedLookupId 를 가진 surveys.lookups 사본을 모두 제거. */
+async function propagateSavedLookupDelete(
+  trx: TxRunner,
+  savedLookupId: string,
+): Promise<string[]> {
+  const affected = await trx.execute<{ id: string }>(sql`
+    UPDATE surveys
+    SET lookups = (
+      SELECT COALESCE(jsonb_agg(entry), '[]'::jsonb)
+      FROM jsonb_array_elements(lookups) entry
+      WHERE entry->>'sourceSavedLookupId' IS DISTINCT FROM ${savedLookupId}
+    ),
+    updated_at = NOW()
+    WHERE lookups @> jsonb_build_array(jsonb_build_object('sourceSavedLookupId', ${savedLookupId}))
+    RETURNING id
+  `);
+  return extractSurveyIds(affected);
+}
+
+/** /admin/surveys + 영향 받은 surveyId 의 빌더 경로 revalidate. */
+function revalidateSurveyBuilders(surveyIds: string[]) {
+  revalidatePath('/admin/surveys');
+  for (const sid of surveyIds) {
+    revalidatePath(`/admin/surveys/${sid}`);
+    revalidatePath(`/admin/surveys/${sid}/edit`);
+  }
+}
+
+// 보관함 LUT 수정 — 마스터 update + propagation 을 한 트랜잭션으로 처리.
 export async function updateSavedLookupAction(
   id: string,
   input: Partial<SavedLookupInput>,
@@ -108,8 +179,8 @@ export async function updateSavedLookupAction(
 
   const parsed = SavedLookupInputSchema.partial().parse(input);
 
-  const result = await db.transaction(async (tx) => {
-    const [row] = await tx
+  const { row, affectedSurveyIds } = await db.transaction(async (tx) => {
+    const [updatedRow] = await tx
       .update(savedLookups)
       .set({
         ...parsed,
@@ -119,85 +190,33 @@ export async function updateSavedLookupAction(
       .where(eq(savedLookups.id, id))
       .returning();
 
-    if (!row) {
+    if (!updatedRow) {
       throw new Error('보관함 LUT 를 찾을 수 없습니다.');
     }
 
-    // 같은 sourceSavedLookupId 사본을 가진 surveys 식별 + propagate + 영향 id 수집
-    const affected = await tx.execute<{ id: string }>(sql`
-      UPDATE surveys
-      SET lookups = (
-        SELECT jsonb_agg(
-          CASE
-            WHEN entry->>'sourceSavedLookupId' = ${id}
-            THEN entry
-                 || jsonb_build_object('name', ${row.name}::text)
-                 || jsonb_build_object('columns', ${JSON.stringify(row.columns)}::jsonb)
-                 || jsonb_build_object('rows', ${JSON.stringify(row.rows)}::jsonb)
-            ELSE entry
-          END
-        )
-        FROM jsonb_array_elements(lookups) entry
-      ),
-      updated_at = NOW()
-      WHERE lookups @> jsonb_build_array(jsonb_build_object('sourceSavedLookupId', ${id}))
-      RETURNING id
-    `);
-
-    return { row, affectedSurveyIds: extractSurveyIds(affected) };
+    const ids = await propagateSavedLookupUpdate(tx, id, {
+      name: updatedRow.name,
+      columns: updatedRow.columns,
+      rows: updatedRow.rows,
+    });
+    return { row: updatedRow, affectedSurveyIds: ids };
   });
 
-  revalidatePath('/admin/surveys');
-  for (const sid of result.affectedSurveyIds) {
-    revalidatePath(`/admin/surveys/${sid}`);
-    revalidatePath(`/admin/surveys/${sid}/edit`);
-  }
-  return toSavedLookup(result.row);
+  revalidateSurveyBuilders(affectedSurveyIds);
+  return toSavedLookup(row);
 }
 
-// 보관함 LUT 삭제
-//
-// 마스터 삭제 시 같은 sourceSavedLookupId 를 참조하는 모든 설문의 사본도 일괄 제거.
-// (publish 된 설문의 snapshot 은 별도 freeze 되어 있어 응답자 화면에 영향 없음)
-//
-// 트랜잭션으로 propagation + 마스터 delete 묶어 부분 실패 방지.
+// 보관함 LUT 삭제 — propagation 후 마스터 delete 를 한 트랜잭션으로 처리.
 export async function deleteSavedLookupAction(id: string): Promise<void> {
   await requireAuth();
 
   const affectedSurveyIds = await db.transaction(async (tx) => {
-    // 모든 설문의 lookups 에서 매칭되는 사본 제거 + 영향 id 수집
-    const affected = await tx.execute<{ id: string }>(sql`
-      UPDATE surveys
-      SET lookups = (
-        SELECT COALESCE(jsonb_agg(entry), '[]'::jsonb)
-        FROM jsonb_array_elements(lookups) entry
-        WHERE entry->>'sourceSavedLookupId' IS DISTINCT FROM ${id}
-      ),
-      updated_at = NOW()
-      WHERE lookups @> jsonb_build_array(jsonb_build_object('sourceSavedLookupId', ${id}))
-      RETURNING id
-    `);
-
+    const ids = await propagateSavedLookupDelete(tx, id);
     await tx.delete(savedLookups).where(eq(savedLookups.id, id));
-
-    return extractSurveyIds(affected);
+    return ids;
   });
 
-  revalidatePath('/admin/surveys');
-  for (const sid of affectedSurveyIds) {
-    revalidatePath(`/admin/surveys/${sid}`);
-    revalidatePath(`/admin/surveys/${sid}/edit`);
-  }
-}
-
-// drizzle postgres-js 의 execute 반환은 array-like (rows) 형태. 안전하게 id 만 추출.
-function extractSurveyIds(result: unknown): string[] {
-  if (Array.isArray(result)) {
-    return (result as Array<{ id?: string }>)
-      .map((r) => r?.id)
-      .filter((id): id is string => typeof id === 'string');
-  }
-  return [];
+  revalidateSurveyBuilders(affectedSurveyIds);
 }
 
 // ========================

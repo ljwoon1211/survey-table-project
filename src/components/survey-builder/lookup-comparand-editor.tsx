@@ -12,10 +12,9 @@ import type { RightOperand } from '@/types/survey';
 
 import { LookupKeyMappingEditor } from './lookup-key-mapping-editor';
 import { LookupSelector } from './lookup-selector';
+import { NONE_SENTINEL } from './lookup-shared';
 
 type LookupOperand = Extract<RightOperand, { kind: 'lookup' }>;
-
-const NONE_SENTINEL = '__none__';
 
 interface Props {
   value: LookupOperand;

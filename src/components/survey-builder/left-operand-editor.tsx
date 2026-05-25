@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { Input } from '@/components/ui/input';
 import {
@@ -62,7 +62,11 @@ const emptyCellRef = (): CellRef => ({ kind: 'cell', questionId: '', cellId: '' 
 
 export function LeftOperandEditor({ value, onChange, sourceQuestionId }: Props) {
   const questions = useSurveyBuilderStore((s) => s.currentSurvey.questions);
-  const cells = collectInputCells(questions, sourceQuestionId);
+  // 큰 설문일수록 input 셀 집계가 비싸므로 questions / sourceQuestionId 변화 시에만 재계산
+  const cells = useMemo(
+    () => collectInputCells(questions, sourceQuestionId),
+    [questions, sourceQuestionId],
+  );
 
   // 값이 binop 이면 "셀 산술", 아니면 (undefined 또는 옛 단일 cell 데이터) "응답값 그대로".
   const isBinop = value?.kind === 'binop';

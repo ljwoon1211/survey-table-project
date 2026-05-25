@@ -17,11 +17,7 @@ import type { SavedLookup } from '@/types/survey';
 
 import { LookupCsvImport } from './lookup-csv-import';
 import { LookupEditModal } from './lookup-edit-modal';
-
-type LookupDraft = Pick<
-  SavedLookup,
-  'name' | 'description' | 'category' | 'tags' | 'columns' | 'rows'
->;
+import type { LookupDraft } from './lookup-shared';
 
 interface CsvImportResult {
   columns: string[];

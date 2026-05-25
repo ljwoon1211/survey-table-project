@@ -14,12 +14,11 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { SavedLookup } from '@/types/survey';
 
-type LookupDraft = Pick<
-  SavedLookup,
-  'name' | 'description' | 'category' | 'tags' | 'columns' | 'rows'
->;
+import type { LookupDraft } from './lookup-shared';
+
+// 현재 모달은 카테고리 선택 UI 가 없어 항상 'custom' 으로 저장. 추후 카테고리 picker 추가 시 prop 으로 받기.
+const DEFAULT_CATEGORY = 'custom';
 
 interface Props {
   isOpen: boolean;
@@ -36,7 +35,7 @@ interface Props {
 export function LookupEditModal({ isOpen, initialValue, onClose, onSave }: Props) {
   const [name, setName] = useState(initialValue?.name ?? '');
   const [description, setDescription] = useState(initialValue?.description ?? '');
-  const [category] = useState(initialValue?.category ?? 'custom');
+  const category = initialValue?.category ?? DEFAULT_CATEGORY;
   const [columns, setColumns] = useState<string[]>(
     initialValue?.columns ?? ['컬럼1', '컬럼2'],
   );
