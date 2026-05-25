@@ -1,6 +1,10 @@
 import {
   BranchRule,
   DynamicRowGroupConfig,
+  ExpressionClause,
+  ExpressionComparison,
+  ExpressionConditionConfig,
+  ExpressionOperand,
   NumericComparison,
   Question,
   QuestionCondition,
@@ -13,6 +17,7 @@ import {
   TableValidationRule,
 } from '@/types/survey';
 import { evaluateComparisonWithFailSafe, type ComparisonResult } from '@/lib/lookup/evaluate-comparison';
+import { evaluateRightOperand } from '@/lib/lookup/evaluate-lookup';
 import type { LookupEvalCtx } from '@/lib/lookup/types';
 
 // numeric-input 의 parseNumericInput 는 evaluateComparisonWithFailSafe 내부 (evaluate-arith) 에서 사용.
@@ -1065,6 +1070,123 @@ export function shouldDisplayQuestion(
   }
 }
 
+// ─── Expression conditionType evaluators ────────────────────────────────────
+
+function toNumber(v: unknown): number | undefined {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
+  if (typeof v === 'string') {
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n : undefined;
+  }
+  return undefined;
+}
+
+function evaluateExpressionOperand(
+  operand: ExpressionOperand,
+  responses: Record<string, unknown>,
+  ctx: BranchEvalCtx,
+): number | string | undefined {
+  switch (operand.kind) {
+    case 'literal':
+      return operand.value;
+    case 'cell': {
+      const qr = responses[operand.questionId] as
+        | { questionType?: string; tableResponse?: Record<string, Record<string, string | undefined>> }
+        | undefined;
+      if (!qr || qr.questionType !== 'table' || !qr.tableResponse) return undefined;
+      // tableResponse 구조: { rowId: { cellId: value } }
+      for (const rowResponse of Object.values(qr.tableResponse)) {
+        if (rowResponse && operand.cellId in rowResponse) {
+          const v = rowResponse[operand.cellId];
+          if (v === undefined || v === '') return undefined;
+          return typeof v === 'string' || typeof v === 'number' ? v : undefined;
+        }
+      }
+      return undefined;
+    }
+    case 'question': {
+      const qr = responses[operand.questionId] as
+        | { questionType?: string; textResponse?: string; selectedValue?: string }
+        | undefined;
+      if (!qr) return undefined;
+      if (qr.questionType === 'text' || qr.questionType === 'textarea') return qr.textResponse;
+      if (qr.questionType === 'radio' || qr.questionType === 'select') return qr.selectedValue;
+      // 기타 question type 은 expression 비교 대상 외 — undefined
+      return undefined;
+    }
+    case 'lookup': {
+      // ExpressionOperand 'lookup' 은 RightOperand 'lookup' 과 동일한 구조
+      const result = evaluateRightOperand(operand, ctx);
+      if (result.ok) return result.value;
+      return undefined; // fail-safe SHOW
+    }
+    case 'attr': {
+      return ctx.contactAttrs?.[operand.attrsKey];
+    }
+    case 'binop': {
+      const L = toNumber(evaluateExpressionOperand(operand.left, responses, ctx));
+      const R = toNumber(evaluateExpressionOperand(operand.right, responses, ctx));
+      if (L === undefined || R === undefined) return undefined;
+      switch (operand.op) {
+        case '+': return L + R;
+        case '-': return L - R;
+        case '*': return L * R;
+        case '/': return R === 0 ? undefined : L / R;
+      }
+    }
+  }
+}
+
+function evaluateExpressionComparison(
+  comparison: ExpressionComparison,
+  responses: Record<string, unknown>,
+  ctx: BranchEvalCtx,
+): boolean {
+  const L = evaluateExpressionOperand(comparison.left, responses, ctx);
+  const R = evaluateExpressionOperand(comparison.right, responses, ctx);
+  if (L === undefined || R === undefined) return true; // fail-safe SHOW
+
+  if (comparison.op === '==' || comparison.op === '!=') {
+    const eq = String(L) === String(R);
+    return comparison.op === '==' ? eq : !eq;
+  }
+  const ln = toNumber(L);
+  const rn = toNumber(R);
+  if (ln === undefined || rn === undefined) return true;
+  switch (comparison.op) {
+    case '>': return ln > rn;
+    case '<': return ln < rn;
+    case '>=': return ln >= rn;
+    case '<=': return ln <= rn;
+  }
+}
+
+function evaluateExpressionClause(
+  clause: ExpressionClause,
+  responses: Record<string, unknown>,
+  ctx: BranchEvalCtx,
+): boolean {
+  if (clause.kind === 'comparison') return evaluateExpressionComparison(clause.comparison, responses, ctx);
+  return evaluateExpressionConfig(clause.group, responses, ctx);
+}
+
+function evaluateExpressionConfig(
+  config: ExpressionConditionConfig,
+  responses: Record<string, unknown>,
+  ctx: BranchEvalCtx,
+): boolean {
+  if (config.clauses.length === 0) return true;
+  let acc = evaluateExpressionClause(config.clauses[0], responses, ctx);
+  for (let i = 1; i < config.clauses.length; i++) {
+    const next = evaluateExpressionClause(config.clauses[i], responses, ctx);
+    const op = config.joinOps[i - 1] ?? 'AND';
+    acc = op === 'AND' ? (acc && next) : (acc || next);
+  }
+  return acc;
+}
+
+// ─── End expression evaluators ──────────────────────────────────────────────
+
 /**
  * 개별 질문 조건 평가
  */
@@ -1077,6 +1199,14 @@ function evaluateQuestionCondition(
   // enabled가 false면 false 반환
   if (condition.enabled === false) {
     return false;
+  }
+
+  // expression 조건 타입: 응답 전체를 expression evaluator 에 위임 (fail-safe SHOW 자체 처리)
+  if (condition.conditionType === 'expression') {
+    if (condition.expressionConfig) {
+      return evaluateExpressionConfig(condition.expressionConfig, allResponses, ctx);
+    }
+    return true;
   }
 
   const sourceResponse = allResponses[condition.sourceQuestionId];
