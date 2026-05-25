@@ -540,6 +540,7 @@ export const QuestionConditionEditor = forwardRef<
                               ) ? (
                                 <NumericComparisonEditor
                                   idPrefix={`numeric-${condition.id}`}
+                                  sourceQuestionId={condition.sourceQuestionId}
                                   value={condition.tableConditions.numericComparison}
                                   onChange={(nc) => {
                                     updateCondition(condition.id, {
@@ -681,6 +682,7 @@ export const QuestionConditionEditor = forwardRef<
                                     ) ? (
                                       <NumericComparisonEditor
                                         idPrefix={`numeric-additional-${condition.id}`}
+                                        sourceQuestionId={condition.sourceQuestionId}
                                         value={ac.numericComparison}
                                         onChange={(nc) => {
                                           updateCondition(condition.id, {

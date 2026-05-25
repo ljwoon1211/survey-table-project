@@ -19,6 +19,8 @@ interface NumericComparisonEditorProps {
   value?: NumericComparison;
   onChange: (value: NumericComparison) => void;
   idPrefix: string; // label htmlFor 충돌 방지 (외부에서 단일성 보장)
+  /** 부모 조건이 가리키는 source question id (좌변 산술 picker 의 옵션 정렬에 사용) */
+  sourceQuestionId?: string;
 }
 
 const OPERATOR_OPTIONS: Array<{ value: NumericComparison['operator']; label: string }> = [
@@ -29,8 +31,6 @@ const OPERATOR_OPTIONS: Array<{ value: NumericComparison['operator']; label: str
   { value: '>', label: '초과 (>)' },
   { value: '<', label: '미만 (<)' },
 ];
-
-const emptyCellLeft = (): LeftOperand => ({ kind: 'cell', questionId: '', cellId: '' });
 
 /**
  * 기존 (comparand 기반) 데이터를 새 (right 기반) 모델로 마이그레이션해서 반환.
@@ -52,9 +52,11 @@ export function NumericComparisonEditor({
   value,
   onChange,
   idPrefix,
+  sourceQuestionId,
 }: NumericComparisonEditorProps) {
   const operator = value?.operator ?? '==';
-  const left: LeftOperand = value?.left ?? emptyCellLeft();
+  // undefined 면 LeftOperandEditor 가 "응답값 그대로" 모드로 표시.
+  const left: LeftOperand | undefined = value?.left;
   const right: RightOperand = getRightOperand(value);
 
   // literal 입력 raw state — 부분 입력(`-`, `.`, `-.`) 보존용.
@@ -71,15 +73,17 @@ export function NumericComparisonEditor({
   }, [right.kind, right.kind === 'literal' ? right.value : null]);
 
   // 새 모델로 emit 할 때는 항상 right 사용 + comparand 비움 (마이그레이션).
+  // left 는 undefined ("응답값 그대로") 일 수 있으므로 patch 가 left 명시하지 않으면 그대로 유지.
   const emit = useCallback(
     (patch: Partial<NumericComparison>) => {
-      onChange({
+      const next: NumericComparison = {
         operator,
         left,
         right,
         ...patch,
         comparand: undefined,
-      });
+      };
+      onChange(next);
     },
     [operator, left, right, onChange],
   );
@@ -88,7 +92,7 @@ export function NumericComparisonEditor({
     emit({ operator: newOp });
   };
 
-  const emitLeft = (next: LeftOperand) => {
+  const emitLeft = (next: LeftOperand | undefined) => {
     emit({ left: next });
   };
 
@@ -119,7 +123,11 @@ export function NumericComparisonEditor({
 
       <div className="space-y-1">
         <Label className="text-xs text-slate-600">좌변 (응답값 또는 산술)</Label>
-        <LeftOperandEditor value={left} onChange={emitLeft} />
+        <LeftOperandEditor
+          value={left}
+          onChange={emitLeft}
+          sourceQuestionId={sourceQuestionId}
+        />
       </div>
 
       <div className="flex items-center gap-2">

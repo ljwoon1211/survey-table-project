@@ -16,8 +16,15 @@ import type { CellRef, LeftOperand, Question } from '@/types/survey';
 import { isPartialNumericInput, parseNumericInput } from '@/utils/numeric-input';
 
 interface Props {
-  value: LeftOperand;
-  onChange: (next: LeftOperand) => void;
+  /**
+   * 좌변. undefined 면 "응답값 그대로" — 부모 조건이 가리키는 셀의 응답값을 사용 (evaluateNumericComparisonV2 가 처리).
+   * binop 객체면 다른 셀들로 산술 계산.
+   * 옛 단일 cell 변종은 evaluate 로직이 backward-compat 하지만 UI 에서는 새로 만들지 않음.
+   */
+  value: LeftOperand | undefined;
+  onChange: (next: LeftOperand | undefined) => void;
+  /** 좌변 산술 picker 의 옵션을 이 question 의 셀만 우선 노출하려면 지정 (현재는 모든 input 셀 노출) */
+  sourceQuestionId?: string;
 }
 
 interface CellOption {
@@ -25,15 +32,16 @@ interface CellOption {
   cellRef: CellRef;
 }
 
-/**
- * 테이블 질문의 모든 input 셀을 평탄화하여 셀렉터 옵션으로 변환.
- * 라벨 포맷: `질문제목 > 행라벨 / 셀라벨` (셀라벨 = exportLabel ?? cellCode ?? id slice).
- *
- * TableCell 에는 직접적인 label 필드가 없으므로 exportLabel > cellCode > id 순으로 fallback.
- */
-function collectInputCells(questions: Question[]): CellOption[] {
+function collectInputCells(questions: Question[], preferredQuestionId?: string): CellOption[] {
   const out: CellOption[] = [];
-  for (const q of questions) {
+  // 먼저 preferredQuestionId 의 셀을 위로, 그 다음 다른 질문 셀
+  const orderedQuestions = preferredQuestionId
+    ? [
+        ...questions.filter((q) => q.id === preferredQuestionId),
+        ...questions.filter((q) => q.id !== preferredQuestionId),
+      ]
+    : questions;
+  for (const q of orderedQuestions) {
     if (q.type !== 'table' || !q.tableRowsData) continue;
     for (const row of q.tableRowsData) {
       for (const c of row.cells ?? []) {
@@ -52,18 +60,15 @@ function collectInputCells(questions: Question[]): CellOption[] {
 
 const emptyCellRef = (): CellRef => ({ kind: 'cell', questionId: '', cellId: '' });
 
-const isRealCellRef = (ref: CellRef): boolean =>
-  Boolean(ref.questionId && ref.cellId);
-
-export function LeftOperandEditor({ value, onChange }: Props) {
+export function LeftOperandEditor({ value, onChange, sourceQuestionId }: Props) {
   const questions = useSurveyBuilderStore((s) => s.currentSurvey.questions);
-  const cells = collectInputCells(questions);
+  const cells = collectInputCells(questions, sourceQuestionId);
 
-  const isBinop = value.kind === 'binop';
-  const mode: 'cell' | 'binop' = isBinop ? 'binop' : 'cell';
+  // 값이 binop 이면 "셀 산술", 아니면 (undefined 또는 옛 단일 cell 데이터) "응답값 그대로".
+  const isBinop = value?.kind === 'binop';
+  const mode: 'current' | 'binop' = isBinop ? 'binop' : 'current';
 
-  // literal 우변은 raw string 으로 controlled — 부분 입력(`-`, `.`) 보존을 위해
-  // value.right.value 가 바뀌면 sync, 사용자 타이핑 중에는 raw 만 갱신.
+  // binop.right 가 literal 일 때 raw string 보존 (부분 입력 `-`, `.` 허용)
   const [literalRaw, setLiteralRaw] = useState<string>(() =>
     isBinop && value.right.kind === 'literal' ? String(value.right.value) : '',
   );
@@ -71,40 +76,27 @@ export function LeftOperandEditor({ value, onChange }: Props) {
   useEffect(() => {
     if (isBinop && value.right.kind === 'literal') {
       const next = String(value.right.value);
-      // raw 가 parsing 결과와 동일한 값이면 갱신하지 않아 부분 입력 보존.
       if (parseNumericInput(literalRaw) !== value.right.value) {
         setLiteralRaw(next);
       }
     }
   }, [isBinop, value, literalRaw]);
 
-  const onModeChange = (next: 'cell' | 'binop') => {
+  const onModeChange = (next: 'current' | 'binop') => {
     if (next === mode) return;
-    if (next === 'cell') {
-      // binop → cell: binop.left 가 실제 셀이면 보존, 아니면 기존 left 슬롯도 비어있으니 그대로.
-      if (isBinop && isRealCellRef(value.left)) {
-        onChange(value.left);
-      } else {
-        onChange(emptyCellRef());
-      }
+    if (next === 'current') {
+      onChange(undefined);
     } else {
-      // cell → binop: 현재 단일 셀을 left 로 보존, right 는 비어있는 셀로 초기화.
-      const preservedLeft: CellRef = isRealCellRef(value as CellRef)
-        ? (value as CellRef)
-        : emptyCellRef();
       onChange({
         kind: 'binop',
         op: '/',
-        left: preservedLeft,
+        left: emptyCellRef(),
         right: emptyCellRef(),
       });
     }
   };
 
-  const renderCellSelect = (
-    ref: CellRef,
-    on: (next: CellRef) => void,
-  ) => {
+  const renderCellSelect = (ref: CellRef, on: (next: CellRef) => void) => {
     const composite =
       ref.questionId && ref.cellId ? `${ref.questionId}::${ref.cellId}` : '';
     return (
@@ -140,16 +132,23 @@ export function LeftOperandEditor({ value, onChange }: Props) {
 
   return (
     <div className="space-y-2">
-      <Tabs value={mode} onValueChange={(v) => onModeChange(v as 'cell' | 'binop')}>
+      <Tabs
+        value={mode}
+        onValueChange={(v) => onModeChange(v as 'current' | 'binop')}
+      >
         <TabsList>
-          <TabsTrigger value="cell">단일 셀</TabsTrigger>
-          <TabsTrigger value="binop">셀 산술 (셀 + 셀/숫자)</TabsTrigger>
+          <TabsTrigger value="current">응답값 그대로</TabsTrigger>
+          <TabsTrigger value="binop">셀 산술 (셀 ± 셀/숫자)</TabsTrigger>
         </TabsList>
       </Tabs>
 
-      {!isBinop && renderCellSelect(value, (next) => onChange(next))}
+      {mode === 'current' && (
+        <div className="text-xs text-gray-500">
+          위에서 선택한 셀의 응답값을 비교 좌변으로 사용합니다.
+        </div>
+      )}
 
-      {isBinop && (
+      {mode === 'binop' && isBinop && (
         <div className="space-y-2">
           <div className="grid grid-cols-[1fr_80px_1fr] items-center gap-2">
             {renderCellSelect(value.left, (next) =>
@@ -185,8 +184,6 @@ export function LeftOperandEditor({ value, onChange }: Props) {
                   if (!isPartialNumericInput(raw)) return;
                   setLiteralRaw(raw);
                   const parsed = parseNumericInput(raw);
-                  // 빈 입력·부분 입력은 store 에 반영하지 않고 raw 만 유지 →
-                  // 다음 입력에서 완전한 숫자가 되면 그때 commit.
                   if (parsed !== null) {
                     onChange({
                       ...value,
