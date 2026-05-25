@@ -143,7 +143,7 @@ export function LookupLibrarySection() {
                 </button>
                 <button
                   type="button"
-                  className="text-blue-600 hover:text-blue-700"
+                  className="rounded p-0.5 text-blue-500 hover:bg-blue-50 hover:text-blue-800"
                   onClick={() => void handleAddToSurvey(lut.id)}
                   title="이 설문에 추가"
                   aria-label="이 설문에 추가"
