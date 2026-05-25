@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react';
 
-import { Database, Plus, Upload } from 'lucide-react';
+import { Database, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 
 import {
   copySavedLookupToSurveyAction,
   createSavedLookupAction,
+  deleteSavedLookupAction,
   listSavedLookupsAction,
+  updateSavedLookupAction,
 } from '@/actions/lookup-actions';
 import { Button } from '@/components/ui/button';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
@@ -33,6 +35,8 @@ export function LookupLibrarySection() {
   const [editOpen, setEditOpen] = useState(false);
   const [csvOpen, setCsvOpen] = useState(false);
   const [editInitial, setEditInitial] = useState<Partial<LookupDraft> | undefined>(undefined);
+  // 편집 중인 항목 id — null 이면 새로 만들기, 있으면 기존 LUT 수정.
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const reload = async () => {
     const list = await listSavedLookupsAction();
@@ -43,12 +47,39 @@ export function LookupLibrarySection() {
     void reload();
   }, []);
 
+  const closeEdit = () => {
+    setEditOpen(false);
+    setEditingId(null);
+    setEditInitial(undefined);
+  };
+
   const handleNew = () => {
+    setEditingId(null);
     setEditInitial(undefined);
     setEditOpen(true);
   };
 
+  const handleEdit = (lut: SavedLookup) => {
+    setEditingId(lut.id);
+    setEditInitial({
+      name: lut.name,
+      description: lut.description,
+      category: lut.category,
+      tags: lut.tags,
+      columns: lut.columns,
+      rows: lut.rows,
+    });
+    setEditOpen(true);
+  };
+
+  const handleDelete = async (lut: SavedLookup) => {
+    if (!confirm(`보관함에서 "${lut.name}" 을(를) 삭제할까요?`)) return;
+    await deleteSavedLookupAction(lut.id);
+    await reload();
+  };
+
   const handleCsvImported = (result: CsvImportResult) => {
+    setEditingId(null);
     setEditInitial({
       name: '',
       category: 'custom',
@@ -60,12 +91,16 @@ export function LookupLibrarySection() {
   };
 
   const handleSave = async (draft: LookupDraft) => {
-    await createSavedLookupAction(draft);
-    setEditOpen(false);
+    if (editingId) {
+      await updateSavedLookupAction(editingId, draft);
+    } else {
+      await createSavedLookupAction(draft);
+    }
+    closeEdit();
     await reload();
   };
 
-  const handleLoad = async (savedLookupId: string) => {
+  const handleAddToSurvey = async (savedLookupId: string) => {
     if (!surveyId) return;
     await copySavedLookupToSurveyAction(surveyId, savedLookupId);
     await reload();
@@ -77,23 +112,46 @@ export function LookupLibrarySection() {
         <Database size={14} />
         외부 데이터
       </div>
+      <div className="text-muted-foreground px-3 pb-2 text-xs">
+        모든 설문에서 재사용 가능한 LUT 보관함입니다. "이 설문에 추가" 를 눌러야 조건 편집에서 선택 가능합니다.
+      </div>
 
       <ul className="space-y-1 px-3 pb-2">
         {items.length === 0 ? (
           <li className="text-xs text-gray-400">등록된 LUT 없음</li>
         ) : (
           items.map((lut) => (
-            <li key={lut.id} className="group flex items-center justify-between">
+            <li key={lut.id} className="group flex items-center justify-between gap-2 py-1">
               <span className="truncate text-sm" title={lut.name}>
                 {lut.name}
               </span>
-              <button
-                type="button"
-                className="text-xs text-blue-600 opacity-0 hover:underline group-hover:opacity-100"
-                onClick={() => void handleLoad(lut.id)}
-              >
-                불러오기
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleEdit(lut)}
+                  className="text-gray-400 hover:text-gray-700"
+                  title="편집"
+                  aria-label="LUT 편집"
+                >
+                  <Pencil size={12} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDelete(lut)}
+                  className="text-gray-400 hover:text-red-500"
+                  title="삭제"
+                  aria-label="LUT 삭제"
+                >
+                  <Trash2 size={12} />
+                </button>
+                <button
+                  type="button"
+                  className="text-xs text-blue-600 hover:underline"
+                  onClick={() => void handleAddToSurvey(lut.id)}
+                >
+                  이 설문에 추가
+                </button>
+              </div>
             </li>
           ))
         )}
@@ -112,7 +170,7 @@ export function LookupLibrarySection() {
       <LookupEditModal
         isOpen={editOpen}
         initialValue={editInitial}
-        onClose={() => setEditOpen(false)}
+        onClose={closeEdit}
         onSave={handleSave}
       />
       <LookupCsvImport
