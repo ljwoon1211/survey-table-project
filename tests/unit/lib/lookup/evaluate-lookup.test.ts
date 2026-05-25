@@ -123,6 +123,28 @@ describe('evaluateRightOperand', () => {
     expect(r).toEqual({ ok: false, reason: 'lookup-value-missing' });
   });
 
+  it('lookup: keyMapping 빈 배열 → attrs-key-missing fail-safe SHOW', () => {
+    const op: RightOperand = {
+      kind: 'lookup',
+      surveyLookupId: 'lut-1',
+      keyMapping: [],
+      valueColumn: '2026년도_적용액',
+    };
+    const r = evaluateRightOperand(op, ctx({ 개최대륙: '유럽' }));
+    expect(r).toEqual({ ok: false, reason: 'attrs-key-missing' });
+  });
+
+  it('lookup: keyMapping row 의 lutKey 또는 attrsKey 가 비어있으면 attrs-key-missing', () => {
+    const op: RightOperand = {
+      kind: 'lookup',
+      surveyLookupId: 'lut-1',
+      keyMapping: [{ lutKey: '', attrsKey: '개최대륙' }],
+      valueColumn: '2026년도_적용액',
+    };
+    const r = evaluateRightOperand(op, ctx({ 개최대륙: '유럽' }));
+    expect(r).toEqual({ ok: false, reason: 'attrs-key-missing' });
+  });
+
   it('lookup: valueColumn 이 LUT 의 columns 목록에 없으면 lookup-value-missing', () => {
     const op: RightOperand = {
       kind: 'lookup',

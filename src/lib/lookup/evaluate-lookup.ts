@@ -13,9 +13,19 @@ export function evaluateRightOperand(
   const lookup = ctx.lookups.find((l) => l.id === op.surveyLookupId);
   if (!lookup) return { ok: false, reason: 'lookup-not-found' };
 
+  // keyMapping 자체가 비어있으면 매칭 기준이 없는 상태 → fail-safe SHOW.
+  // (LookupComparandEditor 가 비어있는 상태로 저장되었거나 옛 데이터 등)
+  if (op.keyMapping.length === 0) {
+    return { ok: false, reason: 'attrs-key-missing' };
+  }
+
   // keyMapping 으로 keys 만들기
   const keys: Record<string, string | undefined> = {};
   for (const { lutKey, attrsKey } of op.keyMapping) {
+    // lutKey 또는 attrsKey 어느 한쪽이 빈 행이면 매핑이 미완성 → fail-safe SHOW
+    if (!lutKey || !attrsKey) {
+      return { ok: false, reason: 'attrs-key-missing' };
+    }
     const v = ctx.contactAttrs[attrsKey];
     if (v === undefined || v === '') {
       return { ok: false, reason: 'attrs-key-missing' };

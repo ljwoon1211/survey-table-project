@@ -102,8 +102,13 @@ export function LookupLibrarySection() {
 
   const handleAddToSurvey = async (savedLookupId: string) => {
     if (!surveyId) return;
-    await copySavedLookupToSurveyAction(surveyId, savedLookupId);
-    await reload();
+    try {
+      await copySavedLookupToSurveyAction(surveyId, savedLookupId);
+      await reload();
+    } catch (e) {
+      // 사용자에게 최소한의 피드백 — toast 인프라가 없어 alert 사용
+      alert(`설문에 추가하지 못했습니다: ${(e as Error).message ?? '알 수 없는 오류'}`);
+    }
   };
 
   return (
