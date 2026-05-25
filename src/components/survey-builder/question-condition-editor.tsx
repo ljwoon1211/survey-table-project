@@ -733,57 +733,143 @@ export const QuestionConditionEditor = forwardRef<
                                   </select>
                                 </div>
 
-                                {/* 추가 조건 확인할 옵션 선택 (숫자 셀이면 NumericComparisonEditor, 아니면 TableOptionSelector) */}
+                                {/* 추가 조건 — 값 비교 펼치기 패턴 */}
                                 {condition.additionalConditions &&
                                   condition.additionalConditions.cellColumnIndex !== undefined &&
-                                  sourceQuestion &&
                                   (() => {
-                                    const ac = condition.additionalConditions;
+                                    const ac = condition.additionalConditions!;
                                     const effectiveRowIds =
                                       (condition.tableConditions?.rowIds?.length ?? 0) > 0
                                         ? (condition.tableConditions?.rowIds ?? [])
-                                        : sourceQuestion.tableRowsData?.map((r) => r.id) || [];
+                                        : sourceQuestion?.tableRowsData?.map((r) => r.id) || [];
                                     const acKind = detectCellTypeKind(
                                       sourceQuestion,
                                       effectiveRowIds,
                                       ac.cellColumnIndex,
                                     );
-                                    return acKind === 'numeric-input' ? (
-                                      <NumericComparisonEditor
-                                        idPrefix={`numeric-additional-${condition.id}`}
-                                        sourceQuestionId={condition.sourceQuestionId}
-                                        value={ac.numericComparison}
-                                        onChange={(nc) => {
-                                          updateCondition(condition.id, {
-                                            additionalConditions: {
-                                              ...ac,
-                                              expectedValues: undefined,
-                                              numericComparison: nc,
-                                            },
-                                          });
-                                        }}
-                                      />
-                                    ) : ac.checkType === 'input' ? null : (
-                                      <TableOptionSelector
-                                        question={sourceQuestion}
-                                        rowIds={effectiveRowIds}
-                                        colIndex={ac.cellColumnIndex}
-                                        expectedValues={ac.expectedValues}
-                                        onChange={(values) => {
-                                          updateCondition(condition.id, {
-                                            additionalConditions: {
-                                              ...ac,
-                                              expectedValues: values,
-                                              numericComparison: undefined,
-                                            },
-                                          });
-                                        }}
-                                        helpText="선택한 옵션들 중 하나가 선택되었는지 확인합니다. 비워두면 아무거나 선택되었는지만 확인합니다."
-                                        multipleRows={
-                                          (condition.tableConditions?.rowIds?.length ?? 0) > 1 ||
-                                          (condition.tableConditions?.rowIds?.length ?? 0) === 0
-                                        }
-                                      />
+                                    const hasComparison =
+                                      !!ac.expectedValues || !!ac.numericComparison;
+                                    const disabled =
+                                      acKind === 'mixed' ||
+                                      acKind === 'unsupported' ||
+                                      acKind === 'text-input';
+
+                                    if (!hasComparison) {
+                                      return (
+                                        <div className="space-y-1">
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={disabled}
+                                            onClick={() => {
+                                              if (acKind === 'option') {
+                                                updateCondition(condition.id, {
+                                                  additionalConditions: {
+                                                    ...ac,
+                                                    expectedValues: [],
+                                                    numericComparison: undefined,
+                                                  },
+                                                });
+                                              } else if (acKind === 'numeric-input') {
+                                                updateCondition(condition.id, {
+                                                  additionalConditions: {
+                                                    ...ac,
+                                                    expectedValues: undefined,
+                                                    numericComparison: {
+                                                      operator: '==',
+                                                      comparand: { kind: 'literal', value: 0 },
+                                                    },
+                                                  },
+                                                });
+                                              }
+                                            }}
+                                          >
+                                            <Plus className="mr-1 h-3 w-3" />
+                                            값 비교 조건 추가
+                                          </Button>
+                                          {acKind === 'mixed' && (
+                                            <p className="text-xs text-amber-700">
+                                              선택한 행들의 셀 타입이 달라 값 비교를 적용할 수 없습니다.
+                                            </p>
+                                          )}
+                                          {acKind === 'text-input' && (
+                                            <p className="text-xs text-slate-500">
+                                              텍스트 일치 매칭은 다음 업데이트에서 제공됩니다. 지금은 응답 유무로만 검사합니다.
+                                            </p>
+                                          )}
+                                          {acKind === 'unsupported' && (
+                                            <p className="text-xs text-slate-500">
+                                              선택한 셀 타입은 값 비교를 지원하지 않습니다.
+                                            </p>
+                                          )}
+                                        </div>
+                                      );
+                                    }
+
+                                    return (
+                                      <div className="space-y-2 rounded-md border border-slate-200 p-3">
+                                        <div className="flex items-center justify-between">
+                                          <Label className="text-sm font-medium">값 비교 조건</Label>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                              updateCondition(condition.id, {
+                                                additionalConditions: {
+                                                  ...ac,
+                                                  expectedValues: undefined,
+                                                  numericComparison: undefined,
+                                                },
+                                              });
+                                            }}
+                                            aria-label="값 비교 조건 해제"
+                                          >
+                                            <X className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                        {acKind === 'numeric-input' ? (
+                                          <NumericComparisonEditor
+                                            idPrefix={`numeric-additional-${condition.id}`}
+                                            value={ac.numericComparison}
+                                            onChange={(nc) => {
+                                              updateCondition(condition.id, {
+                                                additionalConditions: {
+                                                  ...ac,
+                                                  expectedValues: undefined,
+                                                  numericComparison: nc,
+                                                },
+                                              });
+                                            }}
+                                          />
+                                        ) : acKind === 'option' && sourceQuestion ? (
+                                          <TableOptionSelector
+                                            question={sourceQuestion}
+                                            rowIds={effectiveRowIds}
+                                            colIndex={ac.cellColumnIndex}
+                                            expectedValues={ac.expectedValues}
+                                            onChange={(values) => {
+                                              updateCondition(condition.id, {
+                                                additionalConditions: {
+                                                  ...ac,
+                                                  expectedValues: values,
+                                                  numericComparison: undefined,
+                                                },
+                                              });
+                                            }}
+                                            helpText="선택한 옵션들 중 하나가 선택되었는지 확인합니다."
+                                            multipleRows={
+                                              (condition.tableConditions?.rowIds?.length ?? 0) > 1 ||
+                                              (condition.tableConditions?.rowIds?.length ?? 0) === 0
+                                            }
+                                          />
+                                        ) : (
+                                          <p className="text-xs text-amber-700">
+                                            이 비교 조건은 더 이상 셀 타입과 일치하지 않습니다. [x] 로 해제하고 다시 추가해주세요.
+                                          </p>
+                                        )}
+                                      </div>
                                     );
                                   })()}
                               </div>
