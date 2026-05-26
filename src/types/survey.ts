@@ -1,3 +1,5 @@
+import type { ContactColumnScheme } from '@/db/schema/schema-types';
+
 export type QuestionType =
   | 'text'
   | 'textarea'
@@ -81,13 +83,99 @@ export interface TableValidationRule {
 // 질문 표시 조건 논리 타입
 export type ConditionLogicType = 'AND' | 'OR' | 'NOT';
 
-// 분기 조건 우변 (forward-compat union, 이번 구현은 'literal' 만 처리)
-export type ComparandRef = { kind: 'literal'; value: number };
+// 분기 조건 좌변 — 단일 셀 또는 1단계 binop (L5 폭증 방지)
+export type CellRef = { kind: 'cell'; questionId: string; cellId: string };
 
-// 분기 조건 숫자 비교 (input + inputType='number' 셀 전용)
+export type LeftOperand =
+  | CellRef
+  | {
+      kind: 'binop';
+      op: '+' | '-' | '*' | '/';
+      left: CellRef;
+      right: CellRef | { kind: 'literal'; value: number };
+    };
+
+// 분기 조건 우변 — literal (기존 L2) 또는 LUT 룩업 (신규 L4)
+export type RightOperand =
+  | { kind: 'literal'; value: number }
+  | {
+      kind: 'lookup';
+      surveyLookupId: string;
+      keyMapping: Array<{ lutKey: string; attrsKey: string }>;
+      // LUT 가 다중 값 컬럼을 가질 수 있으므로 비교 시점에 어느 값 컬럼을 쓸지 명시.
+      // 빈 문자열이면 평가 시 lookup-value-missing 으로 fail-safe SHOW.
+      valueColumn: string;
+    };
+
+// 분기 조건 숫자 비교
 export interface NumericComparison {
   operator: '==' | '!=' | '>' | '<' | '>=' | '<=';
-  comparand: ComparandRef;
+  // 하위 호환: 기존 데이터는 left 가 없고 comparand 만 있음.
+  // 평가 시 left undefined 면 "현재 평가 중인 cellValue" 를 좌변으로 본다.
+  left?: LeftOperand;
+  // 하위 호환: 기존 데이터는 comparand 사용. 새 데이터는 right 사용.
+  comparand?: { kind: 'literal'; value: number };
+  right?: RightOperand;
+}
+
+// 설문에 복사된 LUT 사본 (snapshot 시점 freeze)
+// LUT 자체는 키/값 구분 없이 columns + rows 만 보유. 어떤 컬럼이 키이고 어떤 컬럼이
+// 비교 값인지는 조건 에디터(RightOperand.lookup)에서 결정한다.
+export interface SurveyLookup {
+  id: string; // nanoid
+  name: string;
+  sourceSavedLookupId?: string;
+  columns: string[];
+  rows: Array<Record<string, string | number>>;
+}
+
+// 보관함 LUT
+export interface SavedLookup {
+  id: string;
+  name: string;
+  description?: string;
+  category: string;
+  tags: string[];
+  columns: string[];
+  rows: Array<Record<string, string | number>>;
+  usageCount: number;
+  isPreset: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// expression 조건 모드 — operand 재귀 union
+export type ExpressionOperand =
+  | { kind: 'literal'; value: number | string }
+  | { kind: 'cell'; questionId: string; cellId: string }
+  | { kind: 'question'; questionId: string }
+  | {
+      kind: 'lookup';
+      surveyLookupId: string;
+      keyMapping: Array<{ lutKey: string; attrsKey: string }>;
+      valueColumn: string;
+    }
+  | { kind: 'attr'; attrsKey: string }
+  | {
+      kind: 'binop';
+      op: '+' | '-' | '*' | '/';
+      left: ExpressionOperand;
+      right: ExpressionOperand;
+    };
+
+export interface ExpressionComparison {
+  left: ExpressionOperand;
+  op: '==' | '!=' | '>' | '<' | '>=' | '<=';
+  right: ExpressionOperand;
+}
+
+export type ExpressionClause =
+  | { kind: 'comparison'; comparison: ExpressionComparison }
+  | { kind: 'group'; group: ExpressionConditionConfig };
+
+export interface ExpressionConditionConfig {
+  clauses: ExpressionClause[];
+  joinOps: Array<'AND' | 'OR'>;
 }
 
 // 질문 표시 조건
@@ -95,7 +183,9 @@ export interface QuestionCondition {
   id: string;
   name?: string; // 조건 이름 (선택사항)
   sourceQuestionId: string; // 조건을 확인할 질문 ID
-  conditionType: 'value-match' | 'table-cell-check' | 'custom'; // 조건 타입
+  conditionType: 'value-match' | 'table-cell-check' | 'expression' | 'custom'; // 조건 타입
+  // conditionType === 'expression' 일 때만 사용
+  expressionConfig?: ExpressionConditionConfig;
   // value-match: 특정 값과 일치하는지 확인 (radio, select 등)
   requiredValues?: string[]; // 필요한 값들
   // table-cell-check: 테이블의 특정 셀이 체크되었는지 확인
@@ -388,6 +478,9 @@ export interface Survey {
   groups?: QuestionGroup[]; // 질문 그룹 목록
   questions: Question[];
   settings: SurveySettings;
+  lookups?: SurveyLookup[]; // 설문에 복사된 LUT 사본 목록
+  // 컨택리스트 표시 컬럼 스킴 — 빌더에서 attrs 키 셀렉터·LUT 키 매핑 UI 가 참조.
+  contactColumns?: ContactColumnScheme;
   createdAt: Date;
   updatedAt: Date;
 }

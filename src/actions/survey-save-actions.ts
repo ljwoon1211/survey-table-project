@@ -302,25 +302,33 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
     const surveyId = surveyData.id;
 
     if (existingSurvey) {
+      // lookups 는 별도 server action(보관함 자동 sync, upsertSurveyLookupAction 등)으로
+      // 갱신될 수 있어 빌더 store 가 stale 일 수 있다. surveyData.lookups 가 undefined 면
+      // 명시적으로 set 하지 않아 DB 의 최신 값 보존.
+      const updateSet: Record<string, unknown> = {
+        title: surveyData.title,
+        description: surveyData.description,
+        slug: surveyData.slug,
+        isPublic: surveyData.settings.isPublic,
+        allowMultipleResponses: surveyData.settings.allowMultipleResponses,
+        showProgressBar: surveyData.settings.showProgressBar,
+        shuffleQuestions: surveyData.settings.shuffleQuestions,
+        requireLogin: surveyData.settings.requireLogin,
+        endDate: surveyData.settings.endDate ? new Date(surveyData.settings.endDate) : null,
+        maxResponses: surveyData.settings.maxResponses ?? null,
+        thankYouMessage: surveyData.settings.thankYouMessage,
+        requireInviteToken: surveyData.settings.requireInviteToken ?? false,
+        updatedAt: new Date(),
+      };
+      if (surveyData.lookups !== undefined) {
+        updateSet.lookups = surveyData.lookups;
+      }
       await tx
         .update(surveys)
-        .set({
-          title: surveyData.title,
-          description: surveyData.description,
-          slug: surveyData.slug,
-          isPublic: surveyData.settings.isPublic,
-          allowMultipleResponses: surveyData.settings.allowMultipleResponses,
-          showProgressBar: surveyData.settings.showProgressBar,
-          shuffleQuestions: surveyData.settings.shuffleQuestions,
-          requireLogin: surveyData.settings.requireLogin,
-          endDate: surveyData.settings.endDate ? new Date(surveyData.settings.endDate) : null,
-          maxResponses: surveyData.settings.maxResponses ?? null,
-          thankYouMessage: surveyData.settings.thankYouMessage,
-          requireInviteToken: surveyData.settings.requireInviteToken ?? false,
-          updatedAt: new Date(),
-        })
+        .set(updateSet)
         .where(eq(surveys.id, surveyData.id));
     } else {
+      // INSERT 시점은 새 설문이라 lookups 가 비어있는 게 정상. surveyData.lookups 가 있으면 그대로, 없으면 빈 배열.
       await tx.insert(surveys).values({
         id: surveyData.id,
         title: surveyData.title,
@@ -336,6 +344,7 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
         maxResponses: surveyData.settings.maxResponses ?? null,
         thankYouMessage: surveyData.settings.thankYouMessage,
         requireInviteToken: surveyData.settings.requireInviteToken ?? false,
+        lookups: surveyData.lookups ?? [],
       });
     }
 

@@ -49,6 +49,7 @@ import {
   shouldDisplayDynamicGroup,
   shouldDisplayQuestion,
   shouldDisplayRow,
+  type BranchEvalCtx,
 } from '@/utils/branch-logic';
 
 type ResponsesMap = Record<string, unknown>;
@@ -82,15 +83,42 @@ function getDisplayableItemsOfStep(
   responses: ResponsesMap,
   allQuestions: Question[],
   allGroups: QuestionGroup[],
+  evalCtx?: BranchEvalCtx,
 ): Question[] {
   if (step.kind === 'table') {
-    return shouldDisplayQuestion(step.question, responses, allQuestions, allGroups)
+    return shouldDisplayQuestion(step.question, responses, allQuestions, allGroups, evalCtx)
       ? [step.question]
       : [];
   }
   return step.items
-    .filter((i) => shouldDisplayQuestion(i.question, responses, allQuestions, allGroups))
+    .filter((i) => shouldDisplayQuestion(i.question, responses, allQuestions, allGroups, evalCtx))
     .map((i) => i.question);
+}
+
+/**
+ * responses (Record<string, unknown>) → LookupEvalCtx 가 기대하는
+ * Record<string, Record<string, string | undefined>> 형태로 변환.
+ *
+ * - table 질문은 응답이 object (cell-id → value) 형태 → 그대로 평탄화 가능.
+ * - 비-table 응답은 LUT 비교 좌변이 CellRef 일 때만 의미가 있으므로 건너뜀.
+ * - LUT 의 좌변/우변은 항상 table input 셀을 가리키므로 이 변환으로 충분.
+ */
+function responsesToLookupShape(
+  responses: ResponsesMap,
+): Record<string, Record<string, string | undefined>> {
+  const out: Record<string, Record<string, string | undefined>> = {};
+  for (const [qid, raw] of Object.entries(responses)) {
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      const cells: Record<string, string | undefined> = {};
+      for (const [cellId, cellVal] of Object.entries(raw as Record<string, unknown>)) {
+        if (typeof cellVal === 'string') cells[cellId] = cellVal;
+        else if (cellVal == null) cells[cellId] = undefined;
+        // checkbox 배열 / object 응답은 numeric 비교 대상 아님 → skip
+      }
+      out[qid] = cells;
+    }
+  }
+  return out;
 }
 
 export default function SurveyResponsePage() {
@@ -235,6 +263,17 @@ export default function SurveyResponsePage() {
   const questions = useMemo(() => loadedSurvey?.questions || [], [loadedSurvey]);
   const groups = useMemo(() => loadedSurvey?.groups || [], [loadedSurvey]);
 
+  // 분기/표시 평가 컨텍스트 — 우변 LUT 룩업 비교가 작동하려면 lookups + contactAttrs 가 필요.
+  // responses 는 cell-id 평탄화 형태로 변환 (table 응답만 의미 있음, 비-table 은 LUT 좌변이 될 수 없음).
+  const evalCtx = useMemo<BranchEvalCtx>(
+    () => ({
+      responses: responsesToLookupShape(responses),
+      contactAttrs,
+      lookups: loadedSurvey?.lookups ?? [],
+    }),
+    [responses, contactAttrs, loadedSurvey?.lookups],
+  );
+
   // 상위그룹 단위 + 테이블 분리 렌더 스텝
   const steps = useMemo<RenderStep[]>(
     () => buildRenderSteps(questions, groups),
@@ -245,9 +284,9 @@ export default function SurveyResponsePage() {
   const visibleSteps = useMemo<RenderStep[]>(
     () =>
       steps.filter(
-        (s) => getDisplayableItemsOfStep(s, responses, questions, groups).length > 0,
+        (s) => getDisplayableItemsOfStep(s, responses, questions, groups, evalCtx).length > 0,
       ),
-    [steps, responses, questions, groups],
+    [steps, responses, questions, groups, evalCtx],
   );
 
   const currentStep: RenderStep | undefined = steps[currentStepIndex];
@@ -256,15 +295,15 @@ export default function SurveyResponsePage() {
   const currentStepQuestions = useMemo<Question[]>(
     () =>
       currentStep
-        ? getDisplayableItemsOfStep(currentStep, responses, questions, groups)
+        ? getDisplayableItemsOfStep(currentStep, responses, questions, groups, evalCtx)
         : [],
-    [currentStep, responses, questions, groups],
+    [currentStep, responses, questions, groups, evalCtx],
   );
 
   // 전역으로 표시되는 모든 질문 (노출 로깅용)
   const visibleQuestions = useMemo(
-    () => questions.filter((q) => shouldDisplayQuestion(q, responses, questions, groups)),
-    [questions, responses, groups],
+    () => questions.filter((q) => shouldDisplayQuestion(q, responses, questions, groups, evalCtx)),
+    [questions, responses, groups, evalCtx],
   );
 
   // 모바일 화면 감지 (matchMedia — resize 루프 방지)
@@ -295,7 +334,7 @@ export default function SurveyResponsePage() {
       for (let i = startIndex; i < steps.length; i += 1) {
         const s = steps[i];
         if (!s) continue;
-        if (getDisplayableItemsOfStep(s, responses, questions, groups).length > 0) {
+        if (getDisplayableItemsOfStep(s, responses, questions, groups, evalCtx).length > 0) {
           return i;
         }
       }
@@ -548,7 +587,7 @@ export default function SurveyResponsePage() {
 
     try {
       const unansweredRequired = questions.filter((q) => {
-        if (!shouldDisplayQuestion(q, responses, questions, groups)) return false;
+        if (!shouldDisplayQuestion(q, responses, questions, groups, evalCtx)) return false;
         return isQuestionRequired(q) && !isQuestionAnswered(q);
       });
 
@@ -621,7 +660,7 @@ export default function SurveyResponsePage() {
                 .filter(
                   (g) =>
                     g.enabled &&
-                    shouldDisplayDynamicGroup(g, responses as Record<string, unknown>, questions),
+                    shouldDisplayDynamicGroup(g, responses as Record<string, unknown>, questions, evalCtx),
                 )
                 .map((g) => g.groupId),
             );
@@ -639,7 +678,7 @@ export default function SurveyResponsePage() {
 
             return q.tableRowsData!
               .filter((row) => {
-                if (!shouldDisplayRow(row, responses as Record<string, unknown>, questions))
+                if (!shouldDisplayRow(row, responses as Record<string, unknown>, questions, evalCtx))
                   return false;
                 if (hasDynamic) {
                   if (row.dynamicGroupId && enabledGroupIds.has(row.dynamicGroupId)) {
@@ -953,6 +992,7 @@ export default function SurveyResponsePage() {
             responses={responses}
             questions={questions}
             groups={groups}
+            evalCtx={evalCtx}
             onResponse={handleResponse}
             highlightQuestionIds={highlightQuestionIds}
           />
@@ -1142,6 +1182,7 @@ function GroupStepView({
   responses,
   questions,
   groups,
+  evalCtx,
   onResponse,
   highlightQuestionIds,
 }: {
@@ -1149,6 +1190,7 @@ function GroupStepView({
   responses: ResponsesMap;
   questions: Question[];
   groups: QuestionGroup[];
+  evalCtx: BranchEvalCtx;
   onResponse: (questionId: string, value: unknown) => void;
   highlightQuestionIds: Set<string>;
 }) {
@@ -1156,9 +1198,9 @@ function GroupStepView({
   const visibleItems: StepItem[] = useMemo(
     () =>
       step.items.filter((it) =>
-        shouldDisplayQuestion(it.question, responses, questions, groups),
+        shouldDisplayQuestion(it.question, responses, questions, groups, evalCtx),
       ),
-    [step.items, responses, questions, groups],
+    [step.items, responses, questions, groups, evalCtx],
   );
 
   return (

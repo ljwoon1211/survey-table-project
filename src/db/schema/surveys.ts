@@ -1,6 +1,8 @@
 import { relations } from 'drizzle-orm';
 import { boolean, integer, jsonb, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 
+import type { SurveyLookup } from '@/types/survey';
+
 import type {
   ContactColumnScheme,
   ContactResultCode,
@@ -40,6 +42,9 @@ export const surveys = pgTable('surveys', {
 
   // 컨택리스트 표시 컬럼 스킴 (slice 3 — 0014 마이그레이션)
   contactColumns: jsonb('contact_columns').$type<ContactColumnScheme>(),
+
+  // 설문에 복사된 LUT 사본 목록 — 외부 LUT 룩업 비교용 (T3 마이그레이션)
+  lookups: jsonb('lookups').$type<SurveyLookup[]>().default([]).notNull(),
 
   // 결과코드 사용자 정의 (NULL = DEFAULT_RESULT_CODES 폴백, slice 3 — 0016 마이그레이션)
   contactResultCodes: jsonb('contact_result_codes').$type<ContactResultCode[]>(),
@@ -262,6 +267,30 @@ export const savedQuestions = pgTable('saved_questions', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// LUT 보관함 테이블
+export const savedLookups = pgTable('saved_lookups', {
+  id: uuid('id').primaryKey().defaultRandom(),
+
+  // 메타데이터
+  name: text('name').notNull(),
+  description: text('description'),
+  tags: jsonb('tags').$type<string[]>().default([]).notNull(),
+  category: text('category').notNull(),
+
+  // LUT 데이터 — 키/값 구분은 조건 에디터에서만 한다. LUT 는 컬럼 + 행만 보유.
+  columns: jsonb('columns').$type<string[]>().notNull(),
+  rows: jsonb('rows').$type<Array<Record<string, string | number>>>().default([]).notNull(),
+
+  usageCount: integer('usage_count').default(0).notNull(),
+  isPreset: boolean('is_preset').default(false).notNull(),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type SavedLookupRow = typeof savedLookups.$inferSelect;
+export type NewSavedLookupRow = typeof savedLookups.$inferInsert;
 
 // 셀 보관함 테이블
 export const savedCells = pgTable('saved_cells', {

@@ -188,6 +188,8 @@ export async function getSurveyWithDetails(surveyId: string): Promise<SurveyType
       thankYouMessage: survey.thankYouMessage,
       requireInviteToken: survey.requireInviteToken,
     },
+    lookups: survey.lookups ?? [],
+    contactColumns: survey.contactColumns ?? undefined,
     createdAt: survey.createdAt,
     updatedAt: survey.updatedAt,
   };
@@ -234,6 +236,8 @@ export async function getSurveyForResponse(
           maxResponses?: number;
           thankYouMessage: string;
         };
+        // T17 이후 snapshot 에 포함. 이전 publish 본은 undefined → DB 의 현재 lookups 로 fallback.
+        lookups?: SurveyType['lookups'];
       };
 
       const surveyData: SurveyType = {
@@ -261,6 +265,8 @@ export async function getSurveyForResponse(
             : undefined,
           requireInviteToken: survey.requireInviteToken,
         },
+        lookups: snapshot.lookups ?? survey.lookups ?? [],
+        contactColumns: survey.contactColumns ?? undefined,
         createdAt: survey.createdAt,
         updatedAt: survey.updatedAt,
       };

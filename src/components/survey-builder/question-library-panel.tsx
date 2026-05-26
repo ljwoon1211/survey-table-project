@@ -57,6 +57,8 @@ import { hasBranchLogic, removeBranchLogic } from '@/stores/question-library-sto
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { Question, SavedQuestion } from '@/types/survey';
 
+import { LookupLibrarySection } from './lookup-library-section';
+
 // 카테고리 아이콘 매핑
 const categoryIcons: Record<string, React.ElementType> = {
   Users: Users,
@@ -521,6 +523,9 @@ export function QuestionLibraryPanel({
             })}
           </div>
         )}
+
+        {/* 외부 데이터 LUT 섹션 */}
+        <LookupLibrarySection />
       </div>
 
       {/* 미리보기 모달 */}

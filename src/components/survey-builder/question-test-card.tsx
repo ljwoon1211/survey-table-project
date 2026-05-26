@@ -7,11 +7,13 @@ import { Input } from '@/components/ui/input';
 import { isEmptyHtml } from '@/lib/utils';
 import { sanitizeRichHtml } from '@/lib/sanitize';
 import { useTestResponseStore } from '@/stores/test-response-store';
-import { Question } from '@/types/survey';
+import { Question, SurveyLookup } from '@/types/survey';
 import { getOptionsLayout } from '@/utils/options-layout';
+import { evaluateNumericComparisonV2 } from '@/utils/branch-logic';
 
 import { RankingQuestion } from '@/components/survey-response/ranking-question';
 
+import { ConditionDebugPanel } from './condition-debug-panel';
 import { InteractiveTableResponse } from './interactive-table-response';
 import { LazyMount } from './sortable-question-list';
 import { substituteTokens } from '@/lib/survey/substitute-tokens';
@@ -517,14 +519,19 @@ export function QuestionTestCard({
   question,
   index,
   testContactAttrs = {},
+  lookups = [],
 }: {
   question: Question;
   index: number;
-  /** 빌더 테스트 모드 진입 시 fetch 한 첫 컨택의 attrs. 토큰 치환에 사용. */
+  /** 빌더 테스트 모드 진입 시 fetch 한 첫 컨택의 attrs. 토큰 치환 + 분기 조건 평가에 사용. */
   testContactAttrs?: Record<string, string>;
+  /** 분기 조건 우변 LUT 룩업 평가에 사용. currentSurvey.lookups 를 전달. */
+  lookups?: SurveyLookup[];
 }) {
   const testResponse = useTestResponseStore((s) => s.testResponses[question.id]);
   const updateTestResponse = useTestResponseStore((s) => s.updateTestResponse);
+  // 디버그 패널 평가용 — 다른 질문 응답도 ctx 에 포함되도록 전체 testResponses 구독.
+  const allTestResponses = useTestResponseStore((s) => s.testResponses);
 
   const handleResponse = (value: unknown) => {
     updateTestResponse(
@@ -532,6 +539,42 @@ export function QuestionTestCard({
       value as string | string[] | Record<string, string | string[] | object>,
     );
   };
+
+  // displayCondition 의 numericComparison 들을 평가해서 디버그 패널 prop 으로 변환.
+  const debugConditions = useMemo(() => {
+    const out: Array<{ label: string; result: ReturnType<typeof evaluateNumericComparisonV2> }> = [];
+    const conds = question.displayCondition?.conditions ?? [];
+    // responses 를 LookupEvalCtx 가 기대하는 형태로 평탄화 (table 응답만 의미 있음).
+    const responsesShaped: Record<string, Record<string, string | undefined>> = {};
+    for (const [qid, raw] of Object.entries(allTestResponses)) {
+      if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        const cells: Record<string, string | undefined> = {};
+        for (const [cellId, cellVal] of Object.entries(raw as Record<string, unknown>)) {
+          if (typeof cellVal === 'string') cells[cellId] = cellVal;
+        }
+        responsesShaped[qid] = cells;
+      }
+    }
+    const ctx = { responses: responsesShaped, contactAttrs: testContactAttrs, lookups };
+
+    conds.forEach((c, idx) => {
+      const mainCmp = c.tableConditions?.numericComparison;
+      const addCmp = c.additionalConditions?.numericComparison;
+      if (mainCmp) {
+        out.push({
+          label: c.name?.trim() || `조건 ${idx + 1} (메인)`,
+          result: evaluateNumericComparisonV2(mainCmp, '', ctx),
+        });
+      }
+      if (addCmp) {
+        out.push({
+          label: `${c.name?.trim() || `조건 ${idx + 1}`} (추가)`,
+          result: evaluateNumericComparisonV2(addCmp, '', ctx),
+        });
+      }
+    });
+    return out;
+  }, [question.displayCondition, allTestResponses, testContactAttrs, lookups]);
 
   return (
     <Card className="border-l-4 border-l-blue-500 p-6" data-question-index={index}>
@@ -580,6 +623,15 @@ export function QuestionTestCard({
           />
         )}
       </div>
+
+      {debugConditions.length > 0 && (
+        <div className="mt-4 space-y-2">
+          <div className="text-xs font-semibold text-gray-500">표시 조건 평가</div>
+          {debugConditions.map((c, idx) => (
+            <ConditionDebugPanel key={idx} conditionLabel={c.label} result={c.result} />
+          ))}
+        </div>
+      )}
     </Card>
   );
 }

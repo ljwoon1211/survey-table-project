@@ -80,6 +80,9 @@ export interface SurveyBuilderState {
 
   // 서버에서 불러온 데이터 설정
   setSurvey: (survey: Survey) => void;
+  // 현재 surveyId 로 다시 fetch 해서 currentSurvey 를 갱신.
+  // LUT 보관함에서 upsert 한 직후처럼, 외부 변경 사항을 빌더에 즉시 반영할 때 호출.
+  refetchSurvey: () => Promise<void>;
   markPublished: () => void; // 배포 완료 후 호출
 
   // 액션들
@@ -144,6 +147,7 @@ const createDefaultSurvey = (): Survey => ({
   privateToken: generatePrivateToken(),
   groups: [],
   questions: [],
+  lookups: [],
   settings: defaultSurveySettings,
   createdAt: new Date(),
   updatedAt: new Date(),
@@ -175,6 +179,22 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           state.questionChanges = emptyChangeset();
           state.isMetadataDirty = false;
         }),
+
+      // surveyId 로 서버에서 다시 fetch 해서 setSurvey 까지 수행.
+      // 다른 server action 으로 currentSurvey 의 jsonb 필드(lookups 등)가 외부 변경됐을 때 사용.
+      refetchSurvey: async () => {
+        const surveyId = get().currentSurvey.id;
+        if (!surveyId) return;
+        const { getSurveyWithDetails } = await import('@/actions/query-actions');
+        const fresh = await getSurveyWithDetails(surveyId);
+        if (fresh) {
+          set((state) => {
+            // 빌더 dirty 상태와 changeset 은 보존 — refetch 는 단일 jsonb 갱신용이므로
+            // setSurvey 의 전체 reset 동작을 의도적으로 피한다.
+            state.currentSurvey = fresh;
+          });
+        }
+      },
 
       markPublished: () =>
         set((state) => {
