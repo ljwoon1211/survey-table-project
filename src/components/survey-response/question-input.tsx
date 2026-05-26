@@ -227,15 +227,15 @@ function RadioQuestion({
             >
               {option.label}
             </label>
-            {option.allowTextInput && (
-              <Input
-                value={optionTexts[option.id] ?? ''}
-                onChange={(e) => setOptionText(question.id, option.id, e.target.value)}
-                placeholder="상세 기재"
-                className="max-w-xs"
-              />
-            )}
           </div>
+          {option.allowTextInput && isSelected(option.value) && (
+            <Input
+              value={optionTexts[option.id] ?? ''}
+              onChange={(e) => setOptionText(question.id, option.id, e.target.value)}
+              placeholder="상세 기재"
+              className="ml-7"
+            />
+          )}
         </div>
       ))}
     </div>
@@ -338,15 +338,15 @@ function CheckboxQuestion({
               >
                 {option.label}
               </label>
-              {option.allowTextInput && (
-                <Input
-                  value={optionTexts[option.id] ?? ''}
-                  onChange={(e) => setOptionText(question.id, option.id, e.target.value)}
-                  placeholder="상세 기재"
-                  className="max-w-xs"
-                />
-              )}
             </div>
+            {option.allowTextInput && checked && (
+              <Input
+                value={optionTexts[option.id] ?? ''}
+                onChange={(e) => setOptionText(question.id, option.id, e.target.value)}
+                placeholder="상세 기재"
+                className="ml-7"
+              />
+            )}
           </div>
         );
       })}
