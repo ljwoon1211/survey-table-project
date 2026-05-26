@@ -233,7 +233,7 @@ function RadioQuestion({
               value={optionTexts[option.id] ?? ''}
               onChange={(e) => setOptionText(question.id, option.id, e.target.value)}
               placeholder="상세 기재"
-              className="ml-7"
+              className="ml-7 mr-2"
             />
           )}
         </div>
