@@ -95,7 +95,7 @@ export function ExpressionConditionEditor({
               <SelectTrigger className="w-24">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-64">
                 <SelectItem value="AND">AND</SelectItem>
                 <SelectItem value="OR">OR</SelectItem>
               </SelectContent>
@@ -190,7 +190,7 @@ function InlineArithmeticOperand({
           <SelectTrigger className="w-24">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-64">
             <SelectItem value="none">없음</SelectItem>
             {ARITH_OPS.map((op) => (
               <SelectItem key={op} value={op}>{ARITH_OP_LABELS[op]}</SelectItem>
@@ -242,7 +242,7 @@ function ComparisonClauseEditor({
           <SelectTrigger className="w-32">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-64">
             {COMPARISON_OPS.map((op) => (
               <SelectItem key={op} value={op}>{COMPARISON_OP_LABELS[op]}</SelectItem>
             ))}

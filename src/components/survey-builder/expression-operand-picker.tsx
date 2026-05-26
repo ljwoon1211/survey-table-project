@@ -84,7 +84,7 @@ export function ExpressionOperandPicker({
         <SelectTrigger id={`${idPrefix}-kind`} className="w-full">
           <SelectValue placeholder="operand 선택" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="max-h-64">
           {(Object.keys(KIND_LABELS) as Array<ExpressionOperand['kind']>)
             // depth 0 의 산술은 ComparisonClauseEditor 의 inline 셀렉트가 담당. 2-deep 케이스는 depth >= 1 에서만 노출.
             .filter((k) => k !== 'binop' || (canNestBinop && currentDepth >= 1))
@@ -193,7 +193,7 @@ function CellPickerSub({
         <SelectTrigger id={`${idPrefix}-q`}>
           <SelectValue placeholder="질문 선택" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="max-h-64">
           {tableQuestions.length === 0 && (
             <div className="p-2 text-xs text-slate-500">테이블 질문이 없습니다</div>
           )}
@@ -212,7 +212,7 @@ function CellPickerSub({
           <SelectTrigger id={`${idPrefix}-c`}>
             <SelectValue placeholder="셀 선택" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-64">
             {inputCells.length === 0 && (
               <div className="p-2 text-xs text-slate-500">이 질문에 input 셀이 없습니다</div>
             )}
@@ -250,7 +250,7 @@ function QuestionPickerSub({
       <SelectTrigger id={`${idPrefix}-q`}>
         <SelectValue placeholder="질문 선택" />
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent className="max-h-64">
         {eligible.length === 0 && (
           <div className="p-2 text-xs text-slate-500">사용 가능한 질문이 없습니다</div>
         )}
@@ -283,7 +283,7 @@ function AttrPickerSub({
       <SelectTrigger id={`${idPrefix}-attr`}>
         <SelectValue placeholder="컨택 속성 선택" />
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent className="max-h-64">
         {attrColumns.length === 0 && (
           <div className="p-2 text-xs text-slate-500">설문에 컨택 컬럼이 정의되지 않았습니다</div>
         )}
@@ -339,7 +339,7 @@ function LookupSub({
         <SelectTrigger id={`${idPrefix}-lut`}>
           <SelectValue placeholder="외부 데이터 선택" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="max-h-64">
           {lookups.length === 0 && (
             <div className="p-2 text-xs text-slate-500">등록된 외부 데이터가 없습니다</div>
           )}
@@ -359,7 +359,7 @@ function LookupSub({
               <SelectTrigger id={`${idPrefix}-vcol`}>
                 <SelectValue placeholder="컬럼 선택" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-64">
                 {lutColumns.length === 0 && (
                   <div className="p-2 text-xs text-slate-500">LUT 에 컬럼이 없습니다</div>
                 )}
@@ -383,7 +383,7 @@ function LookupSub({
                   <SelectTrigger className="flex-1">
                     <SelectValue placeholder="LUT 컬럼" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-64">
                     {lutColumns.map((c) => (
                       <SelectItem key={c} value={c}>
                         {c}
@@ -399,7 +399,7 @@ function LookupSub({
                   <SelectTrigger className="flex-1">
                     <SelectValue placeholder="컨택 속성" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-64">
                     {attrColumns.length === 0 && (
                       <div className="p-2 text-xs text-slate-500">컨택 컬럼이 없습니다</div>
                     )}
@@ -457,7 +457,7 @@ function BinopSub({
         <SelectTrigger className="w-24">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="max-h-64">
           <SelectItem value="+">+</SelectItem>
           <SelectItem value="-">-</SelectItem>
           <SelectItem value="*">x</SelectItem>
