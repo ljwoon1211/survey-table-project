@@ -39,7 +39,10 @@ import {
 import { parsesurveyIdentifier } from '@/lib/survey-url';
 import { isEmptyHtml } from '@/lib/utils';
 import { sanitizeRichHtml } from '@/lib/sanitize';
-import { filterOptionTextsForSubmission } from '@/lib/option-text-migration';
+import {
+  collectTableQuestionOptions,
+  filterOptionTextsForSubmission,
+} from '@/lib/option-text-migration';
 
 import { useSurveyResponseStore } from '@/stores/survey-response-store';
 import { useShallow } from 'zustand/react/shallow';
@@ -707,7 +710,11 @@ export default function SurveyResponsePage() {
           const qOptTexts = storeOptTexts[q.id];
           if (!qOptTexts || Object.keys(qOptTexts).length === 0) continue;
           const qValue = responses[q.id];
-          const filtered = filterOptionTextsForSubmission(qValue, qOptTexts, q.options);
+          // 테이블 질문은 셀 단위로 옵션이 흩어져 있으므로 모든 셀의 옵션을 모아 전달
+          const optionsForFilter = q.type === 'table'
+            ? collectTableQuestionOptions(q)
+            : q.options;
+          const filtered = filterOptionTextsForSubmission(qValue, qOptTexts, optionsForFilter);
           if (filtered) {
             filteredOptTexts[q.id] = filtered;
           }

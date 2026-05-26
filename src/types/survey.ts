@@ -226,6 +226,8 @@ export interface QuestionOption {
    * SPSS export 시 `{questionVar}_{변수번호}_text` 라는 STRING 변수가 자동 생성됨.
    */
   allowTextInput?: boolean;
+  /** 주관식 입력칸 placeholder 텍스트. 비어있으면 응답/테스트 모드에서 '상세 기재' 기본값 사용. */
+  textInputPlaceholder?: string;
   /** @deprecated Phase 7 cleanup 에서 제거. allowTextInput 사용. */
   hasOther?: boolean;
   // 조건부 분기
@@ -324,6 +326,8 @@ export interface CheckboxOption {
    * SPSS export 시 `{questionVar}_{변수번호}_text` 라는 STRING 변수가 자동 생성됨.
    */
   allowTextInput?: boolean;
+  /** 주관식 입력칸 placeholder 텍스트. 비어있으면 응답/테스트 모드에서 '상세 기재' 기본값 사용. */
+  textInputPlaceholder?: string;
   /** @deprecated Phase 7 cleanup 에서 제거. allowTextInput 사용. */
   hasOther?: boolean;
   // 조건부 분기
@@ -344,6 +348,8 @@ export interface RadioOption {
    * SPSS export 시 `{questionVar}_{변수번호}_text` 라는 STRING 변수가 자동 생성됨.
    */
   allowTextInput?: boolean;
+  /** 주관식 입력칸 placeholder 텍스트. 비어있으면 응답/테스트 모드에서 '상세 기재' 기본값 사용. */
+  textInputPlaceholder?: string;
   /** @deprecated Phase 7 cleanup 에서 제거. allowTextInput 사용. */
   hasOther?: boolean;
   // 조건부 분기

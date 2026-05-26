@@ -1136,6 +1136,22 @@ function SortableOptionItem({
         </Button>
       </div>
 
+      {option.allowTextInput && (
+        <div className="flex items-center gap-2 px-3 pt-0 pb-2 pl-9">
+          <span className="shrink-0 text-[10px] text-gray-400">placeholder</span>
+          <Input
+            value={option.textInputPlaceholder ?? ''}
+            onChange={(e) =>
+              updateOption(option.id, {
+                textInputPlaceholder: e.target.value,
+              } as Partial<QuestionOption>)
+            }
+            placeholder="상세 기재"
+            className="h-7 text-xs"
+          />
+        </div>
+      )}
+
       {showBranchSettings && (
         <div className="px-3 pb-3">
           <BranchRuleEditor

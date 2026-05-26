@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { isEmptyHtml } from '@/lib/utils';
 import { sanitizeRichHtml } from '@/lib/sanitize';
+import { useSurveyResponseStore } from '@/stores/survey-response-store';
 import { useTestResponseStore } from '@/stores/test-response-store';
 import { Question, SurveyLookup } from '@/types/survey';
 import { getOptionsLayout } from '@/utils/options-layout';
@@ -42,6 +43,9 @@ export function isOtherChoiceValue(value: unknown): value is OtherChoiceValue {
 type SingleChoiceResponse = string | null | OtherChoiceValue;
 type MultiChoiceResponse = Array<string | OtherChoiceValue>;
 
+// useSyncExternalStore 안정 참조 — selector 내부 `?? {}` 사용 시 무한 루프 경고 회피
+const EMPTY_OPTION_TEXTS: Record<string, string> = {};
+
 // 테스트 모드용 Radio 질문 컴포넌트
 function RadioTestInput({
   question,
@@ -52,6 +56,10 @@ function RadioTestInput({
   value: SingleChoiceResponse;
   onChange: (value: SingleChoiceResponse) => void;
 }) {
+  const optionTexts =
+    useSurveyResponseStore((s) => s.optionTexts[question.id]) ?? EMPTY_OPTION_TEXTS;
+  const setOptionText = useSurveyResponseStore((s) => s.setOptionText);
+
   const [otherInput, setOtherInput] = useState('');
 
   useEffect(() => {
@@ -139,6 +147,14 @@ function RadioTestInput({
               />
             </div>
           )}
+          {option.id !== 'other-option' && option.allowTextInput && isSelected(option.value) && (
+            <Input
+              value={optionTexts[option.id] ?? ''}
+              onChange={(e) => setOptionText(question.id, option.id, e.target.value)}
+              placeholder={option.textInputPlaceholder || '상세 기재'}
+              className="ml-7"
+            />
+          )}
         </div>
       ))}
     </div>
@@ -155,6 +171,10 @@ function CheckboxTestInput({
   value: MultiChoiceResponse;
   onChange: (value: MultiChoiceResponse) => void;
 }) {
+  const optionTexts =
+    useSurveyResponseStore((s) => s.optionTexts[question.id]) ?? EMPTY_OPTION_TEXTS;
+  const setOptionText = useSurveyResponseStore((s) => s.setOptionText);
+
   const [otherInputs, setOtherInputs] = useState<Record<string, string>>({});
 
   const currentValues = useMemo<MultiChoiceResponse>(
@@ -285,6 +305,14 @@ function CheckboxTestInput({
                 />
               </div>
             )}
+            {option.id !== 'other-option' && option.allowTextInput && checked && (
+              <Input
+                value={optionTexts[option.id] ?? ''}
+                onChange={(e) => setOptionText(question.id, option.id, e.target.value)}
+                placeholder={option.textInputPlaceholder || '상세 기재'}
+                className="ml-7"
+              />
+            )}
           </div>
         );
       })}
@@ -319,6 +347,10 @@ function SelectTestInput({
   value: SingleChoiceResponse;
   onChange: (value: SingleChoiceResponse) => void;
 }) {
+  const optionTexts =
+    useSurveyResponseStore((s) => s.optionTexts[question.id]) ?? EMPTY_OPTION_TEXTS;
+  const setOptionText = useSurveyResponseStore((s) => s.setOptionText);
+
   const [otherInput, setOtherInput] = useState('');
   const [selectedValue, setSelectedValue] = useState<string>('');
 
@@ -393,6 +425,21 @@ function SelectTestInput({
           />
         </div>
       )}
+
+      {(() => {
+        if (!selectedValue) return null;
+        const selectedOption = question.options?.find((opt) => opt.value === selectedValue);
+        if (!selectedOption || selectedOption.id === 'other-option') return null;
+        if (!selectedOption.allowTextInput) return null;
+        return (
+          <Input
+            value={optionTexts[selectedOption.id] ?? ''}
+            onChange={(e) => setOptionText(question.id, selectedOption.id, e.target.value)}
+            placeholder={selectedOption.textInputPlaceholder || '상세 기재'}
+            className="w-full"
+          />
+        );
+      })()}
     </div>
   );
 }

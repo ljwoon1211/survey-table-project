@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid';
-import type { QuestionOption, RankingAnswer } from '@/types/survey';
+import type { Question, QuestionOption, RankingAnswer } from '@/types/survey';
 
 export interface LegacyQuestionShape {
   id: string;
@@ -259,6 +259,17 @@ export function filterOptionTextsForSubmission(
         selectedValues.add((v as { optionValue: string }).optionValue);
       }
     }
+  } else if (value && typeof value === 'object') {
+    // 테이블 질문: { [cellId]: string | string[] }. 각 셀 응답을 펼쳐 동일 규칙 적용.
+    for (const cellVal of Object.values(value as Record<string, unknown>)) {
+      if (typeof cellVal === 'string') {
+        selectedValues.add(cellVal);
+      } else if (Array.isArray(cellVal)) {
+        for (const v of cellVal) {
+          if (typeof v === 'string') selectedValues.add(v);
+        }
+      }
+    }
   }
 
   // options 배열이 있으면 option.value → option.id 맵을 빌드
@@ -283,4 +294,31 @@ export function filterOptionTextsForSubmission(
   }
 
   return Object.keys(filtered).length > 0 ? filtered : undefined;
+}
+
+/**
+ * 테이블 질문의 모든 셀(radio/checkbox/select) 옵션을 {id, value} 페어로 모은다.
+ * 같은 id 중복은 한 번만 포함. filterOptionTextsForSubmission 에 전달해
+ * 테이블 셀 응답에서도 option.value → option.id 변환이 가능하도록 한다.
+ */
+export function collectTableQuestionOptions(question: Question): { id: string; value: string }[] {
+  if (!question.tableRowsData || question.tableRowsData.length === 0) return [];
+  const result: { id: string; value: string }[] = [];
+  const seen = new Set<string>();
+  for (const row of question.tableRowsData) {
+    if (!row.cells) continue;
+    for (const cell of row.cells) {
+      const cellOpts = [
+        ...(cell.radioOptions ?? []),
+        ...(cell.checkboxOptions ?? []),
+        ...(cell.selectOptions ?? []),
+      ];
+      for (const opt of cellOpts) {
+        if (seen.has(opt.id)) continue;
+        seen.add(opt.id);
+        result.push({ id: opt.id, value: opt.value ?? opt.id });
+      }
+    }
+  }
+  return result;
 }

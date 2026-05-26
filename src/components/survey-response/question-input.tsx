@@ -232,7 +232,7 @@ function RadioQuestion({
             <Input
               value={optionTexts[option.id] ?? ''}
               onChange={(e) => setOptionText(question.id, option.id, e.target.value)}
-              placeholder="상세 기재"
+              placeholder={option.textInputPlaceholder || '상세 기재'}
               className="ml-7 mr-2"
             />
           )}
@@ -343,7 +343,7 @@ function CheckboxQuestion({
               <Input
                 value={optionTexts[option.id] ?? ''}
                 onChange={(e) => setOptionText(question.id, option.id, e.target.value)}
-                placeholder="상세 기재"
+                placeholder={option.textInputPlaceholder || '상세 기재'}
                 className="ml-7"
               />
             )}
@@ -456,7 +456,7 @@ function SelectQuestion({
       {/* allowTextInput 옵션 선택 시 인라인 텍스트 입력 */}
       {showAllowTextInput && selectedOption && (
         <Input
-          placeholder="상세 기재"
+          placeholder={selectedOption.textInputPlaceholder || '상세 기재'}
           value={optionTexts[selectedOption.id] ?? ''}
           onChange={(e) => setOptionText(question.id, selectedOption.id, e.target.value)}
           className="w-full"

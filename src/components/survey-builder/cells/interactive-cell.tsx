@@ -22,28 +22,29 @@ const CellRouter = React.memo(function CellRouter({
   cell,
   cellResponse,
   onUpdateValue,
+  questionId,
   groupName,
 }: InteractiveCellProps) {
   switch (cell.type) {
     case 'checkbox':
-      return <CheckboxCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} />;
+      return <CheckboxCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} questionId={questionId} />;
     case 'radio':
-      return <RadioCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} groupName={groupName} />;
+      return <RadioCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} questionId={questionId} groupName={groupName} />;
     case 'select':
-      return <SelectCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} />;
+      return <SelectCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} questionId={questionId} />;
     case 'input':
-      return <InputCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} />;
+      return <InputCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} questionId={questionId} />;
     case 'image':
-      return <ImageCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} />;
+      return <ImageCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} questionId={questionId} />;
     case 'video':
-      return <VideoCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} />;
+      return <VideoCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} questionId={questionId} />;
     case 'ranking':
-      return <RankingCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} />;
+      return <RankingCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} questionId={questionId} />;
     case 'ranking_opt':
-      return <RankingOptCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} />;
+      return <RankingOptCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} questionId={questionId} />;
     case 'text':
     default:
-      return <TextCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} />;
+      return <TextCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} questionId={questionId} />;
   }
 });
 
@@ -90,6 +91,7 @@ export const InteractiveCell = React.memo(function InteractiveCell({
       cell={cell}
       cellResponse={cellResponse}
       onUpdateValue={updateValue}
+      questionId={questionId}
       groupName={groupName}
     />
   );
