@@ -1,12 +1,18 @@
 // 서버 전용 모듈 — 클라이언트에서 import 금지 (R2 SDK 포함)
 import * as Sentry from '@sentry/nextjs';
 
+import {
+  extractAttachmentHrefsFromHtml,
+  extractPermanentAttachmentKeysFromHtml,
+} from '@/components/ui/rich-text-editor/file-attachment-html-utils';
 import { deleteR2ObjectsByKey, moveR2Objects } from '@/lib/image-utils-server';
 import { getR2PublicUrl } from '@/lib/r2-env';
 import {
   NOTICE_ATTACHMENT_PREFIX,
   TMP_NOTICE_ATTACHMENT_PREFIX,
 } from '@/lib/upload/attachment-policy';
+
+export { extractPermanentAttachmentKeysFromHtml };
 
 export type PromotableNoticeQuestion = {
   type?: string;
@@ -47,20 +53,9 @@ export function urlToR2Key(url: string): string | null {
  * 중복 제거된 배열 반환.
  */
 export function extractTmpNoticeAttachmentUrlsFromHtml(html: string): string[] {
-  if (!html) return [];
-  const re = /<a\b[^>]*\bdata-file-attachment="true"[^>]*>/gi;
-  const urls = new Set<string>();
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(html)) !== null) {
-    const tag = match[0];
-    const hrefMatch = tag.match(/\bhref="([^"]+)"/i);
-    if (!hrefMatch) continue;
-    const url = hrefMatch[1];
-    if (isTmpNoticeAttachmentUrl(url)) {
-      urls.add(url);
-    }
-  }
-  return [...urls];
+  return extractAttachmentHrefsFromHtml(html).filter((url) =>
+    isTmpNoticeAttachmentUrl(url),
+  );
 }
 
 /**
@@ -71,40 +66,6 @@ export function extractTmpNoticeAttachmentUrlsFromQuestion(
 ): string[] {
   if (!question.noticeContent) return [];
   return extractTmpNoticeAttachmentUrlsFromHtml(question.noticeContent);
-}
-
-const ATTACHMENT_TAG_RE = /<a\b[^>]*\bdata-file-attachment="true"[^>]*>/gi;
-const DATA_KEY_ATTR_RE = /\bdata-key="([^"]+)"/i;
-
-/**
- * HTML 안 `<a data-file-attachment="true">` 의 data-key 추출 (prefix 무관).
- * tmp/notice-attachment/ + notice-attachment/ 양쪽 모두 포함, 중복 제거.
- */
-function extractAllAttachmentKeysFromHtml(html: string): string[] {
-  if (!html) return [];
-  const keys = new Set<string>();
-  let match: RegExpExecArray | null;
-  ATTACHMENT_TAG_RE.lastIndex = 0;
-  while ((match = ATTACHMENT_TAG_RE.exec(html)) !== null) {
-    const tag = match[0];
-    const m = tag.match(DATA_KEY_ATTR_RE);
-    if (m && m[1]) {
-      keys.add(m[1]);
-    }
-  }
-  return [...keys];
-}
-
-/**
- * 영구 prefix(notice-attachment/) 의 첨부 키만 추출 (tmp 제외).
- * orphan diff 비교 / deletion path R2 cleanup 용도.
- */
-export function extractPermanentAttachmentKeysFromHtml(html: string): string[] {
-  return extractAllAttachmentKeysFromHtml(html).filter(
-    (k) =>
-      k.startsWith(NOTICE_ATTACHMENT_PREFIX) &&
-      !k.startsWith(TMP_NOTICE_ATTACHMENT_PREFIX),
-  );
 }
 
 /**

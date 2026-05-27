@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from 'react';
 
 import { TMP_NOTICE_ATTACHMENT_PREFIX } from '@/lib/upload/attachment-policy';
 
+import { extractTmpAttachmentKeysFromHtml } from './file-attachment-html-utils';
 import { deleteTmpNoticeAttachmentKeys } from './file-attachment-r2-client';
 
 /**
@@ -18,23 +19,8 @@ import { deleteTmpNoticeAttachmentKeys } from './file-attachment-r2-client';
  * survey-save-actions 에서 별도 처리.
  */
 
-const ATTACHMENT_TAG_RE = /<a\b[^>]*\bdata-file-attachment="true"[^>]*>/gi;
-const DATA_KEY_ATTR_RE = /\bdata-key="([^"]+)"/i;
-
-export function extractTmpAttachmentKeysFromHtml(html: string): string[] {
-  if (!html) return [];
-  const keys = new Set<string>();
-  let match: RegExpExecArray | null;
-  ATTACHMENT_TAG_RE.lastIndex = 0;
-  while ((match = ATTACHMENT_TAG_RE.exec(html)) !== null) {
-    const tag = match[0];
-    const m = tag.match(DATA_KEY_ATTR_RE);
-    if (m && m[1].startsWith(TMP_NOTICE_ATTACHMENT_PREFIX)) {
-      keys.add(m[1]);
-    }
-  }
-  return [...keys];
-}
+// 기존 호출부 / 테스트 호환을 위한 re-export.
+export { extractTmpAttachmentKeysFromHtml };
 
 export function useEditorFileAttachmentTracker(initialHtml: string) {
   const uploadedRef = useRef<Set<string>>(new Set());
