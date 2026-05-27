@@ -7,7 +7,6 @@ import { surveyResponses } from '@/db/schema';
 
 import type { Platform } from './parse-ua';
 import {
-  formatIpMask,
   type NormalizedListArgs,
   type SortDir,
   type SortKey,
@@ -22,7 +21,6 @@ export interface ProfilesRow {
   id: string;
   /** ROW_NUMBER() — 표시용 순번 (started_at desc 기준, surveyId 단위 절대값) */
   idx: number;
-  ipMasked: string;
   platform: Platform | null;
   browser: string | null;
   status: string;
@@ -57,7 +55,7 @@ function orderExpr(col: AnyColumn | SQL, direction: SortDir): SQL {
  *   숫자 변환 실패 시 결과 0건.
  * - **page 클램프**: page > totalPages 면 totalPages 로 보정해 마지막 페이지 노출
  *   (검색 0건과 시각적 혼동 방지).
- * - **보안**: row 객체에 raw `ip_address` 포함 안 함 — `formatIpMask` 후 `ipMasked` 만 노출.
+ * - **보안**: raw ip_address 컬럼 제거됨. 접속IP 정보는 수집하지 않음.
  */
 export async function listResponsesForProfiles(
   args: ListProfilesArgs,
@@ -70,7 +68,6 @@ export async function listResponsesForProfiles(
       idx: sql<number>`row_number() over (order by ${surveyResponses.startedAt} desc)`.as(
         'idx',
       ),
-      ipAddress: surveyResponses.ipAddress,
       platform: surveyResponses.platform,
       browser: surveyResponses.browser,
       status: surveyResponses.status,
@@ -84,7 +81,6 @@ export async function listResponsesForProfiles(
     .as('numbered');
 
   const SORT_COLUMN_MAP = {
-    ip: numbered.ipAddress,
     platform: numbered.platform,
     browser: numbered.browser,
     startedAt: numbered.startedAt,
@@ -110,15 +106,10 @@ export async function listResponsesForProfiles(
         .replace(/_/g, '\\_');
       const pattern = `%${escaped}%`;
 
-      if (qfield === 'ip') {
-        whereParts.push(ilike(numbered.ipAddress, pattern));
-      } else if (qfield === 'browser') {
+      if (qfield === 'browser') {
         whereParts.push(ilike(numbered.browser, pattern));
       } else if (qfield === 'all') {
-        const orClause = or(
-          ilike(numbered.ipAddress, pattern),
-          ilike(numbered.browser, pattern),
-        );
+        const orClause = or(ilike(numbered.browser, pattern));
         if (orClause) whereParts.push(orClause);
       }
     }
@@ -144,7 +135,6 @@ export async function listResponsesForProfiles(
     .select({
       id: numbered.id,
       idx: numbered.idx,
-      ipAddress: numbered.ipAddress,
       platform: numbered.platform,
       browser: numbered.browser,
       status: numbered.status,
@@ -163,7 +153,6 @@ export async function listResponsesForProfiles(
   const rows: ProfilesRow[] = dataRows.map((r) => ({
     id: r.id,
     idx: r.idx,
-    ipMasked: formatIpMask(r.ipAddress),
     platform: r.platform as Platform | null,
     browser: r.browser,
     status: r.status,

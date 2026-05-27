@@ -1,17 +1,52 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
+// DUPLICATE_DETECTION_SALT 는 signals.ts 에서 필요
+process.env.DUPLICATE_DETECTION_SALT = 'test-salt-blank-response';
+
 // ========================
 // 모듈 모킹
 // ========================
 //
 // createBlankResponse 는 server action 이며 다음에 의존한다:
 // - next/headers 의 headers() (UA / x-forwarded-for / x-real-ip)
-// - @/db 의 drizzle client (db.insert, db.select, db.execute)
+// - @/db 의 drizzle client (db.insert, db.select, db.execute, db.query)
 // - @/lib/operations/parse-ua (순수 함수이므로 모킹 안 함, 실제 호출)
 //
 // drizzle 의 fluent chain 을 흉내내기 위해 매 호출이 동일한 객체를 반환하는
 // chainable mock 을 만든다. returning() / limit() 가 호출자가 await 했을 때
 // 우리가 지정한 Promise 결과를 반환하면 된다.
+//
+// vi.mock factory 는 파일 상단으로 호이스팅되므로 factory 내부에서 참조하는 변수는
+// vi.hoisted() 로 선언해야 한다.
+
+const {
+  insertReturningMock,
+  selectLimitMock,
+  dbExecuteMock,
+  insertValuesArg,
+  findFirstMock,
+} = vi.hoisted(() => ({
+  insertReturningMock: vi.fn(),
+  selectLimitMock: vi.fn(),
+  dbExecuteMock: vi.fn(),
+  insertValuesArg: vi.fn(),
+  findFirstMock: vi.fn(),
+}));
+
+const insertChain = {
+  values: vi.fn((arg: unknown) => {
+    insertValuesArg(arg);
+    return insertChain;
+  }),
+  onConflictDoNothing: vi.fn(() => insertChain),
+  returning: vi.fn(() => insertReturningMock()),
+};
+
+const selectChain = {
+  from: vi.fn(() => selectChain),
+  where: vi.fn(() => selectChain),
+  limit: vi.fn(() => selectLimitMock()),
+};
 
 const headerStore = {
   get: vi.fn((name: string) => {
@@ -30,31 +65,15 @@ vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
 }));
 
-const insertReturningMock = vi.fn();
-const selectLimitMock = vi.fn();
-const dbExecuteMock = vi.fn();
-const insertValuesArg = vi.fn();
-
-const insertChain = {
-  values: vi.fn((arg: unknown) => {
-    insertValuesArg(arg);
-    return insertChain;
-  }),
-  onConflictDoNothing: vi.fn(() => insertChain),
-  returning: vi.fn(() => insertReturningMock()),
-};
-
-const selectChain = {
-  from: vi.fn(() => selectChain),
-  where: vi.fn(() => selectChain),
-  limit: vi.fn(() => selectLimitMock()),
-};
-
 vi.mock('@/db', () => ({
   db: {
     insert: vi.fn(() => insertChain),
     select: vi.fn(() => selectChain),
     execute: vi.fn((...args: unknown[]) => dbExecuteMock(...args)),
+    query: {
+      surveyResponses: { findFirst: findFirstMock },
+      contactTargets: { findFirst: vi.fn() },
+    },
   },
 }));
 
@@ -63,6 +82,15 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 import { createBlankResponse } from '@/actions/response-actions';
+import type { ClientSignals } from '@/lib/duplicate-detection/types';
+
+const PLACEHOLDER_SIGNALS: ClientSignals = {
+  deviceId: null,
+  screen: '',
+  tz: '',
+  lang: '',
+  platform: '',
+};
 
 describe('createBlankResponse', () => {
   beforeEach(() => {
@@ -70,9 +98,15 @@ describe('createBlankResponse', () => {
     insertReturningMock.mockReset();
     selectLimitMock.mockReset();
     dbExecuteMock.mockReset();
+    findFirstMock.mockReset();
   });
 
   it('happy path: 빈 응답을 INSERT 하고 invite 매칭된 contactTargetId 와 함께 id 반환', async () => {
+    // checkTrackA: contact lookup 성공 (respondedAt = null)
+    dbExecuteMock.mockResolvedValueOnce([{ id: 'contact-1' }]);
+    // contactTargets.findFirst (respondedAt 조회)
+    vi.mocked(selectLimitMock).mockResolvedValueOnce([{ respondedAt: null }]);
+    // findContactByInviteToken 2차 호출 (contactTargetId 세팅)
     dbExecuteMock.mockResolvedValueOnce([{ id: 'contact-1' }]);
     insertReturningMock.mockResolvedValueOnce([
       { id: 'response-1', contactTargetId: 'contact-1' },
@@ -84,9 +118,10 @@ describe('createBlankResponse', () => {
       versionId: null,
       currentStepId: 'step-1',
       inviteToken: '11111111-1111-4111-8111-111111111111',
+      clientSignals: PLACEHOLDER_SIGNALS,
     });
 
-    expect(result).toEqual({ id: 'response-1', contactTargetId: 'contact-1' });
+    expect(result).toEqual({ kind: 'created', id: 'response-1', contactTargetId: 'contact-1' });
 
     expect(insertValuesArg).toHaveBeenCalledOnce();
     const values = insertValuesArg.mock.calls[0][0] as {
@@ -95,7 +130,7 @@ describe('createBlankResponse', () => {
       status: string;
       contactTargetId: string | null;
       pageVisits: Array<{ stepId: string }>;
-      ipAddress: string | null;
+      ipHash: string | null;
     };
     expect(values.questionResponses).toEqual({});
     expect(values.isCompleted).toBe(false);
@@ -103,12 +138,19 @@ describe('createBlankResponse', () => {
     expect(values.contactTargetId).toBe('contact-1');
     expect(values.pageVisits).toHaveLength(1);
     expect(values.pageVisits[0].stepId).toBe('step-1');
-    expect(values.ipAddress).toBe('203.0.113.42');
+    // ipHash 는 null 이 아님 (IP 가 있으므로 sha256 결과)
+    expect(values.ipHash).not.toBeNull();
   });
 
   it('conflict path: ON CONFLICT DO NOTHING 으로 빈 returning 시 기존 row id 반환', async () => {
+    // checkTrackA: lookup_contact_by_invite_token (유효 토큰)
     dbExecuteMock.mockResolvedValueOnce([{ id: 'contact-1' }]);
+    // checkTrackA: db.query.contactTargets.findFirst (respondedAt 조회) — undefined 반환으로 null 처리됨
+    // findContactByInviteToken 2차 (contactTargetId 세팅용)
+    dbExecuteMock.mockResolvedValueOnce([{ id: 'contact-1' }]);
+    // INSERT returning 비어있음 (conflict)
     insertReturningMock.mockResolvedValueOnce([]);
+    // SELECT 기존 행 조회
     selectLimitMock.mockResolvedValueOnce([
       { id: 'response-existing', contactTargetId: 'contact-1' },
     ]);
@@ -119,17 +161,16 @@ describe('createBlankResponse', () => {
       versionId: null,
       currentStepId: 'step-1',
       inviteToken: '11111111-1111-4111-8111-111111111111',
+      clientSignals: PLACEHOLDER_SIGNALS,
     });
 
-    expect(result).toEqual({ id: 'response-existing', contactTargetId: 'contact-1' });
-    expect(selectLimitMock).toHaveBeenCalledOnce();
+    expect(result).toEqual({ kind: 'created', id: 'response-existing', contactTargetId: 'contact-1' });
+    expect(selectLimitMock).toHaveBeenCalled();
   });
 
   it('invite 무효: lookup 실패 시 contactTargetId === null 로 INSERT', async () => {
+    // checkTrackA: 토큰 조회 null → blocked: invalid_token
     dbExecuteMock.mockResolvedValueOnce([{ id: null }]);
-    insertReturningMock.mockResolvedValueOnce([
-      { id: 'response-2', contactTargetId: null },
-    ]);
 
     const result = await createBlankResponse({
       surveyId: '00000000-0000-4000-8000-000000000001',
@@ -137,11 +178,11 @@ describe('createBlankResponse', () => {
       versionId: null,
       currentStepId: 'step-1',
       inviteToken: '22222222-2222-4222-8222-222222222222',
+      clientSignals: PLACEHOLDER_SIGNALS,
     });
 
-    expect(result).toEqual({ id: 'response-2', contactTargetId: null });
-
-    const values = insertValuesArg.mock.calls[0][0] as { contactTargetId: string | null };
-    expect(values.contactTargetId).toBeNull();
+    // 무효 토큰이므로 차단 반환
+    expect(result).toEqual({ kind: 'blocked', reason: 'invalid_token' });
+    expect(insertValuesArg).not.toHaveBeenCalled();
   });
 });

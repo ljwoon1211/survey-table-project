@@ -13,6 +13,5 @@ export interface ResponseData {
   startedAt: Date;
   completedAt?: Date;
   userAgent?: string;
-  ipAddress?: string;
   sessionId?: string;
 }

@@ -109,6 +109,7 @@ export interface SurveyBuilderState {
   reorderQuestions: (questionIds: string[]) => void;
 
   updateSurveySettings: (settings: Partial<SurveySettings>) => void;
+  updateContactEmail: (email: string | null) => void;
 
   // 초기화
   resetSurvey: () => void;
@@ -606,6 +607,17 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
       updateSurveySettings: (settings: Partial<SurveySettings>) =>
         set((state) => {
           Object.assign(state.currentSurvey.settings, settings);
+          state.currentSurvey.updatedAt = new Date();
+          state.isDirty = true;
+          state.isMetadataDirty = true;
+          if (state.currentSurvey.status === 'published') {
+            state.isModifiedSincePublish = true;
+          }
+        }),
+
+      updateContactEmail: (email: string | null) =>
+        set((state) => {
+          state.currentSurvey.contactEmail = email;
           state.currentSurvey.updatedAt = new Date();
           state.isDirty = true;
           state.isMetadataDirty = true;

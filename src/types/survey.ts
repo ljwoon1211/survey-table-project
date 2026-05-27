@@ -479,6 +479,7 @@ export interface Survey {
   description?: string;
   slug?: string; // 공개 설문용 커스텀 URL 슬러그
   privateToken?: string; // 비공개 설문용 보안 토큰 (UUID)
+  contactEmail?: string | null; // 중복 응답 차단 화면에 표시할 문의 이메일
   status?: string; // draft | published
   currentVersionId?: string | null; // 현재 배포된 버전 ID
   groups?: QuestionGroup[]; // 질문 그룹 목록
@@ -535,7 +536,6 @@ export interface SurveySubmission {
   currentGroupOrder: number;
   questionResponses: Record<string, any>; // JSON 저장된 응답들 (questionId -> value)
   userAgent?: string | null;
-  ipAddress?: string | null;
   updatedAt: Date;
 }
 

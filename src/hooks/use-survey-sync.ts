@@ -95,6 +95,7 @@ export function useSurveySync() {
             description: survey.description,
             slug: survey.slug,
             privateToken: survey.privateToken,
+            contactEmail: survey.contactEmail ?? null,
             settings: survey.settings,
             thankYouMessage: survey.settings.thankYouMessage,
           };

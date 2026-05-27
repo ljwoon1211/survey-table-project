@@ -161,7 +161,6 @@ export interface SurveyResponse {
   isCompleted: boolean;
   metadata?: {
     userAgent?: string;
-    ipAddress?: string;
     sessionId?: string;
   };
 }

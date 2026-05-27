@@ -20,11 +20,17 @@ export const SurveySettingsPanel = React.memo(function SurveySettingsPanel({
   onAutoGenerateSlug,
   className,
 }: SurveySettingsPanelProps) {
-  const { updateSurveySettings } = useSurveyBuilderStore(
-    useShallow((s) => ({ updateSurveySettings: s.updateSurveySettings })),
+  const { updateSurveySettings, updateContactEmail } = useSurveyBuilderStore(
+    useShallow((s) => ({
+      updateSurveySettings: s.updateSurveySettings,
+      updateContactEmail: s.updateContactEmail,
+    })),
   );
   const surveySettings = useSurveyBuilderStore(
     useShallow((s) => s.currentSurvey.settings),
+  );
+  const contactEmail = useSurveyBuilderStore(
+    useShallow((s) => s.currentSurvey.contactEmail),
   );
   const questions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
   const variableCatalog = useSurveyBuilderStore((s) => s.variableCatalog);
@@ -86,6 +92,24 @@ export const SurveySettingsPanel = React.memo(function SurveySettingsPanel({
               />
             </div>
           </div>
+        </div>
+
+        {/* 문의 이메일 */}
+        <div className="space-y-2">
+          <label htmlFor="contact-email" className="text-sm font-medium text-gray-700">
+            응답자 문의 이메일
+          </label>
+          <input
+            id="contact-email"
+            type="email"
+            value={contactEmail ?? ''}
+            onChange={(e) => updateContactEmail(e.target.value || null)}
+            placeholder="admin@example.com"
+            className="w-full rounded border border-input bg-background px-3 py-2 text-sm"
+          />
+          <p className="text-xs text-muted-foreground">
+            중복 응답 차단 화면에 표시되는 문의 링크입니다. 비워두면 링크 없이 메시지만 표시됩니다.
+          </p>
         </div>
 
         {/* 토큰 경고 */}

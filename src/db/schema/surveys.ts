@@ -172,7 +172,6 @@ export const surveyResponses = pgTable('survey_responses', {
 
   // 메타데이터
   userAgent: text('user_agent'),
-  ipAddress: text('ip_address'),
   sessionId: text('session_id'),
   // 중복 감지 신호 (2026-05-27 추가)
   ipHash: text('ip_hash'),
