@@ -5,36 +5,58 @@ import {
   FileArchive,
   FileSpreadsheet,
   FileText,
+  type LucideIcon,
 } from 'lucide-react';
 
 import { formatFileSize } from './file-attachment-format';
 
-function pickIcon(mime: string | null) {
-  if (!mime) return { Icon: FileText, color: 'text-gray-500' };
-  if (mime === 'application/pdf') return { Icon: FileText, color: 'text-red-600' };
-  if (
-    mime === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-    mime === 'application/vnd.ms-excel'
-  ) {
-    return { Icon: FileSpreadsheet, color: 'text-green-600' };
+interface IconConfig {
+  Icon: LucideIcon;
+  color: string;
+}
+
+const DEFAULT_ICON: IconConfig = { Icon: FileText, color: 'text-gray-500' };
+
+// MIME → IconConfig 매핑 (exact match 우선)
+const MIME_ICON_MAP: Record<string, IconConfig> = {
+  'application/pdf': { Icon: FileText, color: 'text-red-600' },
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {
+    Icon: FileSpreadsheet,
+    color: 'text-green-600',
+  },
+  'application/vnd.ms-excel': { Icon: FileSpreadsheet, color: 'text-green-600' },
+  'application/zip': { Icon: FileArchive, color: 'text-gray-600' },
+  'application/x-zip-compressed': { Icon: FileArchive, color: 'text-gray-600' },
+  'application/hwp+zip': { Icon: FileArchive, color: 'text-gray-600' },
+  'application/msword': { Icon: FileText, color: 'text-blue-600' },
+  'application/hwp': { Icon: FileText, color: 'text-purple-600' },
+  'application/haansofthwp': { Icon: FileText, color: 'text-purple-600' },
+  'application/haansofthwpx': { Icon: FileText, color: 'text-purple-600' },
+  'application/vnd.ms-powerpoint': { Icon: FileText, color: 'text-orange-600' },
+};
+
+// startsWith prefix → IconConfig (exact match 실패 시 사용)
+const MIME_PREFIX_ICON_MAP: Array<[string, IconConfig]> = [
+  ['application/vnd.hancom.hwp', { Icon: FileText, color: 'text-purple-600' }],
+  ['application/x-hwp', { Icon: FileText, color: 'text-purple-600' }],
+  [
+    'application/vnd.openxmlformats-officedocument.wordprocessingml',
+    { Icon: FileText, color: 'text-blue-600' },
+  ],
+  [
+    'application/vnd.openxmlformats-officedocument.presentationml',
+    { Icon: FileText, color: 'text-orange-600' },
+  ],
+];
+
+function pickIcon(mime: string | null): IconConfig {
+  if (!mime) return DEFAULT_ICON;
+  const exact = MIME_ICON_MAP[mime];
+  if (exact) return exact;
+  for (const [prefix, config] of MIME_PREFIX_ICON_MAP) {
+    if (mime.startsWith(prefix)) return config;
   }
-  if (
-    mime === 'application/zip' ||
-    mime === 'application/x-zip-compressed' ||
-    mime === 'application/hwp+zip'
-  ) {
-    return { Icon: FileArchive, color: 'text-gray-600' };
-  }
-  if (mime.startsWith('application/vnd.hancom.hwp') || mime.startsWith('application/x-hwp') || mime === 'application/hwp' || mime === 'application/haansofthwp' || mime === 'application/haansofthwpx') {
-    return { Icon: FileText, color: 'text-purple-600' };
-  }
-  if (mime.startsWith('application/vnd.openxmlformats-officedocument.wordprocessingml') || mime === 'application/msword') {
-    return { Icon: FileText, color: 'text-blue-600' };
-  }
-  if (mime.startsWith('application/vnd.openxmlformats-officedocument.presentationml') || mime === 'application/vnd.ms-powerpoint') {
-    return { Icon: FileText, color: 'text-orange-600' };
-  }
-  return { Icon: FileText, color: 'text-gray-500' };
+  return DEFAULT_ICON;
 }
 
 export function FileAttachmentNodeView({ node, selected }: NodeViewProps) {
