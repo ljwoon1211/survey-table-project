@@ -10,6 +10,7 @@ import { AdminResponseEditor } from './admin-response-editor';
 
 interface PageProps {
   params: Promise<{ id: string; responseId: string }>;
+  searchParams: Promise<{ idx?: string }>;
 }
 
 export const dynamic = 'force-dynamic';
@@ -26,8 +27,11 @@ export const metadata = { title: '응답 수정' };
  * - 응답 작성 당시의 versionSnapshot 을 로드해 AdminResponseEditor 에 전달.
  *   snapshot 미존재 (미배포 응답) 인 경우 null — flow 가 fallback 으로 처리.
  */
-export default async function AdminResponseEditPage({ params }: PageProps) {
+export default async function AdminResponseEditPage({ params, searchParams }: PageProps) {
   const { id: surveyId, responseId } = await params;
+  const sp = await searchParams;
+  const idxNum = sp.idx ? parseInt(sp.idx, 10) : NaN;
+  const idx = Number.isFinite(idxNum) && idxNum > 0 ? idxNum : null;
   await requireSurveyOwnership(surveyId);
 
   const response = await getResponseById(responseId, { includeDeleted: true });
@@ -57,7 +61,7 @@ export default async function AdminResponseEditPage({ params }: PageProps) {
       responseId={responseId}
       initialResponses={response.questionResponses as Record<string, unknown>}
       versionSnapshot={version?.snapshot ?? null}
-      idx={null}
+      idx={idx}
     />
   );
 }

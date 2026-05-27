@@ -52,7 +52,7 @@ export function ProfilesRowActions({ surveyId, responseId, idx, view }: Props) {
     });
   };
 
-  const editHref = `/admin/surveys/${surveyId}/operations/profiles/${responseId}/edit`;
+  const editHref = `/admin/surveys/${surveyId}/operations/profiles/${responseId}/edit?idx=${idx}`;
 
   return (
     <>

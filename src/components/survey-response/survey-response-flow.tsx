@@ -59,16 +59,11 @@ import {
   shouldDisplayRow,
   type BranchEvalCtx,
 } from '@/utils/branch-logic';
+import type { SaveAdminEditPayload } from '@/actions/profiles-row-actions';
 
 export type ResponsesMap = Record<string, unknown>;
 
-/**
- * 어드민 응답 수정 저장 payload.
- * saveAdminEdit 의 SaveAdminEditPayload 와 형태 일치 — 같은 shape 으로 직접 전달.
- */
-export type SaveAdminEditPayload = {
-  questionResponses: Record<string, unknown>;
-};
+export type { SaveAdminEditPayload };
 
 export interface SurveyResponseFlowProps {
   mode?: 'public' | 'admin-edit';
