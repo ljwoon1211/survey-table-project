@@ -36,6 +36,7 @@ export interface SurveyDiffPayload {
     description?: string;
     slug?: string;
     privateToken?: string;
+    contactEmail?: string | null;
     settings: SurveySettings;
     thankYouMessage?: string;
   };
@@ -72,6 +73,7 @@ export async function saveSurveyDiff(payload: SurveyDiffPayload) {
           title: metadata.title,
           description: metadata.description,
           slug: metadata.slug,
+          contactEmail: metadata.contactEmail ?? null,
           isPublic: metadata.settings.isPublic,
           allowMultipleResponses: metadata.settings.allowMultipleResponses,
           showProgressBar: metadata.settings.showProgressBar,
@@ -309,6 +311,7 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
         title: surveyData.title,
         description: surveyData.description,
         slug: surveyData.slug,
+        contactEmail: surveyData.contactEmail ?? null,
         isPublic: surveyData.settings.isPublic,
         allowMultipleResponses: surveyData.settings.allowMultipleResponses,
         showProgressBar: surveyData.settings.showProgressBar,
@@ -335,6 +338,7 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
         description: surveyData.description,
         slug: surveyData.slug,
         privateToken: surveyData.privateToken,
+        contactEmail: surveyData.contactEmail ?? null,
         isPublic: surveyData.settings.isPublic,
         allowMultipleResponses: surveyData.settings.allowMultipleResponses,
         showProgressBar: surveyData.settings.showProgressBar,

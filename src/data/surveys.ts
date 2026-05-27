@@ -190,6 +190,7 @@ export async function getSurveyWithDetails(surveyId: string): Promise<SurveyType
     },
     lookups: survey.lookups ?? [],
     contactColumns: survey.contactColumns ?? undefined,
+    contactEmail: survey.contactEmail ?? null,
     createdAt: survey.createdAt,
     updatedAt: survey.updatedAt,
   };
@@ -267,6 +268,7 @@ export async function getSurveyForResponse(
         },
         lookups: snapshot.lookups ?? survey.lookups ?? [],
         contactColumns: survey.contactColumns ?? undefined,
+        contactEmail: survey.contactEmail ?? null,
         createdAt: survey.createdAt,
         updatedAt: survey.updatedAt,
       };

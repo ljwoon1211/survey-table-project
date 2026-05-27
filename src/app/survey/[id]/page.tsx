@@ -906,7 +906,7 @@ export default function SurveyResponsePage() {
       <AlreadyRespondedView
         reason={duplicateStatus.reason}
         surveyTitle={loadedSurvey?.title ?? ''}
-        contactEmail={null}
+        contactEmail={loadedSurvey?.contactEmail ?? null}
       />
     );
   }
