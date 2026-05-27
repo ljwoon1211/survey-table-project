@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// 파일 최상단 hoisted mock — promote 가 의존하는 R2 mover 만 mock
+// 파일 최상단 hoisted mock — promote 가 의존하는 R2 mover / deleter mock
 vi.mock('@/lib/image-utils-server', () => ({
   moveR2Objects: vi.fn(),
+  deleteR2ObjectsByKey: vi.fn(),
 }));
 
-import { moveR2Objects } from '@/lib/image-utils-server';
+import { deleteR2ObjectsByKey, moveR2Objects } from '@/lib/image-utils-server';
 import {
+  extractPermanentAttachmentKeysFromHtml,
   extractTmpNoticeAttachmentUrlsFromHtml,
   isTmpNoticeAttachmentUrl,
   noticeAttachmentTmpToPermanentUrl,
@@ -125,6 +127,7 @@ describe('promoteNoticeAttachments', () => {
   beforeEach(() => {
     process.env.CLOUDFLARE_R2_PUBLIC_URL = 'https://cdn.test';
     vi.mocked(moveR2Objects).mockReset();
+    vi.mocked(deleteR2ObjectsByKey).mockReset();
   });
   afterEach(() => {
     delete process.env.CLOUDFLARE_R2_PUBLIC_URL;
@@ -175,5 +178,87 @@ describe('promoteNoticeAttachments', () => {
     expect(out[0].noticeContent).toMatch(/notice-attachment\/[ab]\.pdf/);
     // 실패한 것은 tmp 그대로
     expect(out[0].noticeContent).toContain('tmp/notice-attachment/');
+  });
+
+  it('previousQuestions 의 영구 키 중 새 HTML 에 없는 것 → deleteR2ObjectsByKey 호출', async () => {
+    vi.mocked(moveR2Objects).mockResolvedValue({ movedKeys: [], failed: [] });
+    vi.mocked(deleteR2ObjectsByKey).mockResolvedValue(true);
+
+    const previousQuestions = [
+      {
+        type: 'notice',
+        noticeContent:
+          '<a data-file-attachment="true" data-key="notice-attachment/old.pdf">old</a>',
+      },
+    ];
+    const newQuestions = [
+      {
+        type: 'notice',
+        noticeContent:
+          '<a data-file-attachment="true" data-key="notice-attachment/new.pdf">new</a>',
+      },
+    ];
+
+    await promoteNoticeAttachments(newQuestions, { previousQuestions });
+
+    expect(deleteR2ObjectsByKey).toHaveBeenCalledWith(['notice-attachment/old.pdf']);
+  });
+
+  it('previousQuestions 의 영구 키가 새 HTML 에 그대로 있으면 → DELETE 호출 안 됨', async () => {
+    vi.mocked(moveR2Objects).mockResolvedValue({ movedKeys: [], failed: [] });
+    vi.mocked(deleteR2ObjectsByKey).mockResolvedValue(true);
+
+    const sameContent =
+      '<a data-file-attachment="true" data-key="notice-attachment/keep.pdf">keep</a>';
+    await promoteNoticeAttachments(
+      [{ type: 'notice', noticeContent: sameContent }],
+      { previousQuestions: [{ type: 'notice', noticeContent: sameContent }] },
+    );
+
+    expect(deleteR2ObjectsByKey).not.toHaveBeenCalled();
+  });
+
+  it('previousQuestions 미전달 시 orphan cleanup 호출 안 됨 (backward compat)', async () => {
+    vi.mocked(moveR2Objects).mockResolvedValue({ movedKeys: [], failed: [] });
+    vi.mocked(deleteR2ObjectsByKey).mockResolvedValue(true);
+
+    await promoteNoticeAttachments([
+      {
+        type: 'notice',
+        noticeContent:
+          '<a data-file-attachment="true" data-key="notice-attachment/x.pdf">x</a>',
+      },
+    ]);
+
+    expect(deleteR2ObjectsByKey).not.toHaveBeenCalled();
+  });
+});
+
+describe('extractPermanentAttachmentKeysFromHtml', () => {
+  it('영구 prefix data-key 만 추출', () => {
+    const html =
+      '<a data-file-attachment="true" data-key="notice-attachment/a.pdf">A</a>' +
+      '<a data-file-attachment="true" data-key="tmp/notice-attachment/b.pdf">B</a>';
+    expect(extractPermanentAttachmentKeysFromHtml(html)).toEqual([
+      'notice-attachment/a.pdf',
+    ]);
+  });
+
+  it('중복 제거', () => {
+    const html =
+      '<a data-file-attachment="true" data-key="notice-attachment/a.pdf">A</a>' +
+      '<a data-file-attachment="true" data-key="notice-attachment/a.pdf">A2</a>';
+    expect(extractPermanentAttachmentKeysFromHtml(html)).toEqual([
+      'notice-attachment/a.pdf',
+    ]);
+  });
+
+  it('빈 HTML 은 빈 배열', () => {
+    expect(extractPermanentAttachmentKeysFromHtml('')).toEqual([]);
+  });
+
+  it('data-file-attachment 없는 a 태그는 무시', () => {
+    const html = '<a data-key="notice-attachment/a.pdf">A</a>';
+    expect(extractPermanentAttachmentKeysFromHtml(html)).toEqual([]);
   });
 });
