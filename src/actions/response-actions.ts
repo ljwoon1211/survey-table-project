@@ -153,7 +153,7 @@ export async function createResponseWithFirstAnswer(input: {
     isCompleted: false,
     status: 'in_progress',
     userAgent,
-    ipAddress,
+    // ipAddress 컬럼 제거됨 — Task 10에서 ip_hash 기반으로 대체
     platform,
     browser,
     currentStepId,
@@ -247,7 +247,7 @@ export async function createBlankResponse(input: {
     isCompleted: false,
     status: 'in_progress',
     userAgent,
-    ipAddress,
+    // ipAddress 컬럼 제거됨 — Task 10에서 ip_hash 기반으로 대체
     platform,
     browser,
     currentStepId,
