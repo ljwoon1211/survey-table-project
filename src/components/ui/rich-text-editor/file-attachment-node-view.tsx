@@ -7,6 +7,8 @@ import {
   FileText,
 } from 'lucide-react';
 
+import { formatFileSize } from './file-attachment-format';
+
 function pickIcon(mime: string | null) {
   if (!mime) return { Icon: FileText, color: 'text-gray-500' };
   if (mime === 'application/pdf') return { Icon: FileText, color: 'text-red-600' };
@@ -35,15 +37,6 @@ function pickIcon(mime: string | null) {
   return { Icon: FileText, color: 'text-gray-500' };
 }
 
-function formatSize(size: number | string | null): string {
-  if (size == null) return '';
-  const n = typeof size === 'string' ? parseInt(size, 10) : size;
-  if (!Number.isFinite(n) || n <= 0) return '';
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
-
 export function FileAttachmentNodeView({ node, selected }: NodeViewProps) {
   const { label, filename, size, mime } = node.attrs as {
     label: string;
@@ -52,7 +45,7 @@ export function FileAttachmentNodeView({ node, selected }: NodeViewProps) {
     mime: string | null;
   };
   const { Icon, color } = pickIcon(mime);
-  const sizeText = formatSize(size);
+  const sizeText = formatFileSize(size);
 
   return (
     <NodeViewWrapper

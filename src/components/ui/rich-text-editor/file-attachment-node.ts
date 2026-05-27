@@ -2,6 +2,7 @@ import { mergeAttributes, Node } from '@tiptap/core';
 import { ReactNodeViewRenderer } from '@tiptap/react';
 
 import { FileAttachmentNodeView } from './file-attachment-node-view';
+import { buildAttachmentMetaText } from './file-attachment-format';
 
 export interface FileAttachmentAttrs {
   key: string | null;
@@ -39,11 +40,13 @@ export const FileAttachment = Node.create({
           if (typeof node === 'string') return false;
           const el = node as HTMLElement;
           if (typeof el.getAttribute !== 'function') return false;
+          const labelEl = el.querySelector('.notice-file-attachment-label');
+          const label = labelEl?.textContent ?? el.textContent ?? '';
           return {
             key: el.getAttribute('data-key') ?? null,
             url: el.getAttribute('href') ?? null,
             filename: el.getAttribute('data-filename') ?? null,
-            label: el.textContent ?? '',
+            label,
             size: el.getAttribute('data-size') ?? null,
             mime: el.getAttribute('data-mime') ?? null,
           };
@@ -59,6 +62,15 @@ export const FileAttachment = Node.create({
   renderHTML({ HTMLAttributes, node }) {
     const attrs = node.attrs as FileAttachmentAttrs;
     const label = attrs.label || attrs.filename || '첨부 파일';
+    const meta = buildAttachmentMetaText(attrs.filename, attrs.size);
+
+    const textChildren: Array<unknown> = [
+      ['span', { class: 'notice-file-attachment-label' }, label],
+    ];
+    if (meta) {
+      textChildren.push(['span', { class: 'notice-file-attachment-meta' }, meta]);
+    }
+
     return [
       'a',
       mergeAttributes(HTMLAttributes, {
@@ -73,7 +85,7 @@ export const FileAttachment = Node.create({
         rel: 'noopener noreferrer',
         class: 'notice-file-attachment',
       }),
-      label,
-    ];
+      ['span', { class: 'notice-file-attachment-text' }, ...textChildren],
+    ] as never;
   },
 });

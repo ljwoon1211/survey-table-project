@@ -58,7 +58,9 @@ describe('FileAttachment node', () => {
     expect(html).toContain('target="_blank"');
     expect(html).toContain('rel="noopener noreferrer"');
     expect(html).toContain('class="notice-file-attachment"');
-    expect(html).toContain('>협조 공문<');
+    expect(html).toContain('<span class="notice-file-attachment-text">');
+    expect(html).toContain('<span class="notice-file-attachment-label">협조 공문</span>');
+    expect(html).toContain('<span class="notice-file-attachment-meta">공문.pdf · 1 KB</span>');
     editor.destroy();
   });
 
@@ -78,7 +80,7 @@ describe('FileAttachment node', () => {
         },
       })
       .run();
-    expect(editor.getHTML()).toContain('>공문.pdf<');
+    expect(editor.getHTML()).toContain('<span class="notice-file-attachment-label">공문.pdf</span>');
     editor.destroy();
   });
 
@@ -87,8 +89,17 @@ describe('FileAttachment node', () => {
       '<p><a data-file-attachment="true" data-key="notice-attachment/x.pdf" ' +
       'data-filename="공문.pdf" data-size="1234" data-mime="application/pdf" ' +
       'href="https://cdn.test/notice-attachment/x.pdf" download="공문.pdf" ' +
-      'target="_blank" rel="noopener noreferrer" class="notice-file-attachment">협조 공문</a></p>';
+      'target="_blank" rel="noopener noreferrer" class="notice-file-attachment">' +
+      '<span class="notice-file-attachment-text">' +
+      '<span class="notice-file-attachment-label">협조 공문</span>' +
+      '<span class="notice-file-attachment-meta">공문.pdf · 1 KB</span>' +
+      '</span></a></p>';
     const editor = createEditor(original);
+    const json = editor.getJSON();
+    const para = json.content?.[0] as { content?: Array<{ type?: string; attrs?: Record<string, unknown> }> } | undefined;
+    const parsed = para?.content?.[0];
+    expect(parsed?.attrs?.label).toBe('협조 공문');
+
     const out = editor.getHTML();
     for (const fragment of [
       'data-file-attachment="true"',
@@ -98,7 +109,8 @@ describe('FileAttachment node', () => {
       'data-mime="application/pdf"',
       'href="https://cdn.test/notice-attachment/x.pdf"',
       'download="공문.pdf"',
-      '>협조 공문<',
+      '<span class="notice-file-attachment-label">협조 공문</span>',
+      '<span class="notice-file-attachment-meta">공문.pdf · 1 KB</span>',
     ]) {
       expect(out).toContain(fragment);
     }
