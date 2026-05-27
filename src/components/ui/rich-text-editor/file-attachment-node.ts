@@ -1,4 +1,7 @@
 import { mergeAttributes, Node } from '@tiptap/core';
+import { ReactNodeViewRenderer } from '@tiptap/react';
+
+import { FileAttachmentNodeView } from './file-attachment-node-view';
 
 export interface FileAttachmentAttrs {
   key: string | null;
@@ -47,6 +50,10 @@ export const FileAttachment = Node.create({
         },
       },
     ];
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(FileAttachmentNodeView);
   },
 
   renderHTML({ HTMLAttributes, node }) {
