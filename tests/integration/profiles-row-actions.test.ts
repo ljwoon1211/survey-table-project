@@ -300,6 +300,11 @@ import {
   hardResetResponse,
 } from '@/actions/profiles-row-actions';
 
+import * as aggregateStatusServer from '@/lib/operations/aggregate-status.server';
+import * as profilesServer from '@/lib/operations/profiles.server';
+import type { StatusCounts } from '@/lib/operations/aggregate-status';
+import type { ListProfilesResult } from '@/lib/operations/profiles.server';
+
 describe('profiles-row-actions', () => {
   beforeEach(() => {
     h.responseStore.clear();
@@ -403,6 +408,157 @@ describe('profiles-row-actions', () => {
       const contactAfter = h.contactStore.get(contactId);
       expect(contactAfter?.responseId).toBeNull();
       expect(contactAfter?.respondedAt).toBeNull();
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // softDelete cross-layer impact
+  //
+  // aggregateStatus / listResponsesForProfiles 는 db.select() 체인과
+  // row_number() subquery 를 사용하므로 현 mock DB 로는 재현이 불가.
+  // vi.spyOn 으로 각 어댑터를 in-memory store 위에서 동작하는 stub 으로 교체한다.
+  // ─────────────────────────────────────────────────────────────
+
+  describe('softDelete cross-layer impact', () => {
+    // spyOn stub: h.responseStore 를 직접 집계
+    function stubAggregateStatus(surveyId: string): Promise<StatusCounts> {
+      const counts: StatusCounts = {
+        total: 0,
+        completed: 0,
+        screenedOut: 0,
+        quotafulOut: 0,
+        bad: 0,
+        drop: 0,
+        inProgress: 0,
+      };
+      for (const row of h.responseStore.values()) {
+        if (row.surveyId !== surveyId) continue;
+        if (row.deletedAt !== null) continue; // isNull(deletedAt) 조건
+        switch (row.status) {
+          case 'completed': counts.completed += 1; break;
+          case 'screened_out': counts.screenedOut += 1; break;
+          case 'quotaful_out': counts.quotafulOut += 1; break;
+          case 'bad': counts.bad += 1; break;
+          case 'drop': counts.drop += 1; break;
+          case 'in_progress': counts.inProgress += 1; break;
+        }
+      }
+      counts.total = counts.completed + counts.screenedOut + counts.quotafulOut + counts.bad + counts.drop;
+      return Promise.resolve(counts);
+    }
+
+    // spyOn stub: view 분기 + deletedAt 필터만 검증하는 단순 구현
+    function stubListResponsesForProfiles(
+      args: Parameters<typeof profilesServer.listResponsesForProfiles>[0],
+    ): Promise<ListProfilesResult> {
+      const { surveyId, view, page = 1, pageSize = 20 } = args;
+      const rows = Array.from(h.responseStore.values()).filter((row) => {
+        if (row.surveyId !== surveyId) return false;
+        if (view === 'deleted') return row.deletedAt !== null;
+        return row.deletedAt === null; // active
+      });
+      const total = rows.length;
+      return Promise.resolve({ rows: [] as ListProfilesResult['rows'], total, page });
+    }
+
+    it('softDelete 하면 active view 에서 사라지고 deleted view 에 나타난다', async () => {
+      const surveyId = createTestSurvey();
+      const responseId = createTestResponse(surveyId);
+
+      vi.spyOn(profilesServer, 'listResponsesForProfiles').mockImplementation(
+        stubListResponsesForProfiles,
+      );
+
+      const normalizedArgs = {
+        surveyId,
+        page: 1,
+        pageSize: 20,
+        q: '',
+        qfield: 'all' as const,
+        status: 'all' as const,
+        sort: 'idx' as const,
+        dir: 'desc' as const,
+        view: 'active' as const,
+      };
+
+      const before = await profilesServer.listResponsesForProfiles(normalizedArgs);
+      expect(before.total).toBe(1);
+
+      await softDeleteResponse(surveyId, responseId);
+
+      const afterActive = await profilesServer.listResponsesForProfiles({
+        ...normalizedArgs,
+        view: 'active',
+      });
+      const afterDeleted = await profilesServer.listResponsesForProfiles({
+        ...normalizedArgs,
+        view: 'deleted',
+      });
+      expect(afterActive.total).toBe(0);
+      expect(afterDeleted.total).toBe(1);
+
+      vi.restoreAllMocks();
+    });
+
+    it('softDelete 하면 aggregateStatus 의 completed 카운트가 줄어든다', async () => {
+      const surveyId = createTestSurvey();
+      const responseId = createTestResponse(surveyId);
+
+      vi.spyOn(aggregateStatusServer, 'aggregateStatus').mockImplementation(stubAggregateStatus);
+
+      const before = await aggregateStatusServer.aggregateStatus(surveyId);
+      expect(before.completed).toBeGreaterThanOrEqual(1);
+
+      await softDeleteResponse(surveyId, responseId);
+
+      const after = await aggregateStatusServer.aggregateStatus(surveyId);
+      expect(after.completed).toBe(before.completed - 1);
+
+      vi.restoreAllMocks();
+    });
+
+    it('softDelete 후 restore 하면 active view / aggregateStatus 모두 원복된다', async () => {
+      const surveyId = createTestSurvey();
+      const responseId = createTestResponse(surveyId);
+
+      vi.spyOn(profilesServer, 'listResponsesForProfiles').mockImplementation(
+        stubListResponsesForProfiles,
+      );
+      vi.spyOn(aggregateStatusServer, 'aggregateStatus').mockImplementation(stubAggregateStatus);
+
+      const normalizedArgs = {
+        surveyId,
+        page: 1,
+        pageSize: 20,
+        q: '',
+        qfield: 'all' as const,
+        status: 'all' as const,
+        sort: 'idx' as const,
+        dir: 'desc' as const,
+        view: 'active' as const,
+      };
+
+      // 1단계: softDelete
+      await softDeleteResponse(surveyId, responseId);
+
+      const midActive = await profilesServer.listResponsesForProfiles({ ...normalizedArgs, view: 'active' });
+      const midDeleted = await profilesServer.listResponsesForProfiles({ ...normalizedArgs, view: 'deleted' });
+      const midCounts = await aggregateStatusServer.aggregateStatus(surveyId);
+      expect(midActive.total).toBe(0);
+      expect(midDeleted.total).toBe(1);
+      expect(midCounts.completed).toBe(0);
+
+      // 2단계: restore
+      await restoreResponse(surveyId, responseId);
+
+      const afterActive = await profilesServer.listResponsesForProfiles({ ...normalizedArgs, view: 'active' });
+      const afterDeleted = await profilesServer.listResponsesForProfiles({ ...normalizedArgs, view: 'deleted' });
+      const afterCounts = await aggregateStatusServer.aggregateStatus(surveyId);
+      expect(afterActive.total).toBe(1);
+      expect(afterDeleted.total).toBe(0);
+      expect(afterCounts.completed).toBe(1);
+
+      vi.restoreAllMocks();
     });
   });
 
