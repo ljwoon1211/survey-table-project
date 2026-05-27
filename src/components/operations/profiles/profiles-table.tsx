@@ -56,7 +56,6 @@ interface Props {
 interface DisplayRow {
   id: string;
   idx: number;
-  ipMasked: string;
   platformKo: string;
   browser: string;
   pill: StatusPillResult;
@@ -69,7 +68,7 @@ interface DisplayRow {
 const meta = (align: CellAlign, sortable: boolean): ColumnMeta => ({ align, sortable });
 
 /**
- * 응답 내역 테이블. 9 컬럼 + URL state sort/pagination + 검색 결과 EmptyState.
+ * 응답 내역 테이블. 8 컬럼 + URL state sort/pagination + 검색 결과 EmptyState.
  */
 export function ProfilesTable({ rows, total, page, pageSize, sort, dir, questions }: Props) {
   const pushParams = useSearchParamsMutator();
@@ -104,7 +103,6 @@ export function ProfilesTable({ rows, total, page, pageSize, sort, dir, question
         return {
           id: r.id,
           idx: r.idx,
-          ipMasked: r.ipMasked,
           platformKo: formatPlatformKo(r.platform),
           browser: r.browser ?? 'Other',
           pill,
@@ -126,7 +124,6 @@ export function ProfilesTable({ rows, total, page, pageSize, sort, dir, question
         header: '조사 대상 그룹',
         meta: meta('left', false),
       },
-      { id: 'ip', accessorKey: 'ipMasked', header: '접속IP', meta: meta('left', true) },
       {
         id: 'platform',
         accessorKey: 'platformKo',

@@ -19,7 +19,6 @@ interface Props {
 const QFIELD_OPTIONS: ReadonlyArray<{ value: QField; label: string }> = [
   { value: 'all', label: '전체' },
   { value: 'idx', label: '순번' },
-  { value: 'ip', label: '접속IP' },
   { value: 'browser', label: '브라우저' },
 ];
 
@@ -88,7 +87,7 @@ export function ProfilesFilterBar({ initialQ, initialQField, initialStatus }: Pr
         type="text"
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="🔍 순번 · 접속IP · 브라우저 검색"
+        placeholder="순번 · 브라우저 검색"
         className="h-9 max-w-[300px] flex-1 rounded border border-slate-200 px-3 text-sm focus:border-blue-400 focus:outline-none"
       />
       <select

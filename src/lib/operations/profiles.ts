@@ -14,7 +14,6 @@
 
 export const SORT_KEYS = [
   'idx',
-  'ip',
   'platform',
   'browser',
   'startedAt',
@@ -25,7 +24,7 @@ export type SortKey = (typeof SORT_KEYS)[number];
 
 export type SortDir = 'asc' | 'desc';
 
-export const QFIELDS = ['all', 'idx', 'ip', 'browser'] as const;
+export const QFIELDS = ['all', 'idx', 'browser'] as const;
 export type QField = (typeof QFIELDS)[number];
 
 export const STATUS_FILTERS = [

@@ -7,7 +7,6 @@ import { surveyResponses } from '@/db/schema';
 
 import type { Platform } from './parse-ua';
 import {
-  formatIpMask,
   type NormalizedListArgs,
   type SortDir,
   type SortKey,
@@ -22,7 +21,6 @@ export interface ProfilesRow {
   id: string;
   /** ROW_NUMBER() — 표시용 순번 (started_at desc 기준, surveyId 단위 절대값) */
   idx: number;
-  ipMasked: string;
   platform: Platform | null;
   browser: string | null;
   status: string;
@@ -57,7 +55,7 @@ function orderExpr(col: AnyColumn | SQL, direction: SortDir): SQL {
  *   숫자 변환 실패 시 결과 0건.
  * - **page 클램프**: page > totalPages 면 totalPages 로 보정해 마지막 페이지 노출
  *   (검색 0건과 시각적 혼동 방지).
- * - **보안**: raw ip_address 컬럼 제거됨. ipMasked 는 항상 "—" 반환 (Task 10 이후 ip_hash 기반으로 대체).
+ * - **보안**: raw ip_address 컬럼 제거됨. 접속IP 정보는 수집하지 않음.
  */
 export async function listResponsesForProfiles(
   args: ListProfilesArgs,
@@ -70,7 +68,6 @@ export async function listResponsesForProfiles(
       idx: sql<number>`row_number() over (order by ${surveyResponses.startedAt} desc)`.as(
         'idx',
       ),
-      // ipAddress 컬럼 제거됨 — Task 10에서 ip_hash 기반으로 대체
       platform: surveyResponses.platform,
       browser: surveyResponses.browser,
       status: surveyResponses.status,
@@ -84,8 +81,6 @@ export async function listResponsesForProfiles(
     .as('numbered');
 
   const SORT_COLUMN_MAP = {
-    // ipAddress 컬럼 제거됨 — ip sort는 Task 10에서 ip_hash 기반으로 대체될 때까지 startedAt 으로 fallback
-    ip: numbered.startedAt,
     platform: numbered.platform,
     browser: numbered.browser,
     startedAt: numbered.startedAt,
@@ -111,13 +106,9 @@ export async function listResponsesForProfiles(
         .replace(/_/g, '\\_');
       const pattern = `%${escaped}%`;
 
-      if (qfield === 'ip') {
-        // ipAddress 컬럼 제거됨 — Task 10에서 ip_hash 기반으로 대체. 현재는 결과 0건 반환
-        whereParts.push(sql`false`);
-      } else if (qfield === 'browser') {
+      if (qfield === 'browser') {
         whereParts.push(ilike(numbered.browser, pattern));
       } else if (qfield === 'all') {
-        // ipAddress 컬럼 제거됨 — Task 10에서 ip_hash 기반으로 대체. 현재는 browser 만 검색
         const orClause = or(ilike(numbered.browser, pattern));
         if (orClause) whereParts.push(orClause);
       }
@@ -144,7 +135,6 @@ export async function listResponsesForProfiles(
     .select({
       id: numbered.id,
       idx: numbered.idx,
-      // ipAddress 컬럼 제거됨 — Task 10에서 ip_hash 기반으로 대체
       platform: numbered.platform,
       browser: numbered.browser,
       status: numbered.status,
@@ -163,8 +153,6 @@ export async function listResponsesForProfiles(
   const rows: ProfilesRow[] = dataRows.map((r) => ({
     id: r.id,
     idx: r.idx,
-    // ipAddress 컬럼 제거됨 — Task 10에서 ip_hash 기반으로 대체
-    ipMasked: formatIpMask(null),
     platform: r.platform as Platform | null,
     browser: r.browser,
     status: r.status,
