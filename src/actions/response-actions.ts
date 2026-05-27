@@ -152,20 +152,15 @@ export async function createResponseWithFirstAnswer(input: {
   const signals = computeSignals(headerStore, clientSignals);
 
   // 중복 감지 재검증 (bypass defense — checkDuplicateOnEntry 우회 시 server action에서 2차 차단)
+  // checkTrackA 가 통과 시 contactTargetId 를 반환하므로 그대로 사용 (중복 DB 호출 회피)
+  let contactTargetId: string | null = null;
   if (inviteToken) {
     const trackA = await checkTrackA(surveyId, inviteToken);
     if (trackA.blocked) return { kind: 'blocked', reason: trackA.reason };
+    contactTargetId = trackA.contactTargetId ?? null;
   } else {
     const trackB = await checkTrackB({ surveyId, signals });
     if (trackB.blocked) return { kind: 'blocked', reason: trackB.reason };
-  }
-
-  // 컨택 매칭: inviteToken 이 있고 유효하면 contactTargetId 세팅. 무효 토큰은 silent fallback (null).
-  // checkTrackA 통과 = 유효 토큰이므로 contactTargetId 를 그기서 가져온다.
-  let contactTargetId: string | null = null;
-  if (inviteToken) {
-    const target = await findContactByInviteToken(surveyId, inviteToken);
-    contactTargetId = target?.id ?? null;
   }
 
   const firstVisit: PageVisit = {
@@ -259,19 +254,15 @@ export async function createBlankResponse(input: {
   // 신호 계산: ipHash, fpHash, deviceId
   const signals = computeSignals(headerStore, clientSignals);
 
-  // 중복 감지 재검증 (bypass defense)
+  // 중복 감지 재검증 (bypass defense). checkTrackA 반환의 contactTargetId 를 재사용해 중복 DB 호출 회피
+  let contactTargetId: string | null = null;
   if (inviteToken) {
     const trackA = await checkTrackA(surveyId, inviteToken);
     if (trackA.blocked) return { kind: 'blocked', reason: trackA.reason };
+    contactTargetId = trackA.contactTargetId ?? null;
   } else {
     const trackB = await checkTrackB({ surveyId, signals });
     if (trackB.blocked) return { kind: 'blocked', reason: trackB.reason };
-  }
-
-  let contactTargetId: string | null = null;
-  if (inviteToken) {
-    const target = await findContactByInviteToken(surveyId, inviteToken);
-    contactTargetId = target?.id ?? null;
   }
 
   const firstVisit: PageVisit = {
@@ -683,20 +674,3 @@ export async function clearAllResponses() {
   revalidatePath('/analytics');
 }
 
-/**
- * 헤더에서 클라이언트 IP 를 추출한다.
- *
- * - `x-forwarded-for` 가 "client, proxy1, proxy2" 형태인 경우 첫 항목 사용
- * - 없으면 `x-real-ip` fallback
- * - 둘 다 비어 있으면 null
- *
- * 운영자 콘솔의 응답 내역 페이지에서 회사·사무실 단위 그룹화에 사용한다.
- * 표시는 `formatIpMask` 로 끝 옥텟 마스킹.
- */
-function extractClientIp(xff: string | null, xri: string | null): string | null {
-  if (xff) {
-    const first = xff.split(',')[0]?.trim();
-    if (first) return first;
-  }
-  return xri?.trim() || null;
-}
