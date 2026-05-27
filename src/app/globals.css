@@ -764,3 +764,49 @@ html {
   font-size: 0.95em;
 }
 
+/* 공지사항 파일 첨부 — 응답 페이지·미리보기 시각 (lucide Paperclip data URI) */
+a.notice-file-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  padding-left: 2.5rem;
+  background-color: #f3f4f6;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 17.93 8.83l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48'/></svg>");
+  background-repeat: no-repeat;
+  background-position: 0.75rem center;
+  background-size: 1.125rem 1.125rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  color: #374151;
+  text-decoration: none;
+  font-size: 0.875rem;
+  cursor: pointer;
+  line-height: 1.3;
+}
+a.notice-file-attachment:hover {
+  background-color: #e5e7eb;
+}
+.notice-file-attachment-text {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.notice-file-attachment-label {
+  color: #1f2937;
+  font-weight: 500;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.notice-file-attachment-meta {
+  color: #6b7280;
+  font-size: 0.75rem;
+  margin-top: 0.125rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+

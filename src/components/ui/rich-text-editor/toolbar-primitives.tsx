@@ -7,7 +7,7 @@ interface ToolBtnProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'ty
 }
 
 const BASE =
-  'inline-flex h-9 items-center justify-center gap-1 rounded-md px-2 py-1 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50';
+  'inline-flex h-8 items-center justify-center gap-1 rounded-md px-1.5 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50';
 const INACTIVE = 'text-gray-700 hover:bg-gray-100';
 const ACTIVE = 'bg-gray-100 text-gray-900 ring-1 ring-inset ring-gray-300';
 
@@ -29,5 +29,5 @@ export const ToolBtn = forwardRef<HTMLButtonElement, ToolBtnProps>(function Tool
 });
 
 export function Sep() {
-  return <div className="h-6 w-px bg-gray-300" />;
+  return <div className="h-5 w-px bg-gray-300" />;
 }

@@ -5,9 +5,12 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'r
 import { EditorContent, useEditor } from '@tiptap/react';
 
 import { createUnifiedExtensions } from './extensions';
+import { deleteTmpNoticeAttachmentKey } from './file-attachment-r2-client';
+import { FileAttachmentUploadModal } from './file-attachment-upload-modal';
 import { ImageUploadModal } from './image-upload-modal';
 import { stripTrailingEmptyParagraph } from './trailing-node';
 import { Toolbar } from './toolbar';
+import { useEditorFileAttachmentTracker } from './use-editor-file-attachment-tracker';
 import { useEditorImageTracker } from './use-editor-image-tracker';
 import type { RichTextEditorHandle, RichTextEditorProps } from './types';
 
@@ -69,7 +72,10 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
   ) {
     const extensions = useMemo(() => createUnifiedExtensions({ kind }), [kind]);
     const imageTracker = useEditorImageTracker(initialHtml);
+    const fileTracker = useEditorFileAttachmentTracker(initialHtml);
     const [showModal, setShowModal] = useState(false);
+    const [showFileModal, setShowFileModal] = useState(false);
+    const [replacingFile, setReplacingFile] = useState(false);
 
     const editor = useEditor({
       extensions,
@@ -84,6 +90,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
       onUpdate: ({ editor }) => {
         const currentHtml = stripTrailingEmptyParagraph(editor.getHTML());
         imageTracker.reconcileAfterUpdate(currentHtml);
+        fileTracker.reconcileAfterUpdate(currentHtml);
         onChange(editor.isEmpty ? '' : currentHtml);
       },
     });
@@ -94,6 +101,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
       if (initialHtml !== currentNormalized) {
         editor.commands.setContent(initialHtml, { emitUpdate: false });
         imageTracker.resetPrevious(initialHtml);
+        fileTracker.resetPrevious(initialHtml);
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [initialHtml]);
@@ -101,18 +109,28 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
     useImperativeHandle(
       ref,
       () => ({
-        getUnsavedImages: () => (editor ? imageTracker.getOrphans(editor.getHTML()) : []),
+        getUnsavedImages: () =>
+          editor && !editor.isDestroyed ? imageTracker.getOrphans(editor.getHTML()) : [],
         cleanupOrphanImages: async () => {
-          if (editor) await imageTracker.cleanupOrphans(editor.getHTML());
+          // editor 가 destroy 된 후 getHTML() 은 빈 문자열을 반환할 수 있어,
+          // 잘못된 orphan 검출로 살아있는 R2 객체가 삭제되는 사고를 막아야 한다.
+          if (!editor || editor.isDestroyed) return;
+          await imageTracker.cleanupOrphans(editor.getHTML());
         },
         insertImage: (url: string) => {
-          if (!editor) return;
+          if (!editor || editor.isDestroyed) return;
           imageTracker.trackUpload(url);
           editor.chain().focus().setImage({ src: url }).run();
         },
         getEditor: () => editor,
+        getUnsavedFileAttachments: () =>
+          editor && !editor.isDestroyed ? fileTracker.getOrphans(editor.getHTML()) : [],
+        cleanupOrphanFileAttachments: async () => {
+          if (!editor || editor.isDestroyed) return;
+          await fileTracker.cleanupOrphans(editor.getHTML());
+        },
       }),
-      [editor, imageTracker],
+      [editor, imageTracker, fileTracker],
     );
 
     if (!editor) return null;
@@ -153,6 +171,60 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
       if (url) editor.chain().focus().setLink({ href: url }).run();
     };
 
+    const onPickFile = () => setShowFileModal(true);
+    const onReplaceFile = () => {
+      if (!editor || !editor.isActive('fileAttachment')) return;
+      setReplacingFile(true);
+      setShowFileModal(true);
+    };
+
+    const handleFileUploaded = (
+      result: { key: string; url: string; filename: string; size: number; mime: string },
+      label: string,
+    ) => {
+      if (!editor || editor.isDestroyed) return;
+
+      if (replacingFile && editor.isActive('fileAttachment')) {
+        const prev = editor.getAttributes('fileAttachment') as { key?: string | null };
+        const prevKey = prev?.key ?? null;
+        fileTracker.trackUpload(result.key);
+        editor
+          .chain()
+          .focus()
+          .updateAttributes('fileAttachment', {
+            key: result.key,
+            url: result.url,
+            filename: result.filename,
+            label: label || result.filename,
+            size: result.size,
+            mime: result.mime,
+          })
+          .run();
+        // 트래커 reconcile 가 onUpdate 안에서 prevKey 사라짐을 detect 해 자동 DELETE.
+        // 기존 명시 DELETE 는 안전망으로 유지 prevKey 가 추적 안 된 케이스 대비.
+        // 멱등적이므로 중복 DELETE 가 발생해도 두 번째는 404 또는 no-op.
+        void deleteTmpNoticeAttachmentKey(prevKey);
+      } else {
+        fileTracker.trackUpload(result.key);
+        editor
+          .chain()
+          .focus()
+          .insertContent({
+            type: 'fileAttachment',
+            attrs: {
+              key: result.key,
+              url: result.url,
+              filename: result.filename,
+              label: label || result.filename,
+              size: result.size,
+              mime: result.mime,
+            },
+          })
+          .run();
+      }
+      setReplacingFile(false);
+    };
+
     return (
       <div
         className={`flex flex-col overflow-hidden rounded-lg border border-gray-200 transition-colors focus-within:border-blue-500 ${className ?? ''}`}
@@ -162,6 +234,8 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
           variableCatalog={variableCatalog}
           onPickImage={onPickImage}
           onPickLink={onPickLink}
+          onPickFile={kind === 'survey' ? onPickFile : undefined}
+          onReplaceFile={kind === 'survey' ? onReplaceFile : undefined}
         />
         <div
           className="flex flex-col overflow-y-auto max-h-[calc(100vh-260px)]"
@@ -178,6 +252,17 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
             editor.chain().focus().setImage({ src: url }).run();
           }}
           kind={kind}
+        />
+        <FileAttachmentUploadModal
+          open={showFileModal}
+          onClose={() => {
+            setShowFileModal(false);
+            setReplacingFile(false);
+          }}
+          onUploaded={(result, label) => {
+            setShowFileModal(false);
+            handleFileUploaded(result, label);
+          }}
         />
       </div>
     );

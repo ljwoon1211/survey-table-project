@@ -14,8 +14,12 @@ import {
 } from '@/db/schema';
 import { requireAuth } from '@/lib/auth';
 import { extractImageUrlsFromQuestions } from '@/lib/image-extractor';
-import { deleteImagesFromR2Server } from '@/lib/image-utils-server';
+import { deleteImagesFromR2Server, deleteR2ObjectsByKey } from '@/lib/image-utils-server';
 import { promoteSurveyImages } from '@/lib/survey/survey-image-promote';
+import {
+  extractPermanentAttachmentKeysFromQuestions,
+  promoteNoticeAttachments,
+} from '@/lib/survey/notice-attachment-promote';
 import type {
   Question,
   QuestionGroup,
@@ -161,13 +165,35 @@ export async function saveSurveyDiff(payload: SurveyDiffPayload) {
         if (imagesToDelete.length > 0) {
           deleteImagesFromR2Server(imagesToDelete).catch(console.error);
         }
+        const attachmentKeysToDelete = extractPermanentAttachmentKeysFromQuestions(
+          questionsToRemove,
+        );
+        if (attachmentKeysToDelete.length > 0) {
+          deleteR2ObjectsByKey(attachmentKeysToDelete).catch(console.error);
+        }
         await tx.delete(questions).where(inArray(questions.id, questionChanges.deleted));
       }
 
       // 3b. Upsert (추가 + 수정)
       if (questionChanges.upserted.length > 0) {
+        // 이전 publish 의 영구 첨부 키를 orphan 검출용으로 미리 fetch
+        const upsertIds = questionChanges.upserted
+          .map((q) => q.id)
+          .filter((id): id is string => typeof id === 'string' && id.length > 0);
+        const previousQuestionRows =
+          upsertIds.length > 0
+            ? await tx.query.questions.findMany({
+                where: inArray(questions.id, upsertIds),
+                columns: { id: true, noticeContent: true, type: true },
+              })
+            : [];
+
         // tmp/survey/ 이미지를 영구 prefix로 promote (R2 move + URL 치환)
-        const promotedQuestions = await promoteSurveyImages(questionChanges.upserted);
+        // tmp/notice-attachment/ 첨부도 영구 prefix로 promote + 이전 영구 키 orphan cleanup
+        const promotedQuestions = await promoteNoticeAttachments(
+          await promoteSurveyImages(questionChanges.upserted),
+          { previousQuestions: previousQuestionRows },
+        );
 
         const questionValues = promotedQuestions.map((question) => ({
           id: question.id,
@@ -443,13 +469,31 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
         if (imagesToDelete.length > 0) {
           deleteImagesFromR2Server(imagesToDelete).catch(console.error);
         }
+        const attachmentKeysToDelete = extractPermanentAttachmentKeysFromQuestions(
+          questionsToRemove,
+        );
+        if (attachmentKeysToDelete.length > 0) {
+          deleteR2ObjectsByKey(attachmentKeysToDelete).catch(console.error);
+        }
 
         await tx.delete(questions).where(inArray(questions.id, questionIdsToRemove));
       }
 
       if (surveyData.questions.length > 0) {
+        // 이전 영구 첨부 키 orphan 검출용으로 fetch (전체 questions 덮어쓰기 흐름)
+        const previousQuestionRows = existingSurvey
+          ? await tx.query.questions.findMany({
+              where: eq(questions.surveyId, surveyId),
+              columns: { id: true, noticeContent: true, type: true },
+            })
+          : [];
+
         // tmp/survey/ 이미지를 영구 prefix로 promote (R2 move + URL 치환)
-        const promotedQuestions = await promoteSurveyImages(surveyData.questions);
+        // tmp/notice-attachment/ 첨부도 영구 prefix로 promote + 이전 영구 키 orphan cleanup
+        const promotedQuestions = await promoteNoticeAttachments(
+          await promoteSurveyImages(surveyData.questions),
+          { previousQuestions: previousQuestionRows },
+        );
 
         const questionValues = promotedQuestions.map((question) => ({
           id: question.id,

@@ -1,8 +1,34 @@
+import { HeadObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import * as Sentry from '@sentry/nextjs';
 
 import { extractImageUrlsFromHtml } from '@/lib/image-extractor';
 import { moveR2Objects } from '@/lib/image-utils-server';
 import { getR2PublicUrl } from '@/lib/r2-env';
+
+const r2Client = new S3Client({
+  region: 'auto',
+  endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY || '',
+    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_KEY || '',
+  },
+});
+
+/**
+ * 영구 위치(dstKey)에 객체가 이미 존재하는지 확인.
+ * 클라이언트의 stale state 가 같은 publish 를 N 회 시도해도 idempotent 하도록
+ * 첫 publish 가 이미 옮겨놓은 객체를 재인식하는 데 사용한다.
+ */
+async function permanentObjectExists(dstKey: string): Promise<boolean> {
+  const bucketName = process.env.CLOUDFLARE_R2_BUCKET;
+  if (!bucketName) return false;
+  try {
+    await r2Client.send(new HeadObjectCommand({ Bucket: bucketName, Key: dstKey }));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * tmp/mail/ prefix를 가진 URL만 추출합니다.
@@ -61,7 +87,25 @@ export async function promoteMailImages(bodyHtml: string): Promise<string> {
 
   if (pairs.length === 0) return bodyHtml;
 
-  const { movedKeys, failed } = await moveR2Objects(pairs);
+  const moveResult = await moveR2Objects(pairs);
+  let movedKeys = moveResult.movedKeys;
+  let failed = moveResult.failed;
+
+  // 클라이언트 stale state 로 같은 publish 가 재시도된 케이스는 영구 위치에
+  // 객체가 이미 존재. tmp 객체는 첫 publish 가 옮긴 뒤 사라졌지만, dst 가
+  // 살아있으면 정상 promote 와 동등 — URL 만 영구로 치환해 idempotent 동작 유지.
+  if (failed.length > 0) {
+    const recoveredFromExisting: string[] = [];
+    for (const srcKey of failed) {
+      const pair = pairs.find((p) => p.srcKey === srcKey);
+      if (!pair) continue;
+      if (await permanentObjectExists(pair.dstKey)) {
+        movedKeys = [...movedKeys, { srcKey: pair.srcKey, dstKey: pair.dstKey }];
+        recoveredFromExisting.push(srcKey);
+      }
+    }
+    failed = failed.filter((k) => !recoveredFromExisting.includes(k));
+  }
 
   if (failed.length > 0) {
     Sentry.captureMessage(
@@ -74,7 +118,7 @@ export async function promoteMailImages(bodyHtml: string): Promise<string> {
     );
   }
 
-  // 성공한 URL만 치환 (실패한 건 tmp URL 그대로 — lifecycle 처리)
+  // 성공한 URL만 치환 (실패한 건 tmp URL 그대로 — lifecycle 처리, idempotency 이미 처리됨)
   const publicUrl = getR2PublicUrl();
   let updated = bodyHtml;
   for (const { srcKey, dstKey } of movedKeys) {

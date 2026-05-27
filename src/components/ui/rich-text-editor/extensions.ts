@@ -17,6 +17,7 @@ import ImageResize from 'tiptap-extension-resize-image';
 import { ImageTextIsolation } from '@/lib/tiptap/image-text-isolation';
 import { TableSelectOnBackspace } from '@/lib/tiptap/table-select-on-backspace';
 
+import { FileAttachment } from './file-attachment-node';
 import { FontSize } from './font-size-mark';
 import {
   parseTableAlign,
@@ -243,5 +244,6 @@ export function createUnifiedExtensions(options: CreateUnifiedExtensionsOptions 
     TableSelectOnBackspace,
     VarTokenExtension,
     TableAlignDecoration,
+    FileAttachment,
   ];
 }

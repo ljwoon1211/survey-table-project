@@ -12,6 +12,7 @@ import {
   Link as LinkIcon,
   List,
   ListOrdered,
+  Paperclip,
   Redo,
   Strikethrough,
   Underline,
@@ -20,6 +21,7 @@ import {
 
 import { findTableAtSelection } from '@/lib/tiptap/find-table';
 
+import { FileAttachmentContextToolbar } from './file-attachment-context-toolbar';
 import { ImageContextToolbar } from './image-context-toolbar';
 import { PopoverVariableMenu } from './popover-variable-menu';
 import { TableContextToolbar } from './table-context-toolbar';
@@ -34,9 +36,11 @@ interface Props {
   variableCatalog?: VariableDef[];
   onPickImage: () => void;
   onPickLink: () => void;
+  onPickFile?: () => void;
+  onReplaceFile?: () => void;
 }
 
-export function Toolbar({ editor, variableCatalog, onPickImage, onPickLink }: Props) {
+export function Toolbar({ editor, variableCatalog, onPickImage, onPickLink, onPickFile, onReplaceFile }: Props) {
   const s = useEditorState({
     editor,
     selector: ({ editor }) => {
@@ -46,7 +50,7 @@ export function Toolbar({ editor, variableCatalog, onPickImage, onPickLink }: Pr
           bulletList: false, orderedList: false,
           alignLeft: true, alignCenter: false, alignRight: false, alignJustify: false,
           canUndo: false, canRedo: false,
-          imageActive: false, tableActive: false,
+          imageActive: false, tableActive: false, fileAttachmentActive: false,
         };
       }
       return {
@@ -65,12 +69,13 @@ export function Toolbar({ editor, variableCatalog, onPickImage, onPickLink }: Pr
         // ImageResize NodeView 는 schema 에 imageResize 이름으로 등록된다
         imageActive: editor.isActive('imageResize'),
         tableActive: findTableAtSelection(editor.state) !== null,
+        fileAttachmentActive: editor.isActive('fileAttachment'),
       };
     },
   });
 
   return (
-    <div className="flex flex-wrap items-center gap-1 border-b border-gray-200 bg-gray-50/50 p-2">
+    <div className="flex flex-wrap items-center gap-1 border-b border-gray-200 bg-gray-50/50 px-2 py-1.5">
       <ToolBtn active={s.bold} onClick={() => editor.chain().focus().toggleBold().run()} title="굵게">
         <Bold className="h-4 w-4" />
       </ToolBtn>
@@ -85,7 +90,7 @@ export function Toolbar({ editor, variableCatalog, onPickImage, onPickLink }: Pr
       </ToolBtn>
 
       <select
-        className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs"
+        className="h-8 rounded-md border border-gray-200 bg-white px-1.5 text-xs"
         onChange={(e) => (editor.chain().focus() as any).setFontSize(`${e.target.value}px`).run()}
         defaultValue="14"
         aria-label="폰트 크기"
@@ -121,6 +126,11 @@ export function Toolbar({ editor, variableCatalog, onPickImage, onPickLink }: Pr
 
       <ToolBtn onClick={onPickImage} title="이미지"><ImageIcon className="h-4 w-4" /></ToolBtn>
       <ToolBtn onClick={onPickLink} title="링크"><LinkIcon className="h-4 w-4" /></ToolBtn>
+      {onPickFile && (
+        <ToolBtn onClick={onPickFile} title="파일 첨부">
+          <Paperclip className="h-4 w-4" />
+        </ToolBtn>
+      )}
       <TableInsertMenu editor={editor} />
 
       {variableCatalog && variableCatalog.length > 0 && (
@@ -163,6 +173,9 @@ export function Toolbar({ editor, variableCatalog, onPickImage, onPickLink }: Pr
 
       {s.imageActive && <ImageContextToolbar editor={editor} />}
       {s.tableActive && <TableContextToolbar editor={editor} />}
+      {s.fileAttachmentActive && onReplaceFile && (
+        <FileAttachmentContextToolbar editor={editor} onReplace={onReplaceFile} />
+      )}
     </div>
   );
 }
