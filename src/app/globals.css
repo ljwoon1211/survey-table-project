@@ -765,7 +765,7 @@ html {
 }
 
 /* 공지사항 파일 첨부 — 응답 페이지·미리보기 시각 (lucide Paperclip data URI) */
-.notice-file-attachment {
+a.notice-file-attachment {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -784,7 +784,7 @@ html {
   font-size: 0.875rem;
   cursor: pointer;
 }
-.notice-file-attachment:hover {
+a.notice-file-attachment:hover {
   background-color: #e5e7eb;
 }
 
