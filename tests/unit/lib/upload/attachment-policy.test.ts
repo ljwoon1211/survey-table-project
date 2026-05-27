@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildAttachmentDisposition,
   EXT_TO_MIME,
   getFileExt,
   isAllowedMime,
@@ -61,5 +62,23 @@ describe('상수', () => {
   it('EXT_TO_MIME 에 hwp/hwpx 포함', () => {
     expect(EXT_TO_MIME.hwp).toBe('application/vnd.hancom.hwp');
     expect(EXT_TO_MIME.hwpx).toBe('application/vnd.hancom.hwpx');
+  });
+});
+
+describe('buildAttachmentDisposition', () => {
+  it('ASCII 파일명 그대로 encode', () => {
+    expect(buildAttachmentDisposition('report.pdf')).toBe(
+      "attachment; filename*=UTF-8''report.pdf",
+    );
+  });
+  it('한글 파일명 percent-encode', () => {
+    expect(buildAttachmentDisposition('협조 공문.pdf')).toBe(
+      "attachment; filename*=UTF-8''%ED%98%91%EC%A1%B0%20%EA%B3%B5%EB%AC%B8.pdf",
+    );
+  });
+  it("RFC 5987 reserved 문자 (' ( ) *) 도 percent-encode", () => {
+    expect(buildAttachmentDisposition("a'b(c)*.pdf")).toBe(
+      "attachment; filename*=UTF-8''a%27b%28c%29%2A.pdf",
+    );
   });
 });

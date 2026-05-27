@@ -16,6 +16,7 @@ import {
   TMP_ATTACHMENT_PREFIX,
 } from '@/lib/mail/constants';
 import {
+  buildAttachmentDisposition,
   getFileExt,
   MIN_FILE_BYTES,
   resolveAttachmentType,
@@ -139,6 +140,7 @@ export async function POST(request: NextRequest) {
         Body: buffer,
         ContentType: resolvedMime,
         ContentLength: buffer.byteLength,
+        ContentDisposition: buildAttachmentDisposition(file.name),
       }),
     );
   } catch (error) {

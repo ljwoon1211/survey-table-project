@@ -98,3 +98,15 @@ export function validateFilename(name: string): string | null {
   }
   return null;
 }
+
+/**
+ * RFC 5987 형식의 Content-Disposition 헤더 값.
+ * 한글·특수문자 파일명을 안전하게 percent-encode 하여 브라우저가 항상 다운로드를 강제하도록 한다.
+ * `encodeURIComponent` 는 RFC 3986 기준이라 RFC 5987 reserved 문자 (' ( ) *) 를 별도로 변환한다.
+ */
+export function buildAttachmentDisposition(filename: string): string {
+  const encoded = encodeURIComponent(filename).replace(/['()*]/g, (c) =>
+    `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+  return `attachment; filename*=UTF-8''${encoded}`;
+}
