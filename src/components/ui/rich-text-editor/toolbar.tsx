@@ -75,7 +75,7 @@ export function Toolbar({ editor, variableCatalog, onPickImage, onPickLink, onPi
   });
 
   return (
-    <div className="flex flex-wrap items-center gap-1 border-b border-gray-200 bg-gray-50/50 p-2">
+    <div className="flex flex-wrap items-center gap-1 border-b border-gray-200 bg-gray-50/50 px-2 py-1.5">
       <ToolBtn active={s.bold} onClick={() => editor.chain().focus().toggleBold().run()} title="굵게">
         <Bold className="h-4 w-4" />
       </ToolBtn>
@@ -90,7 +90,7 @@ export function Toolbar({ editor, variableCatalog, onPickImage, onPickLink, onPi
       </ToolBtn>
 
       <select
-        className="rounded-md border border-gray-200 bg-white px-2 py-1 text-xs"
+        className="h-8 rounded-md border border-gray-200 bg-white px-1.5 text-xs"
         onChange={(e) => (editor.chain().focus() as any).setFontSize(`${e.target.value}px`).run()}
         defaultValue="14"
         aria-label="폰트 크기"
