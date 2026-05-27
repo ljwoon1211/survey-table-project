@@ -1,14 +1,12 @@
 // 서버 전용 모듈 — 클라이언트에서 import 금지 (R2 SDK 포함)
 import * as Sentry from '@sentry/nextjs';
 
+import { moveR2Objects } from '@/lib/image-utils-server';
 import { getR2PublicUrl } from '@/lib/r2-env';
 import {
   NOTICE_ATTACHMENT_PREFIX,
   TMP_NOTICE_ATTACHMENT_PREFIX,
 } from '@/lib/upload/attachment-policy';
-
-// moveR2Objects 는 promoteNoticeAttachments 안에서 lazy import.
-// (테스트가 vi.doMock 으로 모킹 후 동적 import 하는 패턴을 지원.)
 
 export type PromotableNoticeQuestion = {
   type?: string;
@@ -125,7 +123,6 @@ export async function promoteNoticeAttachments<T extends PromotableNoticeQuestio
 
   if (pairs.length === 0) return questions;
 
-  const { moveR2Objects } = await import('@/lib/image-utils-server');
   const { movedKeys, failed } = await moveR2Objects(
     pairs.map(({ srcKey, dstKey }) => ({ srcKey, dstKey })),
   );

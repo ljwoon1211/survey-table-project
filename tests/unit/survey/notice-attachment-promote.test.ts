@@ -1,9 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// 파일 최상단 hoisted mock — promote 가 의존하는 R2 mover 만 mock
+vi.mock('@/lib/image-utils-server', () => ({
+  moveR2Objects: vi.fn(),
+}));
+
+import { moveR2Objects } from '@/lib/image-utils-server';
 import {
   extractTmpNoticeAttachmentUrlsFromHtml,
   isTmpNoticeAttachmentUrl,
   noticeAttachmentTmpToPermanentUrl,
+  promoteNoticeAttachments,
   replaceNoticeAttachmentUrlsInQuestion,
 } from '@/lib/survey/notice-attachment-promote';
 
@@ -55,7 +62,7 @@ describe('extractTmpNoticeAttachmentUrlsFromHtml', () => {
   it('a[data-file-attachment] 의 href 만 추출', () => {
     const html =
       '<p><a data-file-attachment="true" href="https://cdn.test/tmp/notice-attachment/a.pdf">A</a>' +
-      '<a href="https://example.com/page">B (일반 링크)</a>' +
+      '<a href="https://example.com/page">B 일반 링크</a>' +
       '<img src="https://cdn.test/tmp/survey/x.webp" />' +
       '</p>';
     expect(extractTmpNoticeAttachmentUrlsFromHtml(html)).toEqual([
@@ -117,22 +124,17 @@ describe('replaceNoticeAttachmentUrlsInQuestion', () => {
 describe('promoteNoticeAttachments', () => {
   beforeEach(() => {
     process.env.CLOUDFLARE_R2_PUBLIC_URL = 'https://cdn.test';
+    vi.mocked(moveR2Objects).mockReset();
   });
   afterEach(() => {
     delete process.env.CLOUDFLARE_R2_PUBLIC_URL;
-    vi.restoreAllMocks();
   });
 
   it('R2 move 성공 시 모든 tmp URL 영구 URL 치환', async () => {
-    vi.doMock('@/lib/image-utils-server', () => ({
-      moveR2Objects: vi.fn(async (pairs: Array<{ srcKey: string; dstKey: string }>) => ({
-        movedKeys: pairs.map((p) => ({ srcKey: p.srcKey, dstKey: p.dstKey })),
-        failed: [],
-      })),
+    vi.mocked(moveR2Objects).mockImplementationOnce(async (pairs) => ({
+      movedKeys: pairs.map((p) => ({ srcKey: p.srcKey, dstKey: p.dstKey })),
+      failed: [],
     }));
-    const { promoteNoticeAttachments } = await import(
-      '@/lib/survey/notice-attachment-promote'
-    );
 
     const questions = [
       {
@@ -148,24 +150,18 @@ describe('promoteNoticeAttachments', () => {
   });
 
   it('tmp URL 없으면 same reference', async () => {
-    const { promoteNoticeAttachments } = await import(
-      '@/lib/survey/notice-attachment-promote'
-    );
     const questions = [{ type: 'notice', noticeContent: '<p>그냥 본문</p>' }];
     const out = await promoteNoticeAttachments(questions);
     expect(out).toBe(questions);
+    // moveR2Objects 호출 안 됨 early return
+    expect(vi.mocked(moveR2Objects)).not.toHaveBeenCalled();
   });
 
   it('R2 move 부분 실패 시 성공한 것만 치환', async () => {
-    vi.doMock('@/lib/image-utils-server', () => ({
-      moveR2Objects: vi.fn(async (pairs: Array<{ srcKey: string; dstKey: string }>) => ({
-        movedKeys: [{ srcKey: pairs[0].srcKey, dstKey: pairs[0].dstKey }],
-        failed: [pairs[1]?.srcKey].filter(Boolean) as string[],
-      })),
+    vi.mocked(moveR2Objects).mockImplementationOnce(async (pairs) => ({
+      movedKeys: [{ srcKey: pairs[0].srcKey, dstKey: pairs[0].dstKey }],
+      failed: [pairs[1]?.srcKey].filter(Boolean) as string[],
     }));
-    const { promoteNoticeAttachments } = await import(
-      '@/lib/survey/notice-attachment-promote'
-    );
     const questions = [
       {
         type: 'notice',
@@ -175,7 +171,7 @@ describe('promoteNoticeAttachments', () => {
       },
     ];
     const out = await promoteNoticeAttachments(questions);
-    // 하나만 치환됨 (R2 mock 의 movedKeys 첫 번째)
+    // 하나만 치환됨 R2 mock 의 movedKeys 첫 번째
     expect(out[0].noticeContent).toMatch(/notice-attachment\/[ab]\.pdf/);
     // 실패한 것은 tmp 그대로
     expect(out[0].noticeContent).toContain('tmp/notice-attachment/');
