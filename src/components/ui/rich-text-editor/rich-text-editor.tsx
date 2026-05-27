@@ -109,20 +109,25 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
     useImperativeHandle(
       ref,
       () => ({
-        getUnsavedImages: () => (editor ? imageTracker.getOrphans(editor.getHTML()) : []),
+        getUnsavedImages: () =>
+          editor && !editor.isDestroyed ? imageTracker.getOrphans(editor.getHTML()) : [],
         cleanupOrphanImages: async () => {
-          if (editor) await imageTracker.cleanupOrphans(editor.getHTML());
+          // editor 가 destroy 된 후 getHTML() 은 빈 문자열을 반환할 수 있어,
+          // 잘못된 orphan 검출로 살아있는 R2 객체가 삭제되는 사고를 막아야 한다.
+          if (!editor || editor.isDestroyed) return;
+          await imageTracker.cleanupOrphans(editor.getHTML());
         },
         insertImage: (url: string) => {
-          if (!editor) return;
+          if (!editor || editor.isDestroyed) return;
           imageTracker.trackUpload(url);
           editor.chain().focus().setImage({ src: url }).run();
         },
         getEditor: () => editor,
         getUnsavedFileAttachments: () =>
-          editor ? fileTracker.getOrphans(editor.getHTML()) : [],
+          editor && !editor.isDestroyed ? fileTracker.getOrphans(editor.getHTML()) : [],
         cleanupOrphanFileAttachments: async () => {
-          if (editor) await fileTracker.cleanupOrphans(editor.getHTML());
+          if (!editor || editor.isDestroyed) return;
+          await fileTracker.cleanupOrphans(editor.getHTML());
         },
       }),
       [editor, imageTracker, fileTracker],
