@@ -160,11 +160,24 @@ describe('promoteNoticeAttachments', () => {
     expect(vi.mocked(moveR2Objects)).not.toHaveBeenCalled();
   });
 
-  it('R2 move 부분 실패 시 성공한 것만 치환', async () => {
-    vi.mocked(moveR2Objects).mockImplementationOnce(async (pairs) => ({
-      movedKeys: [{ srcKey: pairs[0].srcKey, dstKey: pairs[0].dstKey }],
-      failed: [pairs[1]?.srcKey].filter(Boolean) as string[],
-    }));
+  it('R2 move 1차 실패 → retry 후 성공 시 정상 promote', async () => {
+    let callCount = 0;
+    vi.mocked(moveR2Objects).mockImplementation(async (pairs) => {
+      callCount += 1;
+      if (callCount === 1) {
+        // 1차: 하나만 성공, 하나 실패
+        return {
+          movedKeys: [{ srcKey: pairs[0].srcKey, dstKey: pairs[0].dstKey }],
+          failed: [pairs[1].srcKey],
+        };
+      }
+      // 2차 retry: 나머지 성공
+      return {
+        movedKeys: pairs.map((p) => ({ srcKey: p.srcKey, dstKey: p.dstKey })),
+        failed: [],
+      };
+    });
+
     const questions = [
       {
         type: 'notice',
@@ -174,10 +187,47 @@ describe('promoteNoticeAttachments', () => {
       },
     ];
     const out = await promoteNoticeAttachments(questions);
-    // 하나만 치환됨 R2 mock 의 movedKeys 첫 번째
-    expect(out[0].noticeContent).toMatch(/notice-attachment\/[ab]\.pdf/);
-    // 실패한 것은 tmp 그대로
-    expect(out[0].noticeContent).toContain('tmp/notice-attachment/');
+    expect(out[0].noticeContent).toContain('notice-attachment/a.pdf');
+    expect(out[0].noticeContent).toContain('notice-attachment/b.pdf');
+    expect(out[0].noticeContent).not.toContain('tmp/notice-attachment/');
+    expect(callCount).toBe(2);
+  });
+
+  it('R2 move 1차+retry 모두 실패 → 부분 성공분 rollback + throw', async () => {
+    let callCount = 0;
+    vi.mocked(moveR2Objects).mockImplementation(async (pairs) => {
+      callCount += 1;
+      if (callCount === 1) {
+        // 1차: a 성공, b 실패
+        return {
+          movedKeys: [
+            { srcKey: pairs[0].srcKey, dstKey: pairs[0].dstKey },
+          ],
+          failed: [pairs[1].srcKey],
+        };
+      }
+      // retry: pairs 는 stillFailed (b) 만 포함 — 여전히 실패
+      return {
+        movedKeys: [],
+        failed: pairs.map((p) => p.srcKey),
+      };
+    });
+    vi.mocked(deleteR2ObjectsByKey).mockResolvedValue(true);
+
+    const questions = [
+      {
+        type: 'notice',
+        noticeContent:
+          '<a data-file-attachment="true" href="https://cdn.test/tmp/notice-attachment/a.pdf">A</a>' +
+          '<a data-file-attachment="true" href="https://cdn.test/tmp/notice-attachment/b.pdf">B</a>',
+      },
+    ];
+
+    await expect(promoteNoticeAttachments(questions)).rejects.toThrow(
+      /공지사항 첨부 promote 실패/,
+    );
+    // 부분 성공분 rollback DELETE 호출 확인
+    expect(deleteR2ObjectsByKey).toHaveBeenCalledWith(['notice-attachment/a.pdf']);
   });
 
   it('previousQuestions 의 영구 키 중 새 HTML 에 없는 것 → deleteR2ObjectsByKey 호출', async () => {

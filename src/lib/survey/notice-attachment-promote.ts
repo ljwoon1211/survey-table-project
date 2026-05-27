@@ -13,6 +13,22 @@ export type PromotableNoticeQuestion = {
   noticeContent?: string | null;
 };
 
+/**
+ * promote 가 최종 실패했을 때 throw 되는 에러.
+ * publish 흐름이 이를 catch 해 트랜잭션을 abort 시키도록 한다.
+ * (mail-attachment-promote.ts 의 AttachmentPromoteError 와 동일 패턴)
+ */
+export class NoticeAttachmentPromoteError extends Error {
+  failedKeys: string[];
+  constructor(failedKeys: string[]) {
+    super(
+      `공지사항 첨부 promote 실패: ${failedKeys.length}개 객체가 영구 위치로 이동되지 못함`,
+    );
+    this.failedKeys = failedKeys;
+    this.name = 'NoticeAttachmentPromoteError';
+  }
+}
+
 export function isTmpNoticeAttachmentUrl(url: string): boolean {
   return url.startsWith(`${getR2PublicUrl()}/${TMP_NOTICE_ATTACHMENT_PREFIX}`);
 }
@@ -179,22 +195,45 @@ export async function promoteNoticeAttachments<T extends PromotableNoticeQuestio
   let result = questions;
 
   if (pairs.length > 0) {
-    const { movedKeys, failed } = await moveR2Objects(
-      pairs.map(({ srcKey, dstKey }) => ({ srcKey, dstKey })),
-    );
+    const movePairs = pairs.map(({ srcKey, dstKey }) => ({ srcKey, dstKey }));
 
-    if (failed.length > 0) {
-      Sentry.captureMessage(
-        `공지사항 첨부 promote 부분 실패: ${failed.length}개 객체가 tmp 에 잔존`,
-        {
-          level: 'warning',
-          tags: { operation: 'notice_attachment_promote' },
-          extra: { failedKeys: failed },
-        },
-      );
+    let allMoved = [] as Array<{ srcKey: string; dstKey: string }>;
+    let stillFailed: string[] = [];
+
+    const first = await moveR2Objects(movePairs);
+    allMoved = first.movedKeys;
+    stillFailed = first.failed;
+
+    // R2 read-after-write 일시 불일치나 transient 네트워크 케이스 대비 1회 retry
+    if (stillFailed.length > 0) {
+      const retryPairs = movePairs.filter((p) => stillFailed.includes(p.srcKey));
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const second = await moveR2Objects(retryPairs);
+      allMoved = [...allMoved, ...second.movedKeys];
+      stillFailed = second.failed;
     }
 
-    const movedSrcKeys = new Set(movedKeys.map((m) => m.srcKey));
+    if (stillFailed.length > 0) {
+      // 이미 영구 위치로 옮긴 객체는 DB 갱신이 일어나지 않으면 cleanup orchestrator 도
+      // 못 잡아내는 orphan 이 됨. 같은 batch 의 부분 성공분을 즉시 폐기.
+      if (allMoved.length > 0) {
+        deleteR2ObjectsByKey(allMoved.map((p) => p.dstKey)).catch(() => undefined);
+      }
+      Sentry.captureMessage(
+        `공지사항 첨부 promote 최종 실패: ${stillFailed.length}개`,
+        {
+          level: 'error',
+          tags: { operation: 'notice_attachment_promote' },
+          extra: {
+            failedKeys: stillFailed,
+            rolledBackKeys: allMoved.map((p) => p.dstKey),
+          },
+        },
+      );
+      throw new NoticeAttachmentPromoteError(stillFailed);
+    }
+
+    const movedSrcKeys = new Set(allMoved.map((m) => m.srcKey));
     const publicUrl = getR2PublicUrl();
     const mapping = new Map<string, string>();
     for (const { srcKey, srcUrl } of pairs) {
