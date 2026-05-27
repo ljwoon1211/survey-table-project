@@ -547,6 +547,7 @@ export default function SurveyResponsePage() {
         currentStep
       ) {
         setIsCreatingResponse(true);
+        // TODO(Task 12): clientSignals를 useClientSignals 훅으로 교체
         createResponseWithFirstAnswer({
           surveyId: loadedSurvey.id,
           sessionId,
@@ -555,8 +556,14 @@ export default function SurveyResponsePage() {
           value,
           currentStepId: stepIdOf(currentStep),
           inviteToken: inviteToken ?? undefined,
+          clientSignals: { deviceId: null, screen: '', dpr: 1, tz: '', lang: '', platform: '' },
         })
-          .then(({ id, contactTargetId }) => {
+          .then((result) => {
+            if (result.kind === 'blocked') {
+              console.warn('[createResponseWithFirstAnswer] 중복 감지로 차단됨:', result.reason);
+              return;
+            }
+            const { id, contactTargetId } = result;
             setCurrentResponseId(id);
             // invite 토큰이 있었는데 contactTargetId 매칭 실패 → 무효 토큰. 익명 응답으로 폴백 알림.
             if (inviteToken && !contactTargetId) {
@@ -632,20 +639,26 @@ export default function SurveyResponsePage() {
       let effectiveResponseId = currentResponseId;
       if (!effectiveResponseId && loadedSurvey && currentStep) {
         try {
+          // TODO(Task 12): clientSignals를 useClientSignals 훅으로 교체
           const created = await createBlankResponse({
             surveyId: loadedSurvey.id,
             sessionId,
             versionId: versionId ?? null,
             currentStepId: stepIdOf(currentStep),
             inviteToken: inviteToken ?? undefined,
+            clientSignals: { deviceId: null, screen: '', dpr: 1, tz: '', lang: '', platform: '' },
           });
-          effectiveResponseId = created.id;
-          setCurrentResponseId(created.id);
-          if (inviteToken && !created.contactTargetId) {
-            setInviteIsInvalid(true);
-          }
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem(sessionStorageKey(loadedSurvey.id), sessionId);
+          if (created.kind === 'blocked') {
+            console.warn('[createBlankResponse] 중복 감지로 차단됨:', created.reason);
+          } else {
+            effectiveResponseId = created.id;
+            setCurrentResponseId(created.id);
+            if (inviteToken && !created.contactTargetId) {
+              setInviteIsInvalid(true);
+            }
+            if (typeof window !== 'undefined') {
+              window.localStorage.setItem(sessionStorageKey(loadedSurvey.id), sessionId);
+            }
           }
         } catch (err) {
           console.error('빈 응답 생성 오류:', err);

@@ -15,6 +15,9 @@ import {
 } from '@/db/schema';
 import type { PageVisit } from '@/db/schema/schema-types';
 import { requireAuth } from '@/lib/auth';
+import { checkTrackA, checkTrackB } from '@/lib/duplicate-detection/check';
+import { computeSignals } from '@/lib/duplicate-detection/signals';
+import type { ClientSignals } from '@/lib/duplicate-detection/types';
 import { parseBrowser, parsePlatform } from '@/lib/operations/parse-ua';
 import { normalizeToAnswers } from '@/lib/response-normalizer';
 import { substituteTokens } from '@/lib/survey/substitute-tokens';
@@ -108,14 +111,24 @@ export async function updateQuestionResponse(
 // ========================
 
 /**
+ * createResponseWithFirstAnswer / createBlankResponse 의 반환 타입.
+ * - created: 응답 행 생성 성공
+ * - blocked: 중복 감지로 차단
+ */
+export type FirstAnswerResult =
+  | { kind: 'created'; id: string; contactTargetId: string | null }
+  | { kind: 'blocked'; reason: 'invalid_token' | 'token_already_used' | 'device_already_responded' };
+
+/**
  * 첫 답변과 함께 survey_responses 행을 INSERT.
  *
  * - UA를 서버 헤더에서 읽어 platform/browser를 파싱
  * - 첫 답변(`questionResponses`)과 첫 페이지 방문 기록을 함께 기록
  * - 동일 (surveyId, sessionId) 조합 동시 INSERT race 는 DB UNIQUE 제약 +
  *   `ON CONFLICT DO NOTHING` 으로 차단. 충돌 시 기존 행에 답변만 적용.
+ * - clientSignals 로 중복 감지 재검증 (bypass defense). 차단 시 blocked 반환.
  *
- * @returns 생성되거나 기존에 존재하던 응답 행의 id
+ * @returns created (생성/기존 행 id) 또는 blocked (중복 감지)
  */
 export async function createResponseWithFirstAnswer(input: {
   surveyId: string;
@@ -125,21 +138,30 @@ export async function createResponseWithFirstAnswer(input: {
   value: unknown;
   currentStepId: string;
   inviteToken?: string;
-}): Promise<{ id: string; contactTargetId: string | null }> {
-  const { surveyId, sessionId, versionId, questionId, value, currentStepId, inviteToken } = input;
+  clientSignals: ClientSignals;
+}): Promise<FirstAnswerResult> {
+  const { surveyId, sessionId, versionId, questionId, value, currentStepId, inviteToken, clientSignals } = input;
 
   // UA + IP (Next 15+ 비동기 headers API)
   const headerStore = await headers();
   const userAgent = headerStore.get('user-agent') ?? null;
   const platform = parsePlatform(userAgent);
   const browser = parseBrowser(userAgent);
-  // x-forwarded-for 는 "client, proxy1, proxy2" 형태 → 첫 IP 사용. 없으면 x-real-ip fallback.
-  const ipAddress = extractClientIp(
-    headerStore.get('x-forwarded-for'),
-    headerStore.get('x-real-ip'),
-  );
+
+  // 신호 계산: ipHash, fpHash, deviceId
+  const signals = computeSignals(headerStore, clientSignals);
+
+  // 중복 감지 재검증 (bypass defense — checkDuplicateOnEntry 우회 시 server action에서 2차 차단)
+  if (inviteToken) {
+    const trackA = await checkTrackA(surveyId, inviteToken);
+    if (trackA.blocked) return { kind: 'blocked', reason: trackA.reason };
+  } else {
+    const trackB = await checkTrackB({ surveyId, signals });
+    if (trackB.blocked) return { kind: 'blocked', reason: trackB.reason };
+  }
 
   // 컨택 매칭: inviteToken 이 있고 유효하면 contactTargetId 세팅. 무효 토큰은 silent fallback (null).
+  // checkTrackA 통과 = 유효 토큰이므로 contactTargetId 를 그기서 가져온다.
   let contactTargetId: string | null = null;
   if (inviteToken) {
     const target = await findContactByInviteToken(surveyId, inviteToken);
@@ -160,7 +182,9 @@ export async function createResponseWithFirstAnswer(input: {
     isCompleted: false,
     status: 'in_progress',
     userAgent,
-    // ipAddress 컬럼 제거됨 — Task 10에서 ip_hash 기반으로 대체
+    ipHash: signals.ipHash,
+    fpHash: signals.fpHash,
+    deviceId: signals.deviceId,
     platform,
     browser,
     currentStepId,
@@ -179,7 +203,7 @@ export async function createResponseWithFirstAnswer(input: {
     .returning({ id: surveyResponses.id, contactTargetId: surveyResponses.contactTargetId });
 
   if (inserted.length > 0) {
-    return { id: inserted[0].id, contactTargetId: inserted[0].contactTargetId };
+    return { kind: 'created', id: inserted[0].id, contactTargetId: inserted[0].contactTargetId };
   }
 
   // 충돌 → 기존 행에 답변 머지. UNIQUE 제약이 있으므로 존재가 보장된다.
@@ -198,7 +222,7 @@ export async function createResponseWithFirstAnswer(input: {
   }
 
   await updateQuestionResponse(existing.id, questionId, value);
-  return { id: existing.id, contactTargetId: existing.contactTargetId };
+  return { kind: 'created', id: existing.id, contactTargetId: existing.contactTargetId };
 }
 
 /**
@@ -212,7 +236,8 @@ export async function createResponseWithFirstAnswer(input: {
  * createResponseWithFirstAnswer 와 동일하게:
  * - (surveyId, sessionId) UNIQUE 제약으로 멱등 (ON CONFLICT DO NOTHING)
  * - inviteToken 으로 contactTargetId 매칭
- * - UA/IP/platform/browser/firstVisit 캡처
+ * - UA/platform/browser/firstVisit 캡처
+ * - clientSignals 로 중복 감지 재검증 (bypass defense)
  *
  * 충돌(=이미 답변이 있는 row 존재) 시 기존 row 의 id 를 그대로 반환.
  */
@@ -222,17 +247,26 @@ export async function createBlankResponse(input: {
   versionId: string | null;
   currentStepId: string;
   inviteToken?: string;
-}): Promise<{ id: string; contactTargetId: string | null }> {
-  const { surveyId, sessionId, versionId, currentStepId, inviteToken } = input;
+  clientSignals: ClientSignals;
+}): Promise<FirstAnswerResult> {
+  const { surveyId, sessionId, versionId, currentStepId, inviteToken, clientSignals } = input;
 
   const headerStore = await headers();
   const userAgent = headerStore.get('user-agent') ?? null;
   const platform = parsePlatform(userAgent);
   const browser = parseBrowser(userAgent);
-  const ipAddress = extractClientIp(
-    headerStore.get('x-forwarded-for'),
-    headerStore.get('x-real-ip'),
-  );
+
+  // 신호 계산: ipHash, fpHash, deviceId
+  const signals = computeSignals(headerStore, clientSignals);
+
+  // 중복 감지 재검증 (bypass defense)
+  if (inviteToken) {
+    const trackA = await checkTrackA(surveyId, inviteToken);
+    if (trackA.blocked) return { kind: 'blocked', reason: trackA.reason };
+  } else {
+    const trackB = await checkTrackB({ surveyId, signals });
+    if (trackB.blocked) return { kind: 'blocked', reason: trackB.reason };
+  }
 
   let contactTargetId: string | null = null;
   if (inviteToken) {
@@ -254,7 +288,9 @@ export async function createBlankResponse(input: {
     isCompleted: false,
     status: 'in_progress',
     userAgent,
-    // ipAddress 컬럼 제거됨 — Task 10에서 ip_hash 기반으로 대체
+    ipHash: signals.ipHash,
+    fpHash: signals.fpHash,
+    deviceId: signals.deviceId,
     platform,
     browser,
     currentStepId,
@@ -271,7 +307,7 @@ export async function createBlankResponse(input: {
     .returning({ id: surveyResponses.id, contactTargetId: surveyResponses.contactTargetId });
 
   if (inserted.length > 0) {
-    return { id: inserted[0].id, contactTargetId: inserted[0].contactTargetId };
+    return { kind: 'created', id: inserted[0].id, contactTargetId: inserted[0].contactTargetId };
   }
 
   const [existing] = await db
@@ -288,7 +324,7 @@ export async function createBlankResponse(input: {
     );
   }
 
-  return { id: existing.id, contactTargetId: existing.contactTargetId };
+  return { kind: 'created', id: existing.id, contactTargetId: existing.contactTargetId };
 }
 
 /**
