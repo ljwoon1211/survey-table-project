@@ -1,0 +1,183 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  extractTmpNoticeAttachmentUrlsFromHtml,
+  isTmpNoticeAttachmentUrl,
+  noticeAttachmentTmpToPermanentUrl,
+  replaceNoticeAttachmentUrlsInQuestion,
+} from '@/lib/survey/notice-attachment-promote';
+
+describe('isTmpNoticeAttachmentUrl', () => {
+  beforeEach(() => {
+    process.env.CLOUDFLARE_R2_PUBLIC_URL = 'https://cdn.test';
+  });
+  afterEach(() => {
+    delete process.env.CLOUDFLARE_R2_PUBLIC_URL;
+  });
+
+  it('tmp/notice-attachment/ prefix 는 true', () => {
+    expect(isTmpNoticeAttachmentUrl('https://cdn.test/tmp/notice-attachment/x.pdf')).toBe(true);
+  });
+  it('영구 prefix 는 false', () => {
+    expect(isTmpNoticeAttachmentUrl('https://cdn.test/notice-attachment/x.pdf')).toBe(false);
+  });
+  it('tmp/mail-attachment 는 false', () => {
+    expect(isTmpNoticeAttachmentUrl('https://cdn.test/tmp/mail-attachment/x.pdf')).toBe(false);
+  });
+  it('tmp/survey 는 false', () => {
+    expect(isTmpNoticeAttachmentUrl('https://cdn.test/tmp/survey/x.webp')).toBe(false);
+  });
+});
+
+describe('noticeAttachmentTmpToPermanentUrl', () => {
+  beforeEach(() => {
+    process.env.CLOUDFLARE_R2_PUBLIC_URL = 'https://cdn.test';
+  });
+  afterEach(() => {
+    delete process.env.CLOUDFLARE_R2_PUBLIC_URL;
+  });
+
+  it('tmp/notice-attachment/ → notice-attachment/', () => {
+    expect(
+      noticeAttachmentTmpToPermanentUrl('https://cdn.test/tmp/notice-attachment/x.pdf'),
+    ).toBe('https://cdn.test/notice-attachment/x.pdf');
+  });
+});
+
+describe('extractTmpNoticeAttachmentUrlsFromHtml', () => {
+  beforeEach(() => {
+    process.env.CLOUDFLARE_R2_PUBLIC_URL = 'https://cdn.test';
+  });
+  afterEach(() => {
+    delete process.env.CLOUDFLARE_R2_PUBLIC_URL;
+  });
+
+  it('a[data-file-attachment] 의 href 만 추출', () => {
+    const html =
+      '<p><a data-file-attachment="true" href="https://cdn.test/tmp/notice-attachment/a.pdf">A</a>' +
+      '<a href="https://example.com/page">B (일반 링크)</a>' +
+      '<img src="https://cdn.test/tmp/survey/x.webp" />' +
+      '</p>';
+    expect(extractTmpNoticeAttachmentUrlsFromHtml(html)).toEqual([
+      'https://cdn.test/tmp/notice-attachment/a.pdf',
+    ]);
+  });
+
+  it('중복 제거', () => {
+    const html =
+      '<a data-file-attachment="true" href="https://cdn.test/tmp/notice-attachment/a.pdf">A</a>' +
+      '<a data-file-attachment="true" href="https://cdn.test/tmp/notice-attachment/a.pdf">A2</a>';
+    expect(extractTmpNoticeAttachmentUrlsFromHtml(html)).toEqual([
+      'https://cdn.test/tmp/notice-attachment/a.pdf',
+    ]);
+  });
+
+  it('영구 prefix 는 제외', () => {
+    const html =
+      '<a data-file-attachment="true" href="https://cdn.test/notice-attachment/a.pdf">A</a>';
+    expect(extractTmpNoticeAttachmentUrlsFromHtml(html)).toEqual([]);
+  });
+
+  it('빈 HTML 은 빈 배열', () => {
+    expect(extractTmpNoticeAttachmentUrlsFromHtml('')).toEqual([]);
+  });
+});
+
+describe('replaceNoticeAttachmentUrlsInQuestion', () => {
+  it('mapping 의 URL 만 치환, 그 외는 유지', () => {
+    const mapping = new Map([
+      [
+        'https://cdn.test/tmp/notice-attachment/a.pdf',
+        'https://cdn.test/notice-attachment/a.pdf',
+      ],
+    ]);
+    const q = {
+      noticeContent:
+        '<a data-file-attachment="true" data-key="tmp/notice-attachment/a.pdf" ' +
+        'href="https://cdn.test/tmp/notice-attachment/a.pdf">A</a>',
+    };
+    const out = replaceNoticeAttachmentUrlsInQuestion(q, mapping);
+    // href URL 치환 확인
+    expect(out.noticeContent).toContain('href="https://cdn.test/notice-attachment/a.pdf"');
+    expect(out.noticeContent).not.toContain('tmp/notice-attachment/a.pdf');
+  });
+
+  it('noticeContent 없는 질문 그대로 반환', () => {
+    const q = { noticeContent: null };
+    const mapping = new Map([['x', 'y']]);
+    expect(replaceNoticeAttachmentUrlsInQuestion(q, mapping)).toEqual(q);
+  });
+
+  it('mapping 비었으면 same reference', () => {
+    const q = { noticeContent: '<a>x</a>' };
+    expect(replaceNoticeAttachmentUrlsInQuestion(q, new Map())).toBe(q);
+  });
+});
+
+describe('promoteNoticeAttachments', () => {
+  beforeEach(() => {
+    process.env.CLOUDFLARE_R2_PUBLIC_URL = 'https://cdn.test';
+  });
+  afterEach(() => {
+    delete process.env.CLOUDFLARE_R2_PUBLIC_URL;
+    vi.restoreAllMocks();
+  });
+
+  it('R2 move 성공 시 모든 tmp URL 영구 URL 치환', async () => {
+    vi.doMock('@/lib/image-utils-server', () => ({
+      moveR2Objects: vi.fn(async (pairs: Array<{ srcKey: string; dstKey: string }>) => ({
+        movedKeys: pairs.map((p) => ({ srcKey: p.srcKey, dstKey: p.dstKey })),
+        failed: [],
+      })),
+    }));
+    const { promoteNoticeAttachments } = await import(
+      '@/lib/survey/notice-attachment-promote'
+    );
+
+    const questions = [
+      {
+        type: 'notice',
+        noticeContent:
+          '<a data-file-attachment="true" data-key="tmp/notice-attachment/a.pdf" ' +
+          'href="https://cdn.test/tmp/notice-attachment/a.pdf">A</a>',
+      },
+    ];
+    const out = await promoteNoticeAttachments(questions);
+    expect(out[0].noticeContent).toContain('https://cdn.test/notice-attachment/a.pdf');
+    expect(out[0].noticeContent).not.toContain('tmp/notice-attachment/a.pdf');
+  });
+
+  it('tmp URL 없으면 same reference', async () => {
+    const { promoteNoticeAttachments } = await import(
+      '@/lib/survey/notice-attachment-promote'
+    );
+    const questions = [{ type: 'notice', noticeContent: '<p>그냥 본문</p>' }];
+    const out = await promoteNoticeAttachments(questions);
+    expect(out).toBe(questions);
+  });
+
+  it('R2 move 부분 실패 시 성공한 것만 치환', async () => {
+    vi.doMock('@/lib/image-utils-server', () => ({
+      moveR2Objects: vi.fn(async (pairs: Array<{ srcKey: string; dstKey: string }>) => ({
+        movedKeys: [{ srcKey: pairs[0].srcKey, dstKey: pairs[0].dstKey }],
+        failed: [pairs[1]?.srcKey].filter(Boolean) as string[],
+      })),
+    }));
+    const { promoteNoticeAttachments } = await import(
+      '@/lib/survey/notice-attachment-promote'
+    );
+    const questions = [
+      {
+        type: 'notice',
+        noticeContent:
+          '<a data-file-attachment="true" href="https://cdn.test/tmp/notice-attachment/a.pdf">A</a>' +
+          '<a data-file-attachment="true" href="https://cdn.test/tmp/notice-attachment/b.pdf">B</a>',
+      },
+    ];
+    const out = await promoteNoticeAttachments(questions);
+    // 하나만 치환됨 (R2 mock 의 movedKeys 첫 번째)
+    expect(out[0].noticeContent).toMatch(/notice-attachment\/[ab]\.pdf/);
+    // 실패한 것은 tmp 그대로
+    expect(out[0].noticeContent).toContain('tmp/notice-attachment/');
+  });
+});
