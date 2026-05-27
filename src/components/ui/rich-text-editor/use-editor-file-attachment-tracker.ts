@@ -9,11 +9,14 @@ import { deleteTmpNoticeAttachmentKeys } from './file-attachment-r2-client';
 
 /**
  * TipTap 에디터에서 업로드한 파일 첨부의 R2 lifecycle 을 추적.
- * 이미지 트래커 use-editor-image-tracker.ts 와 동일 패턴.
  *
  * - 마운트 시 initialHtml 의 tmp/notice-attachment/ 키를 추적 대상으로 등록
- * - editor onUpdate 시 reconcileAfterUpdate 가 직전과 비교해 사라진 tmp 키 R2 DELETE
- * - 폼 취소 시 cleanupOrphans 로 미사용 tmp 키 일괄 정리
+ * - editor onUpdate 시 reconcileAfterUpdate 가 직전과 비교해 사라진 tmp 키를
+ *   uploadedRef 에서만 즉시 제거(추적 해제). R2 DELETE 는 호출하지 않는다 —
+ *   사용자가 undo/redo 로 노드를 복원할 수 있고, 그 사이 R2 객체가 사라지면
+ *   publish 시 NoSuchKey 로 promote 가 실패하기 때문.
+ * - 폼 취소·unmount 시 cleanupOrphans 가 추적 대상 중 현재 HTML 에 없는 것만
+ *   일괄 R2 DELETE. 비정상 종료(브라우저 close 등)는 R2 24h lifecycle 안전망.
  *
  * 영구 prefix notice-attachment/ 는 추적 대상 아님 — promote 후 lifecycle 은
  * survey-save-actions 에서 별도 처리.
@@ -41,19 +44,12 @@ export function useEditorFileAttachmentTracker(initialHtml: string) {
     }
   }, []);
 
-  /** onUpdate 시점에 호출 — diff 후 사라진 tmp 키 R2 삭제 + previous 갱신 */
+  /**
+   * onUpdate 시점에 호출 — 사라진 tmp 키는 추적에서만 제거.
+   * R2 DELETE 는 의도적으로 호출하지 않는다(undo 시점 보존). 실제 R2 cleanup 은
+   * unmount/폼 취소 시 cleanupOrphans 가 일괄 수행하거나 24h lifecycle 이 처리.
+   */
   const reconcileAfterUpdate = useCallback((currentHtml: string) => {
-    const previousKeys = extractTmpAttachmentKeysFromHtml(previousContentRef.current);
-    const currentKeys = extractTmpAttachmentKeysFromHtml(currentHtml);
-    const deleted = previousKeys.filter(
-      (k) => !currentKeys.includes(k) && uploadedRef.current.has(k),
-    );
-
-    if (deleted.length > 0) {
-      void deleteTmpNoticeAttachmentKeys(deleted);
-      deleted.forEach((k) => uploadedRef.current.delete(k));
-    }
-
     previousContentRef.current = currentHtml;
   }, []);
 
