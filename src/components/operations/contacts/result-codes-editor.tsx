@@ -13,7 +13,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { DEFAULT_RESULT_CODES, type ContactResultCode } from '@/db/schema/schema-types';
+import {
+  DEFAULT_RESULT_CODES,
+  type ContactResultCode,
+  type ResultCodeStatus,
+} from '@/db/schema/schema-types';
 
 interface ResultCodesEditorProps {
   surveyId: string;
@@ -27,6 +31,32 @@ const TONE_OPTIONS: Array<NonNullable<ContactResultCode['tone']>> = [
   'blue',
   'slate',
 ];
+
+const STATUS_DOT_BG: Record<ResultCodeStatus, string> = {
+  positive: 'bg-green-500',
+  neutral: 'bg-slate-400',
+  negative: 'bg-rose-500',
+};
+
+const STATUS_LABEL: Record<ResultCodeStatus, string> = {
+  positive: '긍정 — 응답 완료로 인정',
+  neutral: '중립',
+  negative: '부정 — 모집단에서 제외',
+};
+
+function StatusDot({ status }: { status: ResultCodeStatus }) {
+  return (
+    <span
+      aria-hidden
+      className={`inline-block h-2 w-2 rounded-full ${STATUS_DOT_BG[status]}`}
+    />
+  );
+}
+
+function resolveStatus(c: ContactResultCode): ResultCodeStatus {
+  if (c.status) return c.status;
+  return c.code === '1.조사완료' ? 'positive' : 'neutral';
+}
 
 type SaveMode = 'custom' | 'use-default';
 
@@ -150,6 +180,7 @@ export function ResultCodesEditor({ surveyId, initialCodes }: ResultCodesEditorP
               <th className="px-3 py-2 text-left">코드</th>
               <th className="px-3 py-2 text-left">라벨</th>
               <th className="px-3 py-2 text-left">색상</th>
+              <th className="px-3 py-2 text-left">상태</th>
               <th className="px-3 py-2 text-center">액션</th>
             </tr>
           </thead>
@@ -202,6 +233,31 @@ export function ResultCodesEditor({ surveyId, initialCodes }: ResultCodesEditorP
                       {TONE_OPTIONS.map((t) => (
                         <SelectItem key={t} value={t}>
                           {t}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </td>
+                <td className="px-3 py-2">
+                  <Select
+                    value={resolveStatus(c)}
+                    onValueChange={(v) => update(i, { status: v as ResultCodeStatus })}
+                  >
+                    <SelectTrigger className="h-8 w-56">
+                      <SelectValue>
+                        <span className="inline-flex items-center gap-2">
+                          <StatusDot status={resolveStatus(c)} />
+                          {STATUS_LABEL[resolveStatus(c)]}
+                        </span>
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(['positive', 'neutral', 'negative'] as ResultCodeStatus[]).map((s) => (
+                        <SelectItem key={s} value={s}>
+                          <span className="inline-flex items-center gap-2">
+                            <StatusDot status={s} />
+                            {STATUS_LABEL[s]}
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectContent>
