@@ -147,6 +147,42 @@ function responsesToLookupShape(
   return out;
 }
 
+/**
+ * visibleQuestions 에서 미선택 옵션 텍스트를 drop 한 뒤 responses 와 병합한다.
+ *
+ * store.optionTexts(key=option.id)와 responses value(=option.value)가 다르므로
+ * question.options 배열을 통해 value→id 변환 후 필터링.
+ * 기존 분석 파이프라인(value가 string/array라는 가정)을 보존하기 위해
+ * optionTexts는 "__optTexts__" 사이드카 key에 저장한다.
+ *
+ * admin-edit 경로와 public 제출 경로 양쪽에서 공유한다.
+ */
+function buildOptTextsPayload(
+  visibleQuestions: Question[],
+  responses: ResponsesMap,
+): Record<string, unknown> {
+  const storeOptTexts = useSurveyResponseStore.getState().optionTexts;
+  const filteredOptTexts: Record<string, Record<string, string>> = {};
+  for (const q of visibleQuestions) {
+    const qOptTexts = storeOptTexts[q.id];
+    if (!qOptTexts || Object.keys(qOptTexts).length === 0) continue;
+    const qValue = responses[q.id];
+    const optionsForFilter = q.type === 'table'
+      ? collectTableQuestionOptions(q)
+      : q.options;
+    const filtered = filterOptionTextsForSubmission(qValue, qOptTexts, optionsForFilter);
+    if (filtered) {
+      filteredOptTexts[q.id] = filtered;
+    }
+  }
+  return {
+    ...responses,
+    ...(Object.keys(filteredOptTexts).length > 0
+      ? { __optTexts__: filteredOptTexts }
+      : {}),
+  };
+}
+
 export function SurveyResponseFlow({
   surveyIdentifier,
   inviteToken: inviteTokenProp = null,
@@ -215,7 +251,9 @@ export function SurveyResponseFlow({
     | { kind: 'checking' }
     | { kind: 'blocked'; reason: BlockReason }
     | { kind: 'ok' };
-  const [duplicateStatus, setDuplicateStatus] = useState<DuplicateStatus>({ kind: 'checking' });
+  const [duplicateStatus, setDuplicateStatus] = useState<DuplicateStatus>(() =>
+    isAdminEdit ? { kind: 'ok' } : { kind: 'checking' },
+  );
 
   // URL 식별자로 설문 조회
   useEffect(() => {
@@ -347,15 +385,9 @@ export function SurveyResponseFlow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identifier, isAdminEdit]);
 
-  // admin-edit 분기 (2/8) — 중복 검사 자동 통과 (어드민 수정은 새 응답이 아님)
-  useEffect(() => {
-    if (!isAdminEdit) return;
-    setDuplicateStatus({ kind: 'ok' });
-  }, [isAdminEdit]);
-
   // 진입 시 중복 검사 — 설문 로드 + 신호 수집 완료 후 1회 실행
   // signals 가 null 인 동안 effect skip → state 채워지면 자동 재실행
-  // admin-edit 분기 (2/8) — 어드민 수정 모드에서는 검사 자체를 건너뜀 (위 effect 가 ok 로 set)
+  // admin-edit 분기 (2/8) — 어드민 수정 모드에서는 검사 자체를 건너뜀 (초기값이 이미 ok)
   useEffect(() => {
     if (isAdminEdit) return;
     if (!loadedSurvey?.id || !signals) return;
@@ -772,26 +804,7 @@ export function SurveyResponseFlow({
       // admin-edit 분기 (6/8) — 새 응답 INSERT 없이 onSubmit 으로 위임.
       if (isAdminEdit && adminContext) {
         // 옵션 텍스트(__optTexts__) 사이드카 — 응답자 흐름과 동일하게 합쳐서 보낸다.
-        const storeOptTexts = useSurveyResponseStore.getState().optionTexts;
-        const filteredOptTexts: Record<string, Record<string, string>> = {};
-        for (const q of visibleQuestions) {
-          const qOptTexts = storeOptTexts[q.id];
-          if (!qOptTexts || Object.keys(qOptTexts).length === 0) continue;
-          const qValue = responses[q.id];
-          const optionsForFilter = q.type === 'table'
-            ? collectTableQuestionOptions(q)
-            : q.options;
-          const filtered = filterOptionTextsForSubmission(qValue, qOptTexts, optionsForFilter);
-          if (filtered) {
-            filteredOptTexts[q.id] = filtered;
-          }
-        }
-        const questionResponses: Record<string, unknown> = {
-          ...responses,
-          ...(Object.keys(filteredOptTexts).length > 0
-            ? { __optTexts__: filteredOptTexts }
-            : {}),
-        };
+        const questionResponses = buildOptTextsPayload(visibleQuestions, responses);
 
         // onSubmit 안에서 router.push 처리 — 본 컴포넌트는 thank-you 화면을 띄우지 않는다.
         await adminContext.onSubmit({ questionResponses });
@@ -886,31 +899,7 @@ export function SurveyResponseFlow({
           });
 
         // 제출 직전 — 미선택 옵션의 텍스트 drop 후 questionResponses에 병합.
-        // store의 optionTexts(key=option.id)와 responses value(=option.value)가 다르므로
-        // question.options 배열을 통해 value→id 변환 후 필터링.
-        // 기존 분석 파이프라인(value가 string/array라는 가정)을 보존하기 위해
-        // optionTexts는 "__optTexts__" 사이드카 key에 저장한다.
-        const storeOptTexts = useSurveyResponseStore.getState().optionTexts;
-        const filteredOptTexts: Record<string, Record<string, string>> = {};
-        for (const q of visibleQuestions) {
-          const qOptTexts = storeOptTexts[q.id];
-          if (!qOptTexts || Object.keys(qOptTexts).length === 0) continue;
-          const qValue = responses[q.id];
-          // 테이블 질문은 셀 단위로 옵션이 흩어져 있으므로 모든 셀의 옵션을 모아 전달
-          const optionsForFilter = q.type === 'table'
-            ? collectTableQuestionOptions(q)
-            : q.options;
-          const filtered = filterOptionTextsForSubmission(qValue, qOptTexts, optionsForFilter);
-          if (filtered) {
-            filteredOptTexts[q.id] = filtered;
-          }
-        }
-        const questionResponsesWithTexts: Record<string, unknown> = {
-          ...responses,
-          ...(Object.keys(filteredOptTexts).length > 0
-            ? { __optTexts__: filteredOptTexts }
-            : {}),
-        };
+        const questionResponsesWithTexts = buildOptTextsPayload(visibleQuestions, responses);
 
         await completeResponse(effectiveResponseId, {
           questionResponses: questionResponsesWithTexts,

@@ -52,9 +52,8 @@ export async function restoreResponse(surveyId: string, responseId: string) {
  * 어드민 응답 수정 저장.
  *
  * - questionResponses (JSONB) 와 response_answers 정규화 행을 일괄 갱신.
- * - completedAt / status / startedAt 은 명시적으로 set 하지 않아 보존됨.
+ * - completedAt / status / startedAt / totalSeconds 는 명시적으로 set 하지 않아 보존됨.
  * - lastEditedAt / lastActivityAt 은 갱신, currentStepId 는 null 로 초기화.
- * - totalSeconds 는 startedAt~completedAt 차이로 재계산 (변경 가능성 없으나 명시).
  * - 삭제(soft delete)된 응답은 거부.
  *
  * spread 사용 금지 — 명시적 set 만.
@@ -82,11 +81,6 @@ export async function saveAdminEdit(
   }
 
   const now = new Date();
-  const totalSeconds = existing.completedAt
-    ? Math.floor(
-        (existing.completedAt.getTime() - existing.startedAt.getTime()) / 1000,
-      )
-    : null;
 
   await db.transaction(async (tx) => {
     await tx
@@ -96,7 +90,6 @@ export async function saveAdminEdit(
         lastEditedAt: now,
         lastActivityAt: now,
         currentStepId: null,
-        totalSeconds,
       })
       .where(
         and(
@@ -117,6 +110,10 @@ export async function saveAdminEdit(
   return { ok: true as const };
 }
 
+/**
+ * 응답 행을 물리적으로 삭제한다.
+ * deletedAt 상태와 무관하게 물리 삭제 (active/휴지통 양쪽에서 호출 가능).
+ */
 export async function hardResetResponse(surveyId: string, responseId: string) {
   await requireSurveyOwnership(surveyId);
   // contactTargets.responseId 는 onDelete:'set null' 이지만 respondedAt 은

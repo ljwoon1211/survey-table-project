@@ -48,22 +48,22 @@ export default async function AdminResponseEditPage({ params, searchParams }: Pa
     );
   }
 
-  // 응답 작성 당시의 questions 스냅샷 로드
-  const version = response.versionId
-    ? await db.query.surveyVersions.findFirst({
-        where: eq(surveyVersions.id, response.versionId),
-      })
-    : null;
-
-  // 응답자가 사용한 contact attrs 복원 — contactTargetId 가 없으면 익명 응답이므로 빈 객체.
-  const contactAttrs = response.contactTargetId
-    ? (
-        await db.query.contactTargets.findFirst({
+  // 응답 작성 당시의 스냅샷과 contact attrs 를 병렬로 조회.
+  const [version, contactRow] = await Promise.all([
+    response.versionId
+      ? db.query.surveyVersions.findFirst({
+          where: eq(surveyVersions.id, response.versionId),
+        })
+      : Promise.resolve(null),
+    response.contactTargetId
+      ? db.query.contactTargets.findFirst({
           where: eq(contactTargets.id, response.contactTargetId),
           columns: { attrs: true },
         })
-      )?.attrs ?? {}
-    : {};
+      : Promise.resolve(null),
+  ]);
+  // contactTargetId 가 없으면 익명 응답이므로 빈 객체.
+  const contactAttrs = contactRow?.attrs ?? {};
 
   return (
     <AdminResponseEditor
