@@ -16,6 +16,7 @@ import {
   formatTotalTime,
   mapStatusPill,
   parseQuestionNumberFromTitle,
+  type ProfilesView,
   type SortDir,
   type SortKey,
   type StatusPillResult,
@@ -29,6 +30,7 @@ import {
   TablePagerFooter,
   type CellAlign,
 } from '../table-primitives';
+import { ProfilesRowActions } from './profiles-row-actions';
 import { StatusPill } from './status-pill';
 
 interface QuestionMeta {
@@ -51,6 +53,8 @@ interface Props {
   dir: SortDir;
   /** 진척률 N/M·Qx 표기에 사용. surveyId 의 questions 메타 (id → order, title) */
   questions: ReadonlyArray<QuestionMeta>;
+  surveyId: string;
+  view: ProfilesView;
 }
 
 interface DisplayRow {
@@ -68,9 +72,9 @@ interface DisplayRow {
 const meta = (align: CellAlign, sortable: boolean): ColumnMeta => ({ align, sortable });
 
 /**
- * 응답 내역 테이블. 8 컬럼 + URL state sort/pagination + 검색 결과 EmptyState.
+ * 응답 내역 테이블. 9 컬럼 + URL state sort/pagination + 검색 결과 EmptyState.
  */
-export function ProfilesTable({ rows, total, page, pageSize, sort, dir, questions }: Props) {
+export function ProfilesTable({ rows, total, page, pageSize, sort, dir, questions, surveyId, view }: Props) {
   const pushParams = useSearchParamsMutator();
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -163,8 +167,21 @@ export function ProfilesTable({ rows, total, page, pageSize, sort, dir, question
         header: '소요시간',
         meta: meta('right', true),
       },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => (
+          <ProfilesRowActions
+            surveyId={surveyId}
+            responseId={row.original.id}
+            idx={row.original.idx}
+            view={view}
+          />
+        ),
+        meta: meta('center', false),
+      },
     ],
-    [],
+    [surveyId, view],
   );
 
   const table = useReactTable({

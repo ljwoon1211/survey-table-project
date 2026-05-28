@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { count, eq } from 'drizzle-orm';
+import { and, count, eq, isNull } from 'drizzle-orm';
 import * as XLSX from 'xlsx';
 
 import { db } from '@/db';
@@ -66,7 +66,7 @@ export async function GET(
       const [{ total }] = await db
         .select({ total: count() })
         .from(surveyResponses)
-        .where(eq(surveyResponses.surveyId, surveyId));
+        .where(and(eq(surveyResponses.surveyId, surveyId), isNull(surveyResponses.deletedAt)));
 
       if (total > MAX_EXPORT_RESPONSES) {
         return NextResponse.json(
@@ -76,7 +76,7 @@ export async function GET(
       }
 
       responses = await db.query.surveyResponses.findMany({
-        where: eq(surveyResponses.surveyId, surveyId),
+        where: and(eq(surveyResponses.surveyId, surveyId), isNull(surveyResponses.deletedAt)),
         orderBy: (responses, { desc }) => [desc(responses.createdAt)],
       });
     }

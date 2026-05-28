@@ -27,6 +27,8 @@ export type SortDir = 'asc' | 'desc';
 export const QFIELDS = ['all', 'idx', 'browser'] as const;
 export type QField = (typeof QFIELDS)[number];
 
+export type ProfilesView = 'active' | 'deleted';
+
 export const STATUS_FILTERS = [
   'all',
   'completed',
@@ -35,6 +37,7 @@ export const STATUS_FILTERS = [
   'screened_out',
   'quotaful_out',
   'bad',
+  'deleted',
 ] as const;
 export type StatusFilter = (typeof STATUS_FILTERS)[number];
 
@@ -56,6 +59,8 @@ export interface NormalizedListArgs {
   status: StatusFilter;
   sort: SortKey;
   dir: SortDir;
+  /** status='deleted' 이면 'deleted', 그 외 전부 'active'. */
+  view: ProfilesView;
 }
 
 /** `searchParams` 의 가공되지 않은 string 입력을 화이트리스트 + 기본값으로 normalize. */
@@ -67,17 +72,22 @@ export function normalizeListArgs(input: {
   sort?: string;
   dir?: string;
 }): NormalizedListArgs {
+  const status = pickFromWhitelist(input.status, STATUS_FILTERS, 'all');
+  const view: ProfilesView = status === 'deleted' ? 'deleted' : 'active';
   return {
     page: Math.max(1, parseInt(input.page ?? '1', 10) || 1),
     q: (input.q ?? '').slice(0, 200),
     qfield: pickFromWhitelist(input.qfield, QFIELDS, 'all'),
-    status: pickFromWhitelist(input.status, STATUS_FILTERS, 'all'),
+    status,
     sort: pickFromWhitelist(input.sort, SORT_KEYS, 'idx'),
     dir: input.dir === 'asc' ? 'asc' : 'desc',
+    view,
   };
 }
 
-/** 현재 URL 의 검색 파라미터에 활성 필터가 걸려 있는지 판단. */
+/** 현재 URL 의 검색 파라미터에 활성 필터가 걸려 있는지 판단.
+ *  status='deleted' 도 활성 필터로 간주 (기본 뷰가 active 이므로).
+ */
 export function hasActiveFilters(input: {
   q?: string;
   qfield?: string;

@@ -113,6 +113,8 @@ export function ProfilesFilterBar({ initialQ, initialQField, initialStatus }: Pr
             {o.label}
           </option>
         ))}
+        <option disabled>──────────</option>
+        <option value="deleted">삭제됨</option>
       </select>
       <button
         type="submit"

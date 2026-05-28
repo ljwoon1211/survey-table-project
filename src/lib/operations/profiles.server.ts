@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, asc, eq, ilike, or, sql, type AnyColumn, type SQL } from 'drizzle-orm';
+import { and, asc, eq, ilike, isNotNull, isNull, or, sql, type AnyColumn, type SQL } from 'drizzle-orm';
 
 import { db } from '@/db';
 import { surveyResponses } from '@/db/schema';
@@ -60,7 +60,7 @@ function orderExpr(col: AnyColumn | SQL, direction: SortDir): SQL {
 export async function listResponsesForProfiles(
   args: ListProfilesArgs,
 ): Promise<ListProfilesResult> {
-  const { surveyId, page, pageSize, q, qfield, status, sort, dir } = args;
+  const { surveyId, page, pageSize, q, qfield, status, sort, dir, view } = args;
 
   const numbered = db
     .select({
@@ -77,7 +77,14 @@ export async function listResponsesForProfiles(
       totalSeconds: surveyResponses.totalSeconds,
     })
     .from(surveyResponses)
-    .where(eq(surveyResponses.surveyId, surveyId))
+    .where(
+      and(
+        eq(surveyResponses.surveyId, surveyId),
+        view === 'deleted'
+          ? isNotNull(surveyResponses.deletedAt)
+          : isNull(surveyResponses.deletedAt),
+      ),
+    )
     .as('numbered');
 
   const SORT_COLUMN_MAP = {
@@ -90,7 +97,9 @@ export async function listResponsesForProfiles(
 
   const whereParts: SQL[] = [];
 
-  if (status !== 'all') {
+  // deleted view 는 base subquery 가 이미 deletedAt IS NOT NULL 로 걸러냄.
+  // status 필터는 active view 일 때만 적용 (deleted view 는 전체 노출).
+  if (view === 'active' && status !== 'all') {
     whereParts.push(eq(numbered.status, status));
   }
 
