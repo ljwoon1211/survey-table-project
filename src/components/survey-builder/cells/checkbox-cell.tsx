@@ -99,11 +99,12 @@ export const CheckboxCell = React.memo(function CheckboxCell({
               </label>
             </div>
             {option.allowTextInput && isChecked && (
-              <OptionTextInput
-                questionId={questionId}
-                option={option}
-                className="ml-6"
-              />
+              <div className="pl-6">
+                <OptionTextInput
+                  questionId={questionId}
+                  option={option}
+                />
+              </div>
             )}
           </div>
         );

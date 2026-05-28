@@ -64,11 +64,12 @@ export const RadioCell = React.memo(function RadioCell({
               </label>
             </div>
             {option.allowTextInput && isSelected && (
-              <OptionTextInput
-                questionId={questionId}
-                option={option}
-                className="ml-6"
-              />
+              <div className="pl-6">
+                <OptionTextInput
+                  questionId={questionId}
+                  option={option}
+                />
+              </div>
             )}
           </div>
         );

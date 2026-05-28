@@ -14,8 +14,8 @@ import { InteractiveCell } from './cells';
 
 // ── 상수 ──
 
-const SMALL_TABLE_THRESHOLD = 10;
-const PRE_SELECT_MIN_ROWS = 5; // 사전선택 최소 행 수 (5행 이하는 전체 표시가 나음)
+const SMALL_TABLE_THRESHOLD = 15;
+const PRE_SELECT_MIN_ROWS = 15;
 
 // ── 타입: 사전선택 Phase ──
 type StepperPhase = 'group-select' | 'row-select' | 'detail';
@@ -106,6 +106,8 @@ const RowCard = React.memo(function RowCard({
     );
     return descCell?.radioOptions?.[0]?.label || row.label;
   }, [row.cells, row.label]);
+
+  if (inputCells.length === 0) return null;
 
   let lastSection = '';
 
@@ -357,8 +359,7 @@ export const MobileTableStepper = React.memo(function MobileTableStepper({
     return displayRows.filter((r) => preSelectedRowIds.has(r.id));
   }, [needsPreSelect, phase, displayRows, preSelectedRowIds]);
 
-  // ── 소형 테이블 (사전선택 대상이 아닐 때만) ──
-  if (!needsPreSelect && displayRows.length <= SMALL_TABLE_THRESHOLD) {
+  if (displayRows.length <= SMALL_TABLE_THRESHOLD) {
     return (
       <div className="space-y-4">
         {displayRows.map((row) => (
