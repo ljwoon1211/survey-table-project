@@ -76,6 +76,8 @@ export interface SurveyResponseFlowProps {
     initialResponses: ResponsesMap;
     // 응답이 작성된 시점의 설문 스냅샷. 응답이 published 이전이면 null.
     versionSnapshot: SurveyVersionSnapshot | null;
+    // 응답자가 사용한 contact_targets.attrs — 조건/토큰 복원용.
+    initialContactAttrs: Record<string, string>;
     onSubmit: (payload: SaveAdminEditPayload) => Promise<void>;
   };
 }
@@ -250,7 +252,7 @@ export function SurveyResponseFlow({
                 thankYouMessage: snapshot.settings.thankYouMessage,
                 requireInviteToken: snapshot.settings.requireInviteToken,
               },
-              lookups: [],
+              lookups: (snapshot as { lookups?: Survey['lookups'] }).lookups ?? [],
               createdAt: new Date(),
               updatedAt: new Date(),
             };
@@ -269,6 +271,8 @@ export function SurveyResponseFlow({
           }
           // 초기 응답값 prefill — DB INSERT 없이 state 만 세팅.
           setResponses(adminContext.initialResponses);
+          // 응답 당시 contact attrs 복원 — 조건/토큰 표시 평가에 사용.
+          setContactAttrs(adminContext.initialContactAttrs ?? {});
           return;
         }
 

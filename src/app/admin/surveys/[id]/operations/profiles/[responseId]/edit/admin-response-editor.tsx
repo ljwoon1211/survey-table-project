@@ -11,6 +11,7 @@ interface Props {
   responseId: string;
   initialResponses: Record<string, unknown>;
   versionSnapshot: SurveyVersionSnapshot | null;
+  initialContactAttrs: Record<string, string>;
   idx: number | null;
 }
 
@@ -26,6 +27,7 @@ export function AdminResponseEditor({
   responseId,
   initialResponses,
   versionSnapshot,
+  initialContactAttrs,
   idx,
 }: Props) {
   const router = useRouter();
@@ -43,6 +45,7 @@ export function AdminResponseEditor({
           surveyId,
           initialResponses,
           versionSnapshot,
+          initialContactAttrs,
           onSubmit: async (payload) => {
             await saveAdminEdit(surveyId, responseId, payload);
             router.push(`/admin/surveys/${surveyId}/operations/profiles`);

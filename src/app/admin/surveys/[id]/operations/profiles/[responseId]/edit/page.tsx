@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { eq } from 'drizzle-orm';
 
 import { db } from '@/db';
-import { surveyVersions } from '@/db/schema';
+import { contactTargets, surveyVersions } from '@/db/schema';
 import { requireSurveyOwnership } from '@/lib/auth/require-survey-ownership';
 import { getResponseById } from '@/data/responses';
 
@@ -55,12 +55,23 @@ export default async function AdminResponseEditPage({ params, searchParams }: Pa
       })
     : null;
 
+  // 응답자가 사용한 contact attrs 복원 — contactTargetId 가 없으면 익명 응답이므로 빈 객체.
+  const contactAttrs = response.contactTargetId
+    ? (
+        await db.query.contactTargets.findFirst({
+          where: eq(contactTargets.id, response.contactTargetId),
+          columns: { attrs: true },
+        })
+      )?.attrs ?? {}
+    : {};
+
   return (
     <AdminResponseEditor
       surveyId={surveyId}
       responseId={responseId}
       initialResponses={response.questionResponses as Record<string, unknown>}
       versionSnapshot={version?.snapshot ?? null}
+      initialContactAttrs={contactAttrs}
       idx={idx}
     />
   );
