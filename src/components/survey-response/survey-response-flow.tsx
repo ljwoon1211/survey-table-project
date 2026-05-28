@@ -41,7 +41,7 @@ import {
   StepItem,
 } from '@/lib/group-ordering';
 import { parsesurveyIdentifier } from '@/lib/survey-url';
-import { isEmptyHtml } from '@/lib/utils';
+import { cn, isEmptyHtml } from '@/lib/utils';
 import { sanitizeRichHtml } from '@/lib/sanitize';
 import {
   collectTableQuestionOptions,
@@ -1120,9 +1120,9 @@ export function SurveyResponseFlow({
         <div className={`${containerMaxWidth} mx-auto px-4 py-4 transition-all duration-300 md:px-6`}>
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-lg font-semibold text-gray-900 md:text-xl">{loadedSurvey.title}</h1>
+              <h1 className="text-xl font-semibold text-gray-900 md:text-xl">{loadedSurvey.title}</h1>
               {!isEmptyHtml(loadedSurvey.description) && (
-                <p className="mt-1 text-sm text-gray-600">{loadedSurvey.description}</p>
+                <p className="mt-1 text-base text-gray-600 md:text-sm">{loadedSurvey.description}</p>
               )}
             </div>
             <div className="hidden self-start text-sm text-gray-500 md:block md:self-auto">
@@ -1144,7 +1144,7 @@ export function SurveyResponseFlow({
               />
             </div>
             {isMobile && (
-              <div className="mt-1.5 flex items-center justify-between text-[11px] text-gray-400">
+              <div className="mt-1.5 flex items-center justify-between text-xs text-gray-400">
                 <span>
                   {answeredCount}/{visibleQuestions.length} 응답 완료
                 </span>
@@ -1251,6 +1251,35 @@ export function SurveyResponseFlow({
 
 // ── 서브 컴포넌트 ──
 
+/**
+ * TipTap이 출력한 sanitized HTML을 prose 스타일로 렌더.
+ * 모바일 표 길들이기는 globals.css의 `.tiptap-mobile-tame`이 담당하므로
+ * 여기선 데스크탑용 prose + 표 외형만 정의한다.
+ */
+function RichDescription({
+  html,
+  size = 'sm',
+  className,
+}: {
+  html: string;
+  size?: 'sm' | 'base';
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        'tiptap-mobile-tame prose min-w-0 max-w-none [&_a]:break-all [&_p]:break-words',
+        '[&_table]:max-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-200 [&_table_p]:m-0',
+        '[&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:break-words',
+        '[&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:bg-gray-50 [&_table_th]:break-words [&_table_th]:font-semibold',
+        size === 'base' ? 'prose-base' : 'prose-sm',
+        className,
+      )}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
+
 function TableStepView({
   step,
   isMobile,
@@ -1304,7 +1333,7 @@ function TableStepView({
           )}
           <h2
             className={`${
-              titleHasMultipleLines ? 'text-base' : 'text-lg'
+              titleHasMultipleLines ? 'text-lg' : 'text-xl'
             } leading-[1.6] font-bold break-keep text-gray-900`}
           >
             {titleText}
@@ -1315,10 +1344,10 @@ function TableStepView({
             )}
           </h2>
           {!isEmptyHtml(q.description) && (
-            <div
-              className="prose prose-sm max-h-[40vh] max-w-none overflow-auto leading-relaxed text-[13px] text-gray-500 [&_p]:min-h-[1.5em] [&_p]:leading-relaxed [&_table]:my-2 [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-200 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:px-3 [&_table_td]:py-1.5 [&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:bg-gray-50 [&_table_th]:px-3 [&_table_th]:py-1.5 [&_table_th]:font-semibold"
-              style={{ WebkitOverflowScrolling: 'touch' }}
-              dangerouslySetInnerHTML={{ __html: descriptionHtml }}
+            <RichDescription
+              html={descriptionHtml}
+              size="base"
+              className="max-h-[40vh] overflow-y-auto leading-relaxed text-base text-gray-500 [&_p]:min-h-[1.5em] [&_p]:leading-relaxed [&_table]:my-2 [&_table_td]:px-3 [&_table_td]:py-1.5 [&_table_th]:px-3 [&_table_th]:py-1.5"
             />
           )}
         </div>
@@ -1361,10 +1390,10 @@ function TableStepView({
                   )}
                 </CardTitle>
                 {!isEmptyHtml(q.description) && (
-                  <div
-                    className="prose prose-base mt-3 max-h-[60vh] max-w-none overflow-auto text-base text-gray-600 [&_p]:min-h-[1.6em] [&_table]:my-2 [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-200 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:px-4 [&_table_td]:py-2 [&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:bg-gray-50 [&_table_th]:px-4 [&_table_th]:py-2 [&_table_th]:font-semibold"
-                    style={{ WebkitOverflowScrolling: 'touch' }}
-                    dangerouslySetInnerHTML={{ __html: descriptionHtml }}
+                  <RichDescription
+                    html={descriptionHtml}
+                    size="base"
+                    className="mt-3 max-h-[60vh] overflow-y-auto text-base text-gray-600 [&_p]:min-h-[1.6em] [&_table]:my-2 [&_table_td]:px-4 [&_table_td]:py-2 [&_table_th]:px-4 [&_table_th]:py-2"
                   />
                 )}
               </div>
@@ -1480,7 +1509,7 @@ function GroupStepItem({
   return (
     <div className="py-5 first:pt-0 last:pb-0">
       {showSubgroupHeading && (
-        <h3 className="mb-3 text-xs font-semibold tracking-[0.12em] text-gray-500 uppercase">
+        <h3 className="mb-3 text-sm font-semibold tracking-[0.12em] text-gray-500 uppercase md:text-xs">
           {item.subgroupName}
         </h3>
       )}
@@ -1492,7 +1521,7 @@ function GroupStepItem({
       >
         <div className="flex items-start gap-2.5">
           <span
-            className={`mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${
+            className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold tabular-nums md:h-6 md:w-6 md:text-xs ${
               isHighlighted ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'
             }`}
           >
@@ -1500,7 +1529,7 @@ function GroupStepItem({
           </span>
           <label
             htmlFor={`q-${q.id}`}
-            className={`text-base leading-snug font-semibold break-keep md:text-lg ${
+            className={`text-lg leading-snug font-semibold break-keep ${
               isHighlighted ? 'text-red-700' : 'text-gray-900'
             }`}
           >
@@ -1513,9 +1542,10 @@ function GroupStepItem({
           </label>
         </div>
         {!isEmptyHtml(q.description) && (
-          <div
-            className="prose prose-sm ml-3 max-w-none text-xs text-gray-500 [&_p]:min-h-[1.3em] [&_table]:my-1.5 [&_table]:min-w-full [&_table]:table-auto [&_table]:border-collapse [&_table]:border [&_table]:border-gray-200 [&_table_p]:m-0 [&_table_td]:border [&_table_td]:border-gray-200 [&_table_td]:px-2.5 [&_table_td]:py-1 [&_table_th]:border [&_table_th]:border-gray-200 [&_table_th]:bg-gray-50 [&_table_th]:px-2.5 [&_table_th]:py-1 [&_table_th]:font-semibold"
-            dangerouslySetInnerHTML={{ __html: descriptionHtml }}
+          <RichDescription
+            html={descriptionHtml}
+            size="sm"
+            className="ml-3 md:overflow-x-auto text-sm text-gray-500 md:text-xs [&_p]:min-h-[1.3em] [&_table]:my-1.5 [&_table_td]:px-2.5 [&_table_td]:py-1 [&_table_th]:px-2.5 [&_table_th]:py-1"
           />
         )}
         <div id={`q-${q.id}`} className="mt-2 ml-3">

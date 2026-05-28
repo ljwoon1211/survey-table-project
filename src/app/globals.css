@@ -810,3 +810,31 @@ a.notice-file-attachment:hover {
   text-overflow: ellipsis;
 }
 
+/* 모바일에서 TipTap 출력 표 길들이기.
+ * TipTap이 <colgroup>/<col>에 inline width를 박아서 Tailwind utility로는 못 누른다.
+ * - 표는 콘텐츠 비례 폭(auto) + 부모 안에서 가로 스크롤로 폴백
+ * - 한국어 어절 보존(keep-all), 영문 긴 토큰만 강제 줄바꿈(anywhere) */
+@media (max-width: 767px) {
+  .tiptap-mobile-tame {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tiptap-mobile-tame table {
+    width: auto !important;
+    max-width: none !important;
+    table-layout: auto !important;
+  }
+  .tiptap-mobile-tame colgroup,
+  .tiptap-mobile-tame col {
+    display: none !important;
+  }
+  .tiptap-mobile-tame th,
+  .tiptap-mobile-tame td {
+    width: auto !important;
+    min-width: 0 !important;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+    padding: 0.375rem 0.5rem !important;
+  }
+}
+
