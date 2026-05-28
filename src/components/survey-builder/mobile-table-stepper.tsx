@@ -6,6 +6,8 @@ import { Check, CheckCircle2, ChevronLeft, ChevronRight, ListChecks } from 'luci
 
 import { Card, CardContent } from '@/components/ui/card';
 import { useColumnSectionMap, useRowGroups } from '@/hooks/use-row-groups';
+import { useContactAttrs } from '@/lib/survey/contact-attrs-context';
+import { substituteTokens } from '@/lib/survey/substitute-tokens';
 import { cn } from '@/lib/utils';
 import type { HeaderCell, TableColumn, TableRow } from '@/types/survey';
 import { getAlignmentClasses } from '@/utils/table-grid-utils';
@@ -84,6 +86,8 @@ const RowCard = React.memo(function RowCard({
   value?: Record<string, unknown>;
   onChange?: (value: Record<string, unknown>) => void;
 }) {
+  const attrs = useContactAttrs();
+
   const inputCells = useMemo(
     () =>
       row.cells
@@ -141,7 +145,7 @@ const RowCard = React.memo(function RowCard({
         <div className="flex items-center justify-between">
           <div className="min-w-0 flex-1">
             {rowDesc && (
-              <p className="text-sm font-semibold leading-snug text-gray-900">{rowDesc}</p>
+              <p className="text-sm font-semibold leading-snug text-gray-900">{substituteTokens(rowDesc, attrs)}</p>
             )}
           </div>
           {completed && (
@@ -194,7 +198,7 @@ const RowCard = React.memo(function RowCard({
               {sectionHeader && (
                 <div className="flex items-center gap-2 pt-1 first:pt-0">
                   <div className="h-px flex-1 bg-gray-200" />
-                  <span className="text-xs font-semibold text-gray-500">{sectionHeader}</span>
+                  <span className="text-xs font-semibold text-gray-500">{substituteTokens(sectionHeader, attrs)}</span>
                   <div className="h-px flex-1 bg-gray-200" />
                 </div>
               )}
@@ -202,7 +206,7 @@ const RowCard = React.memo(function RowCard({
                 {!hideColumnLabels && (
                   <div className="flex items-start gap-1.5">
                     <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
-                    <span className="line-clamp-2 text-sm font-medium text-gray-900">{shortLabel}</span>
+                    <span className="line-clamp-2 text-sm font-medium text-gray-900">{substituteTokens(shortLabel, attrs)}</span>
                   </div>
                 )}
                 {isUnitPairStart && nextEntry ? (
