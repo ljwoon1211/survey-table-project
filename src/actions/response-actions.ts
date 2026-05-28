@@ -624,6 +624,7 @@ export async function completeResponse(
         completedAt: new Date(),
         // 운영 현황 콘솔용 추적 컬럼
         status: 'completed',
+        progressPct: 100,
         lastActivityAt: new Date(),
         // 서버 클럭 기준 경과 초 (started_at부터 now()까지)
         totalSeconds: sql`EXTRACT(EPOCH FROM (now() - ${surveyResponses.startedAt}))::int`,
