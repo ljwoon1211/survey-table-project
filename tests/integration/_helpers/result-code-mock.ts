@@ -33,10 +33,15 @@ export function mockBuildNegativeCodeExists(
   contactTargetIdExpr: SQL,
 ): SQL {
   if (negativeCodes.length === 0) return sql`FALSE`;
+  // 실 헬퍼와 동일 — IN + sql.join 패턴 mirror (ANY array scalar unwrap 회피).
+  const codeList = sql.join(
+    negativeCodes.map((c) => sql`${c}`),
+    sql`, `,
+  );
   return sql`EXISTS (
     SELECT 1 FROM contact_attempts ca
     WHERE ca.contact_target_id = ${contactTargetIdExpr}
-      AND ca.result_code = ANY(${negativeCodes})
+      AND ca.result_code IN (${codeList})
   )`;
 }
 

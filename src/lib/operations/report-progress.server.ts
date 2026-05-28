@@ -31,11 +31,19 @@ const EMPTY_SCHEME: ProgressColumnScheme = { version: 1, columns: [] };
  * notDeletedResponse 와 동일 의미 (서브쿼리 내부 raw SQL 컨텍스트라 인라인 유지).
  */
 function buildClosingFilter(positiveCodes: string[]): SQL {
-  const positiveBranch =
-    positiveCodes.length === 0
-      ? sql`FALSE`
-      : sql`EXISTS (SELECT 1 FROM contact_attempts ca
-                    WHERE ca.contact_target_id = ct.id AND ca.result_code = ANY(${positiveCodes}))`;
+  let positiveBranch: SQL;
+  if (positiveCodes.length === 0) {
+    positiveBranch = sql`FALSE`;
+  } else {
+    // sql.join — length=1 array scalar unwrap 으로 ANY 가 22P02 (malformed array literal)
+    // 던지는 케이스 회피. buildNegativeCodeExists 와 동일 패턴.
+    const codeList = sql.join(
+      positiveCodes.map((c) => sql`${c}`),
+      sql`, `,
+    );
+    positiveBranch = sql`EXISTS (SELECT 1 FROM contact_attempts ca
+                                 WHERE ca.contact_target_id = ct.id AND ca.result_code IN (${codeList}))`;
+  }
   return sql`
     EXISTS (SELECT 1 FROM survey_responses sr
             WHERE sr.contact_target_id = ct.id AND sr.is_completed = true AND sr.deleted_at IS NULL)

@@ -39,9 +39,15 @@ export function buildNegativeCodeExists(
   contactTargetIdExpr: SQL,
 ): SQL {
   if (negativeCodes.length === 0) return sql`FALSE`;
+  // sql.join 으로 각 code 개별 binding — drizzle 의 length=1 array scalar unwrap 으로
+  // PG 가 ANY 인자를 array literal 로 파싱하다 실패하는 22P02 회피.
+  const codeList = sql.join(
+    negativeCodes.map((c) => sql`${c}`),
+    sql`, `,
+  );
   return sql`EXISTS (
     SELECT 1 FROM contact_attempts ca
     WHERE ca.contact_target_id = ${contactTargetIdExpr}
-      AND ca.result_code = ANY(${negativeCodes})
+      AND ca.result_code IN (${codeList})
   )`;
 }
