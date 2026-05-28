@@ -82,9 +82,20 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 // findContactByInviteToken 내부에서 negative codes 조회
-vi.mock('@/lib/operations/result-code-statuses.server', () => ({
-  getResultCodeStatuses: vi.fn(async () => ({ positive: [], negative: [] })),
-}));
+vi.mock('@/lib/operations/result-code-statuses.server', async () => {
+  const { sql } = await import('drizzle-orm');
+  return {
+    getResultCodeStatuses: vi.fn(async () => ({ positive: [], negative: [] })),
+    buildNegativeCodeExists: (negativeCodes: string[], idExpr: ReturnType<typeof sql>) => {
+      if (negativeCodes.length === 0) return sql`FALSE`;
+      return sql`EXISTS (
+        SELECT 1 FROM contact_attempts ca
+        WHERE ca.contact_target_id = ${idExpr}
+          AND ca.result_code = ANY(${negativeCodes})
+      )`;
+    },
+  };
+});
 
 import { createBlankResponse } from '@/actions/response-actions';
 import type { ClientSignals } from '@/lib/duplicate-detection/types';

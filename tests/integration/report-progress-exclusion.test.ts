@@ -126,12 +126,23 @@ vi.mock('@/db', () => ({
   },
 }));
 
-vi.mock('@/lib/operations/result-code-statuses.server', () => ({
-  getResultCodeStatuses: vi.fn(async () => ({
-    positive: state.positiveCodes,
-    negative: state.negativeCodes,
-  })),
-}));
+vi.mock('@/lib/operations/result-code-statuses.server', async () => {
+  const { sql } = await import('drizzle-orm');
+  return {
+    getResultCodeStatuses: vi.fn(async () => ({
+      positive: state.positiveCodes,
+      negative: state.negativeCodes,
+    })),
+    buildNegativeCodeExists: (negativeCodes: string[], idExpr: ReturnType<typeof sql>) => {
+      if (negativeCodes.length === 0) return sql`FALSE`;
+      return sql`EXISTS (
+        SELECT 1 FROM contact_attempts ca
+        WHERE ca.contact_target_id = ${idExpr}
+          AND ca.result_code = ANY(${negativeCodes})
+      )`;
+    },
+  };
+});
 
 // progress-filters.server 의 FilterCondition 타입만 import 하므로 모킹 불필요
 // — buildFilterSql(null) 분기만 사용한다.

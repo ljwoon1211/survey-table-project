@@ -12,7 +12,7 @@ import {
   type SortDir,
   type SortKey,
 } from './profiles';
-import { getResultCodeStatuses } from './result-code-statuses.server';
+import { buildNegativeCodeExists, getResultCodeStatuses } from './result-code-statuses.server';
 
 export type ListProfilesArgs = NormalizedListArgs & {
   surveyId: string;
@@ -70,11 +70,7 @@ export async function listResponsesForProfiles(
 
   const negativeCodeBranch =
     negativeCodes.length > 0
-      ? sql`OR EXISTS (
-          SELECT 1 FROM contact_attempts ca
-          WHERE ca.contact_target_id = ct.id
-            AND ca.result_code = ANY(${negativeCodes})
-        )`
+      ? sql`OR ${buildNegativeCodeExists(negativeCodes, sql`ct.id`)}`
       : sql``;
 
   const numbered = db
@@ -216,11 +212,7 @@ export async function isResponseExcluded(
 
   const negativeCodeBranch =
     negativeCodes.length > 0
-      ? sql`OR EXISTS (
-          SELECT 1 FROM contact_attempts ca
-          WHERE ca.contact_target_id = ct.id
-            AND ca.result_code = ANY(${negativeCodes})
-        )`
+      ? sql`OR ${buildNegativeCodeExists(negativeCodes, sql`ct.id`)}`
       : sql``;
 
   const rows = await db.execute(sql`

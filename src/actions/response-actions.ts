@@ -18,7 +18,10 @@ import { checkTrackA, checkTrackB } from '@/lib/duplicate-detection/check';
 import { computeSignals } from '@/lib/duplicate-detection/signals';
 import type { BlockReason, ClientSignals } from '@/lib/duplicate-detection/types';
 import { parseBrowser, parsePlatform } from '@/lib/operations/parse-ua';
-import { getResultCodeStatuses } from '@/lib/operations/result-code-statuses.server';
+import {
+  buildNegativeCodeExists,
+  getResultCodeStatuses,
+} from '@/lib/operations/result-code-statuses.server';
 import { replaceResponseAnswers } from '@/actions/response-answers-replace';
 import { substituteTokens } from '@/lib/survey/substitute-tokens';
 
@@ -62,9 +65,7 @@ export async function findContactByInviteToken(
       AND (
         ct.unsubscribed_at IS NOT NULL
         ${negativeCodes.length > 0
-          ? sql`OR EXISTS (SELECT 1 FROM contact_attempts ca
-                           WHERE ca.contact_target_id = ct.id
-                             AND ca.result_code = ANY(${negativeCodes}))`
+          ? sql`OR ${buildNegativeCodeExists(negativeCodes, sql`ct.id`)}`
           : sql``}
       )
     LIMIT 1

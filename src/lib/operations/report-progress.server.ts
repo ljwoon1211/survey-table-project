@@ -11,7 +11,7 @@ import type { ContactColumnScheme, ProgressColumnScheme } from '@/db/schema/sche
 import type { ProgressRow, ProgressSortKey, SortDir, ProgressTotals } from './report-progress';
 import type { FilterCondition } from './progress-filters.server';
 import { FILTER_SOURCE, escapeLikePattern } from './filter-shared';
-import { getResultCodeStatuses } from './result-code-statuses.server';
+import { buildNegativeCodeExists, getResultCodeStatuses } from './result-code-statuses.server';
 
 const EMPTY_SCHEME: ProgressColumnScheme = { version: 1, columns: [] };
 
@@ -52,12 +52,7 @@ function buildClosingFilter(positiveCodes: string[]): SQL {
  * negative codes 빈 배열이면 unsubscribed_at 만 평가.
  */
 function buildExcludeFilter(negativeCodes: string[]): SQL {
-  const codeBranch =
-    negativeCodes.length === 0
-      ? sql`FALSE`
-      : sql`EXISTS (SELECT 1 FROM contact_attempts ca
-                    WHERE ca.contact_target_id = ct.id AND ca.result_code = ANY(${negativeCodes}))`;
-  return sql`${codeBranch} OR ct.unsubscribed_at IS NOT NULL`;
+  return sql`${buildNegativeCodeExists(negativeCodes, sql`ct.id`)} OR ct.unsubscribed_at IS NOT NULL`;
 }
 
 /**

@@ -22,7 +22,10 @@ import {
 } from '@/lib/crypto/contact-pii-repo';
 import type { PiiFieldType } from '@/lib/crypto/pii-fields';
 import { maskEmail } from '@/lib/operations/contacts';
-import { getResultCodeStatuses } from '@/lib/operations/result-code-statuses.server';
+import {
+  buildNegativeCodeExists,
+  getResultCodeStatuses,
+} from '@/lib/operations/result-code-statuses.server';
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -358,12 +361,8 @@ const HAS_EMAIL_PII = sql`EXISTS (
  * unsubscribed_at 제외는 별도 isNull 조건으로 결합되므로 여기선 코드만 본다.
  */
 function buildNotExcludedByNegativeCode(negativeCodes: string[]): SQL {
-  if (negativeCodes.length === 0) return sql`TRUE`;
-  return sql`NOT EXISTS (
-    SELECT 1 FROM contact_attempts ca
-    WHERE ca.contact_target_id = "contact_targets"."id"
-      AND ca.result_code = ANY(${negativeCodes})
-  )`;
+  // negative codes 가 비어 있을 때 EXISTS = FALSE → NOT(FALSE) = TRUE 로 자연 평가됨
+  return sql`NOT ${buildNegativeCodeExists(negativeCodes, sql`"contact_targets"."id"`)}`;
 }
 
 async function buildCandidateWhere(
@@ -636,15 +635,10 @@ export async function preflightRecipients(args: {
         WHERE cp.contact_target_id = "contact_targets"."id"
           AND cp.field_type = 'email'
       )`.as('has_email'),
-      excludedByCode: sql<boolean>`${
-        negativeCodes.length === 0
-          ? sql`FALSE`
-          : sql`EXISTS (
-              SELECT 1 FROM contact_attempts ca
-              WHERE ca.contact_target_id = "contact_targets"."id"
-                AND ca.result_code = ANY(${negativeCodes})
-            )`
-      }`.as('excluded_by_code'),
+      excludedByCode: sql<boolean>`${buildNegativeCodeExists(
+        negativeCodes,
+        sql`"contact_targets"."id"`,
+      )}`.as('excluded_by_code'),
     })
     .from(contactTargets)
     .where(
