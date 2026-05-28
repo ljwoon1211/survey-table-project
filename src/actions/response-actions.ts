@@ -115,8 +115,11 @@ export async function updateQuestionResponse(
   questionId: string,
   value: unknown,
 ) {
-  // 🚀 SQL 레벨에서 JSON의 특정 경로만 원자적으로 업데이트
-  // PostgreSQL의 jsonb_set 함수 사용 (읽기-수정-쓰기 과정 없음)
+  // jsonb_set 으로 답변 저장 + progress_pct 동기 갱신.
+  // progress_pct 는 versionId 의 snapshot 에서 questionId 의 1-based position 을 찾아
+  // (position / totalQuestions) × 100 으로 계산. GREATEST 로 단조 증가 보장 (앞 질문 수정
+  // 시 % 후퇴 방지). snapshot 깨졌거나 questionId 가 snapshot 에 없으면 inner subquery
+  // 가 NULL → COALESCE(0) → GREATEST 가 기존값 유지.
   const [updated] = await db
     .update(surveyResponses)
     .set({
@@ -126,6 +129,18 @@ export async function updateQuestionResponse(
         ${JSON.stringify(value)}::jsonb,
         true
       )`,
+      progressPct: sql`LEAST(100, GREATEST(
+        COALESCE(${surveyResponses.progressPct}, 0),
+        COALESCE((
+          SELECT ROUND((t.idx::numeric
+                        / NULLIF(jsonb_array_length(sv.snapshot->'questions'), 0)) * 100)::int
+          FROM survey_versions sv,
+               jsonb_array_elements(sv.snapshot->'questions') WITH ORDINALITY AS t(elem, idx)
+          WHERE sv.id = ${surveyResponses.versionId}
+            AND elem->>'id' = ${questionId}
+          LIMIT 1
+        ), 0)
+      ))::smallint`,
     })
     .where(eq(surveyResponses.id, responseId))
     .returning();
