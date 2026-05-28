@@ -90,7 +90,13 @@ function computeCell(col: ContactColumnDef, row: ContactsRow): {
         : undefined;
       return {
         display: row.respondedAt ? (
-          <span className="inline-block h-2 w-2 rounded-full bg-blue-500" title={t} />
+          // formatLocalMonthDayTime 은 브라우저 locale/tz 의존(Client 전용)이라
+          // SSR HTML 의 title 과 hydration 결과가 어긋난다. LocalDateTime 과 동일하게 허용.
+          <span
+            className="inline-block h-2 w-2 rounded-full bg-blue-500"
+            title={t}
+            suppressHydrationWarning
+          />
         ) : (
           <span className="inline-block h-2 w-2 rounded-full bg-slate-200" />
         ),
@@ -206,6 +212,7 @@ export function ContactsTable({
                         key={col.key}
                         className={`max-w-[240px] truncate px-3 py-2 whitespace-nowrap ${responded ? 'border-t border-blue-100' : ''}`}
                         title={plain}
+                        suppressHydrationWarning
                       >
                         {display}
                       </td>
