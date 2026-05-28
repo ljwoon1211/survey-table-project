@@ -751,6 +751,10 @@ html {
     grid-template-columns: var(--options-grid-cols, minmax(0, 1fr));
   }
 }
+/* 모바일 카드 안에서는 뷰포트 폭과 무관하게 --options-grid-cols 적용 */
+.mobile-row-card .options-grid {
+  grid-template-columns: var(--options-grid-cols, minmax(0, 1fr));
+}
 
 /* ==========================================
    메일 템플릿 — 변수 토큰 (ProseMirror Decoration)

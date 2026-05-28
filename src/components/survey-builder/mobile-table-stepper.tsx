@@ -96,7 +96,24 @@ const RowCard = React.memo(function RowCard({
             cell.type !== 'image' &&
             cell.type !== 'video' &&
             !isLabelOnlyRadio(cell),
-        ),
+        )
+        .map((entry) => {
+          // 카드 안 옵션 그리드 강제: 짧은 라벨은 2열, 10자 초과는 1열
+          const opts =
+            entry.cell.radioOptions ??
+            entry.cell.checkboxOptions ??
+            entry.cell.selectOptions ??
+            [];
+          if (opts.length === 0) return entry;
+          const longest = opts.reduce(
+            (max, o) => Math.max(max, o.label?.length ?? 0),
+            0,
+          );
+          const effectiveColumns = longest > 10 ? 1 : 2;
+          return entry.cell.optionsColumns === effectiveColumns
+            ? entry
+            : { ...entry, cell: { ...entry.cell, optionsColumns: effectiveColumns } };
+        }),
     [row.cells],
   );
 
@@ -114,7 +131,7 @@ const RowCard = React.memo(function RowCard({
   return (
     <Card
       className={cn(
-        'overflow-hidden transition-all duration-200',
+        'mobile-row-card overflow-hidden transition-all duration-200',
         completed
           ? 'border-green-400 bg-green-50/30 ring-1 ring-green-400'
           : 'border-gray-200',
