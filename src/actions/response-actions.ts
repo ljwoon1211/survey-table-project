@@ -446,7 +446,8 @@ export async function resumeOrCreateResponse(input: {
   // - 무효 토큰 → silent fallback, 일반 sessionId 흐름 진행
   if (inviteToken) {
     const lookup = await findContactByInviteToken(surveyId, inviteToken);
-    // Task 7 까지는 excluded 도 valid 외 = null 로 호환 처리 (기존 fallback 흐름)
+    // excluded 도 valid 외 = null 로 fallback (anonymous sessionId 흐름으로 자연 처리).
+    // excluded race 차단은 saveResponse 시점의 checkTrackA 가 별도로 책임.
     const target = lookup.kind === 'valid'
       ? { id: lookup.contactTargetId }
       : null;
