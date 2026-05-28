@@ -81,6 +81,11 @@ vi.mock('@/lib/auth', () => ({
   requireAuth: vi.fn(async () => ({ id: 'user-test' })),
 }));
 
+// findContactByInviteToken 내부에서 negative codes 조회
+vi.mock('@/lib/operations/result-code-statuses.server', () => ({
+  getResultCodeStatuses: vi.fn(async () => ({ positive: [], negative: [] })),
+}));
+
 import { createBlankResponse } from '@/actions/response-actions';
 import type { ClientSignals } from '@/lib/duplicate-detection/types';
 
@@ -102,12 +107,11 @@ describe('createBlankResponse', () => {
   });
 
   it('happy path: 빈 응답을 INSERT 하고 invite 매칭된 contactTargetId 와 함께 id 반환', async () => {
-    // checkTrackA: contact lookup 성공 (respondedAt = null)
+    // findContactByInviteToken: 1) RPC lookup 성공
     dbExecuteMock.mockResolvedValueOnce([{ id: 'contact-1' }]);
-    // contactTargets.findFirst (respondedAt 조회)
-    vi.mocked(selectLimitMock).mockResolvedValueOnce([{ respondedAt: null }]);
-    // findContactByInviteToken 2차 호출 (contactTargetId 세팅)
-    dbExecuteMock.mockResolvedValueOnce([{ id: 'contact-1' }]);
+    // findContactByInviteToken: 2) excluded EXISTS — 비어있음 (제외 아님)
+    dbExecuteMock.mockResolvedValueOnce([]);
+    // findContactByInviteToken: 3) db.query.contactTargets.findFirst (respondedAt) — default undefined → null 처리
     insertReturningMock.mockResolvedValueOnce([
       { id: 'response-1', contactTargetId: 'contact-1' },
     ]);
@@ -143,11 +147,11 @@ describe('createBlankResponse', () => {
   });
 
   it('conflict path: ON CONFLICT DO NOTHING 으로 빈 returning 시 기존 row id 반환', async () => {
-    // checkTrackA: lookup_contact_by_invite_token (유효 토큰)
+    // findContactByInviteToken: 1) RPC lookup (유효 토큰)
     dbExecuteMock.mockResolvedValueOnce([{ id: 'contact-1' }]);
-    // checkTrackA: db.query.contactTargets.findFirst (respondedAt 조회) — undefined 반환으로 null 처리됨
-    // findContactByInviteToken 2차 (contactTargetId 세팅용)
-    dbExecuteMock.mockResolvedValueOnce([{ id: 'contact-1' }]);
+    // findContactByInviteToken: 2) excluded EXISTS — 비어있음 (제외 아님)
+    dbExecuteMock.mockResolvedValueOnce([]);
+    // findContactByInviteToken: 3) db.query.contactTargets.findFirst (respondedAt) — default undefined → null
     // INSERT returning 비어있음 (conflict)
     insertReturningMock.mockResolvedValueOnce([]);
     // SELECT 기존 행 조회

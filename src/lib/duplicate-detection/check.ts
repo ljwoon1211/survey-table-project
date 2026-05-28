@@ -10,12 +10,16 @@ export async function checkTrackA(
   surveyId: string,
   inviteToken: string,
 ): Promise<CheckResult> {
-  const contact = await findContactByInviteToken(surveyId, inviteToken);
-  if (!contact) return { blocked: true, reason: 'invalid_token' };
-  if (contact.respondedAt) {
+  const lookup = await findContactByInviteToken(surveyId, inviteToken);
+  // Task 7 까지는 valid 외 (excluded/invalid) 를 동일하게 invalid_token 으로 처리
+  // [기존 동작 유지 — excluded 의 별도 차단 분기는 Task 7]
+  if (lookup.kind !== 'valid') {
+    return { blocked: true, reason: 'invalid_token' };
+  }
+  if (lookup.respondedAt) {
     return { blocked: true, reason: 'token_already_used' };
   }
-  return { blocked: false, contactTargetId: contact.id };
+  return { blocked: false, contactTargetId: lookup.contactTargetId };
 }
 
 export async function checkTrackB(params: {

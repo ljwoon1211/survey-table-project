@@ -18,6 +18,7 @@ import { checkTrackA, checkTrackB } from '@/lib/duplicate-detection/check';
 import { computeSignals } from '@/lib/duplicate-detection/signals';
 import type { BlockReason, ClientSignals } from '@/lib/duplicate-detection/types';
 import { parseBrowser, parsePlatform } from '@/lib/operations/parse-ua';
+import { getResultCodeStatuses } from '@/lib/operations/result-code-statuses.server';
 import { replaceResponseAnswers } from '@/actions/response-answers-replace';
 import { substituteTokens } from '@/lib/survey/substitute-tokens';
 
@@ -26,28 +27,58 @@ import { substituteTokens } from '@/lib/survey/substitute-tokens';
 // ========================
 
 /**
- * inviteToken 으로 컨택 lookup. 무효 토큰이면 null 반환 (silent fallback).
+ * inviteToken 으로 컨택 lookup. 반환 케이스 3가지:
+ * - valid: 정상 ct, contactTargetId 매칭됨 (+ respondedAt 동봉 — token_already_used 판정용)
+ * - excluded: 부정 결과코드 OR unsubscribed_at IS NOT NULL [응답 차단]
+ * - invalid: 토큰 자체가 무효 [익명 폴백]
+ *
  * 액션은 mutation 흐름이라 dedupe 가 의미 없어 cache 적용 안 함.
  *
  * SECURITY DEFINER PG 함수 사용 — connection role 이 anon/authenticated 라도
  * RLS 우회해서 contact_target_id 만 안전하게 조회 가능. 다른 attrs/PII 는 노출 안 됨.
+ *
+ * SECURITY: 차단 사유는 호출자에게 구분 노출하지 않음 [UI 는 동일 카피 — PII].
  */
+export type InviteTokenLookupResult =
+  | { kind: 'valid'; contactTargetId: string; respondedAt: Date | null }
+  | { kind: 'excluded' }
+  | { kind: 'invalid' };
+
 export async function findContactByInviteToken(
   surveyId: string,
   inviteToken: string,
-): Promise<{ id: string; respondedAt: Date | null } | null> {
-  const result = (await db.execute(
+): Promise<InviteTokenLookupResult> {
+  const lookup = (await db.execute(
     sql`SELECT public.lookup_contact_by_invite_token(${surveyId}::uuid, ${inviteToken}::uuid) AS id`,
   )) as unknown as Array<{ id: string | null }>;
-  const id = result[0]?.id;
-  if (!id) return null;
+  const contactTargetId = lookup[0]?.id ?? null;
+  if (!contactTargetId) return { kind: 'invalid' };
+
+  const { negative: negativeCodes } = await getResultCodeStatuses(surveyId);
+  const excludedRows = (await db.execute(sql`
+    SELECT 1
+    FROM contact_targets ct
+    WHERE ct.id = ${contactTargetId}::uuid
+      AND (
+        ct.unsubscribed_at IS NOT NULL
+        ${negativeCodes.length > 0
+          ? sql`OR EXISTS (SELECT 1 FROM contact_attempts ca
+                           WHERE ca.contact_target_id = ct.id
+                             AND ca.result_code = ANY(${negativeCodes}))`
+          : sql``}
+      )
+    LIMIT 1
+  `)) as unknown as unknown[];
+  if (excludedRows.length > 0) {
+    return { kind: 'excluded' };
+  }
 
   const row = await db.query.contactTargets.findFirst({
-    where: eq(contactTargets.id, id),
+    where: eq(contactTargets.id, contactTargetId),
     columns: { respondedAt: true },
   });
 
-  return { id, respondedAt: row?.respondedAt ?? null };
+  return { kind: 'valid', contactTargetId, respondedAt: row?.respondedAt ?? null };
 }
 
 // ========================
@@ -414,7 +445,11 @@ export async function resumeOrCreateResponse(input: {
   // - 유효 토큰 + in_progress 행 없음 → null (호출자가 새 응답 생성)
   // - 무효 토큰 → silent fallback, 일반 sessionId 흐름 진행
   if (inviteToken) {
-    const target = await findContactByInviteToken(surveyId, inviteToken);
+    const lookup = await findContactByInviteToken(surveyId, inviteToken);
+    // Task 7 까지는 excluded 도 valid 외 = null 로 호환 처리 (기존 fallback 흐름)
+    const target = lookup.kind === 'valid'
+      ? { id: lookup.contactTargetId }
+      : null;
     if (target) {
       const [existingByContact] = await db
         .select({
