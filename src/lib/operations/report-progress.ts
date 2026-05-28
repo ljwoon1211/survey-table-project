@@ -6,13 +6,10 @@
  * - computeTotals: 푸터 합계 계산.
  *
  * 클로징 정의: W∪A — survey_responses.is_completed=true OR
- * contact_attempts.result_code='1.조사완료'. SQL 집계는 server.ts 의 FILTER 절 참고.
- *
- * Known Limitation: '1.조사완료' hardcoded — slice 6/7 에서
- * ContactResultCode.isClosing 토글 도입 후 동적화.
+ * contact_attempts.result_code = ANY(positive codes). positive codes 는
+ * `getResultCodeStatuses(surveyId).positive` 로 동적 추출. SQL 집계는
+ * server.ts 의 FILTER 절 참고.
  */
-
-export const CLOSING_RESULT_CODES = ['1.조사완료'] as const;
 
 export type ProgressTone = 'green' | 'amber' | 'rose' | 'gray';
 
