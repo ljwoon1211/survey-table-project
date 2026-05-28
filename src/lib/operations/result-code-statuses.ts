@@ -13,11 +13,30 @@
  * cache wrapped DB 호출은 `result-code-statuses.server.ts` 참조.
  */
 
-import { DEFAULT_RESULT_CODES, type ContactResultCode } from '@/db/schema/schema-types';
+import {
+  DEFAULT_RESULT_CODES,
+  type ContactResultCode,
+  type ResultCodeStatus,
+} from '@/db/schema/schema-types';
 
 export interface ResultCodeStatuses {
   positive: string[];
   negative: string[];
+}
+
+/**
+ * 결과코드 status 결정 — 명시 우선 + fallback.
+ *
+ * fallback rule:
+ * - 명시 status 있음 → 그대로 사용
+ * - 명시 status 없음 + code === '1.조사완료' → 'positive'
+ * - 그 외 → 'neutral'
+ *
+ * pure 함수 — UI 렌더링 (result-codes-editor) 와 서버 추출 (extractResultCodeStatuses) 양쪽에서 호출.
+ * fallback rule 단일 정의 보장.
+ */
+export function resolveCodeStatus(code: ContactResultCode): ResultCodeStatus {
+  return code.status ?? (code.code === '1.조사완료' ? 'positive' : 'neutral');
 }
 
 /** pure — 단위 테스트 가능. `getResultCodeStatuses` 가 DB 조회 후 호출. */
@@ -28,7 +47,7 @@ export function extractResultCodeStatuses(
   const positive: string[] = [];
   const negative: string[] = [];
   for (const c of list) {
-    const status = c.status ?? (c.code === '1.조사완료' ? 'positive' : 'neutral');
+    const status = resolveCodeStatus(c);
     if (status === 'positive') positive.push(c.code);
     else if (status === 'negative') negative.push(c.code);
   }

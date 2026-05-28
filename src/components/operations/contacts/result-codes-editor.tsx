@@ -18,6 +18,7 @@ import {
   type ContactResultCode,
   type ResultCodeStatus,
 } from '@/db/schema/schema-types';
+import { resolveCodeStatus } from '@/lib/operations/result-code-statuses';
 
 interface ResultCodesEditorProps {
   surveyId: string;
@@ -51,11 +52,6 @@ function StatusDot({ status }: { status: ResultCodeStatus }) {
       className={`inline-block h-2 w-2 rounded-full ${STATUS_DOT_BG[status]}`}
     />
   );
-}
-
-function resolveStatus(c: ContactResultCode): ResultCodeStatus {
-  if (c.status) return c.status;
-  return c.code === '1.조사완료' ? 'positive' : 'neutral';
 }
 
 type SaveMode = 'custom' | 'use-default';
@@ -95,9 +91,9 @@ export function ResultCodesEditor({ surveyId, initialCodes }: ResultCodesEditorP
       return;
     }
     const target = codes[index];
-    if (resolveStatus(target) === 'positive') {
+    if (resolveCodeStatus(target) === 'positive') {
       const otherPositiveExists = codes.some(
-        (c, i) => i !== index && resolveStatus(c) === 'positive',
+        (c, i) => i !== index && resolveCodeStatus(c) === 'positive',
       );
       if (!otherPositiveExists) {
         setError('마지막 긍정 상태 코드는 삭제할 수 없습니다. 다른 코드를 긍정으로 먼저 지정해 주세요.');
@@ -139,7 +135,7 @@ export function ResultCodesEditor({ surveyId, initialCodes }: ResultCodesEditorP
       if (seen.has(c)) return `중복된 코드: ${c}`;
       seen.add(c);
     }
-    if (!codes.some((c) => resolveStatus(c) === 'positive')) {
+    if (!codes.some((c) => resolveCodeStatus(c) === 'positive')) {
       return '긍정 상태(응답 완료로 인정) 코드가 최소 1개 필요합니다.';
     }
     return null;
@@ -253,14 +249,14 @@ export function ResultCodesEditor({ surveyId, initialCodes }: ResultCodesEditorP
                 </td>
                 <td className="px-3 py-2">
                   <Select
-                    value={resolveStatus(c)}
+                    value={resolveCodeStatus(c)}
                     onValueChange={(v) => update(i, { status: v as ResultCodeStatus })}
                   >
                     <SelectTrigger className="h-8 w-56">
                       <SelectValue>
                         <span className="inline-flex items-center gap-2">
-                          <StatusDot status={resolveStatus(c)} />
-                          {STATUS_LABEL[resolveStatus(c)]}
+                          <StatusDot status={resolveCodeStatus(c)} />
+                          {STATUS_LABEL[resolveCodeStatus(c)]}
                         </span>
                       </SelectValue>
                     </SelectTrigger>
