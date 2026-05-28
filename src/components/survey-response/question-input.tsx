@@ -9,7 +9,13 @@ import { Input } from '@/components/ui/input';
 import { useContactAttrs } from '@/lib/survey/contact-attrs-context';
 import { substituteTokens } from '@/lib/survey/substitute-tokens';
 import { Question, QuestionOption, RankingAnswer } from '@/types/survey';
+import {
+  applyMobileOptionsGridOverride,
+  computeMobileOptionsColumnsByLabels,
+} from '@/utils/mobile-card-options';
 import { getOptionsLayout } from '@/utils/options-layout';
+
+import { useMobileView } from '@/hooks/use-media-query';
 
 import { OptionTextInput } from './option-text-input';
 import { RankingQuestion } from './ranking-question';
@@ -192,10 +198,17 @@ function RadioQuestion({
     onChange(optionValue);
   };
 
-  const layout = getOptionsLayout(question.optionsColumns);
+  const isMobileView = useMobileView();
+  const effectiveColumns = isMobileView
+    ? computeMobileOptionsColumnsByLabels(question.options?.map((o) => o.label) ?? [])
+    : question.optionsColumns;
+  const layout = getOptionsLayout(effectiveColumns);
+  const layoutStyle = isMobileView
+    ? applyMobileOptionsGridOverride(layout.style, effectiveColumns)
+    : layout.style;
 
   return (
-    <div className={layout.className} style={layout.style}>
+    <div className={layout.className} style={layoutStyle}>
       {question.options?.map((option: QuestionOption) => (
         <div key={option.id} className="space-y-2">
           <div className="flex items-center space-x-3">
@@ -296,10 +309,17 @@ function CheckboxQuestion({
     return true;
   };
 
-  const layout = getOptionsLayout(question.optionsColumns);
+  const isMobileView = useMobileView();
+  const effectiveColumns = isMobileView
+    ? computeMobileOptionsColumnsByLabels(question.options?.map((o) => o.label) ?? [])
+    : question.optionsColumns;
+  const layout = getOptionsLayout(effectiveColumns);
+  const layoutStyle = isMobileView
+    ? applyMobileOptionsGridOverride(layout.style, effectiveColumns)
+    : layout.style;
 
   return (
-    <div className={layout.className} style={layout.style}>
+    <div className={layout.className} style={layoutStyle}>
       {question.options?.map((option: QuestionOption) => {
         const checked = isChecked(option.value);
         const disabled = !canSelect(option.value);

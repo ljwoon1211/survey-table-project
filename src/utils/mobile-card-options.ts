@@ -1,21 +1,43 @@
+import type { CSSProperties } from 'react';
+
 import type { TableCell } from '@/types/survey';
 
 const LABEL_WRAP_THRESHOLD = 10;
 
 /**
- * 모바일 카드(RowCard) 안 옵션 그리드의 열 수 결정.
- * - 옵션 라벨 최댓값이 LABEL_WRAP_THRESHOLD 초과면 1열, 이하면 2열.
- * - 옵션 없는 셀(input 등)은 0 반환 — 호출자가 분기에 사용.
+ * 라벨 길이 기반 옵션 그리드 열 수 휴리스틱.
+ * - 빈 배열은 0 반환 — 호출자가 분기에 사용.
+ * - 최대 라벨 길이가 LABEL_WRAP_THRESHOLD 초과면 1열, 이하면 2열.
+ */
+export function computeMobileOptionsColumnsByLabels(labels: ReadonlyArray<string | undefined>): number {
+  if (labels.length === 0) return 0;
+  const longest = labels.reduce(
+    (max, label) => Math.max(max, label?.length ?? 0),
+    0,
+  );
+  return longest > LABEL_WRAP_THRESHOLD ? 1 : 2;
+}
+
+/**
+ * 모바일 카드(RowCard) 안 옵션 그리드의 열 수 결정 (TableCell 입력).
  */
 export function computeMobileCardOptionsColumns(cell: TableCell): number {
   const opts =
     cell.radioOptions ?? cell.checkboxOptions ?? cell.selectOptions ?? [];
-  if (opts.length === 0) return 0;
-  const longest = opts.reduce(
-    (max, o) => Math.max(max, o.label?.length ?? 0),
-    0,
-  );
-  return longest > LABEL_WRAP_THRESHOLD ? 1 : 2;
+  return computeMobileOptionsColumnsByLabels(opts.map((o) => o.label));
+}
+
+/**
+ * globals.css 의 `.options-grid` 는 모바일(<640px)에서 1열로 강제하므로,
+ * 모바일에서 N열을 적용하려는 경우 inline gridTemplateColumns 로 override.
+ * 일반 응답 페이지의 라디오/체크박스가 모바일에서도 휴리스틱 N열을 유지하기 위함.
+ */
+export function applyMobileOptionsGridOverride(
+  baseStyle: CSSProperties | undefined,
+  columns: number | undefined,
+): CSSProperties | undefined {
+  if (!columns || columns < 2) return baseStyle;
+  return { ...baseStyle, gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` };
 }
 
 /**
