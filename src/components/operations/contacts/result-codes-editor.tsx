@@ -40,9 +40,9 @@ const STATUS_DOT_BG: Record<ResultCodeStatus, string> = {
 };
 
 const STATUS_LABEL: Record<ResultCodeStatus, string> = {
-  positive: '긍정 — 응답 완료로 인정',
+  positive: '긍정',
   neutral: '중립',
-  negative: '부정 — 모집단에서 제외',
+  negative: '부정',
 };
 
 function StatusDot({ status }: { status: ResultCodeStatus }) {
@@ -252,7 +252,7 @@ export function ResultCodesEditor({ surveyId, initialCodes }: ResultCodesEditorP
                     value={resolveCodeStatus(c)}
                     onValueChange={(v) => update(i, { status: v as ResultCodeStatus })}
                   >
-                    <SelectTrigger className="h-8 w-56">
+                    <SelectTrigger className="h-8 w-24">
                       <SelectValue>
                         <span className="inline-flex items-center gap-2">
                           <StatusDot status={resolveCodeStatus(c)} />
