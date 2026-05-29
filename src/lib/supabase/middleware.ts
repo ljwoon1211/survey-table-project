@@ -40,8 +40,13 @@ export async function updateSession(request: NextRequest) {
   if (isAdminRoute) {
     // 로그인 페이지가 아닌 admin 경로에서 로그인되지 않은 경우
     if (!user && !isLoginPage) {
+      // 원래 가려던 경로를 redirect 파라미터로 보존 — 로그인 후 그대로 복귀시킨다.
+      // admin 경로만 여기 도달하므로 루트("/") 는 자연히 제외된다.
+      const original = request.nextUrl.pathname + request.nextUrl.search;
       const url = request.nextUrl.clone();
       url.pathname = '/admin/login';
+      url.search = '';
+      url.searchParams.set('redirect', original);
       return NextResponse.redirect(url);
     }
 
