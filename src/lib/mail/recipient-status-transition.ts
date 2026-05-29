@@ -1,5 +1,8 @@
 import 'server-only';
 
+import { eq, sql } from 'drizzle-orm';
+
+import { db } from '@/db';
 import { mailRecipients } from '@/db/schema/mail';
 import type { MailRecipientStatus } from '@/db/schema/mail';
 
@@ -84,4 +87,68 @@ export function buildTimestampUpdate(
     default:
       return {};
   }
+}
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * 단일 트랜잭션 안에서 recipient status를 newStatus로 전이하고 campaign 카운터를
+ * atomic delta로 갱신한 뒤 finalize를 판정한다. 호출자는 row를 FOR UPDATE로 잠근 뒤
+ * prevStatus를 넘겨야 한다. 역행/중복(canTransition=false)이면 no-op하고 false 반환.
+ *
+ * webhook 핸들러(resend route)와 reconcile이 공유한다.
+ */
+export async function applyRecipientTransition(
+  tx: Tx,
+  args: {
+    recipientId: string;
+    campaignId: string;
+    prevStatus: MailRecipientStatus;
+    newStatus: MailRecipientStatus;
+    eventAt: Date;
+  },
+): Promise<boolean> {
+  const { recipientId, campaignId, prevStatus, newStatus, eventAt } = args;
+  if (!canTransition(prevStatus, newStatus)) return false;
+
+  await tx
+    .update(mailRecipients)
+    .set({
+      status: newStatus,
+      ...buildTimestampUpdate(newStatus, eventAt),
+      updatedAt: new Date(),
+    })
+    .where(eq(mailRecipients.id, recipientId));
+
+  await tx.execute(sql`
+    UPDATE mail_campaigns
+    SET
+      queued_count    = queued_count    - CASE WHEN ${prevStatus} = 'queued'    THEN 1 ELSE 0 END,
+      sent_count      = sent_count      - CASE WHEN ${prevStatus} = 'sent'      THEN 1 ELSE 0 END
+                                        + CASE WHEN ${newStatus} = 'sent'        THEN 1 ELSE 0 END,
+      delivered_count = delivered_count - CASE WHEN ${prevStatus} = 'delivered' THEN 1 ELSE 0 END
+                                        + CASE WHEN ${newStatus} = 'delivered'   THEN 1 ELSE 0 END,
+      opened_count     = opened_count     + CASE WHEN ${newStatus} = 'opened'     THEN 1 ELSE 0 END,
+      bounced_count    = bounced_count    + CASE WHEN ${newStatus} = 'bounced'    THEN 1 ELSE 0 END,
+      complained_count = complained_count + CASE WHEN ${newStatus} = 'complained' THEN 1 ELSE 0 END,
+      failed_count     = failed_count     + CASE WHEN ${newStatus} = 'failed'     THEN 1 ELSE 0 END,
+      updated_at = now()
+    WHERE id = ${campaignId}
+  `);
+
+  await tx.execute(sql`
+    UPDATE mail_campaigns
+    SET status = CASE
+            WHEN bounced_count + failed_count + complained_count > 0 THEN 'partial'
+            ELSE 'completed'
+          END,
+        completed_at = COALESCE(completed_at, now()),
+        updated_at = now()
+    WHERE id = ${campaignId}
+      AND status = 'sending'
+      AND queued_count = 0
+      AND sent_count = 0
+  `);
+
+  return true;
 }
