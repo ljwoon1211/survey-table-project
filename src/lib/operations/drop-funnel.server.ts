@@ -63,14 +63,12 @@ export async function getDropFunnel(surveyId: string): Promise<DropFunnelOutput>
 
   // ── B) SQL 위치별 COUNT 집계 (마지막 pageVisit stepId) ───────────────────────
   const aggregateRows = await db.execute(sql`
-    WITH drop_lasts AS (
-      SELECT COALESCE(sr.page_visits, '[]'::jsonb) -> -1 ->> 'stepId' AS last_step_id
-      FROM survey_responses sr
-      WHERE sr.survey_id = ${surveyId}::uuid AND sr.status = 'drop'
-    )
-    SELECT last_step_id, COUNT(*)::int AS cnt
-    FROM drop_lasts
-    GROUP BY last_step_id
+    SELECT
+      COALESCE(sr.page_visits, '[]'::jsonb) -> -1 ->> 'stepId' AS last_step_id,
+      COUNT(*)::int AS cnt
+    FROM survey_responses sr
+    WHERE sr.survey_id = ${surveyId}::uuid AND sr.status = 'drop'
+    GROUP BY COALESCE(sr.page_visits, '[]'::jsonb) -> -1 ->> 'stepId'
   `);
 
   // ── C) JS 분류: counts (정상 위치) vs legacyCount (snapshot 부재 / null) ──

@@ -64,8 +64,8 @@ export async function getPageDwell(surveyId: string): Promise<DwellOutput> {
   // ── B) SQL trimmed 통계 직접 산출 ────────────────────────────────────────
   const rows = await db.execute(sql`
     WITH dwell AS (
+      -- 응답(sr.id) × step 단위로 SUM → 한 응답이 같은 step을 여러 visit으로 가져도 1표본.
       SELECT
-        sr.id AS response_id,
         visit->>'stepId' AS step_id,
         SUM(EXTRACT(EPOCH FROM ((visit->>'leftAt')::timestamptz - (visit->>'enteredAt')::timestamptz))) AS seconds
       FROM survey_responses sr,

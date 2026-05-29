@@ -36,6 +36,8 @@ import type {
   SurveyVersionSnapshot,
 } from '@/db/schema/schema-types';
 
+import { validVisitMs } from './active-seconds';
+
 /** 한 페이지(RenderStep)의 체류시간 통계. */
 export interface DwellPage {
   /** stepId — 'group:<rootGroupId | "root">' 또는 'table:<questionId>'. */
@@ -319,17 +321,17 @@ export function aggregatePageDwell(
     if (!Array.isArray(visits) || visits.length === 0) continue;
 
     // 응답 내 stepId 별 활성시간 합산 (세그먼트 분할/재방문을 표본 1개로 묶는다).
+    // visit 유효성/시간 파싱은 validVisitMs로 위임 — sumActiveSeconds와 동일 판정.
     const perStep = new Map<string, number>();
-    // 클램프/스킵 조건(leftAt 누락/NaN/역전)은 active-seconds.ts sumActiveSeconds와 동일하게 유지한다.
     for (const visit of visits) {
       if (!visit || typeof visit.stepId !== 'string') continue;
       if (!validStepIds.has(visit.stepId)) continue;
-      if (typeof visit.leftAt !== 'string' || !visit.leftAt) continue;
-      const enteredMs = Date.parse(visit.enteredAt);
-      const leftMs = Date.parse(visit.leftAt);
-      if (!Number.isFinite(enteredMs) || !Number.isFinite(leftMs)) continue;
-      if (leftMs <= enteredMs) continue;
-      perStep.set(visit.stepId, (perStep.get(visit.stepId) ?? 0) + (leftMs - enteredMs) / 1000);
+      const ms = validVisitMs(visit);
+      if (!ms) continue;
+      perStep.set(
+        visit.stepId,
+        (perStep.get(visit.stepId) ?? 0) + (ms.leftMs - ms.enteredMs) / 1000,
+      );
     }
 
     for (const [stepId, seconds] of perStep) {

@@ -103,6 +103,31 @@ function sessionStorageKey(surveyId: string): string {
   return `survey-session:${surveyId}`;
 }
 
+/**
+ * Page Visibility 세그먼트 신호를 /api/response/segment로 전송한다(fire-and-forget).
+ * 탭 닫힘에도 살아남아야 하는 hide는 sendBeacon, 그 외는 keepalive fetch를 쓴다.
+ */
+function sendVisibilitySegment(
+  responseId: string,
+  action: 'hide' | 'show',
+  useBeacon = false,
+): void {
+  const payload = JSON.stringify({ responseId, action });
+  if (useBeacon && typeof navigator !== 'undefined' && navigator.sendBeacon) {
+    navigator.sendBeacon(
+      '/api/response/segment',
+      new Blob([payload], { type: 'application/json' }),
+    );
+  } else {
+    fetch('/api/response/segment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+      keepalive: true,
+    }).catch(() => {});
+  }
+}
+
 // step 내에서 표시 가능한 질문만 추린 뒤 step-like 객체로 반환
 function getDisplayableItemsOfStep(
   step: RenderStep,
@@ -552,28 +577,11 @@ export function SurveyResponseFlow({
     if (isCompleted) return;
     const rid = currentResponseId;
 
-    const send = (action: 'hide' | 'show', useBeacon: boolean) => {
-      const payload = JSON.stringify({ responseId: rid, action });
-      if (useBeacon && typeof navigator !== 'undefined' && navigator.sendBeacon) {
-        navigator.sendBeacon(
-          '/api/response/segment',
-          new Blob([payload], { type: 'application/json' }),
-        );
-      } else {
-        fetch('/api/response/segment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: payload,
-          keepalive: true,
-        }).catch(() => {});
-      }
-    };
-
     const onVisibility = () => {
-      if (document.visibilityState === 'hidden') send('hide', true);
-      else send('show', false);
+      if (document.visibilityState === 'hidden') sendVisibilitySegment(rid, 'hide', true);
+      else sendVisibilitySegment(rid, 'show');
     };
-    const onPageHide = () => send('hide', true);
+    const onPageHide = () => sendVisibilitySegment(rid, 'hide', true);
 
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('pagehide', onPageHide);
@@ -621,11 +629,7 @@ export function SurveyResponseFlow({
         setSessionId(savedSessionId);
         setCurrentResponseId(result.id);
         // 회복 직후 새 visit 열기 — recordStepVisit은 동일 step 재진입 시 no-op이라 의존 불가.
-        fetch('/api/response/segment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ responseId: result.id, action: 'show' }),
-        }).catch(() => {});
+        sendVisibilitySegment(result.id, 'show');
         // 회복된 경우(drop → in_progress)만 토스트
         if (result.resumed) {
           setResumeMessage('이전 응답을 이어서 진행합니다');

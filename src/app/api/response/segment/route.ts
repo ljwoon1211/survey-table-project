@@ -15,8 +15,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'invalid json' }, { status: 400 });
   }
 
-  const responseId = (body as { responseId?: unknown })?.responseId;
-  const action = (body as { action?: unknown })?.action;
+  const { responseId, action } = (body ?? {}) as {
+    responseId?: unknown;
+    action?: unknown;
+  };
 
   if (
     typeof responseId !== 'string' ||
