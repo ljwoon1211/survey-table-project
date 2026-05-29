@@ -18,7 +18,11 @@ import {
   type ContactsSortKey,
 } from './contacts';
 import type { FilterClause, FilterCondition } from './contacts-filters.server';
-import { FILTER_SOURCE, escapeLikePattern } from './filter-shared';
+import {
+  FILTER_SOURCE,
+  escapeLikePattern,
+  type ColumnCandidateWithPii,
+} from './filter-shared';
 
 export interface ListContactsArgs {
   surveyId: string;
@@ -84,7 +88,7 @@ const progressPctExpr = sql<number | null>`(
  *
  * pii.* 평문 미노출 (사전 계산된 blindIndex 만 SQL 에 진입).
  */
-function buildClauseSql(cond: FilterCondition): SQL {
+export function buildClauseSql(cond: FilterCondition): SQL {
   if (cond.source === FILTER_SOURCE.RESID) {
     if (cond.mode === 'idlist') {
       if (!cond.ranges || cond.ranges.length === 0) return sql`FALSE`;
@@ -136,7 +140,7 @@ function buildClauseSql(cond: FilterCondition): SQL {
  *
  * 빈 배열 → TRUE (전체 조회).
  */
-function buildContactsFilterSql(clauses: FilterClause[]): SQL {
+export function buildContactsFilterSql(clauses: FilterClause[]): SQL {
   if (clauses.length === 0) return sql`TRUE`;
   // 첫 절도 괄호로 감싸 buildClauseSql 의 결과가 내부 OR 체인이어도 외부 AND 와 안전하게 결합.
   let expr: SQL = sql`(${buildClauseSql(clauses[0].condition)})`;
@@ -279,6 +283,26 @@ export const getContactColumnScheme = cache(
     return (row?.contactColumns as ContactColumnScheme | null) ?? null;
   },
 );
+
+/**
+ * 필터 컬럼 후보 생성 — 조사대상목록·단체 메일 마법사 공유.
+ * system.resid / system.contact_result / system.web + attrs.* + pii.* 만 후보.
+ * placeholder 전용 컬럼(system.email_count / system.contact_owner)은 제외.
+ */
+export function buildColumnCandidates(
+  scheme: ContactColumnScheme | null,
+): ColumnCandidateWithPii[] {
+  return (scheme?.columns ?? [])
+    .filter(
+      (c) =>
+        c.source === FILTER_SOURCE.RESID ||
+        c.source === FILTER_SOURCE.CONTACT_RESULT ||
+        c.source === FILTER_SOURCE.WEB ||
+        c.source.startsWith(FILTER_SOURCE.ATTRS_PREFIX) ||
+        c.source.startsWith(FILTER_SOURCE.PII_PREFIX),
+    )
+    .map((c) => ({ source: c.source, label: c.label, piiType: c.piiType }));
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 컨택 단건 편집 (slice 3 detail page) — 0016 마이그레이션 활용
