@@ -317,6 +317,9 @@ export function aggregatePageDwell(
   for (const resp of responses) {
     const visits = resp.pageVisits;
     if (!Array.isArray(visits) || visits.length === 0) continue;
+
+    // 응답 내 stepId 별 활성시간 합산 (세그먼트 분할/재방문을 표본 1개로 묶는다).
+    const perStep = new Map<string, number>();
     for (const visit of visits) {
       if (!visit || typeof visit.stepId !== 'string') continue;
       if (!validStepIds.has(visit.stepId)) continue;
@@ -325,12 +328,16 @@ export function aggregatePageDwell(
       const leftMs = Date.parse(visit.leftAt);
       if (!Number.isFinite(enteredMs) || !Number.isFinite(leftMs)) continue;
       if (leftMs <= enteredMs) continue;
-      let bucket = buckets.get(visit.stepId);
+      perStep.set(visit.stepId, (perStep.get(visit.stepId) ?? 0) + (leftMs - enteredMs) / 1000);
+    }
+
+    for (const [stepId, seconds] of perStep) {
+      let bucket = buckets.get(stepId);
       if (!bucket) {
         bucket = [];
-        buckets.set(visit.stepId, bucket);
+        buckets.set(stepId, bucket);
       }
-      bucket.push((leftMs - enteredMs) / 1000);
+      bucket.push(seconds);
     }
   }
 
