@@ -320,6 +320,7 @@ export function aggregatePageDwell(
 
     // 응답 내 stepId 별 활성시간 합산 (세그먼트 분할/재방문을 표본 1개로 묶는다).
     const perStep = new Map<string, number>();
+    // 클램프/스킵 조건(leftAt 누락/NaN/역전)은 active-seconds.ts sumActiveSeconds와 동일하게 유지한다.
     for (const visit of visits) {
       if (!visit || typeof visit.stepId !== 'string') continue;
       if (!validStepIds.has(visit.stepId)) continue;
