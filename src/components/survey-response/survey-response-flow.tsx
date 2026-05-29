@@ -1099,9 +1099,6 @@ export function SurveyResponseFlow({
               <p>총 {questions.length}개 질문</p>
               <p>응답 완료 시간: {formatLocalDateTime(new Date())}</p>
             </div>
-            <Button onClick={() => router.push('/')} className="mt-6">
-              홈으로 돌아가기
-            </Button>
           </CardContent>
         </Card>
       </div>
