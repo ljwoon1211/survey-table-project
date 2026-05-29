@@ -11,7 +11,13 @@
  *   - 본 파일: 타입 정의 + 순수 변환 함수 `shapeDropFunnel` (서버 의존성 없음 → 단위 테스트 대상)
  *   - `drop-funnel.server.ts`: DB 어댑터 `getDropFunnel`
  *
- * 정책 (plan §5, §9, §10):
+ * server 경로 주의:
+ *   - `getDropFunnel` 은 이제 drop 세션의 *마지막 pageVisit stepId* (`table:<uuid>`/`group:<rootId>`)
+ *     로 이탈 위치를 귀속하며, 막대 questionId 에는 question UUID 가 아닌 stepId 가 담길 수 있다.
+ *   - 아래 `response_answers` / `exposedQuestionIds` 기반 정책은 `shapeDropFunnel` / `aggregateDrops`
+ *     (단위 테스트 호환용 순수 함수) 에만 적용된다. server 경로는 이 정책을 따르지 않는다.
+ *
+ * 정책 (plan §5, §9, §10 — shapeDropFunnel/aggregateDrops 한정):
  *   - **drop 사례 귀속**: drop 세션의 `response_answers` 중 `created_at` 최댓값의 question_id가
  *     "마지막으로 답한 질문". 이 위치에서 이탈했다고 본다.
  *   - **버전 섞인 집계 (§9)**: 라벨 매핑은 *현재 published version snapshot* 기준.

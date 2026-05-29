@@ -132,7 +132,7 @@ export function DropFunnel({ data }: Props) {
             이탈 응답 위치별 사례
           </h3>
           <p className="mt-0.5 text-xs text-slate-400">
-            x: 질문 위치 (질문번호 / 페이지 / 진행률) · y: 이탈자 수
+            x: 이탈 위치 (질문/페이지 · 진행률) · y: 이탈자 수
           </p>
         </div>
 

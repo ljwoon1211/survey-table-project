@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  formatDropFunnel,
   shapeDropFunnel,
   type DropFunnelInput,
   type FunnelQuestion,
@@ -319,5 +320,23 @@ describe('shapeDropFunnel', () => {
     expect(result.bars.map((b) => b.page)).toEqual([2, null, 3]);
     // 진행률: q3=60, q4=80, q5=100
     expect(result.bars.map((b) => b.cumulativeProgressPct)).toEqual([60, 80, 100]);
+  });
+});
+
+describe('formatDropFunnel — stepId 키 귀속', () => {
+  it('stepId를 id로 받아 막대를 만든다', () => {
+    const out = formatDropFunnel({
+      questions: [
+        { id: 'group:root', position: 1, label: 'Q1', page: 1 },
+        { id: 'table:abc', position: 2, label: 'Q2', page: 1 },
+      ],
+      counts: new Map([['table:abc', 3]]),
+      legacyCount: 1,
+      totalDrops: 4,
+    });
+    const bar = out.bars.find((b) => b.questionId === 'table:abc');
+    expect(bar?.dropCount).toBe(3);
+    expect(out.bars.some((b) => b.questionId === 'legacy')).toBe(true);
+    expect(out.totalDrops).toBe(4);
   });
 });
