@@ -32,7 +32,11 @@ import {
 import { ContactsFilterBar } from '@/components/operations/contacts/contacts-filter-bar';
 import type { MailTemplate } from '@/db/schema/mail';
 import type { CampaignFilterSnapshot, ContactResultCode } from '@/db/schema/schema-types';
-import type { CampaignCandidateRow } from '@/lib/operations/campaigns.server';
+import type {
+  CampaignCandidateRow,
+  CampaignSortDir,
+  CampaignSortKey,
+} from '@/lib/operations/campaigns.server';
 import type { ColumnCandidate } from '@/lib/operations/filter-shared';
 
 interface Props {
@@ -49,6 +53,8 @@ interface Props {
   columnCandidates: ColumnCandidate[];
   resultCodeOptions: ContactResultCode[];
   initialClauses: { op: 'AND' | 'OR' | null; source: string; value: string }[];
+  sort: CampaignSortKey;
+  dir: CampaignSortDir;
 }
 
 export function CampaignWizard({
@@ -60,6 +66,8 @@ export function CampaignWizard({
   columnCandidates,
   resultCodeOptions,
   initialClauses,
+  sort,
+  dir,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -95,6 +103,16 @@ export function CampaignWizard({
     const next = new URLSearchParams(searchParams?.toString() ?? '');
     if (checked) next.set('unresponded', '1');
     else next.delete('unresponded');
+    next.delete('page');
+    router.push(`?${next.toString()}`);
+  }
+
+  function changeSort(key: CampaignSortKey) {
+    // 같은 컬럼 재클릭 → 방향 토글, 다른 컬럼 → asc 부터.
+    const nextDir: CampaignSortDir = sort === key && dir === 'asc' ? 'desc' : 'asc';
+    const next = new URLSearchParams(searchParams?.toString() ?? '');
+    next.set('sort', key);
+    next.set('dir', nextDir);
     next.delete('page');
     router.push(`?${next.toString()}`);
   }
@@ -339,11 +357,23 @@ export function CampaignWizard({
                     aria-label="현재 페이지 전체 선택"
                   />
                 </th>
-                <th className="px-3 py-2">번호</th>
+                <th className="px-3 py-2">
+                  <SortHeader label="번호" sortKey="resid" activeSort={sort} dir={dir} onSort={changeSort} />
+                </th>
                 <th className="px-3 py-2">이메일</th>
                 <th className="px-3 py-2">그룹</th>
-                <th className="px-3 py-2">응답</th>
-                <th className="px-3 py-2">최근 결과코드</th>
+                <th className="px-3 py-2">
+                  <SortHeader label="응답" sortKey="responded" activeSort={sort} dir={dir} onSort={changeSort} />
+                </th>
+                <th className="px-3 py-2">
+                  <SortHeader
+                    label="최근 결과코드"
+                    sortKey="resultCode"
+                    activeSort={sort}
+                    dir={dir}
+                    onSort={changeSort}
+                  />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -481,6 +511,35 @@ export function CampaignWizard({
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function SortHeader({
+  label,
+  sortKey,
+  activeSort,
+  dir,
+  onSort,
+}: {
+  label: string;
+  sortKey: CampaignSortKey;
+  activeSort: CampaignSortKey;
+  dir: CampaignSortDir;
+  onSort: (key: CampaignSortKey) => void;
+}) {
+  const active = activeSort === sortKey;
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(sortKey)}
+      className="inline-flex items-center gap-1 uppercase hover:text-gray-700"
+      aria-label={`${label} 정렬`}
+    >
+      {label}
+      <span className={active ? 'text-gray-700' : 'text-gray-300'}>
+        {active ? (dir === 'asc' ? '▲' : '▼') : '↕'}
+      </span>
+    </button>
   );
 }
 

@@ -21,7 +21,10 @@ import {
   buildNegativeCodeExists,
   getResultCodeStatuses,
 } from '@/lib/operations/result-code-statuses.server';
-import { buildContactsFilterSql } from '@/lib/operations/contacts-filter-sql';
+import {
+  buildContactsFilterSql,
+  latestResultCodeExpr,
+} from '@/lib/operations/contacts-filter-sql';
 import type { FilterClause } from '@/lib/operations/contacts-filters.server';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -342,6 +345,12 @@ export interface CampaignCandidatesResult {
   page: number;
 }
 
+/** 미리보기 정렬 — 번호 / 응답여부 / 최근 결과코드. 이메일·그룹은 PII·비용 사유로 제외. */
+export type CampaignSortKey = 'resid' | 'responded' | 'resultCode';
+export type CampaignSortDir = 'asc' | 'desc';
+
+export const CAMPAIGN_SORT_KEYS: readonly CampaignSortKey[] = ['resid', 'responded', 'resultCode'];
+
 // "이 컨택에 email PII 가 등록돼 있나" 정확검사. NULL/'' 무관 — contact_pii row 존재 자체가 기준.
 const HAS_EMAIL_PII = sql`EXISTS (
   SELECT 1 FROM contact_pii cp
@@ -427,10 +436,23 @@ async function fetchEmailMaskHints(contactIds: readonly string[]): Promise<Map<s
 
 const EMAIL_DASH = '—';
 
+/** 미리보기 정렬 컬럼 매핑 — NULLS LAST (응답·결과코드는 null 다수). id tiebreaker 는 호출부에서 추가. */
+function buildCandidateOrderBy(sort: CampaignSortKey, dir: CampaignSortDir): SQL {
+  const col =
+    sort === 'responded'
+      ? sql`${contactTargets.respondedAt}`
+      : sort === 'resultCode'
+        ? latestResultCodeExpr
+        : sql`${contactTargets.resid}`;
+  return dir === 'asc' ? sql`${col} ASC NULLS LAST` : sql`${col} DESC NULLS LAST`;
+}
+
 export async function previewCampaignCandidates(args: {
   surveyId: string;
   clauses: FilterClause[];
   unrespondedOnly: boolean;
+  sort?: CampaignSortKey;
+  dir?: CampaignSortDir;
   page?: number;
   pageSize?: number;
 }): Promise<CampaignCandidatesResult> {
@@ -447,12 +469,6 @@ export async function previewCampaignCandidates(args: {
   const clampedPage = Math.min(Math.max(1, args.page ?? 1), totalPages);
   const offset = (clampedPage - 1) * pageSize;
 
-  const latestResultCodeExpr = sql<string | null>`(
-    SELECT result_code FROM contact_attempts
-    WHERE contact_target_id = "contact_targets"."id"
-    ORDER BY attempt_no DESC LIMIT 1
-  )`;
-
   const rows = await db
     .select({
       id: contactTargets.id,
@@ -464,7 +480,7 @@ export async function previewCampaignCandidates(args: {
     })
     .from(contactTargets)
     .where(where)
-    .orderBy(contactTargets.resid)
+    .orderBy(buildCandidateOrderBy(args.sort ?? 'resid', args.dir ?? 'asc'), asc(contactTargets.id))
     .limit(pageSize)
     .offset(offset);
 

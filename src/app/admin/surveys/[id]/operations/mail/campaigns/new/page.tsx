@@ -4,7 +4,12 @@ import { redirect } from 'next/navigation';
 import { CampaignWizard } from '@/components/operations/mail-campaign/campaign-wizard';
 import type { CampaignFilterSnapshot } from '@/db/schema/schema-types';
 import { getMailTemplatesBySurvey } from '@/data/mail-templates';
-import { previewCampaignCandidates } from '@/lib/operations/campaigns.server';
+import {
+  CAMPAIGN_SORT_KEYS,
+  previewCampaignCandidates,
+  type CampaignSortDir,
+  type CampaignSortKey,
+} from '@/lib/operations/campaigns.server';
 import {
   buildColumnCandidates,
   getContactColumnScheme,
@@ -22,6 +27,8 @@ interface Props {
     q?: string | string[];
     op?: string | string[];
     unresponded?: string;
+    sort?: string;
+    dir?: string;
     page?: string;
   }>;
 }
@@ -70,10 +77,17 @@ export default async function NewCampaignPage({ params, searchParams }: Props) {
   const clauses = parseClausesFromUrl(sp.col, sp.q, sp.op, columnCandidates, resultCodes);
   const unrespondedOnly = sp.unresponded === '1';
 
+  const sort: CampaignSortKey = CAMPAIGN_SORT_KEYS.includes(sp.sort as CampaignSortKey)
+    ? (sp.sort as CampaignSortKey)
+    : 'resid';
+  const dir: CampaignSortDir = sp.dir === 'desc' ? 'desc' : 'asc';
+
   const candidates = await previewCampaignCandidates({
     surveyId,
     clauses,
     unrespondedOnly,
+    sort,
+    dir,
     page: parsePage(sp.page),
     pageSize: PAGE_SIZE,
   });
@@ -121,6 +135,8 @@ export default async function NewCampaignPage({ params, searchParams }: Props) {
         columnCandidates={columnCandidates}
         resultCodeOptions={resultCodes}
         initialClauses={initialClauses}
+        sort={sort}
+        dir={dir}
       />
     </main>
   );
