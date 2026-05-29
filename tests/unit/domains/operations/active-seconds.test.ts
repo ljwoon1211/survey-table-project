@@ -25,7 +25,7 @@ describe('sumActiveSeconds', () => {
     expect(sumActiveSeconds(visits)).toBe(10);
   });
 
-  it('leftAt <= enteredAt(역전)은 0으로 clamp 한다', () => {
+  it('leftAt <= enteredAt(역전) 구간은 제외하고, 유효 segment 없으면 null을 반환한다', () => {
     const visits = [v('2026-05-29T00:00:10.000Z', '2026-05-29T00:00:05.000Z')];
     expect(sumActiveSeconds(visits)).toBeNull(); // 유효 segment 0개 → null
   });
