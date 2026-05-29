@@ -522,7 +522,7 @@ export async function recordVisibilitySegment(input: {
       .update(surveyResponses)
       .set({
         pageVisits: sql`jsonb_set(
-          ${surveyResponses.pageVisits},
+          COALESCE(${surveyResponses.pageVisits}, '[]'::jsonb),
           ARRAY[(jsonb_array_length(${surveyResponses.pageVisits}) - 1)::text, 'leftAt'],
           to_jsonb(now())
         )`,

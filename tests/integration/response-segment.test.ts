@@ -48,9 +48,20 @@ describe('recordVisibilitySegment — SQL 분기', () => {
     expect('lastActivityAt' in setArg).toBe(true); // show는 복귀 → 갱신
   });
 
-  it('where 가드가 항상 적용된다 (status in_progress)', async () => {
+  it('hide: where 가드에 status in_progress + leftAt NULL 조건이 포함된다', async () => {
     const { recordVisibilitySegment } = await import('@/actions/response-actions');
     await recordVisibilitySegment({ responseId: 'r1', action: 'hide' });
     expect(whereMock).toHaveBeenCalledTimes(1); // 단일 UPDATE + WHERE 가드
+    const whereSql = extractRawSql(whereMock.mock.calls[0][0]);
+    expect(whereSql).toContain('leftAt');
+  });
+
+  it('show: where 가드에 멱등 조건(leftAt IS NOT NULL)이 포함된다', async () => {
+    const { recordVisibilitySegment } = await import('@/actions/response-actions');
+    await recordVisibilitySegment({ responseId: 'r1', action: 'show' });
+    expect(whereMock).toHaveBeenCalledTimes(1);
+    const whereSql = extractRawSql(whereMock.mock.calls[0][0]);
+    expect(whereSql).toContain('leftAt');
+    expect(whereSql).toContain('IS NOT NULL');
   });
 });
