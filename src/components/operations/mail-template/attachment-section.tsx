@@ -15,6 +15,7 @@ import {
   deleteMailAttachmentTmp,
   uploadMailAttachment,
 } from '@/lib/mail/mail-attachment-client';
+import { formatBytes } from '@/lib/utils';
 
 interface Props {
   attachments: MailAttachment[];
@@ -28,12 +29,6 @@ interface InFlight {
   tempId: string;
   filename: string;
   size: number;
-}
-
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
 /** 같은 파일명+사이즈가 이미 있으면 중복으로 판정 — 사용자 실수 패턴 차단. */

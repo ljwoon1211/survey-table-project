@@ -28,6 +28,15 @@ export function isEmptyHtml(html: string | undefined | null): boolean {
   return trimmed === '' || trimmed === '<p></p>' || trimmed === '<p><br></p>' || trimmed === '<p><br/></p>';
 }
 
+/**
+ * 바이트 수를 사람이 읽기 좋은 단위 (B / KB / MB) 로 포맷.
+ */
+export function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
 export function generateId(): string {
   // crypto.randomUUID()가 지원되면 사용
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
