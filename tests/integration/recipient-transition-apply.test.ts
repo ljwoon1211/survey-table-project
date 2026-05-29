@@ -41,4 +41,22 @@ describe('applyRecipientTransition', () => {
     expect(m.update).not.toHaveBeenCalled();
     expect(m.execute).not.toHaveBeenCalled();
   });
+
+  it('sent->failed 전이는 update 1회(deliveredAt 없음) + execute 2회 후 true', async () => {
+    const m = makeTx();
+    const ok = await applyRecipientTransition(m.tx as never, {
+      ...ARGS,
+      prevStatus: 'sent',
+      newStatus: 'failed',
+    });
+    expect(ok).toBe(true);
+    expect(m.update).toHaveBeenCalledTimes(1);
+    expect(m.updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'failed' }),
+    );
+    expect(m.updateSet).toHaveBeenCalledWith(
+      expect.not.objectContaining({ deliveredAt: expect.anything() }),
+    );
+    expect(m.execute).toHaveBeenCalledTimes(2);
+  });
 });

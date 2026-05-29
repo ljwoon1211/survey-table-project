@@ -50,6 +50,7 @@ export function planReconcileTransitions(
 }
 
 const STUCK_STATUSES: MailRecipientStatus[] = ['queued', 'sending', 'sent'];
+const RESEND_LOOKUP_CHUNK = 10;
 
 /**
  * 한 캠페인의 stuck recipient(message_id 보유)를 Resend 실제 상태와 동기화한다.
@@ -79,16 +80,20 @@ export async function reconcileCampaignRecipients(
   if (targets.length === 0) return { checked: 0, updated: 0 };
 
   const resend = getResend();
-  const lookups: ResendLookup[] = await Promise.all(
-    targets.map(async (t): Promise<ResendLookup> => {
-      try {
-        const { data } = await resend.emails.get(t.resendMessageId);
-        return { recipientId: t.id, lastEvent: data?.last_event };
-      } catch {
-        return { recipientId: t.id, error: true };
-      }
-    }),
-  );
+  const lookups: ResendLookup[] = [];
+  for (const group of chunk(targets, RESEND_LOOKUP_CHUNK)) {
+    const groupLookups = await Promise.all(
+      group.map(async (t): Promise<ResendLookup> => {
+        try {
+          const { data } = await resend.emails.get(t.resendMessageId);
+          return { recipientId: t.id, lastEvent: data?.last_event };
+        } catch {
+          return { recipientId: t.id, error: true };
+        }
+      }),
+    );
+    lookups.push(...groupLookups);
+  }
 
   const actions = planReconcileTransitions(targets, lookups);
   const eventAt = new Date();
@@ -119,4 +124,10 @@ export async function reconcileCampaignRecipients(
   }
 
   return { checked: targets.length, updated };
+}
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
 }

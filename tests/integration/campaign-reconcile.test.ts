@@ -101,4 +101,20 @@ describe('reconcileCampaignRecipients', () => {
     expect(res.checked).toBe(0);
     expect(getMock).not.toHaveBeenCalled();
   });
+
+  it('25건 배치 청크 분할 조회 — Resend 25회 호출 확인', async () => {
+    state.stuck = Array.from({ length: 25 }, (_, i) => ({
+      id: `r${i}`,
+      campaignId: 'c1',
+      status: 'sent',
+      resendMessageId: `m${i}`,
+    }));
+    getMock.mockResolvedValue({ data: { last_event: 'delivered' } });
+    const res = await reconcileCampaignRecipients('c1');
+    expect(res.checked).toBe(25);
+    expect(getMock).toHaveBeenCalledTimes(25);
+    // db mock의 FOR UPDATE re-read가 state.stuck 전체(25건)를 반환하고 rows[0]을 사용하므로
+    // 각 action마다 applyMock이 호출되어 updated=25
+    expect(res.updated).toBe(25);
+  });
 });
