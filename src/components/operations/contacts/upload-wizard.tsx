@@ -1,13 +1,16 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
+
+import { FileSpreadsheet, UploadCloud, X } from 'lucide-react';
 
 import { ingestContactUpload, parseExcelPreview } from '@/actions/contact-actions';
 import type { ParseExcelPreviewResult } from '@/actions/contact-actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -18,7 +21,13 @@ import {
 } from '@/components/ui/select';
 import type { ContactUploadMapping } from '@/db/schema/schema-types';
 import { autoDetectPiiMapping, autoDetectSystemFields } from '@/lib/contacts/auto-detect';
+import {
+  MAX_UPLOAD_BYTES,
+  MAX_UPLOAD_ROWS,
+  validateXlsxFile,
+} from '@/lib/contacts/upload-limits';
 import { type PiiFieldType } from '@/lib/crypto/pii-fields';
+import { formatBytes } from '@/lib/utils';
 
 type Step = 'file' | 'mapping' | 'result';
 
@@ -53,6 +62,8 @@ export function UploadWizard({ surveyId, existingContactsCount }: UploadWizardPr
   const router = useRouter();
   const [step, setStep] = useState<Step>('file');
   const [file, setFile] = useState<File | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [headerRow, setHeaderRow] = useState(2);
   const [sheetName, setSheetName] = useState<string>('');
   const [preview, setPreview] = useState<ParseExcelPreviewResult | null>(null);
@@ -70,6 +81,17 @@ export function UploadWizard({ surveyId, existingContactsCount }: UploadWizardPr
   const [error, setError] = useState<string | null>(null);
   const [replaceConfirmed, setReplaceConfirmed] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  function selectFile(picked: File | null | undefined) {
+    if (!picked) return;
+    const err = validateXlsxFile(picked);
+    if (err) {
+      setError(err);
+      return;
+    }
+    setError(null);
+    setFile(picked);
+  }
 
   async function handlePreview() {
     if (!file) return;
@@ -191,27 +213,88 @@ export function UploadWizard({ surveyId, existingContactsCount }: UploadWizardPr
         )}
 
         {step === 'file' && (
-          <div className="space-y-3">
-            <Label htmlFor="excel-file">엑셀 파일 .xlsx 최대 10MB · 5,000행</Label>
+          <div className="space-y-5">
             <input
+              ref={fileInputRef}
               id="excel-file"
               type="file"
               accept=".xlsx"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="block w-full text-sm"
+              className="hidden"
+              onChange={(e) => {
+                selectFile(e.target.files?.[0]);
+                e.target.value = '';
+              }}
             />
-            <div className="flex items-center gap-3">
-              <Label>헤더 행 1-based</Label>
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={headerRow}
-                onChange={(e) => setHeaderRow(parseInt(e.target.value, 10) || 1)}
-                className="w-20 rounded border px-2 py-1 text-sm"
-              />
-              <span className="text-xs text-slate-500">병합 타이틀이 1행이면 디폴트 2 권장</span>
+
+            {!file ? (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOver(false);
+                  selectFile(e.dataTransfer.files?.[0]);
+                }}
+                className={`flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-7 text-center transition-colors ${
+                  dragOver
+                    ? 'border-blue-400 bg-blue-50'
+                    : 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100'
+                }`}
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-500">
+                  <UploadCloud className="h-5 w-5" />
+                </span>
+                <span className="text-sm font-medium text-gray-900">
+                  엑셀 파일을 끌어다 놓거나 클릭해서 선택
+                </span>
+                <span className="text-xs text-gray-500">
+                  .xlsx · 최대 {formatBytes(MAX_UPLOAD_BYTES)} ·{' '}
+                  {MAX_UPLOAD_ROWS.toLocaleString('ko-KR')}행
+                </span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                  <FileSpreadsheet className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-gray-900">{file.name}</div>
+                  <div className="text-xs text-gray-500">{formatBytes(file.size)}</div>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 shrink-0 p-0 text-gray-500 hover:text-red-600"
+                  onClick={() => setFile(null)}
+                  aria-label="파일 선택 취소"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="header-row">헤더 행 (1-based)</Label>
+              <div className="flex items-center gap-3">
+                <Input
+                  id="header-row"
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={headerRow}
+                  onChange={(e) => setHeaderRow(parseInt(e.target.value, 10) || 1)}
+                  className="h-10 w-24 px-3 py-2 text-sm"
+                />
+                <span className="text-xs text-gray-500">병합 타이틀이 1행이면 디폴트 2 권장</span>
+              </div>
             </div>
+
             <Button disabled={!file || isPending} onClick={handlePreview}>
               {isPending ? '파싱 중…' : '미리보기'}
             </Button>

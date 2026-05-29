@@ -16,6 +16,7 @@ import type {
 import { requireAuth } from '@/lib/auth';
 import { parseExcelRows, previewExcel } from '@/lib/contacts/excel-parser';
 import { sanitizeAttrsAgainstPii } from '@/lib/contacts/scheme-helpers';
+import { MAX_UPLOAD_ROWS, validateXlsxFile } from '@/lib/contacts/upload-limits';
 import {
   buildPiiRows,
   insertPiiRows,
@@ -24,16 +25,9 @@ import {
 } from '@/lib/crypto/contact-pii-repo';
 import type { PiiFieldType } from '@/lib/crypto/pii-fields';
 
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB
-const MAX_ROWS = 5000;
-
 function ensureXlsx(file: File): void {
-  if (!file.name.toLowerCase().endsWith('.xlsx')) {
-    throw new Error('xlsx 파일만 업로드할 수 있습니다.');
-  }
-  if (file.size > MAX_UPLOAD_BYTES) {
-    throw new Error(`파일 크기가 ${MAX_UPLOAD_BYTES / 1024 / 1024}MB 를 초과합니다.`);
-  }
+  const err = validateXlsxFile(file);
+  if (err) throw new Error(err);
 }
 
 export interface ParseExcelPreviewInput {
@@ -65,9 +59,9 @@ export async function parseExcelPreview(
     maxRows: 5,
   });
 
-  if (result.totalRows > MAX_ROWS) {
+  if (result.totalRows > MAX_UPLOAD_ROWS) {
     throw new Error(
-      `최대 ${MAX_ROWS.toLocaleString('ko-KR')} 행까지 적재 가능합니다 (현재 ${result.totalRows.toLocaleString('ko-KR')} 행).`,
+      `최대 ${MAX_UPLOAD_ROWS.toLocaleString('ko-KR')} 행까지 적재 가능합니다 (현재 ${result.totalRows.toLocaleString('ko-KR')} 행).`,
     );
   }
 
@@ -118,9 +112,9 @@ export async function ingestContactUpload(
     headerRow: mapping.headerRow,
   });
 
-  if (allRows.length > MAX_ROWS) {
+  if (allRows.length > MAX_UPLOAD_ROWS) {
     throw new Error(
-      `최대 ${MAX_ROWS.toLocaleString('ko-KR')} 행까지 적재 가능합니다.`,
+      `최대 ${MAX_UPLOAD_ROWS.toLocaleString('ko-KR')} 행까지 적재 가능합니다.`,
     );
   }
 
