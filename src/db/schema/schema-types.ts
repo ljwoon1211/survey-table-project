@@ -455,17 +455,19 @@ export interface MailAttachment {
  * 단체 메일 사후 "이 단체 메일 미응답자 재발송" 동선에서 prefill 용으로 활용.
  */
 export interface CampaignFilterSnapshot {
-  /** 검색 필드 */
-  qfield?: 'all' | 'resid' | 'email' | 'group' | 'biz';
-  /** 검색어 */
-  q?: string;
-  /** 미응답자만 (responded_at IS NULL) */
+  /** 다중 절 필터 (조사대상목록과 동일 직렬화). blindIndex 미포함 raw — 요청 시 재계산. */
+  clauses?: { source: string; value: string; op: 'AND' | 'OR' | null }[];
+  /** 미응답자만 (responded_at IS NULL) — 별도 체크박스로 유지 */
   unrespondedOnly?: boolean;
-  /** 결과코드 필터 — contact_attempts.result_code */
-  resultCodes?: string[];
-  /** 그룹값 필터 */
-  groupValues?: string[];
   /** "발송 후 N일 경과 단체 메일의 미오픈자 재발송" 동선 (?from=<cid>&unopenedAfterDays=7) */
   unopenedFromCampaignId?: string;
   unopenedAfterDays?: number;
+  /** @deprecated legacy 단순 검색 필드 — 신규 생성엔 미사용, 기존 저장 캠페인 읽기 호환용. */
+  qfield?: 'all' | 'resid' | 'email' | 'group' | 'biz';
+  /** @deprecated legacy 검색어 */
+  q?: string;
+  /** @deprecated legacy 결과코드 필터 */
+  resultCodes?: string[];
+  /** @deprecated legacy 그룹값 필터 */
+  groupValues?: string[];
 }

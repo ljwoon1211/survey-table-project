@@ -29,9 +29,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ContactsFilterBar } from '@/components/operations/contacts/contacts-filter-bar';
 import type { MailTemplate } from '@/db/schema/mail';
-import type { CampaignFilterSnapshot } from '@/db/schema/schema-types';
-import type { CampaignCandidateRow } from '@/lib/operations/campaigns.server';
+import type { CampaignFilterSnapshot, ContactResultCode } from '@/db/schema/schema-types';
+import type {
+  CampaignCandidateRow,
+  CampaignSortDir,
+  CampaignSortKey,
+} from '@/lib/operations/campaigns.server';
+import type { ColumnCandidate } from '@/lib/operations/filter-shared';
 
 interface Props {
   surveyId: string;
@@ -44,6 +50,11 @@ interface Props {
   };
   currentFilter: CampaignFilterSnapshot;
   initialTemplateId: string | null;
+  columnCandidates: ColumnCandidate[];
+  resultCodeOptions: ContactResultCode[];
+  initialClauses: { op: 'AND' | 'OR' | null; source: string; value: string }[];
+  sort: CampaignSortKey;
+  dir: CampaignSortDir;
 }
 
 export function CampaignWizard({
@@ -52,6 +63,11 @@ export function CampaignWizard({
   candidates,
   currentFilter,
   initialTemplateId,
+  columnCandidates,
+  resultCodeOptions,
+  initialClauses,
+  sort,
+  dir,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -71,8 +87,7 @@ export function CampaignWizard({
     notFound: number;
   } | null>(null);
 
-  // 필터 입력 (form state) — 적용 시 URL 로 push
-  const [qInput, setQInput] = useState<string>(currentFilter.q ?? '');
+  // "미응답자만" 토글 (별도 체크박스) — 변경 시 URL 로 push
   const [unrespondedOnly, setUnrespondedOnly] = useState<boolean>(
     currentFilter.unrespondedOnly ?? false,
   );
@@ -83,11 +98,22 @@ export function CampaignWizard({
   const allVisibleSelected =
     visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
 
-  function applyFilter() {
-    const next = new URLSearchParams();
-    if (templateId) next.set('templateId', templateId);
-    if (qInput.trim()) next.set('q', qInput.trim());
-    if (unrespondedOnly) next.set('unresponded', '1');
+  function toggleUnresponded(checked: boolean) {
+    setUnrespondedOnly(checked);
+    const next = new URLSearchParams(searchParams?.toString() ?? '');
+    if (checked) next.set('unresponded', '1');
+    else next.delete('unresponded');
+    next.delete('page');
+    router.push(`?${next.toString()}`);
+  }
+
+  function changeSort(key: CampaignSortKey) {
+    // 같은 컬럼 재클릭 → 방향 토글, 다른 컬럼 → asc 부터.
+    const nextDir: CampaignSortDir = sort === key && dir === 'asc' ? 'desc' : 'asc';
+    const next = new URLSearchParams(searchParams?.toString() ?? '');
+    next.set('sort', key);
+    next.set('dir', nextDir);
+    next.delete('page');
     router.push(`?${next.toString()}`);
   }
 
@@ -265,29 +291,23 @@ export function CampaignWizard({
       <Card className="space-y-4 p-6">
         <h2 className="text-base font-semibold text-slate-900">수신자 필터</h2>
 
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex-1 space-y-2 min-w-[200px]">
-            <Label htmlFor="q">검색 (이메일/사업자/그룹)</Label>
-            <Input
-              id="q"
-              value={qInput}
-              onChange={(e) => setQInput(e.target.value)}
-              placeholder="검색어"
-            />
-          </div>
-          <div className="flex items-center gap-2 pb-2">
-            <Checkbox
-              id="unresponded"
-              checked={unrespondedOnly}
-              onCheckedChange={(v) => setUnrespondedOnly(v === true)}
-            />
-            <Label htmlFor="unresponded" className="cursor-pointer">
-              미응답자만
-            </Label>
-          </div>
-          <Button onClick={applyFilter} variant="outline">
-            필터 적용
-          </Button>
+        <ContactsFilterBar
+          surveyId={surveyId}
+          initialClauses={initialClauses}
+          columnCandidates={columnCandidates}
+          resultCodeOptions={resultCodeOptions}
+          ariaLabel="수신자 필터"
+        />
+
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="unresponded"
+            checked={unrespondedOnly}
+            onCheckedChange={(v) => toggleUnresponded(v === true)}
+          />
+          <Label htmlFor="unresponded" className="cursor-pointer">
+            미응답자만
+          </Label>
         </div>
 
         <p className="text-xs text-slate-500">
@@ -337,11 +357,23 @@ export function CampaignWizard({
                     aria-label="현재 페이지 전체 선택"
                   />
                 </th>
-                <th className="px-3 py-2">번호</th>
+                <th className="px-3 py-2">
+                  <SortHeader label="번호" sortKey="resid" activeSort={sort} dir={dir} onSort={changeSort} />
+                </th>
                 <th className="px-3 py-2">이메일</th>
                 <th className="px-3 py-2">그룹</th>
-                <th className="px-3 py-2">응답</th>
-                <th className="px-3 py-2">최근 결과코드</th>
+                <th className="px-3 py-2">
+                  <SortHeader label="응답" sortKey="responded" activeSort={sort} dir={dir} onSort={changeSort} />
+                </th>
+                <th className="px-3 py-2">
+                  <SortHeader
+                    label="최근 결과코드"
+                    sortKey="resultCode"
+                    activeSort={sort}
+                    dir={dir}
+                    onSort={changeSort}
+                  />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -482,16 +514,40 @@ export function CampaignWizard({
   );
 }
 
+function SortHeader({
+  label,
+  sortKey,
+  activeSort,
+  dir,
+  onSort,
+}: {
+  label: string;
+  sortKey: CampaignSortKey;
+  activeSort: CampaignSortKey;
+  dir: CampaignSortDir;
+  onSort: (key: CampaignSortKey) => void;
+}) {
+  const active = activeSort === sortKey;
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(sortKey)}
+      className="inline-flex items-center gap-1 uppercase hover:text-gray-700"
+      aria-label={`${label} 정렬`}
+    >
+      {label}
+      <span className={active ? 'text-gray-700' : 'text-gray-300'}>
+        {active ? (dir === 'asc' ? '▲' : '▼') : '↕'}
+      </span>
+    </button>
+  );
+}
+
 function buildFilterSnapshot(current: CampaignFilterSnapshot): CampaignFilterSnapshot {
   // 빈 필드 제거 (DB 스냅샷 깔끔하게)
   const out: CampaignFilterSnapshot = {};
-  if (current.q && current.q.trim()) {
-    out.q = current.q.trim();
-    out.qfield = current.qfield ?? 'all';
-  }
+  if (current.clauses && current.clauses.length > 0) out.clauses = current.clauses;
   if (current.unrespondedOnly) out.unrespondedOnly = true;
-  if (current.resultCodes && current.resultCodes.length > 0) out.resultCodes = current.resultCodes;
-  if (current.groupValues && current.groupValues.length > 0) out.groupValues = current.groupValues;
   if (current.unopenedFromCampaignId) {
     out.unopenedFromCampaignId = current.unopenedFromCampaignId;
     out.unopenedAfterDays = current.unopenedAfterDays;
