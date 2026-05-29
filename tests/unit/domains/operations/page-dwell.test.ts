@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  aggregatePageDwell,
   shapePageDwell,
   trimmedStats,
   type DwellInput,
@@ -293,18 +294,17 @@ describe('shapePageDwell', () => {
     expect(out.pages.map((p) => p.stepId)).not.toContain('group:UNKNOWN');
   });
 
-  it('트리밍: 100개 visit + 양쪽 2개 outlier → 트림된 평균이 원본보다 영향 적음', () => {
-    const visits: PageVisit[] = [];
-    // 1, 2 (하단 outlier), 101..196 (96개), 9000, 10000 (상단 outlier) = 100개.
-    visits.push(visit('group:G1', 1));
-    visits.push(visit('group:G1', 2));
-    for (let i = 1; i <= 96; i++) visits.push(visit('group:G1', i + 100));
-    visits.push(visit('group:G1', 9000));
-    visits.push(visit('group:G1', 10000));
-    expect(visits).toHaveLength(100);
+  it('트리밍: 100명 응답 + 양쪽 2명 outlier → 트림된 평균이 원본보다 영향 적음', () => {
+    // 응답 100개, 각각 visit 1개. 응답당 stepId 합산 후 표본 1개가 됨.
+    // 1, 2 (하단 outlier), 101..196 (96개), 9000, 10000 (상단 outlier) = 100명.
+    const dwells: number[] = [1, 2];
+    for (let i = 1; i <= 96; i++) dwells.push(i + 100);
+    dwells.push(9000, 10000);
+    expect(dwells).toHaveLength(100);
 
+    const responses = dwells.map((d) => ({ pageVisits: [visit('group:G1', d)] }));
     const input: DwellInput = {
-      responses: [{ pageVisits: visits }],
+      responses,
       snapshot: baseSnapshot,
     };
     const out = shapePageDwell(input);
@@ -358,5 +358,24 @@ describe('shapePageDwell', () => {
     expect(tq2step.page).toBe(2);
     // ungrouped → page=null
     expect(rootStep.page).toBeNull();
+  });
+});
+
+// ── aggregatePageDwell — 응답 내 다중 visit 합산 ────────────────────────
+
+describe('aggregatePageDwell — 응답 내 다중 visit 합산', () => {
+  it('같은 응답의 같은 step 다중 visit을 표본 1개(합산값)로 집계한다', () => {
+    const responses = [
+      {
+        pageVisits: [
+          { stepId: 'group:root', enteredAt: '2026-05-29T00:00:00.000Z', leftAt: '2026-05-29T00:00:10.000Z' }, // 10s
+          { stepId: 'group:root', enteredAt: '2026-05-29T00:05:00.000Z', leftAt: '2026-05-29T00:05:20.000Z' }, // 20s
+        ],
+      },
+    ];
+    const stats = aggregatePageDwell(responses, new Set(['group:root']), 0);
+    const s = stats.get('group:root');
+    expect(s?.n).toBe(1); // visit 2개가 아니라 응답 1개
+    expect(s?.mean).toBe(30); // 10 + 20 합산
   });
 });

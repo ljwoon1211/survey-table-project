@@ -103,6 +103,31 @@ function sessionStorageKey(surveyId: string): string {
   return `survey-session:${surveyId}`;
 }
 
+/**
+ * Page Visibility 세그먼트 신호를 /api/response/segment로 전송한다(fire-and-forget).
+ * 탭 닫힘에도 살아남아야 하는 hide는 sendBeacon, 그 외는 keepalive fetch를 쓴다.
+ */
+function sendVisibilitySegment(
+  responseId: string,
+  action: 'hide' | 'show',
+  useBeacon = false,
+): void {
+  const payload = JSON.stringify({ responseId, action });
+  if (useBeacon && typeof navigator !== 'undefined' && navigator.sendBeacon) {
+    navigator.sendBeacon(
+      '/api/response/segment',
+      new Blob([payload], { type: 'application/json' }),
+    );
+  } else {
+    fetch('/api/response/segment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+      keepalive: true,
+    }).catch(() => {});
+  }
+}
+
 // step 내에서 표시 가능한 질문만 추린 뒤 step-like 객체로 반환
 function getDisplayableItemsOfStep(
   step: RenderStep,
@@ -542,6 +567,30 @@ export function SurveyResponseFlow({
     });
   }, [isAdminEdit, currentResponseId, currentStep]);
 
+  // 운영 현황 콘솔: Page Visibility 세그먼트.
+  // - 탭이 숨겨질 때(hidden/pagehide) 현재 visit을 닫고, 다시 보일 때(visible) 새 visit을 연다.
+  // - within-page idle(탭 닫고 떠난 시간)을 pageVisits에서 분리 → 소요시간/체류시간 정확화.
+  // - hide는 sendBeacon(탭 닫힘에도 전송), show는 fetch(keepalive).
+  useEffect(() => {
+    if (isAdminEdit) return;
+    if (currentResponseId === null) return;
+    if (isCompleted) return;
+    const rid = currentResponseId;
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') sendVisibilitySegment(rid, 'hide', true);
+      else sendVisibilitySegment(rid, 'show');
+    };
+    const onPageHide = () => sendVisibilitySegment(rid, 'hide', true);
+
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', onPageHide);
+    };
+  }, [isAdminEdit, currentResponseId, isCompleted]);
+
   // 운영 현황 콘솔(T6): localStorage 기반 응답 회복.
   // - 진입 시 1회 실행 (loadedSurvey 로드 완료 + currentResponseId 가 아직 null 일 때)
   // - localStorage에 saved sessionId 가 있으면 resumeOrCreateResponse 호출
@@ -579,6 +628,8 @@ export function SurveyResponseFlow({
         // 응답 row 사용 — sessionId 를 saved 값으로 갱신해 DB row 와 일치시킨다
         setSessionId(savedSessionId);
         setCurrentResponseId(result.id);
+        // 회복 직후 새 visit 열기 — recordStepVisit은 동일 step 재진입 시 no-op이라 의존 불가.
+        sendVisibilitySegment(result.id, 'show');
         // 회복된 경우(drop → in_progress)만 토스트
         if (result.resumed) {
           setResumeMessage('이전 응답을 이어서 진행합니다');
