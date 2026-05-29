@@ -8,7 +8,8 @@ import { Inngest } from 'inngest';
  * 핸들러 안에서 직접 처리 (campaign-dispatcher 의 event.data 캐스팅).
  *
  * 이벤트 카탈로그 (수동 관리):
- *   - mail/campaign.queued — { campaignId: string; surveyId: string }
+ *   - mail/campaign.queued    — { campaignId: string; surveyId: string }
+ *   - mail/campaign.dispatched — { campaignId: string; surveyId: string }
  */
 export const inngest = new Inngest({
   id: 'survey-table-project',
@@ -16,6 +17,12 @@ export const inngest = new Inngest({
 
 /** mail/campaign.queued 이벤트 payload (수동 타입 — schemas 미사용 보완) */
 export interface MailCampaignQueuedData {
+  campaignId: string;
+  surveyId: string;
+}
+
+/** mail/campaign.dispatched 이벤트 payload — 발송 청크 완료 후 reconciler 트리거용 */
+export interface MailCampaignDispatchedData {
   campaignId: string;
   surveyId: string;
 }

@@ -49,6 +49,11 @@ export const campaignDispatcher = inngest.createFunction(
       totals.failed += result.failed;
     }
 
+    await step.sendEvent('emit-dispatched', {
+      name: 'mail/campaign.dispatched',
+      data: { campaignId, surveyId: data.surveyId },
+    });
+
     return { ok: true, total: ctx.recipientIds.length, ...totals };
   },
 );
