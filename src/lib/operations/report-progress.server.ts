@@ -9,8 +9,7 @@ import { surveys } from '@/db/schema/surveys';
 import type { ContactColumnScheme, ProgressColumnScheme } from '@/db/schema/schema-types';
 
 import type { ProgressRow, ProgressSortKey, SortDir, ProgressTotals } from './report-progress';
-import type { FilterCondition } from './progress-filters.server';
-import { FILTER_SOURCE, escapeLikePattern } from './filter-shared';
+import { buildFilterSql, type FilterCondition } from './progress-filters.server';
 import { buildNegativeCodeExists, getResultCodeStatuses } from './result-code-statuses.server';
 
 const EMPTY_SCHEME: ProgressColumnScheme = { version: 1, columns: [] };
@@ -61,58 +60,6 @@ function buildClosingFilter(positiveCodes: string[]): SQL {
  */
 function buildExcludeFilter(negativeCodes: string[]): SQL {
   return sql`${buildNegativeCodeExists(negativeCodes, sql`ct.id`)} OR ct.unsubscribed_at IS NOT NULL`;
-}
-
-/**
- * 조건 → WHERE 절. null 이면 TRUE (전체 조회).
- *
- * SECURITY: condition.source 는 호출자에서 contactColumns 화이트리스트 검증 끝난 값만
- * 전달된다고 가정. value/from/to/blindIndex/key 모두 parameter binding 으로 안전.
- *
- * pii.* 매칭: condition.value 평문은 SQL 에 들어가지 않고 사전 계산된 blindIndex 만 사용.
- *
- * NULL 동작: ct.attrs->>key 가 NULL 이면 NULL ILIKE → false (자동 제외). pii.* 도 EXISTS
- * 가 false. system.resid 는 NOT NULL.
- */
-function buildFilterSql(condition: FilterCondition | null) {
-  if (!condition) return sql`TRUE`;
-
-  if (condition.source === FILTER_SOURCE.RESID) {
-    if (condition.mode === 'idlist') {
-      if (condition.ranges.length === 0) return sql`FALSE`;
-      const conds = condition.ranges.map((r) =>
-        r.from === r.to
-          ? sql`ct.resid = ${r.from}`
-          : sql`ct.resid BETWEEN ${r.from} AND ${r.to}`,
-      );
-      // 자체 괄호 — 외부 AND 결합 (WHERE ct.survey_id = X AND ${filterSql}) 시 PG AND>OR
-      // 우선순위로 인한 cross-survey 누락/누출 차단.
-      return sql`(${sql.join(conds, sql` OR `)})`;
-    }
-    return sql`FALSE`; // text 폴백 — resid 가 정수 컬럼이라 비숫자 매칭 0건
-  }
-
-  if (condition.source.startsWith(FILTER_SOURCE.ATTRS_PREFIX)) {
-    const key = condition.source.slice(FILTER_SOURCE.ATTRS_PREFIX.length);
-    const escaped = escapeLikePattern(condition.value);
-    // attrs key 도 parameter binding ($1) — PostgreSQL ->> 연산자는 텍스트 파라미터 수용.
-    return sql`ct.attrs->>${key} ILIKE '%' || ${escaped} || '%'`;
-  }
-
-  if (condition.source.startsWith(FILTER_SOURCE.PII_PREFIX) && condition.mode === 'exact') {
-    // pii.* 는 FilterCondition 타입상 항상 mode === 'exact'. mode 가드는 TS narrowing 용.
-    const columnKey = condition.source.slice(FILTER_SOURCE.PII_PREFIX.length);
-    return sql`EXISTS (
-      SELECT 1 FROM contact_pii pp
-      WHERE pp.contact_target_id = ct.id
-        AND pp.column_key = ${columnKey}
-        AND pp.blind_index = ${condition.blindIndex}
-    )`;
-  }
-
-  // 알 수 없는 source — FilterCondition 타입 확장 후 이 함수 업데이트 누락된 경우의 safety net.
-  // FALSE 로 두면 결과가 비어 즉시 인지된다 (TRUE 면 전체 조회로 silent fail).
-  return sql`FALSE`;
 }
 
 /**
