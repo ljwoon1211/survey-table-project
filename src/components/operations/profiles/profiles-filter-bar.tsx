@@ -1,26 +1,32 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-import { useSearchParamsMutator } from '@/hooks/use-search-params-mutator';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
-  hasActiveFilters,
-  type QField,
-  type StatusFilter,
-} from '@/lib/operations/profiles';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useSearchParamsMutator } from '@/hooks/use-search-params-mutator';
+import { hasActiveFilters, type StatusFilter } from '@/lib/operations/profiles';
+import {
+  placeholderFor as sharedPlaceholderFor,
+  type ColumnCandidate,
+} from '@/lib/operations/filter-shared';
+
+import { PiiExactMarker } from '@/components/operations/filter-pii-marker';
 
 interface Props {
-  initialQ: string;
-  initialQField: QField;
+  initialSource: string;
+  initialValue: string;
   initialStatus: StatusFilter;
+  columnCandidates: ColumnCandidate[];
 }
-
-const QFIELD_OPTIONS: ReadonlyArray<{ value: QField; label: string }> = [
-  { value: 'all', label: '전체' },
-  { value: 'idx', label: '순번' },
-  { value: 'browser', label: '브라우저' },
-];
 
 const STATUS_OPTIONS: ReadonlyArray<{ value: StatusFilter; label: string }> = [
   { value: 'all', label: '전체 상태' },
@@ -32,44 +38,67 @@ const STATUS_OPTIONS: ReadonlyArray<{ value: StatusFilter; label: string }> = [
   { value: 'bad', label: '불량' },
 ];
 
+/** idx/browser 는 응답 전용 placeholder, 그 외는 공유 헬퍼('부분일치'). */
+function placeholderFor(source: string): string {
+  if (source === 'idx') return '예: 5';
+  if (source === 'browser') return '예: Chrome';
+  return sharedPlaceholderFor(source || null, '부분일치');
+}
+
 /**
- * 응답 내역 페이지 필터바.
+ * 응답 내역 필터바 (진척률 스타일).
  *
+ * - 컬럼 select + 값 input + 상태 select + [적용] 한 줄
  * - form submit 으로만 URL 갱신 (적용 버튼 또는 Enter)
- * - 기본값(all / 빈 문자열)은 URL 키 자체를 제거 → 깔끔한 URL
- * - 필터 변경 시 page 도 리셋 (마지막 페이지에 머무는 거 방지)
+ * - URL ?col=&q=&status= 직렬화. 빈 값/기본값은 키 삭제. 필터 변경 시 page 리셋.
+ * - 컬럼 미선택 + 검색어 입력 시 [적용] 비활성.
  */
-export function ProfilesFilterBar({ initialQ, initialQField, initialStatus }: Props) {
-  const [q, setQ] = useState(initialQ);
-  const [qfield, setQField] = useState<QField>(initialQField);
+export function ProfilesFilterBar({
+  initialSource,
+  initialValue,
+  initialStatus,
+  columnCandidates,
+}: Props) {
+  const [source, setSource] = useState(initialSource);
+  const [value, setValue] = useState(initialValue);
   const [status, setStatus] = useState<StatusFilter>(initialStatus);
+  const [, startTransition] = useTransition();
   const pushParams = useSearchParamsMutator();
   const searchParams = useSearchParams();
 
+  // 뒤로/앞으로 가기 시 server 가 새 initial 을 내려주면 로컬 state 동기화.
+  useEffect(() => {
+    setSource(initialSource);
+    setValue(initialValue);
+    setStatus(initialStatus);
+  }, [initialSource, initialValue, initialStatus]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    pushParams((p) => {
-      const trimmed = q.trim();
-      if (trimmed) p.set('q', trimmed);
-      else p.delete('q');
-
-      if (qfield !== 'all') p.set('qfield', qfield);
-      else p.delete('qfield');
-
-      if (status !== 'all') p.set('status', status);
-      else p.delete('status');
-
-      p.delete('page');
+    const trimmed = value.trim();
+    startTransition(() => {
+      pushParams((p) => {
+        if (!source || trimmed.length === 0) {
+          p.delete('col');
+          p.delete('q');
+        } else {
+          p.set('col', source);
+          p.set('q', trimmed);
+        }
+        if (status !== 'all') p.set('status', status);
+        else p.delete('status');
+        p.delete('page');
+      });
     });
   };
 
   const handleReset = () => {
-    setQ('');
-    setQField('all');
+    setSource('');
+    setValue('');
     setStatus('all');
     pushParams((p) => {
+      p.delete('col');
       p.delete('q');
-      p.delete('qfield');
       p.delete('status');
       p.delete('page');
     });
@@ -77,59 +106,66 @@ export function ProfilesFilterBar({ initialQ, initialQField, initialStatus }: Pr
 
   const showReset = hasActiveFilters({
     q: searchParams?.get('q') ?? undefined,
-    qfield: searchParams?.get('qfield') ?? undefined,
+    col: searchParams?.get('col') ?? undefined,
     status: searchParams?.get('status') ?? undefined,
   });
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2">
-      <input
-        type="text"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="순번 · 브라우저 검색"
-        className="h-9 max-w-[300px] flex-1 rounded border border-slate-200 px-3 text-sm focus:border-blue-400 focus:outline-none"
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-wrap items-center gap-2"
+      role="search"
+      aria-label="응답 내역 필터"
+    >
+      <label htmlFor="profiles-filter-column" className="sr-only">검색 컬럼</label>
+      <Select value={source || ''} onValueChange={(v) => setSource(v || '')}>
+        <SelectTrigger id="profiles-filter-column" className="w-[160px] shrink-0">
+          <SelectValue placeholder="컬럼 선택" />
+        </SelectTrigger>
+        <SelectContent className="max-h-72">
+          {columnCandidates.map((c) => (
+            <SelectItem key={c.source} value={c.source}>
+              {c.label}
+              <PiiExactMarker source={c.source} />
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <label htmlFor="profiles-filter-value" className="sr-only">검색어</label>
+      <Input
+        id="profiles-filter-value"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={placeholderFor(source)}
+        className="h-10 w-[240px] shrink-0"
       />
-      <select
-        value={qfield}
-        onChange={(e) => setQField(e.target.value as QField)}
-        className="h-9 rounded border border-slate-200 px-2 text-sm"
-        aria-label="검색 항목"
-      >
-        {QFIELD_OPTIONS.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      <select
-        value={status}
-        onChange={(e) => setStatus(e.target.value as StatusFilter)}
-        className="h-9 rounded border border-slate-200 px-2 text-sm"
-        aria-label="상태 필터"
-      >
-        {STATUS_OPTIONS.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-        <option disabled>──────────</option>
-        <option value="deleted">삭제됨</option>
-      </select>
-      <button
+
+      <label htmlFor="profiles-filter-status" className="sr-only">상태 필터</label>
+      <Select value={status} onValueChange={(v) => setStatus(v as StatusFilter)}>
+        <SelectTrigger id="profiles-filter-status" className="w-[140px] shrink-0">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {STATUS_OPTIONS.map((o) => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Button
         type="submit"
-        className="h-9 rounded bg-blue-600 px-3.5 text-sm font-medium text-white hover:bg-blue-700"
+        className="h-10"
+        disabled={!source && value.trim().length > 0}
       >
         적용
-      </button>
+      </Button>
       {showReset && (
-        <button
-          type="button"
-          onClick={handleReset}
-          className="h-9 rounded border border-slate-200 px-3 text-sm text-slate-600 hover:bg-slate-50"
-        >
+        <Button type="button" variant="outline" className="h-10" onClick={handleReset}>
           필터 초기화
-        </button>
+        </Button>
       )}
     </form>
   );
