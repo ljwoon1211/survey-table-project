@@ -33,14 +33,18 @@ interface SeedResponse {
 interface SeedContact {
   id: string;
   surveyId: string;
+  resid: number;
+  attrs: Record<string, string>;
   unsubscribedAt: Date | null;
   negativeAttempts: string[];
+  piiBlindIndexes: Record<string, string>;
 }
 
 interface FakeState {
   responses: SeedResponse[];
   contacts: SeedContact[];
   negativeCodes: string[];
+  hasSurveyScopedLeftJoin: boolean;
   /** base subquery 실행 결과 — count/data 쿼리가 재사용 */
   numberedRows: NumberedRow[];
 }
@@ -66,6 +70,7 @@ const state: FakeState = {
   responses: [],
   contacts: [],
   negativeCodes: [],
+  hasSurveyScopedLeftJoin: false,
   numberedRows: [],
 };
 
@@ -75,6 +80,30 @@ function isExcludedContact(ct: SeedContact): boolean {
   if (ct.unsubscribedAt != null) return true;
   if (state.negativeCodes.length === 0) return false;
   return ct.negativeAttempts.some((a) => state.negativeCodes.includes(a));
+}
+
+function objectContainsString(value: unknown, needle: string, seen = new Set<object>()): boolean {
+  if (typeof value === 'string') return value.toLowerCase().includes(needle);
+  if (value == null || typeof value !== 'object') return false;
+  if (seen.has(value)) return false;
+  seen.add(value);
+  const obj = value as object;
+  return Object.getOwnPropertyNames(obj).some((key) => {
+    if (key.toLowerCase().includes(needle)) return true;
+    return objectContainsString((obj as Record<string, unknown>)[key], needle, seen);
+  });
+}
+
+function objectStringCount(value: unknown, needle: string, seen = new Set<object>()): number {
+  if (typeof value === 'string') return value.toLowerCase().includes(needle) ? 1 : 0;
+  if (value == null || typeof value !== 'object') return 0;
+  if (seen.has(value)) return 0;
+  seen.add(value);
+  const obj = value as object;
+  return Object.getOwnPropertyNames(obj).reduce((count, key) => {
+    const keyHit = key.toLowerCase().includes(needle) ? 1 : 0;
+    return count + keyHit + objectStringCount((obj as Record<string, unknown>)[key], needle, seen);
+  }, 0);
 }
 
 /**
@@ -100,21 +129,29 @@ function evaluateBaseSubquery(
       return !isExcludedContact(ct);                  // negative ct → 가림
     })
     .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
-  return filtered.map((r, i) => ({
-    id: r.id,
-    idx: i + 1,
-    platform: null,
-    browser: null,
-    status: 'in_progress',
-    currentStepId: null,
-    startedAt: r.startedAt,
-    completedAt: null,
-    totalSeconds: null,
-    groupValue: null,
-    contactResid: null,
-    contactAttrs: null,
-    contactTargetId: r.contactTargetId,
-  }));
+  return filtered.map((r, i) => {
+    const ct =
+      r.contactTargetId == null ? null : (contactById.get(r.contactTargetId) ?? null);
+    const joinedCt =
+      ct != null && (!state.hasSurveyScopedLeftJoin || ct.surveyId === r.surveyId)
+        ? ct
+        : null;
+    return {
+      id: r.id,
+      idx: i + 1,
+      platform: null,
+      browser: null,
+      status: 'in_progress',
+      currentStepId: null,
+      startedAt: r.startedAt,
+      completedAt: null,
+      totalSeconds: null,
+      groupValue: null,
+      contactResid: joinedCt?.resid ?? null,
+      contactAttrs: joinedCt?.attrs ?? null,
+      contactTargetId: joinedCt?.id ?? null,
+    };
+  });
 }
 
 // ----------------------------------------------------------------
@@ -159,7 +196,8 @@ function buildSelectChain(selection: Record<string, unknown>) {
       return chain;
     },
     // ct LEFT JOIN — exclusion/idx 동작에 영향 없는 pass-through
-    leftJoin(_table: unknown, _on: unknown) {
+    leftJoin(_table: unknown, on: unknown) {
+      state.hasSurveyScopedLeftJoin = objectStringCount(on, 'survey_id') >= 2;
       return chain;
     },
     where(whereExpr: unknown) {
@@ -194,8 +232,52 @@ function buildCountOrDataChain(selection: Record<string, unknown>) {
   const isCount = 'total' in selection;
   const baseRows = state.numberedRows;
 
+  function applyOuterWhere(rows: NumberedRow[], whereExpr: unknown): NumberedRow[] {
+    const raw = extractRawSql(whereExpr).toLowerCase();
+
+    if (raw.includes('contact_pii')) {
+      return rows.filter((row) => {
+        if (row.contactTargetId == null) return false;
+        const ct = state.contacts.find((c) => c.id === row.contactTargetId);
+        if (!ct) return false;
+        return Object.entries(ct.piiBlindIndexes).some(
+          ([columnKey, blindIndex]) =>
+            raw.includes(columnKey.toLowerCase()) &&
+            raw.includes(blindIndex.toLowerCase()),
+        );
+      });
+    }
+
+    if (raw.includes('contact_resid') || raw.includes('resid')) {
+      const numbers = raw.match(/\b\d+\b/g)?.map((n) => Number(n)) ?? [];
+      if (numbers.length === 0) return rows;
+      return rows.filter(
+        (row) => row.contactResid != null && numbers.includes(row.contactResid),
+      );
+    }
+
+    if (objectContainsString(whereExpr, 'contact_resid')) {
+      const numbers = raw.match(/\b\d+\b/g)?.map((n) => Number(n)) ?? [];
+      if (numbers.length === 0) return rows;
+      return rows.filter(
+        (row) => row.contactResid != null && numbers.includes(row.contactResid),
+      );
+    }
+
+    const numbers = raw.match(/\b\d+\b/g)?.map((n) => Number(n)) ?? [];
+    if (numbers.length > 0) {
+      return rows.filter(
+        (row) => row.contactResid != null && numbers.includes(row.contactResid),
+      );
+    }
+
+    return rows;
+  }
+
   const dataChain = {
+    rows: baseRows,
     where(_w: unknown) {
+      dataChain.rows = applyOuterWhere(baseRows, _w);
       return dataChain;
     },
     orderBy(..._args: unknown[]) {
@@ -209,16 +291,17 @@ function buildCountOrDataChain(selection: Record<string, unknown>) {
     },
     then(resolve: (value: unknown) => unknown) {
       // data query 결과 — base rows 그대로 반환 (필터/페이징 mock 생략)
-      return Promise.resolve(baseRows).then(resolve);
+      return Promise.resolve(dataChain.rows).then(resolve);
     },
   };
 
   if (isCount) {
     return {
-      where(_w: unknown) {
+      where(w: unknown) {
+        const rows = applyOuterWhere(baseRows, w);
         return {
           then(resolve: (value: unknown) => unknown) {
-            return Promise.resolve([{ total: baseRows.length }]).then(resolve);
+            return Promise.resolve([{ total: rows.length }]).then(resolve);
           },
         };
       },
@@ -253,6 +336,7 @@ vi.mock('@/lib/operations/result-code-statuses.server', async () => {
 import { listResponsesForProfiles } from '@/lib/operations/profiles.server';
 
 const SURVEY_ID = '00000000-0000-4000-8000-000000000040';
+const OTHER_SURVEY_ID = '00000000-0000-4000-8000-000000000041';
 
 interface SeedResponseInput {
   negative?: boolean;
@@ -270,8 +354,11 @@ function seedResponseWithContact(opts: SeedResponseInput = {}): {
     state.contacts.push({
       id: contactId,
       surveyId: SURVEY_ID,
+      resid: state.contacts.length + 1,
+      attrs: {},
       unsubscribedAt: opts.unsubscribed ? new Date() : null,
       negativeAttempts: opts.negative ? ['수신거부'] : [],
+      piiBlindIndexes: {},
     });
   }
   const responseId = randomUUID();
@@ -292,6 +379,7 @@ describe('listResponsesForProfiles — negative exclusion', () => {
     state.responses = [];
     state.contacts = [];
     state.negativeCodes = ['수신거부'];
+    state.hasSurveyScopedLeftJoin = false;
     state.numberedRows = [];
   });
 
@@ -359,5 +447,80 @@ describe('listResponsesForProfiles — negative exclusion', () => {
     });
     expect(result.total).toBe(2);
     expect(result.rows.map((r) => r.idx).sort()).toEqual([1, 2]);
+  });
+
+  it('cross-survey contactTargetId mismatch 는 ct LEFT JOIN 결과로 매칭하지 않음', async () => {
+    const foreignContactId = randomUUID();
+    state.contacts.push({
+      id: foreignContactId,
+      surveyId: OTHER_SURVEY_ID,
+      resid: 25,
+      attrs: { 전시회명: '타조사' },
+      unsubscribedAt: null,
+      negativeAttempts: [],
+      piiBlindIndexes: {},
+    });
+    state.responses.push({
+      id: randomUUID(),
+      surveyId: SURVEY_ID,
+      contactTargetId: foreignContactId,
+      startedAt: new Date(),
+      deletedAt: null,
+    });
+
+    const result = await listResponsesForProfiles({
+      surveyId: SURVEY_ID,
+      page: 1,
+      pageSize: 100,
+      condition: {
+        source: 'system.resid',
+        mode: 'idlist',
+        ranges: [{ from: 25, to: 25 }],
+      },
+      status: 'all',
+      sort: 'startedAt',
+      dir: 'desc',
+      view: 'active',
+    });
+
+    expect(result.total).toBe(0);
+  });
+
+  it('PII 필터는 survey-scoped ct LEFT JOIN 행의 contactTargetId 기준으로 매칭', async () => {
+    const foreignContactId = randomUUID();
+    state.contacts.push({
+      id: foreignContactId,
+      surveyId: OTHER_SURVEY_ID,
+      resid: 25,
+      attrs: {},
+      unsubscribedAt: null,
+      negativeAttempts: [],
+      piiBlindIndexes: { email: 'foreign-blind-index' },
+    });
+    state.responses.push({
+      id: randomUUID(),
+      surveyId: SURVEY_ID,
+      contactTargetId: foreignContactId,
+      startedAt: new Date(),
+      deletedAt: null,
+    });
+
+    const result = await listResponsesForProfiles({
+      surveyId: SURVEY_ID,
+      page: 1,
+      pageSize: 100,
+      condition: {
+        source: 'pii.email',
+        mode: 'exact',
+        value: 'user@example.com',
+        blindIndex: 'foreign-blind-index',
+      },
+      status: 'all',
+      sort: 'startedAt',
+      dir: 'desc',
+      view: 'active',
+    });
+
+    expect(result.total).toBe(0);
   });
 });

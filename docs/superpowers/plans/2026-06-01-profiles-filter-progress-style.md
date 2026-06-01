@@ -835,7 +835,7 @@ export function ProfilesFilterBar({
 }
 ```
 
-(주의: 기존 status select에 있던 "삭제됨"(deleted) 옵션은 shadcn `Select`가 disabled separator를 지원하지 않으므로 제외. 삭제 뷰는 별도 진입점이 있다면 그대로 두고, 없으면 이 변경으로 deleted 뷰 진입이 사라진다 — Task 7 검증 시 확인하고, 필요하면 STATUS_OPTIONS에 `{ value: 'deleted', label: '삭제됨' }` 추가.)
+(현재 코드 기준: `profiles-filter-bar.tsx`의 status select에는 `SelectSeparator` 뒤에 `<SelectItem value="deleted">삭제됨</SelectItem>`이 포함되어 있다. 따라서 삭제 뷰 진입은 필터바에서 유지되며, 과거의 "삭제됨 제외" 주의사항은 더 이상 적용되지 않는다.)
 
 - [ ] **Step 2: 타입 체크**
 

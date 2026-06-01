@@ -19,23 +19,39 @@ describe('parseProfilesCondition', () => {
   });
 
   it('빈 q 면 null', () => {
-    expect(parseProfilesCondition('idx', '', candidates)).toBeNull();
-    expect(parseProfilesCondition('idx', '   ', candidates)).toBeNull();
+    expect(parseProfilesCondition('browser', '', candidates)).toBeNull();
+    expect(parseProfilesCondition('browser', '   ', candidates)).toBeNull();
   });
 
-  it('idx 숫자 → idx condition', () => {
-    expect(parseProfilesCondition('idx', '5', candidates)).toEqual({
+  it('idx range-list → idx ranges condition', () => {
+    expect(parseProfilesCondition('idx', '1-20, 25', candidates)).toEqual({
       source: 'idx',
       mode: 'idx',
-      value: 5,
+      ranges: [
+        { from: 1, to: 20 },
+        { from: 25, to: 25 },
+      ],
     });
   });
 
-  it('idx 비숫자 → value 0 (매칭 0건 보장)', () => {
+  it('idx 단일 숫자 → 단일 idx range condition', () => {
+    expect(parseProfilesCondition('idx', '5', candidates)).toEqual({
+      source: 'idx',
+      mode: 'idx',
+      ranges: [{ from: 5, to: 5 }],
+    });
+  });
+
+  it('idx 비숫자/빈 입력 → 빈 ranges (매칭 0건 보장)', () => {
     expect(parseProfilesCondition('idx', 'abc', candidates)).toEqual({
       source: 'idx',
       mode: 'idx',
-      value: 0,
+      ranges: [],
+    });
+    expect(parseProfilesCondition('idx', '', candidates)).toEqual({
+      source: 'idx',
+      mode: 'idx',
+      ranges: [],
     });
   });
 

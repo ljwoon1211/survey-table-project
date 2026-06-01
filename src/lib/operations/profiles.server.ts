@@ -64,7 +64,7 @@ interface ProfilesConditionCols {
 /**
  * ProfilesCondition → outer WHERE SQL. null 이면 null (필터 없음).
  *
- * - idx: 정확 매치 (row_number = value)
+ * - idx: 범위/리스트 매치 (row_number 기준)
  * - browser: ilike 부분일치
  * - resid / attrs / pii: buildFilterSql 위임 (numbered subquery alias 를 cols 로 주입)
  */
@@ -75,7 +75,13 @@ function profilesConditionToSql(
   if (!condition) return null;
 
   if (condition.source === 'idx') {
-    return sql`${cols.idx} = ${condition.value}`;
+    if (condition.ranges.length === 0) return sql`FALSE`;
+    const conds = condition.ranges.map((r) =>
+      r.from === r.to
+        ? sql`${cols.idx} = ${r.from}`
+        : sql`${cols.idx} BETWEEN ${r.from} AND ${r.to}`,
+    );
+    return sql`(${sql.join(conds, sql` OR `)})`;
   }
 
   if (condition.source === 'browser') {
@@ -99,7 +105,7 @@ function profilesConditionToSql(
  *   이를 위해 base subquery 에서 row_number 를 먼저 매기고, 외부 select 에서 필터를 건다.
  *   ct 는 base subquery 에 LEFT JOIN 하되 row_number 는 전체 기준 유지.
  * - **condition 필터**: profilesConditionToSql 로 idx/browser/resid/attrs/pii 를
- *   subquery 위에서 적용. idx 비숫자 입력은 파서가 value=0 으로 넘겨 0건.
+ *   subquery 위에서 적용. idx 비숫자/빈 입력은 파서가 ranges=[] 으로 넘겨 0건.
  * - **page 클램프**: page > totalPages 면 totalPages 로 보정해 마지막 페이지 노출
  *   (검색 0건과 시각적 혼동 방지).
  * - **보안**: raw ip_address 컬럼 제거됨. 접속IP 정보는 수집하지 않음.
@@ -134,10 +140,16 @@ export async function listResponsesForProfiles(
       groupValue: contactTargets.groupValue,
       contactResid: contactTargets.resid,
       contactAttrs: contactTargets.attrs,
-      contactTargetId: surveyResponses.contactTargetId,
+      contactTargetId: contactTargets.id,
     })
     .from(surveyResponses)
-    .leftJoin(contactTargets, eq(contactTargets.id, surveyResponses.contactTargetId))
+    .leftJoin(
+      contactTargets,
+      and(
+        eq(contactTargets.id, surveyResponses.contactTargetId),
+        eq(contactTargets.surveyId, surveyResponses.surveyId),
+      ),
+    )
     .where(
       and(
         eq(surveyResponses.surveyId, surveyId),
