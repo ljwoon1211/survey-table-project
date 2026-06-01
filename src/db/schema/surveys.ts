@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm';
-import { boolean, integer, jsonb, pgTable, smallint, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import { boolean, doublePrecision, integer, jsonb, pgTable, smallint, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 
 import type { SurveyLookup } from '@/types/survey';
 
@@ -136,6 +136,10 @@ export const questions = pgTable('questions', {
 
   // 단답형 prefill 템플릿 — 0022 마이그레이션. {{attrs_key}} 포함 가능.
   defaultValueTemplate: text('default_value_template'),
+
+  // 단답형 숫자 입력 모드 — 0030 마이그레이션
+  inputType: text('input_type'), // 'text' | 'number'
+  emptyDefault: doublePrecision('empty_default'), // 숫자 모드 초기값
 
   // SPSS 변수명 관련
   questionCode: text('question_code'), // SPSS 변수명 (예: "Q1", "Q2M1")

@@ -284,6 +284,8 @@ export interface QuestionData {
   displayCondition?: QuestionConditionGroup;
   rankingConfig?: RankingConfig;
   defaultValueTemplate?: string | null;
+  inputType?: 'text' | 'number';
+  emptyDefault?: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

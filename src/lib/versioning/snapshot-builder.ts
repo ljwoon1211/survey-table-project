@@ -56,6 +56,8 @@ interface SnapshotQuestion {
   displayCondition?: Question['displayCondition'];
   questionCode?: string;
   defaultValueTemplate?: string | null;
+  inputType?: 'text' | 'number';
+  emptyDefault?: number;
 }
 
 interface SnapshotGroup {
@@ -116,6 +118,8 @@ export function buildSurveySnapshot(survey: Survey): SurveySnapshot {
       displayCondition: q.displayCondition,
       questionCode: q.questionCode,
       defaultValueTemplate: q.defaultValueTemplate,
+      inputType: q.inputType,
+      emptyDefault: q.emptyDefault,
     })),
     groups: sortedGroups.map((g) => ({
       id: g.id,
