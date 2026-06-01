@@ -102,7 +102,8 @@ export interface TableCell {
   | 'select'
   | 'input'
   | 'ranking'
-  | 'ranking_opt';
+  | 'ranking_opt'
+  | 'choice_opt';
   checkboxOptions?: CheckboxOption[];
   radioOptions?: RadioOption[];
   radioGroupName?: string;
@@ -126,6 +127,12 @@ export interface TableCell {
   // ranking_opt 셀 (type='ranking_opt') — Case 2 옵션 소스용 라벨
   rankingLabel?: string;
   isOtherRankingCell?: boolean;
+  // choice_opt 셀 (type='choice_opt') — Case A radio/checkbox 옵션 소스
+  choiceLabel?: string;
+  isOtherChoiceCell?: boolean;
+  branchRule?: BranchRule;
+  allowTextInput?: boolean;
+  textInputPlaceholder?: string;
 }
 
 // 테이블 행

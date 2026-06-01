@@ -131,7 +131,8 @@ export function CellContentModal({
     | 'select'
     | 'input'
     | 'ranking'
-    | 'ranking_opt';
+    | 'ranking_opt'
+    | 'choice_opt';
   const narrowCellType = (t: TableCell['type'] | undefined): ContentType =>
     !t ? 'text' : t;
   const [contentType, setContentType] = useState<ContentType>(narrowCellType(cell.type));

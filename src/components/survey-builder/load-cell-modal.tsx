@@ -49,6 +49,7 @@ const cellTypeIcons: Record<TableCell['type'], React.ElementType> = {
   select: ChevronDown,
   ranking: ListOrdered,
   ranking_opt: ListOrdered,
+  choice_opt: Circle,
 };
 
 interface LoadCellModalProps {

@@ -257,7 +257,8 @@ export interface TableCell {
     | 'select'
     | 'input'
     | 'ranking' // Case 3: 셀 내부 랭킹 (셀별 옵션 + 순위 드롭다운 N개)
-    | 'ranking_opt'; // Case 2: 이 셀이 질문 레벨 ranking 의 옵션 소스로 사용됨
+    | 'ranking_opt' // Case 2: 이 셀이 질문 레벨 ranking 의 옵션 소스로 사용됨
+    | 'choice_opt'; // Case A: 이 셀이 질문 레벨 radio/checkbox 의 옵션 소스로 사용됨
   // 체크박스/라디오 버튼 관련 속성
   checkboxOptions?: CheckboxOption[];
   radioOptions?: RadioOption[];
@@ -298,6 +299,16 @@ export interface TableCell {
   // 선택 시 RankingAnswer.optionValue='__other__' + otherText 자유입력 저장.
   // 질문 당 최대 1개.
   isOtherRankingCell?: boolean;
+  // choice_opt 셀 (type='choice_opt') — Case A radio/checkbox 옵션 소스
+  // 옵션 라벨. 선택 열 셀은 보통 content 가 비어 있어(라벨은 다른 열) 명시적으로 지정.
+  choiceLabel?: string;
+  // 이 셀을 "기타 (직접 입력)" 옵션으로 사용 — 해석 시 allowTextInput=true 로 매핑.
+  isOtherChoiceCell?: boolean;
+  // 이 옵션 선택 시 분기. (resolveChoiceOptions 가 QuestionOption.branchRule 로 전달)
+  branchRule?: BranchRule;
+  // 선택 시 사이드카 텍스트 입력 (radio/checkbox 옵션과 동일 의미). __optTexts__ 로 저장됨.
+  allowTextInput?: boolean;
+  textInputPlaceholder?: string;
   // 셀 병합 관련 속성
   rowspan?: number; // 행 병합 (세로)
   colspan?: number; // 열 병합 (가로)

@@ -216,4 +216,5 @@ export const CELL_TYPE_LABELS: Record<TableCell['type'], string> = {
   select: '선택',
   ranking: '순위',
   ranking_opt: '순위 옵션',
+  choice_opt: '선택 옵션',
 };
