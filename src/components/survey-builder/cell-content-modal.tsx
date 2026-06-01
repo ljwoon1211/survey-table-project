@@ -57,6 +57,7 @@ import { generateId } from '@/lib/utils';
 import { isPartialNumericInput, parseNumericInput } from '@/utils/numeric-input';
 import { getMaxSpssCode } from '@/utils/option-code-generator';
 import { hasExistingOtherRankingCell } from '@/utils/ranking-source';
+import { hasExistingOtherChoiceCell } from '@/utils/choice-source';
 import {
   CheckboxOption,
   QuestionOption,
@@ -72,6 +73,7 @@ import { CellContentLayout } from './cells/cell-content-layout';
 import { OptionsLayoutSelector } from './options-layout-selector';
 import { RankingCellTab } from './ranking-cell-tab';
 import { RankingOptCellTab } from './ranking-opt-cell-tab';
+import { ChoiceOptCellTab } from './choice-opt-cell-tab';
 import { VariableButton } from './variable-button';
 
 // textPosition 컨트롤을 표시할 셀 타입 — 텍스트 라벨과 입력/옵션 영역이 분리된 셀들만
@@ -179,6 +181,15 @@ export function CellContentModal({
     cell.isOtherRankingCell === true,
   );
 
+  // 보기 옵션 소스 셀(Case A, choice_opt) 전용 state — spss 코드는 cellSpssNumericCode 공유
+  const [choiceLabel, setChoiceLabel] = useState<string>(cell.choiceLabel || '');
+  const [isOtherChoiceCell, setIsOtherChoiceCell] = useState<boolean>(
+    cell.isOtherChoiceCell === true,
+  );
+  const [choiceAllowTextInput, setChoiceAllowTextInput] = useState<boolean>(
+    cell.allowTextInput === true,
+  );
+
   // 정렬 관련 state
   const [horizontalAlign, setHorizontalAlign] = useState<'left' | 'center' | 'right'>(
     cell.horizontalAlign || 'left',
@@ -240,6 +251,9 @@ export function CellContentModal({
       setRankingLabel(cell.rankingLabel || '');
       setCellSpssNumericCode(cell.spssNumericCode ?? '');
       setIsOtherRankingCell(cell.isOtherRankingCell === true);
+      setChoiceLabel(cell.choiceLabel || '');
+      setIsOtherChoiceCell(cell.isOtherChoiceCell === true);
+      setChoiceAllowTextInput(cell.allowTextInput === true);
       setIsMergeEnabled(
         (cell.rowspan && cell.rowspan > 1) || (cell.colspan && cell.colspan > 1) || false,
       );
@@ -306,6 +320,16 @@ export function CellContentModal({
         return;
       }
     }
+    if (contentType === 'choice_opt' && isOtherChoiceCell) {
+      // 같은 질문 내 기타 choice_opt 셀이 이미 존재하면 차단 (자기 자신은 제외).
+      const hostQuestion = questions.find((q) => q.id === currentQuestionId);
+      if (hasExistingOtherChoiceCell(hostQuestion?.tableRowsData, cell.id)) {
+        alert(
+          '이 질문에는 이미 "기타"로 지정된 보기 옵션 셀이 있습니다. 질문당 최대 1개만 지정할 수 있습니다.',
+        );
+        return;
+      }
+    }
 
     setIsSaving(true);
     try {
@@ -362,17 +386,29 @@ export function CellContentModal({
           contentType === 'ranking_opt' && rankingLabel.trim().length > 0
             ? rankingLabel.trim()
             : undefined,
-        // ranking_opt 전용 spssNumericCode (Case 2 SPSS 재-export 안정성)
+        // ranking_opt / choice_opt 전용 spssNumericCode (Case 2/A SPSS 재-export 안정성)
         // isOther 모드면 numeric 변수가 system-missing 이라 spssNumericCode 는 의미 없음 → 강제 undefined.
         spssNumericCode:
-          contentType === 'ranking_opt'
-            && !isOtherRankingCell
+          ((contentType === 'ranking_opt' && !isOtherRankingCell)
+            || contentType === 'choice_opt')
             && typeof cellSpssNumericCode === 'number'
             ? cellSpssNumericCode
             : undefined,
         // ranking_opt 셀을 질문-레벨 "기타" 엔트리로 사용할지 (타입 전환 시 undefined 로 클리어).
         isOtherRankingCell:
           contentType === 'ranking_opt' && isOtherRankingCell ? true : undefined,
+        // 보기 옵션 소스 셀 (Case A)
+        choiceLabel:
+          contentType === 'choice_opt' && choiceLabel.trim().length > 0
+            ? choiceLabel.trim()
+            : undefined,
+        isOtherChoiceCell:
+          contentType === 'choice_opt' && isOtherChoiceCell ? true : undefined,
+        allowTextInput:
+          contentType === 'choice_opt' && choiceAllowTextInput && !isOtherChoiceCell
+            ? true
+            : undefined,
+        textInputPlaceholder: undefined,
         // 셀 병합 속성 추가
         rowspan: isMergeEnabled && typeof rowspan === 'number' && rowspan > 1 ? rowspan : undefined,
         colspan: isMergeEnabled && typeof colspan === 'number' && colspan > 1 ? colspan : undefined,
@@ -504,6 +540,9 @@ export function CellContentModal({
     setRankingLabel(cell.rankingLabel || '');
     setCellSpssNumericCode(cell.spssNumericCode ?? '');
     setIsOtherRankingCell(cell.isOtherRankingCell === true);
+    setChoiceLabel(cell.choiceLabel || '');
+    setIsOtherChoiceCell(cell.isOtherChoiceCell === true);
+    setChoiceAllowTextInput(cell.allowTextInput === true);
     setIsMergeEnabled(
       (cell.rowspan && cell.rowspan > 1) || (cell.colspan && cell.colspan > 1) || false,
     );
@@ -752,7 +791,7 @@ export function CellContentModal({
             }
           }}
         >
-          <TabsList className="grid w-full grid-cols-9">
+          <TabsList className="grid w-full grid-cols-10">
             <TabsTrigger value="text" className="flex items-center gap-2">
               <Type className="h-4 w-4" />
               텍스트
@@ -788,6 +827,10 @@ export function CellContentModal({
             <TabsTrigger value="ranking_opt" className="flex items-center gap-2">
               <Tag className="h-4 w-4" />
               순위 옵션
+            </TabsTrigger>
+            <TabsTrigger value="choice_opt" className="flex items-center gap-2">
+              <Tag className="h-4 w-4" />
+              보기 옵션
             </TabsTrigger>
           </TabsList>
 
@@ -1132,6 +1175,20 @@ export function CellContentModal({
               onSpssNumericCodeChange={setCellSpssNumericCode}
               isOtherRankingCell={isOtherRankingCell}
               onIsOtherRankingCellChange={setIsOtherRankingCell}
+            />
+          </TabsContent>
+
+          {/* 보기 옵션 소스(choice_opt) 탭 — Case A */}
+          <TabsContent value="choice_opt" className="space-y-4">
+            <ChoiceOptCellTab
+              choiceLabel={choiceLabel}
+              onChoiceLabelChange={setChoiceLabel}
+              spssNumericCode={cellSpssNumericCode}
+              onSpssNumericCodeChange={setCellSpssNumericCode}
+              isOtherChoiceCell={isOtherChoiceCell}
+              onIsOtherChoiceCellChange={setIsOtherChoiceCell}
+              allowTextInput={choiceAllowTextInput}
+              onAllowTextInputChange={setChoiceAllowTextInput}
             />
           </TabsContent>
         </Tabs>
