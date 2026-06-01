@@ -9,6 +9,7 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -96,11 +97,13 @@ export function ProfilesFilterBar({
     setSource('');
     setValue('');
     setStatus('all');
-    pushParams((p) => {
-      p.delete('col');
-      p.delete('q');
-      p.delete('status');
-      p.delete('page');
+    startTransition(() => {
+      pushParams((p) => {
+        p.delete('col');
+        p.delete('q');
+        p.delete('status');
+        p.delete('page');
+      });
     });
   };
 
@@ -152,13 +155,15 @@ export function ProfilesFilterBar({
               {o.label}
             </SelectItem>
           ))}
+          <SelectSeparator />
+          <SelectItem value="deleted">삭제됨</SelectItem>
         </SelectContent>
       </Select>
 
       <Button
         type="submit"
         className="h-10"
-        disabled={!source && value.trim().length > 0}
+        disabled={columnCandidates.length === 0 || (!source && value.trim().length > 0)}
       >
         적용
       </Button>
