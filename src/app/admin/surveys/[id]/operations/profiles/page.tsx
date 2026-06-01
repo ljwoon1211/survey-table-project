@@ -14,6 +14,8 @@ import {
   normalizeListArgs,
 } from '@/lib/operations/profiles';
 import { listResponsesForProfiles } from '@/lib/operations/profiles.server';
+import { getContactColumnScheme, buildColumnCandidates } from '@/lib/operations/contacts.server';
+import { parseProfilesCondition, PROFILES_EXTRA_CANDIDATES } from '@/lib/operations/profiles-filters.server';
 
 export const metadata: Metadata = {
   title: '현황 - 응답 내역',
@@ -24,7 +26,7 @@ interface PageProps {
   searchParams: Promise<{
     page?: string;
     q?: string;
-    qfield?: string;
+    col?: string;
     status?: string;
     sort?: string;
     dir?: string;
@@ -44,11 +46,28 @@ export default async function ProfilesPage({ params, searchParams }: PageProps) 
 
   const args = normalizeListArgs(sp);
 
+  const contactScheme = await getContactColumnScheme(surveyId);
+  const columnCandidates = [
+    ...PROFILES_EXTRA_CANDIDATES,
+    ...buildColumnCandidates(contactScheme).filter(
+      (c) =>
+        c.source === 'system.resid' ||
+        c.source.startsWith('attrs.') ||
+        c.source.startsWith('pii.'),
+    ),
+  ];
+  const condition = parseProfilesCondition(args.col, args.q, columnCandidates);
+
   const [{ rows, total, page: clampedPage }, qs] = await Promise.all([
     listResponsesForProfiles({
       surveyId,
       pageSize: PROFILES_PAGE_SIZE,
-      ...args,
+      page: args.page,
+      status: args.status,
+      sort: args.sort,
+      dir: args.dir,
+      view: args.view,
+      condition,
     }),
     db
       .select({
@@ -80,9 +99,10 @@ export default async function ProfilesPage({ params, searchParams }: PageProps) 
         <CardContent className="px-5 py-4">
           <div className="mb-4">
             <ProfilesFilterBar
-              initialQ={args.q}
-              initialQField={args.qfield}
+              initialSource={args.col}
+              initialValue={args.q}
               initialStatus={args.status}
+              columnCandidates={columnCandidates}
             />
           </div>
 

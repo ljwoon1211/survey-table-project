@@ -536,12 +536,11 @@ describe('profiles-row-actions', () => {
         surveyId,
         page: 1,
         pageSize: 20,
-        q: '',
-        qfield: 'all' as const,
         status: 'all' as const,
         sort: 'idx' as const,
         dir: 'desc' as const,
         view: 'active' as const,
+        condition: null,
       };
 
       const before = await profilesServer.listResponsesForProfiles(normalizedArgs);
@@ -593,12 +592,11 @@ describe('profiles-row-actions', () => {
         surveyId,
         page: 1,
         pageSize: 20,
-        q: '',
-        qfield: 'all' as const,
         status: 'all' as const,
         sort: 'idx' as const,
         dir: 'desc' as const,
         view: 'active' as const,
+        condition: null,
       };
 
       // 1단계: softDelete
