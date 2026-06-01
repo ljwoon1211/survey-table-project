@@ -160,6 +160,8 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         requiresAcknowledgment: (question as any).requiresAcknowledgment || false,
         placeholder: question.placeholder || '',
         defaultValueTemplate: question.defaultValueTemplate ?? null,
+        inputType: question.inputType ?? 'text',
+        emptyDefault: question.emptyDefault,
         tableValidationRules: (question as any).tableValidationRules || [],
         dynamicRowConfigs: (question as any).dynamicRowConfigs || undefined,
         displayCondition: question.displayCondition,

@@ -236,6 +236,8 @@ export async function saveSurveyDiff(payload: SurveyDiffPayload) {
           spssVarType: question.spssVarType,
           spssMeasure: question.spssMeasure,
           defaultValueTemplate: question.defaultValueTemplate ?? null,
+          inputType: question.inputType ?? null,
+          emptyDefault: question.emptyDefault ?? null,
           updatedAt: new Date(),
         }));
 
@@ -277,6 +279,8 @@ export async function saveSurveyDiff(payload: SurveyDiffPayload) {
               spssVarType: sql`excluded.spss_var_type`,
               spssMeasure: sql`excluded.spss_measure`,
               defaultValueTemplate: sql`excluded.default_value_template`,
+              inputType: sql`excluded.input_type`,
+              emptyDefault: sql`excluded.empty_default`,
               updatedAt: sql`excluded.updated_at`,
             },
           });
@@ -538,6 +542,8 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
           spssVarType: question.spssVarType,
           spssMeasure: question.spssMeasure,
           defaultValueTemplate: question.defaultValueTemplate ?? null,
+          inputType: question.inputType ?? null,
+          emptyDefault: question.emptyDefault ?? null,
           updatedAt: new Date(),
         }));
 
@@ -579,6 +585,8 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
               spssVarType: sql`excluded.spss_var_type`,
               spssMeasure: sql`excluded.spss_measure`,
               defaultValueTemplate: sql`excluded.default_value_template`,
+              inputType: sql`excluded.input_type`,
+              emptyDefault: sql`excluded.empty_default`,
               updatedAt: sql`excluded.updated_at`,
             },
           });

@@ -155,6 +155,8 @@ export async function getSurveyWithDetails(surveyId: string): Promise<SurveyType
         requiresAcknowledgment: q.requiresAcknowledgment ?? undefined,
         placeholder: q.placeholder ?? undefined,
         defaultValueTemplate: q.defaultValueTemplate ?? undefined,
+        inputType: (q.inputType as 'text' | 'number' | null) ?? undefined,
+        emptyDefault: q.emptyDefault ?? undefined,
         tableValidationRules: q.tableValidationRules as QuestionType['tableValidationRules'],
         dynamicRowConfigs: q.dynamicRowConfigs as QuestionType['dynamicRowConfigs'],
         hideColumnLabels: q.hideColumnLabels ?? undefined,
