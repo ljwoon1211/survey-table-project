@@ -37,9 +37,19 @@ export function useHorizontalScrollIndicators(
     measure();
     el.addEventListener('scroll', measure, { passive: true });
     window.addEventListener('resize', measure);
+
+    // 마운트 직후 measure() 1회로는 첫 페인트 시점의 레이아웃이 아직
+    // 확정되지 않아 scrollWidth를 0/부정확하게 읽을 수 있다. ResizeObserver는
+    // 관찰 시작 시 1회 콜백이 발화되므로 레이아웃 확정 시점에 자동 재측정한다.
+    // 컨테이너(clientWidth)와 내부 그리드(scrollWidth) 양쪽 변동을 모두 추적.
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+
     return () => {
       el.removeEventListener('scroll', measure);
       window.removeEventListener('resize', measure);
+      ro.disconnect();
     };
   }, [measure, disabled, containerRef]);
 
