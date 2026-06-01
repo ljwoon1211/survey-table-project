@@ -1,4 +1,5 @@
 import type { Question, QuestionOption, RankingAnswer } from '@/types/survey';
+import { resolveChoiceOptions } from '@/utils/choice-source';
 import { RANKING_OTHER_VALUE } from '@/utils/ranking-shared';
 
 export interface SPSSColumn {
@@ -37,10 +38,11 @@ export function transformSingleChoice(
   value: string | { selectedValue: string; otherValue?: string; hasOther: true } | null | undefined,
 ): number | null {
   if (value == null) return null;
+  const options = resolveChoiceOptions(question);
   if (typeof value === 'object' && 'hasOther' in value && value.hasOther) {
-    return getNumericCode(question.options, value.selectedValue);
+    return getNumericCode(options, value.selectedValue);
   }
-  return getNumericCode(question.options, value as string);
+  return getNumericCode(options, value as string);
 }
 
 /**
@@ -51,7 +53,7 @@ export function transformCheckbox(
   question: Question,
   values: string[] | null | undefined,
 ): CheckboxResult[] {
-  const options = question.options ?? [];
+  const options = resolveChoiceOptions(question);
   const selectedSet = new Set(values ?? []);
 
   return options.map((opt, idx) => {

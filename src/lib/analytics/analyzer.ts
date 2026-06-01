@@ -1,6 +1,7 @@
 // src/lib/analytics/analyzer.ts
 import type { SurveyResponse } from '@/db/schema';
 import type { Question, QuestionOption, QuestionType, RankingAnswer } from '@/types/survey';
+import { resolveChoiceOptions } from '@/utils/choice-source';
 import { resolveRankingOptions } from '@/utils/ranking-source';
 import { RANKING_OTHER_VALUE } from '@/utils/ranking-shared';
 
@@ -162,7 +163,8 @@ function analyzeSingleChoice(
     counts[value] = (counts[value] || 0) + 1;
   });
 
-  const distribution: OptionDistribution[] = (question.options || []).map((opt) => ({
+  const resolvedOptions = resolveChoiceOptions(question);
+  const distribution: OptionDistribution[] = resolvedOptions.map((opt) => ({
     label: opt.label,
     value: opt.value,
     count: counts[opt.value] || 0,
@@ -215,7 +217,8 @@ function analyzeMultipleChoice(
     });
   });
 
-  const distribution: OptionDistribution[] = (question.options || []).map((opt) => ({
+  const resolvedOptions = resolveChoiceOptions(question);
+  const distribution: OptionDistribution[] = resolvedOptions.map((opt) => ({
     label: opt.label,
     value: opt.value,
     count: counts[opt.value] || 0,
