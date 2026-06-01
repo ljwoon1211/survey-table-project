@@ -59,6 +59,7 @@ import { getMaxSpssCode } from '@/utils/option-code-generator';
 import { hasExistingOtherRankingCell } from '@/utils/ranking-source';
 import { hasExistingOtherChoiceCell } from '@/utils/choice-source';
 import {
+  BranchRule,
   CheckboxOption,
   QuestionOption,
   RadioOption,
@@ -189,6 +190,7 @@ export function CellContentModal({
   const [choiceAllowTextInput, setChoiceAllowTextInput] = useState<boolean>(
     cell.allowTextInput === true,
   );
+  const [choiceBranchRule, setChoiceBranchRule] = useState<BranchRule | undefined>(cell.branchRule);
 
   // 정렬 관련 state
   const [horizontalAlign, setHorizontalAlign] = useState<'left' | 'center' | 'right'>(
@@ -254,6 +256,7 @@ export function CellContentModal({
       setChoiceLabel(cell.choiceLabel || '');
       setIsOtherChoiceCell(cell.isOtherChoiceCell === true);
       setChoiceAllowTextInput(cell.allowTextInput === true);
+      setChoiceBranchRule(cell.branchRule);
       setIsMergeEnabled(
         (cell.rowspan && cell.rowspan > 1) || (cell.colspan && cell.colspan > 1) || false,
       );
@@ -408,6 +411,12 @@ export function CellContentModal({
           contentType === 'choice_opt' && choiceAllowTextInput && !isOtherChoiceCell
             ? true
             : undefined,
+        // 보기 옵션 소스 셀의 조건부 분기 규칙 (Case A). value 는 셀 id(=resolveChoiceOptions
+        // 가 부여하는 옵션 value)로 강제해 응답 매칭이 일치하도록 한다.
+        branchRule:
+          contentType === 'choice_opt' && choiceBranchRule
+            ? { ...choiceBranchRule, value: cell.id }
+            : undefined,
         textInputPlaceholder: undefined,
         // 셀 병합 속성 추가
         rowspan: isMergeEnabled && typeof rowspan === 'number' && rowspan > 1 ? rowspan : undefined,
@@ -543,6 +552,7 @@ export function CellContentModal({
     setChoiceLabel(cell.choiceLabel || '');
     setIsOtherChoiceCell(cell.isOtherChoiceCell === true);
     setChoiceAllowTextInput(cell.allowTextInput === true);
+    setChoiceBranchRule(cell.branchRule);
     setIsMergeEnabled(
       (cell.rowspan && cell.rowspan > 1) || (cell.colspan && cell.colspan > 1) || false,
     );
@@ -1189,6 +1199,10 @@ export function CellContentModal({
               onIsOtherChoiceCellChange={setIsOtherChoiceCell}
               allowTextInput={choiceAllowTextInput}
               onAllowTextInputChange={setChoiceAllowTextInput}
+              branchRule={choiceBranchRule}
+              onBranchRuleChange={setChoiceBranchRule}
+              allQuestions={questions}
+              currentQuestionId={currentQuestionId}
             />
           </TabsContent>
         </Tabs>

@@ -7,6 +7,9 @@ import { Tag } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { BranchRule, Question } from '@/types/survey';
+
+import { BranchRuleEditor } from './branch-rule-editor';
 
 interface ChoiceOptCellTabProps {
   choiceLabel: string;
@@ -17,6 +20,13 @@ interface ChoiceOptCellTabProps {
   onIsOtherChoiceCellChange: (v: boolean) => void;
   allowTextInput: boolean;
   onAllowTextInputChange: (v: boolean) => void;
+  /** 이 보기 옵션 선택 시 적용할 조건부 분기 규칙 */
+  branchRule: BranchRule | undefined;
+  onBranchRuleChange: (v: BranchRule | undefined) => void;
+  /** 분기 대상 질문 선택용 전체 질문 목록 */
+  allQuestions: Question[];
+  /** 현재 질문 ID (분기 대상은 이 질문 이후만 노출) */
+  currentQuestionId: string;
 }
 
 /**
@@ -32,6 +42,10 @@ export function ChoiceOptCellTab({
   onIsOtherChoiceCellChange,
   allowTextInput,
   onAllowTextInputChange,
+  branchRule,
+  onBranchRuleChange,
+  allQuestions,
+  currentQuestionId,
 }: ChoiceOptCellTabProps) {
   const isOther = isOtherChoiceCell === true;
   return (
@@ -102,6 +116,13 @@ export function ChoiceOptCellTab({
           SPSS 변수의 값으로 기록됩니다. 셀 순서가 바뀌어도 값이 유지되길 원하면 명시하세요.
         </p>
       </div>
+
+      <BranchRuleEditor
+        branchRule={branchRule}
+        allQuestions={allQuestions}
+        currentQuestionId={currentQuestionId}
+        onChange={onBranchRuleChange}
+      />
     </div>
   );
 }

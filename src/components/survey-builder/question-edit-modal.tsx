@@ -29,7 +29,7 @@ import { deleteImagesFromR2 } from '@/lib/image-utils';
 import { isValidUUID } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { Question } from '@/types/survey';
-import { collectChoiceOptCells } from '@/utils/choice-source';
+import { collectChoiceOptCells, resolveChoiceOptions } from '@/utils/choice-source';
 import { collectRankingOptCells } from '@/utils/ranking-source';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -181,7 +181,9 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
       setLocalExportLabel((question as any).exportLabel || '');
 
       // 옵션들 중 하나라도 branchRule이 있으면 조건부 분기 설정 표시
-      const hasBranchRule = question.options?.some((option) => option.branchRule) || false;
+      // resolveChoiceOptions 는 manual 은 question.options, table-source 는 choice_opt 셀 파생
+      // 옵션을 반환하므로 테이블 보기 옵션 셀의 분기 규칙도 함께 집계된다.
+      const hasBranchRule = resolveChoiceOptions(question).some((option) => option.branchRule);
       setShowBranchSettings(hasBranchRule);
     }
   // deps 를 question?.id 로 좁힘 — question 객체 reference 가 바뀐다고 formData 를 reset 하면
