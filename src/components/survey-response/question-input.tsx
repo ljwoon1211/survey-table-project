@@ -8,6 +8,7 @@ import { UserDefinedMultiLevelSelect } from '@/components/survey-builder/user-de
 import { Input } from '@/components/ui/input';
 import { useContactAttrs } from '@/lib/survey/contact-attrs-context';
 import { substituteTokens } from '@/lib/survey/substitute-tokens';
+import { isPartialNumericInput } from '@/utils/numeric-input';
 import { Question, QuestionOption, RankingAnswer } from '@/types/survey';
 import {
   applyMobileOptionsGridOverride,
@@ -505,7 +506,9 @@ function TextResponseInput({
   const template = question.defaultValueTemplate ?? '';
   const isPrefilled = template.trim().length > 0;
   const prefilledValue = isPrefilled ? substituteTokens(template, attrs) : '';
-  const inputValue = isPrefilled ? prefilledValue : (typeof value === 'string' ? value : '');
+  const currentValue = typeof value === 'string' ? value : '';
+  const inputValue = isPrefilled ? prefilledValue : currentValue;
+  const isNumberMode = question.inputType === 'number';
 
   useEffect(() => {
     if (isPrefilled && value !== prefilledValue) {
@@ -514,11 +517,33 @@ function TextResponseInput({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPrefilled, prefilledValue]);
 
+  // 숫자 모드 + emptyDefault 정의 + 토큰 prefill 아님 + 값 미존재 → 첫 진입 시 자동 채움.
+  // 응답자가 지워 빈 문자열이 되면 재채움하지 않음(의도 보존).
+  useEffect(() => {
+    if (
+      !isPrefilled &&
+      isNumberMode &&
+      typeof question.emptyDefault === 'number' &&
+      (value === undefined || value === null)
+    ) {
+      onChange(String(question.emptyDefault));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, isPrefilled, isNumberMode, question.emptyDefault]);
+
   return (
     <Input
-      placeholder={question.placeholder || '답변을 입력하세요...'}
+      type="text"
+      inputMode={isNumberMode ? 'decimal' : undefined}
+      placeholder={
+        question.placeholder || (isNumberMode ? '숫자만 입력하세요...' : '답변을 입력하세요...')
+      }
       value={inputValue}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => {
+        const v = e.target.value;
+        if (isNumberMode && !isPartialNumericInput(v)) return;
+        onChange(v);
+      }}
       className="w-full text-base"
       disabled={isPrefilled}
       data-prefilled={isPrefilled || undefined}

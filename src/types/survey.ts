@@ -469,6 +469,10 @@ export interface Question {
   placeholder?: string; // 입력 필드 placeholder
   // 단답형 prefill 템플릿 — {{attrs_key}} 포함 가능. (0022 마이그레이션)
   defaultValueTemplate?: string | null;
+  // 단답형 숫자 입력 모드 — 셀 input 과 동일 의미. 'number' 면 응답자가 숫자만 입력 가능.
+  inputType?: 'text' | 'number';
+  // 숫자 모드 첫 진입 시 입력란 자동 채움 값(선택). 토큰 prefill 없을 때만 적용.
+  emptyDefault?: number;
   // 테이블 검증 규칙 (테이블 타입 전용)
   tableValidationRules?: TableValidationRule[];
   // 동적 행 그룹 설정 (테이블 타입 전용)

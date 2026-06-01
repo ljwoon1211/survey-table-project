@@ -3,6 +3,7 @@ import type { SurveyResponse } from '@/db/schema';
 import type { Question, QuestionOption, QuestionType, RankingAnswer } from '@/types/survey';
 import { resolveChoiceOptions } from '@/utils/choice-source';
 import { resolveRankingOptions } from '@/utils/ranking-source';
+import { computeNumericStats } from './numeric-stats';
 import { RANKING_OTHER_VALUE } from '@/utils/ranking-shared';
 
 import type {
@@ -285,6 +286,11 @@ function analyzeText(
     .sort((a, b) => b.count - a.count)
     .slice(0, 20);
 
+  const numericStats =
+    question.inputType === 'number'
+      ? computeNumericStats(textResponses.map((r) => r.value))
+      : null;
+
   return {
     type: 'text',
     questionId: question.id,
@@ -295,6 +301,7 @@ function analyzeText(
     avgLength,
     responses: textResponses,
     wordFrequency,
+    numericStats: numericStats ?? undefined,
   };
 }
 

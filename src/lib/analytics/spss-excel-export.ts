@@ -15,6 +15,7 @@ import {
   transformSingleChoice,
   transformTableCell,
   transformText,
+  transformNumericText,
 } from '@/lib/spss/data-transformer';
 import { getOptionText } from '@/lib/option-text-read';
 import { resolveChoiceOptions } from '@/utils/choice-source';
@@ -67,6 +68,8 @@ export interface SPSSExportColumn {
   radioGroupValueLabels?: Record<number, string>;
   // option-text / table-cell-option-text 전용: 옵션 id (응답 데이터 조회용)
   optionId?: string;
+  // 'text' 컬럼 전용: 숫자 단답형(question.inputType==='number') 이면 Numeric 변수로 처리
+  numericText?: boolean;
 }
 
 /**
@@ -367,6 +370,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
         optionLabel: '',
         questionId: q.id,
         type: q.type === 'text' || q.type === 'textarea' ? 'text' : 'multiselect',
+        numericText: q.type === 'text' && q.inputType === 'number',
       });
     }
   }
@@ -668,7 +672,9 @@ export function buildDataRows(
         }
 
         case 'text':
-          return transformText(rawValue as string | null);
+          return col.numericText
+            ? transformNumericText(rawValue)
+            : transformText(rawValue as string | null);
 
         default:
           return rawValue != null ? String(rawValue) : null;
