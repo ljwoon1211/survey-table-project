@@ -28,6 +28,7 @@ import {
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { isPartialNumericInput, parseNumericInput } from '@/utils/numeric-input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { generateOptionCode } from '@/utils/option-code-generator';
@@ -480,6 +481,83 @@ export function QuestionBasicTab({
               <p className="text-xs text-gray-500">
                 변수 토큰 사용 시 응답자에게 readonly로 표시됩니다
               </p>
+            </div>
+            <div className="space-y-2">
+              <div className="flex flex-col gap-3 rounded-md border border-gray-200 bg-gray-50 p-3">
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="text-input-type-number"
+                    checked={formData.inputType === 'number'}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setFormData((prev) => ({
+                        ...prev,
+                        inputType: checked ? 'number' : 'text',
+                        emptyDefault: checked ? prev.emptyDefault : undefined,
+                      }));
+                    }}
+                    className="mt-0.5 h-4 w-4"
+                  />
+                  <label
+                    htmlFor="text-input-type-number"
+                    className="flex-1 cursor-pointer text-sm"
+                  >
+                    <span className="font-medium">숫자만 입력</span>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      체크 시 응답자는 숫자만 입력할 수 있고, 분기 조건(expression)에서 비교
+                      연산자 (=, ≠, ≥, ≤, &gt;, &lt;) 를 사용할 수 있습니다.
+                    </p>
+                  </label>
+                </div>
+
+                {formData.inputType === 'number' && (
+                  <div className="ml-7 flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      id="text-empty-default-enabled"
+                      checked={formData.emptyDefault !== undefined}
+                      disabled={(formData.defaultValueTemplate ?? '').trim().length > 0}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          emptyDefault: e.target.checked ? (prev.emptyDefault ?? 0) : undefined,
+                        }))
+                      }
+                      className="h-4 w-4"
+                    />
+                    <label htmlFor="text-empty-default-enabled" className="cursor-pointer">
+                      응답자 입력란 초기값
+                    </label>
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      value={
+                        formData.emptyDefault !== undefined ? String(formData.emptyDefault) : ''
+                      }
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (isPartialNumericInput(v)) {
+                          setFormData((prev) => ({
+                            ...prev,
+                            emptyDefault:
+                              v === '' ? 0 : (parseNumericInput(v) ?? prev.emptyDefault ?? 0),
+                          }));
+                        }
+                      }}
+                      disabled={
+                        formData.emptyDefault === undefined ||
+                        (formData.defaultValueTemplate ?? '').trim().length > 0
+                      }
+                      className="h-8 w-24"
+                      aria-label="초기값"
+                    />
+                    {(formData.defaultValueTemplate ?? '').trim().length > 0 && (
+                      <span className="text-xs text-gray-400">토큰 prefill 사용 중 (우선)</span>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}
