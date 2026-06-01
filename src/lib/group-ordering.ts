@@ -1,4 +1,4 @@
-import type { Question, QuestionGroup } from '@/types/survey';
+import type { BranchRule, Question, QuestionGroup } from '@/types/survey';
 
 // ── 타입 ──
 
@@ -281,4 +281,49 @@ export function buildRenderSteps(
   }
 
   return steps;
+}
+
+// ── 스텝 단위 분기(branch) 해석 ──
+
+/**
+ * 주어진 질문 id 가 속한 렌더 스텝의 인덱스를 반환한다. 없으면 -1.
+ */
+export function findStepIndexOfQuestion(steps: RenderStep[], questionId: string): number {
+  return steps.findIndex((s) =>
+    s.kind === 'table'
+      ? s.question.id === questionId
+      : s.items.some((it) => it.question.id === questionId),
+  );
+}
+
+export type StepBranchOutcome =
+  | { kind: 'end' }
+  | { kind: 'goto'; stepIndex: number }
+  | { kind: 'fallthrough' };
+
+/**
+ * 현재 스텝의 (표시되는 질문 순서대로 정렬된) 분기 규칙 목록을 평가해
+ * 다음 스텝 이동 방식을 결정한다.
+ *
+ * - `end` 규칙이 가장 먼저 만나지면 즉시 종료.
+ * - `goto` 규칙은 **타깃이 현재 스텝보다 뒤(전진)일 때만** 점프로 인정한다.
+ *   타깃이 같은 스텝(=같은 페이지)이거나 이전 스텝이면 페이지 이동의 의미가 없다.
+ *   같은 페이지 내 질문 노출은 displayCondition 으로 처리되므로, 비-전진 goto 는
+ *   무시하고 다음 표시 스텝으로 진행한다 (제자리 no-op 트랩 방지).
+ * - 적용할 규칙이 없으면 `fallthrough` — 호출부가 다음 표시 스텝을 찾는다.
+ */
+export function resolveStepBranch(
+  steps: RenderStep[],
+  currentStepIndex: number,
+  rules: Array<BranchRule | null | undefined>,
+): StepBranchOutcome {
+  for (const rule of rules) {
+    if (!rule) continue;
+    if (rule.action === 'end') return { kind: 'end' };
+    if (rule.action === 'goto' && rule.targetQuestionId) {
+      const targetIdx = findStepIndexOfQuestion(steps, rule.targetQuestionId);
+      if (targetIdx > currentStepIndex) return { kind: 'goto', stepIndex: targetIdx };
+    }
+  }
+  return { kind: 'fallthrough' };
 }

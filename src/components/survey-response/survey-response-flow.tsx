@@ -38,6 +38,7 @@ import { useMediaQuery } from '@/hooks/use-media-query';
 import {
   buildRenderSteps,
   RenderStep,
+  resolveStepBranch,
   StepItem,
 } from '@/lib/group-ordering';
 import { parsesurveyIdentifier } from '@/lib/survey-url';
@@ -700,19 +701,15 @@ export function SurveyResponseFlow({
   const resolveNextStepIndex = useCallback((): number => {
     if (!currentStep) return -1;
 
-    // step 내 각 질문의 분기 규칙 검사: end 또는 goto
-    for (const q of currentStepQuestions) {
-      const rule = getBranchRuleForResponse(q, responses[q.id]);
-      if (!rule) continue;
-      if (rule.action === 'end') return -1;
-      if (rule.action === 'goto' && rule.targetQuestionId) {
-        const targetIdx = steps.findIndex((s) => {
-          if (s.kind === 'table') return s.question.id === rule.targetQuestionId;
-          return s.items.some((it) => it.question.id === rule.targetQuestionId);
-        });
-        if (targetIdx !== -1) return targetIdx;
-      }
-    }
+    // step 내 각 질문의 분기 규칙(end/goto)을 표시 순서대로 평가.
+    // 같은 step(=같은 페이지) 또는 이전 step 을 가리키는 goto 는 전진 이동이 아니므로
+    // resolveStepBranch 가 무시하고 fallthrough 시킨다 (제자리 no-op 트랩 방지).
+    const rules = currentStepQuestions.map((q) =>
+      getBranchRuleForResponse(q, responses[q.id]),
+    );
+    const outcome = resolveStepBranch(steps, currentStepIndex, rules);
+    if (outcome.kind === 'end') return -1;
+    if (outcome.kind === 'goto') return outcome.stepIndex;
 
     return findNextDisplayableStepIndex(currentStepIndex + 1);
   }, [currentStep, currentStepQuestions, responses, steps, currentStepIndex, findNextDisplayableStepIndex]);
