@@ -21,7 +21,7 @@ import { resolveChoiceOptions } from '@/utils/choice-source';
 import { getOtherOptionCode } from '@/utils/option-code-generator';
 import { hasOtherRankingCell, resolveRankingOptions } from '@/utils/ranking-source';
 import { buildTableCellVarName, resolveRankVarName } from '@/utils/table-cell-code-generator';
-import { buildOptionTextVarName } from '@/utils/spss-var-name';
+import { buildCheckboxItemVarName, buildOptionTextVarName } from '@/utils/spss-var-name';
 
 export interface SPSSExportColumn {
   spssVarName: string;
@@ -106,7 +106,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
       for (let i = 0; i < opts.length; i++) {
         const opt = opts[i];
         columns.push({
-          spssVarName: `${q.questionCode}_${opt.optionCode ?? String(i + 1)}`,
+          spssVarName: buildCheckboxItemVarName(q.questionCode, opt.optionCode, i),
           questionText: q.title,
           optionLabel: opt.label,
           questionId: q.id,

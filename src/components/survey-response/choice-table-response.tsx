@@ -29,7 +29,8 @@ export function ChoiceTableResponse({ question, value, onChange }: ChoiceTableRe
     return typeof value === 'string' && value ? [value] : [];
   }, [isCheckbox, value]);
 
-  const maxSelections = question.maxSelections;
+  const minSel = question.minSelections;
+  const maxSel = question.maxSelections;
 
   const toggle = (cellId: string, checked: boolean) => {
     if (!isCheckbox) {
@@ -38,7 +39,7 @@ export function ChoiceTableResponse({ question, value, onChange }: ChoiceTableRe
     }
     let next = selectedIds.slice();
     if (checked) {
-      if (maxSelections !== undefined && maxSelections > 0 && next.length >= maxSelections) return;
+      if (maxSel !== undefined && maxSel > 0 && next.length >= maxSel) return;
       next.push(cellId);
     } else {
       next = next.filter((id) => id !== cellId);
@@ -53,9 +54,9 @@ export function ChoiceTableResponse({ question, value, onChange }: ChoiceTableRe
     const disabled =
       isCheckbox
       && !checked
-      && maxSelections !== undefined
-      && maxSelections > 0
-      && selectedIds.length >= maxSelections;
+      && maxSel !== undefined
+      && maxSel > 0
+      && selectedIds.length >= maxSel;
 
     return (
       <div className="flex flex-col items-center gap-2">
@@ -75,8 +76,6 @@ export function ChoiceTableResponse({ question, value, onChange }: ChoiceTableRe
     );
   };
 
-  const minSel = question.minSelections;
-  const maxSel = question.maxSelections;
   const showCounter = isCheckbox && (minSel !== undefined || maxSel !== undefined);
 
   return (

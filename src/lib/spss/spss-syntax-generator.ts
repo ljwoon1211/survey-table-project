@@ -6,7 +6,7 @@ import {
   toSpssValueLabelPairs,
 } from '@/utils/ranking-source';
 import { buildTableCellVarName, resolveRankVarName } from '@/utils/table-cell-code-generator';
-import { buildOptionTextVarName } from '@/utils/spss-var-name';
+import { buildCheckboxItemVarName, buildOptionTextVarName } from '@/utils/spss-var-name';
 import { resolveChoiceOptions } from '@/utils/choice-source';
 
 /**
@@ -387,7 +387,9 @@ export function generateMrsets(questions: Question[]): string {
     const options = resolveChoiceOptions(q);
     if (options.length === 0) continue;
 
-    const vars = options.map((opt, i) => `${q.questionCode}_${opt.optionCode ?? String(i + 1)}`).join(' ');
+    const vars = options
+      .map((opt, i) => buildCheckboxItemVarName(q.questionCode!, opt.optionCode, i))
+      .join(' ');
     sets.push(`  /MCGROUP NAME=$${q.questionCode} LABEL='${esc(q.title)}' VARIABLES=${vars}`);
   }
 

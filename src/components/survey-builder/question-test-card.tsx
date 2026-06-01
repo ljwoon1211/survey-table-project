@@ -440,6 +440,18 @@ function QuestionTestInput({
   onChange: (value: unknown) => void;
 }) {
   const attrs = useContactAttrs();
+
+  // choice_opt 테이블 소스 라디오/체크박스는 switch 진입 전에 단일 가드로 분기
+  if ((question.type === 'radio' || question.type === 'checkbox') && isChoiceTableSource(question)) {
+    return (
+      <ChoiceTableResponse
+        question={question}
+        value={value}
+        onChange={onChange as (v: string | string[] | null) => void}
+      />
+    );
+  }
+
   switch (question.type) {
     case 'text':
       return (
@@ -463,15 +475,6 @@ function QuestionTestInput({
       );
 
     case 'radio':
-      if (isChoiceTableSource(question)) {
-        return (
-          <ChoiceTableResponse
-            question={question}
-            value={value}
-            onChange={onChange as (v: string | string[] | null) => void}
-          />
-        );
-      }
       return (
         <RadioTestInput
           question={question}
@@ -481,15 +484,6 @@ function QuestionTestInput({
       );
 
     case 'checkbox':
-      if (isChoiceTableSource(question)) {
-        return (
-          <ChoiceTableResponse
-            question={question}
-            value={value}
-            onChange={onChange as (v: string | string[] | null) => void}
-          />
-        );
-      }
       return (
         <CheckboxTestInput
           question={question}
