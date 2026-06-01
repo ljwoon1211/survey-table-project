@@ -156,6 +156,8 @@ export function getCellPreviewText(cell: Partial<TableCell>): string {
       return '(빈 순위형)';
     case 'ranking_opt':
       return cell.content || cell.rankingLabel || '(순위 옵션 소스)';
+    case 'choice_opt':
+      return cell.choiceLabel || cell.content || '(보기 옵션)';
     case 'text':
     default:
       return cell.content ? cell.content.slice(0, 30) : '';
@@ -200,6 +202,10 @@ export function isCellSaveable(cell: TableCell): boolean {
       || cell.videoUrl
     );
   }
+  if (cell.type === 'choice_opt') {
+    if (cell.isOtherChoiceCell === true) return true;
+    return !!((cell.choiceLabel ?? '').trim() || (cell.content ?? '').trim() || cell.imageUrl || cell.videoUrl);
+  }
 
   // input, video 등은 항상 저장 가능
   return true;
@@ -216,5 +222,5 @@ export const CELL_TYPE_LABELS: Record<TableCell['type'], string> = {
   select: '선택',
   ranking: '순위',
   ranking_opt: '순위 옵션',
-  choice_opt: '선택 옵션',
+  choice_opt: '보기 옵션',
 };

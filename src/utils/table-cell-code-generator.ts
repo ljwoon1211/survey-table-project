@@ -4,7 +4,7 @@ import { generateAllOptionCodes } from './option-code-generator';
 import { sanitizeSpssVarName } from './spss-var-name';
 
 /** 입력 가능한 셀 타입 (SPSS 변수 생성 대상 — ranking_opt 는 Case 2 옵션 소스로 숫자코드/변수타입 설정 필요) */
-export const INTERACTIVE_CELL_TYPES = new Set(['checkbox', 'radio', 'select', 'input', 'ranking_opt']);
+export const INTERACTIVE_CELL_TYPES = new Set(['checkbox', 'radio', 'select', 'input', 'ranking_opt', 'choice_opt']);
 
 /**
  * ranking 셀(Case 3) + 질문 레벨 ranking(Case 1) 의 SPSS 변수 접미사 기본 템플릿.
