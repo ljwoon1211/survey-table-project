@@ -27,9 +27,9 @@ const main: React.CSSProperties = {
 };
 
 const container: React.CSSProperties = {
-  maxWidth: '600px',
+  maxWidth: '700px',
   margin: '0 auto',
-  padding: '24px',
+  padding: '24px 16px',
   backgroundColor: '#ffffff',
 };
 

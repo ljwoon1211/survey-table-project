@@ -54,13 +54,19 @@ type FetchState =
 
 const IFRAME_RESET_CSS = `
   *, *::before, *::after { box-sizing: border-box; }
+  html { background: #f9fafb; }
   html, body { margin: 0; padding: 0; }
+  /* 실제 발송 메일의 컨테이너 폭을 그대로 시뮬레이션
+     (template-wrapper.tsx container: maxWidth 700px, padding 24px 16px, 흰 배경 / main: 회색 배경).
+     바깥 회색 + 가운데 700px 흰 컨테이너로 실제 받은편지함 폭감을 재현. */
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     font-size: 14px;
     line-height: 1.5;
     color: #1f2937;
-    padding: 20px;
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 24px 16px;
     background: #ffffff;
   }
   p { margin: 0 0 0.5em 0; }
