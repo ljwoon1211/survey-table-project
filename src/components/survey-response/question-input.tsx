@@ -13,10 +13,12 @@ import {
   applyMobileOptionsGridOverride,
   computeMobileOptionsColumnsByLabels,
 } from '@/utils/mobile-card-options';
+import { isChoiceTableSource } from '@/utils/choice-source';
 import { getOptionsLayout } from '@/utils/options-layout';
 
 import { useMobileView } from '@/hooks/use-media-query';
 
+import { ChoiceTableResponse } from './choice-table-response';
 import { OptionTextInput } from './option-text-input';
 import { RankingQuestion } from './ranking-question';
 
@@ -183,6 +185,16 @@ function RadioQuestion({
   value: SingleChoiceResponse;
   onChange: (value: SingleChoiceResponse) => void;
 }) {
+  if (isChoiceTableSource(question)) {
+    return (
+      <ChoiceTableResponse
+        question={question}
+        value={value as string | null}
+        onChange={(v) => onChange((v as string | null) ?? null)}
+      />
+    );
+  }
+
   const isSelected = (optionValue: string) => {
     if (isOtherChoiceValue(value)) {
       return value.selectedValue === optionValue;
@@ -256,6 +268,16 @@ function CheckboxQuestion({
   value: unknown;
   onChange: (value: MultiChoiceResponse) => void;
 }) {
+  if (isChoiceTableSource(question)) {
+    return (
+      <ChoiceTableResponse
+        question={question}
+        value={value}
+        onChange={(v) => onChange((Array.isArray(v) ? v : []) as MultiChoiceResponse)}
+      />
+    );
+  }
+
   const currentValues = useMemo<MultiChoiceResponse>(
     () => (Array.isArray(value) ? (value as MultiChoiceResponse) : []),
     [value],
