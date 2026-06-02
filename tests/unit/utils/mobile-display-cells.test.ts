@@ -25,6 +25,8 @@ describe('splitMobileDisplayCells', () => {
       cell({ id: 'r', type: 'radio', mobileDisplay: 'inline' }),
       cell({ id: 'i', type: 'input', mobileDisplay: 'collapsed' }),
       cell({ id: 'co', type: 'choice_opt', mobileDisplay: 'inline' }),
+      cell({ id: 'rk', type: 'ranking', mobileDisplay: 'inline' }),
+      cell({ id: 'ro', type: 'ranking_opt', mobileDisplay: 'collapsed' }),
     ];
     const { inline, collapsed } = splitMobileDisplayCells(cells);
     expect(inline).toEqual([]);
