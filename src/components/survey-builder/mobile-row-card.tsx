@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 
 import { CheckCircle2 } from 'lucide-react';
 
+import { MobileDisplayCells } from '@/components/survey/mobile-display-cells';
 import { Card, CardContent } from '@/components/ui/card';
 import type { useColumnSectionMap } from '@/hooks/use-row-groups';
 import { useContactAttrs } from '@/lib/survey/contact-attrs-context';
@@ -14,6 +15,7 @@ import {
   detectUnitPair,
   overrideCellOptionsColumnsForCard,
 } from '@/utils/mobile-card-options';
+import { findMobileHeaderCell, hasMobileDisplayCells } from '@/utils/mobile-display-cells';
 import { getAlignmentClasses } from '@/utils/table-grid-utils';
 
 import { InteractiveCell } from './cells';
@@ -69,13 +71,19 @@ export const MobileRowCard = React.memo(function MobileRowCard({
   );
 
   const rowDesc = useMemo(() => {
+    // 'header' 로 지정된 text 셀이 있으면 카드 제목으로 우선 사용
+    const headerCell = findMobileHeaderCell(row.cells);
+    const headerText = headerCell ? (headerCell.content ?? '').trim() : '';
+    if (headerText) return headerText;
     const descCell = row.cells.find(
       (c) => c.type === 'radio' && !c.isHidden && c.radioOptions?.length === 1,
     );
     return descCell?.radioOptions?.[0]?.label || row.label;
   }, [row.cells, row.label]);
 
-  if (inputCells.length === 0) return null;
+  // mobileDisplay 미지정/hidden 은 기존 동작처럼 카드에 표시하지 않는다.
+  const hasDisplayCells = hasMobileDisplayCells(row.cells);
+  if (inputCells.length === 0 && !hasDisplayCells) return null;
 
   let lastSection = '';
 
@@ -151,21 +159,38 @@ export const MobileRowCard = React.memo(function MobileRowCard({
                 </div>
               )}
               <div className="space-y-1">
-                {!hideColumnLabels && (
-                  <div className="flex items-start gap-1.5">
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
-                    <span className="line-clamp-2 text-sm font-medium text-gray-900">
-                      {substituteTokens(shortLabel, attrs)}
-                    </span>
-                  </div>
-                )}
+                {(() => {
+                  // hideColumnLabels 여도 인터랙티브 셀은 exportLabel 을 표기해 입력 항목을 식별할 수 있게 한다.
+                  const displayLabel = hideColumnLabels ? cellLabel : shortLabel;
+                  if (!displayLabel) return null;
+                  return (
+                    <div className="flex items-start gap-1.5">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
+                      <span className="line-clamp-2 text-sm font-medium text-gray-900">
+                        {substituteTokens(displayLabel, attrs)}
+                      </span>
+                    </div>
+                  );
+                })()}
                 {isUnitPairStart && nextEntry ? (
                   <div className="flex items-end gap-2 pl-3">
                     <div className="flex-1">
-                      <InteractiveCell cell={cell} questionId={questionId} isTestMode={isTestMode} value={value} onChange={onChange} />
+                      <InteractiveCell
+                        cell={cell}
+                        questionId={questionId}
+                        isTestMode={isTestMode}
+                        value={value}
+                        onChange={onChange}
+                      />
                     </div>
                     <div className="w-28 shrink-0">
-                      <InteractiveCell cell={nextEntry.cell} questionId={questionId} isTestMode={isTestMode} value={value} onChange={onChange} />
+                      <InteractiveCell
+                        cell={nextEntry.cell}
+                        questionId={questionId}
+                        isTestMode={isTestMode}
+                        value={value}
+                        onChange={onChange}
+                      />
                     </div>
                   </div>
                 ) : (
@@ -175,13 +200,21 @@ export const MobileRowCard = React.memo(function MobileRowCard({
                       getAlignmentClasses(cell.horizontalAlign, cell.verticalAlign),
                     )}
                   >
-                    <InteractiveCell cell={cell} questionId={questionId} isTestMode={isTestMode} value={value} onChange={onChange} />
+                    <InteractiveCell
+                      cell={cell}
+                      questionId={questionId}
+                      isTestMode={isTestMode}
+                      value={value}
+                      onChange={onChange}
+                    />
                   </div>
                 )}
               </div>
             </React.Fragment>
           );
         })}
+        {/* 표시 셀 — inline 은 바로 렌더, collapsed 는 "자세히" 접기 안에 렌더 */}
+        <MobileDisplayCells cells={row.cells} />
       </CardContent>
     </Card>
   );

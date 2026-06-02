@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-
 import {
   AlignCenter,
   AlignLeft,
@@ -78,6 +77,7 @@ import { VariableButton } from './variable-button';
 
 // textPosition 컨트롤을 표시할 셀 타입 — 텍스트 라벨과 입력/옵션 영역이 분리된 셀들만
 const TEXT_POSITION_CELL_TYPES = new Set(['input', 'checkbox', 'radio', 'select', 'ranking']);
+const MOBILE_DISPLAY_CELL_TYPES = new Set<TableCell['type']>(['text', 'image', 'video']);
 
 const TEXT_POSITION_OPTIONS: Array<{
   value: NonNullable<TableCell['textPosition']>;
@@ -192,6 +192,11 @@ export function CellContentModal({
   const [horizontalAlign, setHorizontalAlign] = useState<'left' | 'center' | 'right'>(
     cell.horizontalAlign || 'left',
   );
+
+  // 모바일 카드 표시 (text/image/video 셀 전용)
+  const [mobileDisplay, setMobileDisplay] = useState<NonNullable<TableCell['mobileDisplay']>>(
+    cell.mobileDisplay ?? 'hidden',
+  );
   const [verticalAlign, setVerticalAlign] = useState<'top' | 'middle' | 'bottom'>(
     cell.verticalAlign || 'top',
   );
@@ -266,6 +271,7 @@ export function CellContentModal({
       setIsCustomExportLabel(cell.isCustomExportLabel ?? !!cell.exportLabel);
       setSpssVarType(cell.spssVarType);
       setSpssMeasure(cell.spssMeasure);
+      setMobileDisplay(cell.mobileDisplay ?? 'hidden');
     }
   // deps 를 cell?.id 로 좁힘 — 모달 안에서 셀 저장 등으로 cell reference 가 바뀌어도
   // 사용자가 편집 중인 20+ 로컬 state 가 store 의 옛 값으로 reset 되지 않도록 한다.
@@ -402,6 +408,11 @@ export function CellContentModal({
         // 셀 병합 속성 추가
         rowspan: isMergeEnabled && typeof rowspan === 'number' && rowspan > 1 ? rowspan : undefined,
         colspan: isMergeEnabled && typeof colspan === 'number' && colspan > 1 ? colspan : undefined,
+        // 모바일 카드 표시 (text/image/video 셀만; 기본 'hidden' 은 저장 안 함)
+        mobileDisplay:
+          MOBILE_DISPLAY_CELL_TYPES.has(contentType) && mobileDisplay !== 'hidden'
+            ? mobileDisplay
+            : undefined,
         // 정렬 속성 추가
         horizontalAlign: horizontalAlign !== 'left' ? horizontalAlign : undefined,
         verticalAlign: verticalAlign !== 'top' ? verticalAlign : undefined,
@@ -547,6 +558,7 @@ export function CellContentModal({
     setIsCustomExportLabel(cell.isCustomExportLabel ?? !!cell.exportLabel);
     setSpssVarType(cell.spssVarType);
     setSpssMeasure(cell.spssMeasure);
+    setMobileDisplay(cell.mobileDisplay ?? 'hidden');
     onClose();
   };
 
@@ -1188,7 +1200,7 @@ export function CellContentModal({
         {/* 셀 병합 설정 */}
         <div className="mt-6 border-t border-gray-200 pt-6">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-medium text-gray-900">📐 셀 병합</h3>
+            <h3 className="text-sm font-medium text-gray-900">셀 병합</h3>
             <div className="flex items-center gap-2">
               <Label htmlFor="merge-toggle" className="cursor-pointer text-sm text-gray-600">
                 {isMergeEnabled ? '활성화됨' : '비활성화됨'}
@@ -1281,7 +1293,7 @@ export function CellContentModal({
                 (typeof colspan === 'number' && colspan > 1)) && (
                 <div className="mt-3 rounded-lg bg-yellow-50 p-3">
                   <p className="text-xs text-yellow-800">
-                    ⚠️ <strong>주의:</strong> 셀을 병합하면 오른쪽/아래에 있는 셀들이 자동으로
+                    <strong>주의:</strong> 셀을 병합하면 오른쪽/아래에 있는 셀들이 자동으로
                     숨겨집니다. 병합된 영역만큼의 공간이 필요하므로 테이블 구조를 미리 확인하세요.
                   </p>
                 </div>
@@ -1290,9 +1302,60 @@ export function CellContentModal({
           )}
         </div>
 
+        {/* 모바일 카드 표시 설정 (text/image/video 셀 전용) */}
+        {MOBILE_DISPLAY_CELL_TYPES.has(contentType) && (
+          <div className="mt-6 border-t border-gray-200 pt-6">
+            <h3 className="mb-2 text-sm font-medium text-gray-900">모바일 카드 표시</h3>
+            <p className="mb-3 text-xs text-gray-500">
+              좁은 화면(모바일) 카드에서 이 셀을 어떻게 보여줄지 선택합니다. 의미는 지정하지 않으며
+              저작자가 결정합니다.
+            </p>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={mobileDisplay === 'hidden' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setMobileDisplay('hidden')}
+                className="flex-1"
+              >
+                숨기기
+              </Button>
+              {contentType === 'text' && (
+                <Button
+                  type="button"
+                  variant={mobileDisplay === 'header' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setMobileDisplay('header')}
+                  className="flex-1"
+                >
+                  헤더
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant={mobileDisplay === 'inline' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setMobileDisplay('inline')}
+                className="flex-1"
+              >
+                바로표시
+              </Button>
+              <Button
+                type="button"
+                variant={mobileDisplay === 'collapsed' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setMobileDisplay('collapsed')}
+                className="flex-1"
+              >
+                자세히
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* 셀 컨텐츠 정렬 설정 */}
         <div className="mt-6 border-t border-gray-200 pt-6">
-          <h3 className="mb-4 text-sm font-medium text-gray-900">📐 컨텐츠 정렬</h3>
+          <h3 className="mb-4 text-sm font-medium text-gray-900">컨텐츠 정렬</h3>
 
           <div className="space-y-4">
             {/* 가로 정렬 */}
