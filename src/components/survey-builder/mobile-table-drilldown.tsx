@@ -120,33 +120,48 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
     </div>
   );
 
-  // ── 진행률 바 (+ 섹션 진입 시 목차로 돌아가기) ──
-  const ProgressBar = () => (
-    <div className="mt-4">
-      {nav.sec !== null && (
-        <button
-          type="button"
-          onClick={() => setNav({ sec: null, leaf: null })}
-          className="mb-3 flex w-full items-center justify-center gap-1 rounded-xl border border-gray-200 bg-white py-3 text-sm font-semibold text-gray-600 active:bg-gray-50"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          목차로 돌아가기
-        </button>
-      )}
-      <div className="h-1.5 overflow-hidden rounded-full bg-gray-100">
-        <div
-          className="h-full rounded-full bg-blue-500 transition-all"
-          style={{ width: `${pct}%` }}
-        />
+  // ── 진행률 바 (+ 섹션 진입 시 목차로 / 다음 섹션 네비) ──
+  const ProgressBar = () => {
+    const sec = nav.sec;
+    return (
+      <div className="mt-4">
+        {sec !== null && (
+          <div className="mb-3 flex gap-2.5">
+            <button
+              type="button"
+              onClick={() => setNav({ sec: null, leaf: null })}
+              className="flex flex-1 items-center justify-center gap-1 rounded-xl border border-gray-200 bg-white py-3 text-sm font-semibold text-gray-600 active:bg-gray-50"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              목차로
+            </button>
+            {sec < sections.length - 1 && (
+              <button
+                type="button"
+                onClick={() => setNav({ sec: sec + 1, leaf: null })}
+                className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-blue-500 py-3 text-sm font-semibold text-white active:bg-blue-600"
+              >
+                다음 섹션
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        )}
+        <div className="h-1.5 overflow-hidden rounded-full bg-gray-100">
+          <div
+            className="h-full rounded-full bg-blue-500 transition-all"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <div className="mt-1.5 flex justify-between text-xs text-gray-500">
+          <span>
+            전체 <b className="font-semibold text-gray-700">{totalFilled}</b> / {totalInputs}칸
+          </span>
+          <span className="font-semibold text-gray-700">{pct}%</span>
+        </div>
       </div>
-      <div className="mt-1.5 flex justify-between text-xs text-gray-500">
-        <span>
-          전체 <b className="font-semibold text-gray-700">{totalFilled}</b> / {totalInputs}칸
-        </span>
-        <span className="font-semibold text-gray-700">{pct}%</span>
-      </div>
-    </div>
-  );
+    );
+  };
 
   // ── 루트: 섹션 목차 ──
   if (nav.sec === null) {
