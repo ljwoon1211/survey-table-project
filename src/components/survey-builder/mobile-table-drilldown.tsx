@@ -65,7 +65,17 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
   });
 
   // ── 응답 채움 계산 ──
-  const filled = (cellId: string) => String(value?.[cellId] ?? '').trim() !== '';
+  // emptyDefault(숫자 셀 첫 진입 시 자동 채워지는 초기값)와 동일한 값은 사용자가
+  // 실제로 입력한 게 아니므로 미입력으로 간주한다.
+  const filled = (cellId: string) => {
+    const v = String(value?.[cellId] ?? '').trim();
+    if (v === '') return false;
+    const cell = cellById.get(cellId);
+    if (cell && typeof cell.emptyDefault === 'number' && v === String(cell.emptyDefault)) {
+      return false;
+    }
+    return true;
+  };
   const leafFilled = (l: ClassifiedLeaf) => l.inputCellIds.filter(filled).length;
   const leafDone = (l: ClassifiedLeaf) =>
     l.inputCellIds.length > 0 && leafFilled(l) === l.inputCellIds.length;
