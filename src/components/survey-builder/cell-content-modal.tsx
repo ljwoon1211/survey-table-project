@@ -192,6 +192,11 @@ export function CellContentModal({
   const [horizontalAlign, setHorizontalAlign] = useState<'left' | 'center' | 'right'>(
     cell.horizontalAlign || 'left',
   );
+
+  // 모바일 카드 표시 (text/image/video 셀 전용)
+  const [mobileDisplay, setMobileDisplay] = useState<'hidden' | 'inline' | 'collapsed'>(
+    cell.mobileDisplay ?? 'hidden',
+  );
   const [verticalAlign, setVerticalAlign] = useState<'top' | 'middle' | 'bottom'>(
     cell.verticalAlign || 'top',
   );
@@ -266,6 +271,7 @@ export function CellContentModal({
       setIsCustomExportLabel(cell.isCustomExportLabel ?? !!cell.exportLabel);
       setSpssVarType(cell.spssVarType);
       setSpssMeasure(cell.spssMeasure);
+      setMobileDisplay(cell.mobileDisplay ?? 'hidden');
     }
   // deps 를 cell?.id 로 좁힘 — 모달 안에서 셀 저장 등으로 cell reference 가 바뀌어도
   // 사용자가 편집 중인 20+ 로컬 state 가 store 의 옛 값으로 reset 되지 않도록 한다.
@@ -402,6 +408,12 @@ export function CellContentModal({
         // 셀 병합 속성 추가
         rowspan: isMergeEnabled && typeof rowspan === 'number' && rowspan > 1 ? rowspan : undefined,
         colspan: isMergeEnabled && typeof colspan === 'number' && colspan > 1 ? colspan : undefined,
+        // 모바일 카드 표시 (text/image/video 셀만; 기본 'hidden' 은 저장 안 함)
+        mobileDisplay:
+          (contentType === 'text' || contentType === 'image' || contentType === 'video') &&
+          mobileDisplay !== 'hidden'
+            ? mobileDisplay
+            : undefined,
         // 정렬 속성 추가
         horizontalAlign: horizontalAlign !== 'left' ? horizontalAlign : undefined,
         verticalAlign: verticalAlign !== 'top' ? verticalAlign : undefined,
@@ -547,6 +559,7 @@ export function CellContentModal({
     setIsCustomExportLabel(cell.isCustomExportLabel ?? !!cell.exportLabel);
     setSpssVarType(cell.spssVarType);
     setSpssMeasure(cell.spssMeasure);
+    setMobileDisplay(cell.mobileDisplay ?? 'hidden');
     onClose();
   };
 
@@ -1289,6 +1302,46 @@ export function CellContentModal({
             </>
           )}
         </div>
+
+        {/* 모바일 카드 표시 설정 (text/image/video 셀 전용) */}
+        {(contentType === 'text' || contentType === 'image' || contentType === 'video') && (
+          <div className="mt-6 border-t border-gray-200 pt-6">
+            <h3 className="mb-2 text-sm font-medium text-gray-900">모바일 카드 표시</h3>
+            <p className="mb-3 text-xs text-gray-500">
+              좁은 화면(모바일) 카드에서 이 셀을 어떻게 보여줄지 선택합니다. 의미는 지정하지 않으며
+              저작자가 결정합니다.
+            </p>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={mobileDisplay === 'hidden' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setMobileDisplay('hidden')}
+                className="flex-1"
+              >
+                숨기기
+              </Button>
+              <Button
+                type="button"
+                variant={mobileDisplay === 'inline' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setMobileDisplay('inline')}
+                className="flex-1"
+              >
+                바로표시
+              </Button>
+              <Button
+                type="button"
+                variant={mobileDisplay === 'collapsed' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setMobileDisplay('collapsed')}
+                className="flex-1"
+              >
+                자세히
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* 셀 컨텐츠 정렬 설정 */}
         <div className="mt-6 border-t border-gray-200 pt-6">
