@@ -125,7 +125,7 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
     const sec = nav.sec;
     return (
       <div className="mt-4">
-        {sec !== null && (
+        {sec !== null && nav.leaf === null && (
           <div className="mb-3 flex gap-2.5">
             <button
               type="button"
@@ -139,7 +139,7 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
               <button
                 type="button"
                 onClick={() => setNav({ sec: sec + 1, leaf: null })}
-                className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-blue-500 py-3 text-sm font-semibold text-white active:bg-blue-600"
+                className="flex flex-1 items-center justify-center gap-1 rounded-xl border border-blue-200 bg-blue-50 py-3 text-sm font-semibold text-blue-600 active:bg-blue-100"
               >
                 다음 섹션
                 <ChevronRight className="h-4 w-4" />
@@ -340,15 +340,15 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
           onClick={() => setNav({ sec: nav.sec, leaf: (nav.leaf ?? 0) - 1 })}
           className="flex-1 rounded-xl border border-gray-200 bg-white py-3 text-sm font-semibold text-gray-600 disabled:opacity-40"
         >
-          ‹ 이전
+          ‹ 이전 항목
         </button>
         <button
           type="button"
           disabled={nav.leaf >= s.leaves.length - 1}
           onClick={() => setNav({ sec: nav.sec, leaf: (nav.leaf ?? 0) + 1 })}
-          className="flex-1 rounded-xl bg-blue-500 py-3 text-sm font-semibold text-white disabled:opacity-40"
+          className="flex-1 rounded-xl border border-blue-200 bg-blue-50 py-3 text-sm font-semibold text-blue-600 disabled:opacity-40"
         >
-          다음 ›
+          다음 항목 ›
         </button>
       </div>
       <ProgressBar />
