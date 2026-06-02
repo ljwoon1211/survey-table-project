@@ -53,3 +53,41 @@ describe('MobileRowCard 표시 셀', () => {
     expect(screen.getByRole('button', { name: /자세히/ })).toBeInTheDocument();
   });
 });
+
+describe('MobileRowCard 인터랙티브 셀 라벨', () => {
+  function labelRow(): TableRow {
+    return {
+      id: 'r1',
+      label: '설립연도',
+      cells: [
+        { id: 'y', type: 'input', exportLabel: '설립연도_년', placeholder: 'ex) 1994' } as never,
+        { id: 'm', type: 'input', placeholder: 'ex) 12' } as never,
+      ],
+    } as TableRow;
+  }
+
+  function renderWith(hideColumnLabels: boolean) {
+    return render(
+      <MobileRowCard
+        row={labelRow()}
+        visibleColumns={columns}
+        columnSectionMap={null}
+        completed={false}
+        hideColumnLabels={hideColumnLabels}
+        questionId="q1"
+        isTestMode={false}
+      />,
+    );
+  }
+
+  it('hideColumnLabels 여도 exportLabel 이 표기된다', () => {
+    renderWith(true);
+    expect(screen.getByText('설립연도_년')).toBeInTheDocument();
+  });
+
+  it('hideColumnLabels 이고 exportLabel 이 없는 셀은 라벨을 표기하지 않는다', () => {
+    renderWith(true);
+    // placeholder 만 있는 m 셀은 exportLabel 이 없어 열 라벨('점수')로 폴백하지 않아야 한다
+    expect(screen.queryByText('점수')).not.toBeInTheDocument();
+  });
+});

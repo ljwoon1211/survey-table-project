@@ -155,14 +155,19 @@ export const MobileRowCard = React.memo(function MobileRowCard({
                 </div>
               )}
               <div className="space-y-1">
-                {!hideColumnLabels && (
-                  <div className="flex items-start gap-1.5">
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
-                    <span className="line-clamp-2 text-sm font-medium text-gray-900">
-                      {substituteTokens(shortLabel, attrs)}
-                    </span>
-                  </div>
-                )}
+                {(() => {
+                  // hideColumnLabels 여도 인터랙티브 셀은 exportLabel 을 표기해 입력 항목을 식별할 수 있게 한다.
+                  const displayLabel = hideColumnLabels ? cellLabel : shortLabel;
+                  if (!displayLabel) return null;
+                  return (
+                    <div className="flex items-start gap-1.5">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
+                      <span className="line-clamp-2 text-sm font-medium text-gray-900">
+                        {substituteTokens(displayLabel, attrs)}
+                      </span>
+                    </div>
+                  );
+                })()}
                 {isUnitPairStart && nextEntry ? (
                   <div className="flex items-end gap-2 pl-3">
                     <div className="flex-1">
