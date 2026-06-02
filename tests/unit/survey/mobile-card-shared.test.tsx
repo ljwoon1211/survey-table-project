@@ -1,11 +1,17 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { MobileDisplayCells } from '@/components/survey/mobile-display-cells';
+import { MobileOptionCard } from '@/components/survey-response/mobile-card-shared';
 import type { TableCell } from '@/types/survey';
-import { MobileDisplayCells, MobileOptionCard } from '@/components/survey-response/mobile-card-shared';
 
 function cell(partial: Partial<TableCell>): TableCell {
-  return { id: Math.random().toString(36).slice(2), content: '', type: 'text', ...partial } as TableCell;
+  return {
+    id: Math.random().toString(36).slice(2),
+    content: '',
+    type: 'text',
+    ...partial,
+  } as TableCell;
 }
 
 describe('MobileDisplayCells', () => {
@@ -22,7 +28,9 @@ describe('MobileDisplayCells', () => {
   });
 
   it('표시 셀이 없으면 아무것도 렌더하지 않는다', () => {
-    const { container } = render(<MobileDisplayCells cells={[cell({ type: 'text', content: 'x' })]} />);
+    const { container } = render(
+      <MobileDisplayCells cells={[cell({ type: 'text', content: 'x' })]} />,
+    );
     expect(container).toBeEmptyDOMElement();
   });
 });

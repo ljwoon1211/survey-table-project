@@ -5,7 +5,16 @@ export interface SplitDisplayCells {
   collapsed: TableCell[];
 }
 
-const DISPLAY_CELL_TYPES = new Set(['text', 'image', 'video']);
+const DISPLAY_CELL_TYPES = new Set<TableCell['type']>(['text', 'image', 'video']);
+
+function isMobileDisplayCell(cell: TableCell): boolean {
+  return (
+    !cell.isHidden &&
+    !cell._isContinuation &&
+    DISPLAY_CELL_TYPES.has(cell.type) &&
+    (cell.mobileDisplay === 'inline' || cell.mobileDisplay === 'collapsed')
+  );
+}
 
 /**
  * 셀 배열(보통 한 행의 cells)에서 모바일 카드에 표시할 display 셀(text/image/video)을
@@ -18,10 +27,16 @@ export function splitMobileDisplayCells(cells: TableCell[]): SplitDisplayCells {
   const inline: TableCell[] = [];
   const collapsed: TableCell[] = [];
   for (const cell of cells) {
-    if (cell.isHidden || cell._isContinuation) continue;
-    if (!DISPLAY_CELL_TYPES.has(cell.type)) continue;
-    if (cell.mobileDisplay === 'inline') inline.push(cell);
-    else if (cell.mobileDisplay === 'collapsed') collapsed.push(cell);
+    if (!isMobileDisplayCell(cell)) continue;
+    if (cell.mobileDisplay === 'inline') {
+      inline.push(cell);
+    } else {
+      collapsed.push(cell);
+    }
   }
   return { inline, collapsed };
+}
+
+export function hasMobileDisplayCells(cells: TableCell[]): boolean {
+  return cells.some(isMobileDisplayCell);
 }

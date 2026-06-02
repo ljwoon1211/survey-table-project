@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 
 import { CheckCircle2 } from 'lucide-react';
 
+import { MobileDisplayCells } from '@/components/survey/mobile-display-cells';
 import { Card, CardContent } from '@/components/ui/card';
 import type { useColumnSectionMap } from '@/hooks/use-row-groups';
 import { useContactAttrs } from '@/lib/survey/contact-attrs-context';
@@ -14,10 +15,8 @@ import {
   detectUnitPair,
   overrideCellOptionsColumnsForCard,
 } from '@/utils/mobile-card-options';
+import { hasMobileDisplayCells } from '@/utils/mobile-display-cells';
 import { getAlignmentClasses } from '@/utils/table-grid-utils';
-
-import { MobileDisplayCells } from '@/components/survey-response/mobile-card-shared';
-import { splitMobileDisplayCells } from '@/utils/mobile-display-cells';
 
 import { InteractiveCell } from './cells';
 
@@ -78,9 +77,8 @@ export const MobileRowCard = React.memo(function MobileRowCard({
     return descCell?.radioOptions?.[0]?.label || row.label;
   }, [row.cells, row.label]);
 
-  // 표시 셀(text/image/video) 분류 — mobileDisplay 미지정/hidden 은 기본 숨김(회귀 안전)
-  const { inline, collapsed } = splitMobileDisplayCells(row.cells);
-  const hasDisplayCells = inline.length > 0 || collapsed.length > 0;
+  // mobileDisplay 미지정/hidden 은 기존 동작처럼 카드에 표시하지 않는다.
+  const hasDisplayCells = hasMobileDisplayCells(row.cells);
   if (inputCells.length === 0 && !hasDisplayCells) return null;
 
   let lastSection = '';
@@ -168,10 +166,22 @@ export const MobileRowCard = React.memo(function MobileRowCard({
                 {isUnitPairStart && nextEntry ? (
                   <div className="flex items-end gap-2 pl-3">
                     <div className="flex-1">
-                      <InteractiveCell cell={cell} questionId={questionId} isTestMode={isTestMode} value={value} onChange={onChange} />
+                      <InteractiveCell
+                        cell={cell}
+                        questionId={questionId}
+                        isTestMode={isTestMode}
+                        value={value}
+                        onChange={onChange}
+                      />
                     </div>
                     <div className="w-28 shrink-0">
-                      <InteractiveCell cell={nextEntry.cell} questionId={questionId} isTestMode={isTestMode} value={value} onChange={onChange} />
+                      <InteractiveCell
+                        cell={nextEntry.cell}
+                        questionId={questionId}
+                        isTestMode={isTestMode}
+                        value={value}
+                        onChange={onChange}
+                      />
                     </div>
                   </div>
                 ) : (
@@ -181,7 +191,13 @@ export const MobileRowCard = React.memo(function MobileRowCard({
                       getAlignmentClasses(cell.horizontalAlign, cell.verticalAlign),
                     )}
                   >
-                    <InteractiveCell cell={cell} questionId={questionId} isTestMode={isTestMode} value={value} onChange={onChange} />
+                    <InteractiveCell
+                      cell={cell}
+                      questionId={questionId}
+                      isTestMode={isTestMode}
+                      value={value}
+                      onChange={onChange}
+                    />
                   </div>
                 )}
               </div>

@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import type { TableCell } from '@/types/survey';
-import { splitMobileDisplayCells } from '@/utils/mobile-display-cells';
+import { hasMobileDisplayCells, splitMobileDisplayCells } from '@/utils/mobile-display-cells';
 
 function cell(partial: Partial<TableCell>): TableCell {
-  return { id: Math.random().toString(36).slice(2), content: '', type: 'text', ...partial } as TableCell;
+  return {
+    id: Math.random().toString(36).slice(2),
+    content: '',
+    type: 'text',
+    ...partial,
+  } as TableCell;
 }
 
 describe('splitMobileDisplayCells', () => {
@@ -51,5 +56,12 @@ describe('splitMobileDisplayCells', () => {
     const { inline, collapsed } = splitMobileDisplayCells(cells);
     expect(inline.map((c) => c.id)).toEqual(['img']);
     expect(collapsed.map((c) => c.id)).toEqual(['vid']);
+  });
+
+  it('표시 가능한 셀이 있는지 확인', () => {
+    expect(hasMobileDisplayCells([cell({ id: 'a', type: 'text' })])).toBe(false);
+    expect(
+      hasMobileDisplayCells([cell({ id: 'b', type: 'text', mobileDisplay: 'inline' })]),
+    ).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 
 import { TablePreview } from '@/components/survey-builder/table-preview';
 import { useMobileView } from '@/hooks/use-media-query';
@@ -27,6 +27,10 @@ export function ChoiceTableResponse({ question, value, onChange }: ChoiceTableRe
   const isCheckbox = question.type === 'checkbox';
   const isMobile = useMobileView();
   const options = useMemo(() => resolveChoiceOptions(question), [question]);
+  const optionByValue = useMemo(
+    () => new Map(options.map((option) => [option.value, option])),
+    [options],
+  );
 
   const selectedIds: string[] = useMemo(() => {
     if (isCheckbox) return Array.isArray(value) ? (value as string[]) : [];
@@ -35,6 +39,8 @@ export function ChoiceTableResponse({ question, value, onChange }: ChoiceTableRe
 
   const minSel = question.minSelections;
   const maxSel = question.maxSelections;
+  const isMaxSelectionReached =
+    isCheckbox && maxSel !== undefined && maxSel > 0 && selectedIds.length >= maxSel;
 
   const toggle = (cellId: string, checked: boolean) => {
     if (!isCheckbox) {
@@ -51,26 +57,32 @@ export function ChoiceTableResponse({ question, value, onChange }: ChoiceTableRe
     onChange(next);
   };
 
-  const renderCell = (cell: TableCell): React.ReactNode => {
-    if (cell.type !== 'choice_opt' || cell.isHidden) return undefined;
+  const getChoiceCellState = (cell: TableCell) => {
     const checked = selectedIds.includes(cell.id);
-    const opt = options.find((o) => o.value === cell.id);
-    const disabled =
-      isCheckbox && !checked && maxSel !== undefined && maxSel > 0 && selectedIds.length >= maxSel;
+    return {
+      checked,
+      disabled: isMaxSelectionReached && !checked,
+      option: optionByValue.get(cell.id),
+    };
+  };
+
+  const renderCell = (cell: TableCell): ReactNode => {
+    if (cell.type !== 'choice_opt' || cell.isHidden) return undefined;
+    const { checked, disabled, option } = getChoiceCellState(cell);
 
     return (
       <div className="flex flex-col items-center gap-2">
         <input
           type={isCheckbox ? 'checkbox' : 'radio'}
           name={question.id}
-          aria-label={opt?.label ?? '선택'}
+          aria-label={option?.label ?? '선택'}
           checked={checked}
           disabled={disabled}
           onChange={(e) => toggle(cell.id, e.target.checked)}
           className="h-4 w-4"
         />
-        {opt?.allowTextInput && checked && (
-          <OptionTextInput questionId={question.id} option={opt} className="w-full" />
+        {option?.allowTextInput && checked && (
+          <OptionTextInput questionId={question.id} option={option} className="w-full" />
         )}
       </div>
     );
@@ -98,18 +110,11 @@ export function ChoiceTableResponse({ question, value, onChange }: ChoiceTableRe
           row.cells
             .filter((c) => c.type === 'choice_opt' && !c.isHidden)
             .map((choiceCell) => {
-              const opt = options.find((o) => o.value === choiceCell.id);
-              const checked = selectedIds.includes(choiceCell.id);
-              const disabled =
-                isCheckbox &&
-                !checked &&
-                maxSel !== undefined &&
-                maxSel > 0 &&
-                selectedIds.length >= maxSel;
+              const { checked, disabled, option } = getChoiceCellState(choiceCell);
               return (
                 <MobileOptionCard
                   key={choiceCell.id}
-                  label={opt?.label ?? '(라벨 없음)'}
+                  label={option?.label ?? '(라벨 없음)'}
                   cells={row.cells}
                   selected={checked}
                   disabled={disabled}
@@ -118,7 +123,7 @@ export function ChoiceTableResponse({ question, value, onChange }: ChoiceTableRe
                     <input
                       type={isCheckbox ? 'checkbox' : 'radio'}
                       name={question.id}
-                      aria-label={opt?.label ?? '선택'}
+                      aria-label={option?.label ?? '선택'}
                       checked={checked}
                       disabled={disabled}
                       onChange={(e) => toggle(choiceCell.id, e.target.checked)}
@@ -126,8 +131,12 @@ export function ChoiceTableResponse({ question, value, onChange }: ChoiceTableRe
                     />
                   }
                   footer={
-                    opt?.allowTextInput && checked ? (
-                      <OptionTextInput questionId={question.id} option={opt} className="w-full" />
+                    option?.allowTextInput && checked ? (
+                      <OptionTextInput
+                        questionId={question.id}
+                        option={option}
+                        className="w-full"
+                      />
                     ) : null
                   }
                 />
