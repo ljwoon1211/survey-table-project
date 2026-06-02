@@ -94,44 +94,46 @@ export function ChoiceTableResponse({ question, value, onChange }: ChoiceTableRe
   if (isMobile) {
     return (
       <div className="space-y-2">
-        {(question.tableRowsData ?? []).map((row) => {
-          const choiceCell = row.cells.find((c) => c.type === 'choice_opt' && !c.isHidden);
-          if (!choiceCell) return null;
-          const opt = options.find((o) => o.value === choiceCell.id);
-          const checked = selectedIds.includes(choiceCell.id);
-          const disabled =
-            isCheckbox &&
-            !checked &&
-            maxSel !== undefined &&
-            maxSel > 0 &&
-            selectedIds.length >= maxSel;
-          return (
-            <MobileOptionCard
-              key={row.id}
-              label={opt?.label ?? '(라벨 없음)'}
-              cells={row.cells}
-              selected={checked}
-              disabled={disabled}
-              onToggle={() => toggle(choiceCell.id, !checked)}
-              control={
-                <input
-                  type={isCheckbox ? 'checkbox' : 'radio'}
-                  name={question.id}
-                  aria-label={opt?.label ?? '선택'}
-                  checked={checked}
+        {(question.tableRowsData ?? []).flatMap((row) =>
+          row.cells
+            .filter((c) => c.type === 'choice_opt' && !c.isHidden)
+            .map((choiceCell) => {
+              const opt = options.find((o) => o.value === choiceCell.id);
+              const checked = selectedIds.includes(choiceCell.id);
+              const disabled =
+                isCheckbox &&
+                !checked &&
+                maxSel !== undefined &&
+                maxSel > 0 &&
+                selectedIds.length >= maxSel;
+              return (
+                <MobileOptionCard
+                  key={choiceCell.id}
+                  label={opt?.label ?? '(라벨 없음)'}
+                  cells={row.cells}
+                  selected={checked}
                   disabled={disabled}
-                  onChange={(e) => toggle(choiceCell.id, e.target.checked)}
-                  className="h-5 w-5"
+                  onToggle={() => toggle(choiceCell.id, !checked)}
+                  control={
+                    <input
+                      type={isCheckbox ? 'checkbox' : 'radio'}
+                      name={question.id}
+                      aria-label={opt?.label ?? '선택'}
+                      checked={checked}
+                      disabled={disabled}
+                      onChange={(e) => toggle(choiceCell.id, e.target.checked)}
+                      className="h-5 w-5"
+                    />
+                  }
+                  footer={
+                    opt?.allowTextInput && checked ? (
+                      <OptionTextInput questionId={question.id} option={opt} className="w-full" />
+                    ) : null
+                  }
                 />
-              }
-              footer={
-                opt?.allowTextInput && checked ? (
-                  <OptionTextInput questionId={question.id} option={opt} className="w-full" />
-                ) : null
-              }
-            />
-          );
-        })}
+              );
+            }),
+        )}
         {counter}
       </div>
     );

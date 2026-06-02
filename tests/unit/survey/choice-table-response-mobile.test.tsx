@@ -56,4 +56,41 @@ describe('ChoiceTableResponse (mobile)', () => {
     fireEvent.click(screen.getAllByLabelText(/① 컴퓨터 비전|선택/)[0]);
     expect(onChange).toHaveBeenCalledWith(['r1c2']);
   });
+
+  it('한 행에 choice_opt 셀이 여러 개일 때 모든 셀이 카드로 렌더되고 선택 가능', () => {
+    // 회귀 테스트: 한 행에 choice_opt 가 2개인 경우 두 번째 셀도 카드로 렌더해야 한다
+    const multiCellQuestion: Question = {
+      id: 'q2',
+      type: 'checkbox',
+      title: '다중 선택 테스트',
+      required: false,
+      order: 0,
+      tableColumns: [
+        { id: 'c0', label: '항목', width: 100 },
+        { id: 'c1', label: 'A', width: 60 },
+        { id: 'c2', label: 'B', width: 60 },
+      ],
+      tableRowsData: [
+        {
+          id: 'r1',
+          cells: [
+            { id: 'r1c0', type: 'text', content: '항목', mobileDisplay: 'hidden' },
+            { id: 'r1cA', type: 'choice_opt', content: '', choiceLabel: 'A' },
+            { id: 'r1cB', type: 'choice_opt', content: '', choiceLabel: 'B' },
+          ],
+        },
+      ],
+    } as unknown as Question;
+
+    const onChange = vi.fn();
+    render(<ChoiceTableResponse question={multiCellQuestion} value={[]} onChange={onChange} />);
+
+    // 두 choice_opt 셀이 모두 카드로 렌더되어야 한다
+    expect(screen.getByText('A')).toBeInTheDocument();
+    expect(screen.getByText('B')).toBeInTheDocument();
+
+    // 두 번째 셀(r1cB) 컨트롤 클릭 시 onChange(['r1cB']) 호출
+    fireEvent.click(screen.getByLabelText('B'));
+    expect(onChange).toHaveBeenCalledWith(['r1cB']);
+  });
 });
