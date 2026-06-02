@@ -111,10 +111,17 @@ export function ChoiceTableResponse({ question, value, onChange }: ChoiceTableRe
             .filter((c) => c.type === 'choice_opt' && !c.isHidden)
             .map((choiceCell) => {
               const { checked, disabled, option } = getChoiceCellState(choiceCell);
+              // 카드 제목: choiceLabel > content > exportLabel 순. 선택 라벨이 비어도
+              // (라벨이 다른 열 셀에 있는 경우) 셀 exportLabel 로 제목을 식별할 수 있게 한다.
+              const cardLabel =
+                choiceCell.choiceLabel?.trim() ||
+                (choiceCell.content ?? '').trim() ||
+                choiceCell.exportLabel?.trim() ||
+                '(라벨 없음)';
               return (
                 <MobileOptionCard
                   key={choiceCell.id}
-                  label={option?.label ?? '(라벨 없음)'}
+                  label={cardLabel}
                   cells={row.cells}
                   selected={checked}
                   disabled={disabled}
@@ -123,7 +130,7 @@ export function ChoiceTableResponse({ question, value, onChange }: ChoiceTableRe
                     <input
                       type={isCheckbox ? 'checkbox' : 'radio'}
                       name={question.id}
-                      aria-label={option?.label ?? '선택'}
+                      aria-label={cardLabel}
                       checked={checked}
                       disabled={disabled}
                       onChange={(e) => toggle(choiceCell.id, e.target.checked)}
