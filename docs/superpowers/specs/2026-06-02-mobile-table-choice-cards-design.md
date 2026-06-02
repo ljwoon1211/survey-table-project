@@ -21,7 +21,11 @@
 
 **목표**
 - Case A(테이블 내장 radio/checkbox)를 모바일에서 세로 옵션 카드 리스트로 렌더한다.
-- 테이블의 `text` 셀을 **셀 단위**로 카드에서 어떻게 보일지 저작자가 지정한다(`숨기기/바로표시/자세히`).
+- 테이블의 `text`(및 image/video) 셀을 **셀 단위**로 카드에서 어떻게 보일지 저작자가
+  지정한다(`숨기기/바로표시/자세히`).
+- **이 셀 표시 기능은 질문 타입과 무관하게 동작한다.** `TableCell` 단위 설정이므로
+  Case A(radio/checkbox 내장 테이블), 순위형(ranking 내장 테이블), 그리고
+  **`type='table'`(매트릭스 B) 질문**의 카드에서 모두 동일하게 적용된다.
 - B(매트릭스)와 Case A, 순위형이 **하나의 공유 카드 컴포넌트**를 재사용하도록 일원화한다.
 - 의미(정의/예시 등) 하드코딩 없이 동작한다 — 저작자가 셀별로 결정.
 
@@ -40,6 +44,7 @@
 | 기본값 | text 셀 미설정 = `hidden` → 기존 설문 영향 0 |
 | 접기 라벨 | **"자세히"** (의미 추측 안 함, 고정 문구) |
 | 아키텍처 | 접근 2 — 공유 카드 컴포넌트 추출 + 선택 컨트롤 슬롯 |
+| 적용 질문 타입 | radio/checkbox(Case A) + ranking + **type='table'(매트릭스 B)** 모두 |
 | 순위형 | B안 — 드롭다운 스택 상단 유지 + 카드는 참고 표시 전용 |
 | 카드 헤더 라벨 | choice_opt 옵션 라벨(`resolveChoiceOptions`) |
 | 선택 토글 | 체크박스 + 카드 헤더 줄 전체 탭 / "자세히"는 별도 탭 |
@@ -124,15 +129,22 @@ interface MobileOptionCardProps {
   - 라벨 = ranking_opt 옵션 라벨. inline/collapsed = text 셀의 `mobileDisplay`.
 - 데스크톱은 기존 유지.
 
-### 6.4 B(매트릭스) — `MobileRowCard` 정렬
+### 6.4 B(매트릭스, `type='table'`) — `MobileRowCard`도 1급 지원
 
 `src/components/survey-builder/mobile-row-card.tsx`
 
+매트릭스 질문도 본 기능의 **정식 대상**이다. 매트릭스 카드(MobileTableStepper 경유)에서도
+저작자가 셀별로 지정한 `mobileDisplay`가 동일하게 적용된다.
+
 - 카드 외형/레이아웃을 `MobileOptionCard` 기반으로 재구성(중복 제거).
-- 기존: text 셀 전부 숨김 → 변경: `mobileDisplay==='inline'|'collapsed'`인 text 셀은
-  노출(기본 `hidden`이라 **미설정 기존 설문은 동작 동일**).
-- 입력 셀들은 control 슬롯(또는 본문)에 기존대로 렌더(단위쌍/섹션 헤더 로직 유지).
-- 회귀 주의: 단위 페어(`detectUnitPair`), 섹션 헤더, 정렬 클래스는 보존.
+- text/image/video 셀:
+  - `hidden`(기본) — 미노출. **미설정 기존 매트릭스 설문은 동작 동일**(회귀 없음).
+  - `inline` — 입력 영역과 함께 카드에 인라인 노출.
+  - `collapsed` — 카드의 "자세히 ▾" expander 안에 노출(Case A와 동일 UI/문구).
+- 입력 셀들(input/radio/checkbox/select)은 control 영역에 기존대로 렌더.
+- 회귀 주의: 단위 페어(`detectUnitPair`), 섹션 헤더, 정렬 클래스, 행 라벨 헤더는 보존.
+- 빌더 토글(5절)은 질문 타입과 무관하게 동일 셀 에디터에서 노출되므로 매트릭스
+  질문 셀에도 그대로 적용된다(별도 작업 없음).
 
 ## 7. 영향 범위 / 비영향
 
