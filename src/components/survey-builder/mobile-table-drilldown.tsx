@@ -219,17 +219,19 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
             {s.leaves.map((l) => {
               const done = leafDone(l);
               return (
-                <div key={l.rowId} className="flex items-center gap-3 py-3">
-                  <span
-                    className={cn(
-                      'min-w-0 flex-1 text-sm font-medium',
-                      done ? 'text-green-600' : 'text-gray-900',
-                    )}
-                  >
-                    {l.label}
-                  </span>
-                  {done && <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />}
-                  <div className="w-28 shrink-0">{renderCell(l.inputCellIds[0])}</div>
+                <div key={l.rowId} className="py-3">
+                  <div className="mb-1.5 flex items-center gap-1.5">
+                    <span
+                      className={cn(
+                        'text-sm font-medium',
+                        done ? 'text-green-600' : 'text-gray-900',
+                      )}
+                    >
+                      {l.label}
+                    </span>
+                    {done && <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />}
+                  </div>
+                  {renderCell(l.inputCellIds[0])}
                 </div>
               );
             })}
