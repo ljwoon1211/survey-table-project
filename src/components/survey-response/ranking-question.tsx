@@ -3,11 +3,13 @@
 import { useMemo } from 'react';
 
 import { TablePreview } from '@/components/survey-builder/table-preview';
+import { useMobileView } from '@/hooks/use-media-query';
 import { Question, RankingAnswer } from '@/types/survey';
 import { getOptionsLayout } from '@/utils/options-layout';
 import { resolveRankingOptions } from '@/utils/ranking-source';
 import { parseRankingAnswers, RANKING_OTHER_VALUE } from '@/utils/ranking-shared';
 
+import { MobileOptionCard } from './mobile-card-shared';
 import { RankingDropdownStack } from './ranking-dropdown-stack';
 
 interface RankingQuestionProps {
@@ -24,6 +26,7 @@ interface RankingQuestionProps {
  */
 export function RankingQuestion({ question, value, onChange }: RankingQuestionProps) {
   const config = question.rankingConfig;
+  const isMobile = useMobileView();
   const isTableSource = config?.optionsSource === 'table';
 
   // 옵션 해결 (수동 또는 자체 tableRowsData 에서 ranking_opt 셀 수집)
@@ -75,13 +78,32 @@ export function RankingQuestion({ question, value, onChange }: RankingQuestionPr
 
       {/* 내장 테이블이 있으면 테이블이 옵션을 시각화 — 아니면 선택지 목록으로 표시 */}
       {hasEmbeddedTable ? (
-        <TablePreview
-          tableTitle={question.tableTitle}
-          columns={question.tableColumns}
-          rows={question.tableRowsData}
-          tableHeaderGrid={question.tableHeaderGrid}
-          hideColumnLabels={question.hideColumnLabels}
-        />
+        isMobile ? (
+          <div className="space-y-2">
+            {(question.tableRowsData ?? []).map((row) => {
+              const optCell = row.cells.find((c) => c.type === 'ranking_opt' && !c.isHidden);
+              if (!optCell) return null;
+              // resolveRankingOptions 는 항상 id=cell.id 를 부여(기타 셀 포함).
+              // value 는 기타 셀일 때 RANKING_OTHER_VALUE 로 바뀌므로 id 로 매칭한다.
+              const opt = rawOptions.find((o) => o.id === optCell.id);
+              return (
+                <MobileOptionCard
+                  key={row.id}
+                  label={opt?.label ?? optCell.content ?? optCell.rankingLabel ?? '(라벨 없음)'}
+                  cells={row.cells}
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <TablePreview
+            tableTitle={question.tableTitle}
+            columns={question.tableColumns}
+            rows={question.tableRowsData}
+            tableHeaderGrid={question.tableHeaderGrid}
+            hideColumnLabels={question.hideColumnLabels}
+          />
+        )
       ) : (
         (() => {
           const layout = getOptionsLayout(question.optionsColumns);
