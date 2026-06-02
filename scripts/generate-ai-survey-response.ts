@@ -379,11 +379,12 @@ let P: Profile = generateProfile(0);
 // 타입 (인라인)
 // ========================================
 type QType = 'text' | 'textarea' | 'radio' | 'checkbox' | 'select' | 'multiselect' | 'table' | 'notice' | 'ranking';
-interface QOption { id: string; label: string; value: string; hasOther?: boolean; branchRule?: BranchRule }
+interface QOption { id: string; label: string; value: string; hasOther?: boolean; allowTextInput?: boolean; branchRule?: BranchRule }
 interface BranchRule { id: string; value: string; action: 'goto' | 'end'; targetQuestionId?: string }
 interface TableCell {
   id: string;
-  type: 'text' | 'image' | 'video' | 'checkbox' | 'radio' | 'select' | 'input';
+  // choice_opt/ranking_opt: 테이블형 선택/순위 셀 (Case A / Case 2) — 응답 식별자는 cell.id
+  type: 'text' | 'image' | 'video' | 'checkbox' | 'radio' | 'select' | 'input' | 'choice_opt' | 'ranking_opt';
   content?: string;
   placeholder?: string;
   checkboxOptions?: QOption[];
@@ -617,15 +618,62 @@ function pickOptionSubsetBiased(
   return Array.from(set);
 }
 
-/** ranking: rankingConfig.positions 존중 + 셔플. Case 2(optionsSource='table')는 options가 부실할 수 있음 */
-function pickRanking(q: Question, seed: number): Array<{ rank: number; optionValue: string }> {
-  const opts = nonOtherOptions(q);
-  if (opts.length === 0) return [];
+/** 테이블형 선택 셀(choice_opt) id 수집 — Case A checkbox/radio 응답 식별자 */
+function collectChoiceCellIds(q: Question): string[] {
+  const ids: string[] = [];
+  for (const row of q.tableRowsData || []) {
+    for (const cell of row.cells || []) {
+      if (cell.type === 'choice_opt') ids.push(cell.id);
+    }
+  }
+  return ids;
+}
+
+/** 테이블형 순위 셀(ranking_opt) id 수집 — Case 2 ranking optionValue 식별자 */
+function collectRankingCellIds(q: Question): string[] {
+  const ids: string[] = [];
+  for (const row of q.tableRowsData || []) {
+    for (const cell of row.cells || []) {
+      if (cell.type === 'ranking_opt') ids.push(cell.id);
+    }
+  }
+  return ids;
+}
+
+/** allowTextInput(상세 기재) 옵션 선택 시 채울 그럴듯한 텍스트 풀 */
+const RANKING_OPTION_TEXTS: string[] = [
+  '직무 적합성', '조직 문화 적합도', '성장 가능성', '실무 프로젝트 경험',
+  '포트폴리오 완성도', '커뮤니케이션 역량', '문제 해결 역량', '추천인 평판',
+];
+
+/**
+ * ranking: rankingConfig.positions 존중 + 셔플.
+ * Case 2(optionsSource='table')는 ranking_opt 셀 id 를 optionValue 로 사용(앱 응답 형식과 일치).
+ * Case 1(manual)은 options value 사용.
+ * allowTextInput 옵션을 뽑으면 optionText(상세 기재) 도 채운다(앱 응답 형식과 일치).
+ */
+function pickRanking(
+  q: Question,
+  seed: number,
+): Array<{ rank: number; optionValue: string; optionText?: string }> {
+  const cellIds = collectRankingCellIds(q);
+  const candidates = cellIds.length > 0 ? cellIds : nonOtherOptions(q).map((o) => o.value);
+  if (candidates.length === 0) return [];
   const positions = q.rankingConfig?.positions ?? 3;
-  const take = Math.min(positions, opts.length);
-  return deterministicShuffle(opts, seed)
+  const take = Math.min(positions, candidates.length);
+  return deterministicShuffle(candidates, seed)
     .slice(0, take)
-    .map((o, i) => ({ rank: i + 1, optionValue: o.value }));
+    .map((v, i) => {
+      const entry: { rank: number; optionValue: string; optionText?: string } = {
+        rank: i + 1,
+        optionValue: v,
+      };
+      const opt = (q.options || []).find((o) => o.value === v);
+      if (opt?.allowTextInput) {
+        entry.optionText = RANKING_OPTION_TEXTS[(seed + i) % RANKING_OPTION_TEXTS.length];
+      }
+      return entry;
+    });
 }
 
 /** 셀 input 의도 분석: placeholder `ex) ...` 패턴과 content 단위를 결합해 분류 */
@@ -1457,16 +1505,28 @@ function generateValue(q: Question, responses: Record<string, unknown>, question
       return '';
     case 'radio':
     case 'select': {
+      // Case A: 테이블형 라디오(choice_opt) → 응답은 단일 cell.id
+      const choiceIds = collectChoiceCellIds(q);
+      if (choiceIds.length > 0) {
+        return choiceIds[(profileSeed() + domainSeed()) % choiceIds.length];
+      }
       const opts = nonOtherOptions(q);
       return opts[0]?.value ?? null;
     }
     case 'checkbox':
-    case 'multiselect':
+    case 'multiselect': {
+      // Case A: 테이블형 체크박스(choice_opt) → 응답은 선택된 cell.id 배열
+      const choiceIds = collectChoiceCellIds(q);
+      if (choiceIds.length > 0) {
+        const shuffled = deterministicShuffle(choiceIds, profileSeed() + domainSeed() + 7);
+        const count = Math.min(choiceIds.length, 1 + (profileSeed() % Math.min(4, choiceIds.length)));
+        return shuffled.slice(0, count);
+      }
       return pickOptionValues(q, 2);
-    case 'ranking': {
-      const opts = nonOtherOptions(q);
-      return opts.slice(0, 3).map((o, i) => ({ rank: i + 1, optionValue: o.value }));
     }
+    case 'ranking':
+      // Case 1(manual)/Case 2(table) 모두 pickRanking 이 식별자 처리
+      return pickRanking(q, profileSeed() + domainSeed() + 17);
     case 'table':
       return fillTableDefault(q, responses, questions);
     default:
