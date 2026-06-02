@@ -280,11 +280,12 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
               <div className="space-y-3">
                 {g.cols.map((c) => {
                   const cellId = leaf.inputCellIds[k++];
-                  if (!cellById.has(cellId)) return null;
+                  const cell = cellById.get(cellId);
+                  if (!cell) return null;
                   return (
                     <div key={c.col}>
                       <label className="mb-1 block pl-0.5 text-xs font-medium text-gray-500">
-                        {c.label}
+                        {cell.exportLabel?.trim() || c.label}
                       </label>
                       {renderCell(cellId)}
                     </div>
