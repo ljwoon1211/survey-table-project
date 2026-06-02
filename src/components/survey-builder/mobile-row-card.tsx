@@ -16,6 +16,9 @@ import {
 } from '@/utils/mobile-card-options';
 import { getAlignmentClasses } from '@/utils/table-grid-utils';
 
+import { MobileDisplayCells } from '@/components/survey-response/mobile-card-shared';
+import { splitMobileDisplayCells } from '@/utils/mobile-display-cells';
+
 import { InteractiveCell } from './cells';
 
 /** 라디오 옵션 1개짜리 셀은 입력이 아닌 라벨 */
@@ -75,7 +78,10 @@ export const MobileRowCard = React.memo(function MobileRowCard({
     return descCell?.radioOptions?.[0]?.label || row.label;
   }, [row.cells, row.label]);
 
-  if (inputCells.length === 0) return null;
+  // 표시 셀(text/image/video) 분류 — mobileDisplay 미지정/hidden 은 기본 숨김(회귀 안전)
+  const { inline, collapsed } = splitMobileDisplayCells(row.cells);
+  const hasDisplayCells = inline.length > 0 || collapsed.length > 0;
+  if (inputCells.length === 0 && !hasDisplayCells) return null;
 
   let lastSection = '';
 
@@ -182,6 +188,8 @@ export const MobileRowCard = React.memo(function MobileRowCard({
             </React.Fragment>
           );
         })}
+        {/* 표시 셀 — inline 은 바로 렌더, collapsed 는 "자세히" 접기 안에 렌더 */}
+        <MobileDisplayCells cells={row.cells} />
       </CardContent>
     </Card>
   );
