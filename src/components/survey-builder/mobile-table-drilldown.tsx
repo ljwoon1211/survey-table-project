@@ -64,6 +64,14 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
     leaf: null,
   });
 
+  // 리프가 1개뿐인 matrix 섹션은 "리프 목록" 군더더기 단계를 건너뛰고 바로 입력 폼으로 진입한다.
+  // (scalar/list 섹션은 원래 목록 없이 바로 폼이라 leaf:null 그대로 둔다.)
+  const enterSection = (si: number) => {
+    const sec = sections[si];
+    const direct = sec.kind === 'matrix' && sec.leaves.length === 1;
+    setNav({ sec: si, leaf: direct ? 0 : null });
+  };
+
   // 섹션/리프 이동 시(다음 섹션·목차로·뒤로·진입) 본문 컨테이너 상단으로 올린다.
   // window 최상단(설문 헤더)까지 올리지 않고, 드릴다운 root 만 화면 상단에 맞춘다.
   const rootRef = useRef<HTMLDivElement>(null);
@@ -151,7 +159,7 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
             {sec < sections.length - 1 && (
               <button
                 type="button"
-                onClick={() => setNav({ sec: sec + 1, leaf: null })}
+                onClick={() => enterSection(sec + 1)}
                 className="flex flex-1 items-center justify-center gap-1 rounded-xl border border-blue-200 bg-blue-50 py-3 text-sm font-semibold text-blue-600 active:bg-blue-100"
               >
                 다음 섹션
@@ -189,7 +197,7 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
               <button
                 key={si}
                 type="button"
-                onClick={() => setNav({ sec: si, leaf: null })}
+                onClick={() => enterSection(si)}
                 className="flex w-full items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 text-left active:bg-gray-50"
               >
                 <div className="min-w-0 flex-1">
@@ -302,7 +310,11 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
 
   // matrix 리프 폼 (열 그룹별 입력)
   const leaf = s.leaves[nav.leaf];
-  const backToLeaves = () => setNav({ sec: nav.sec, leaf: null });
+  // 리프 1개 섹션은 enterSection 이 목차→폼으로 직행시킨 경우라, '뒤로'도 리프 목록이 아닌
+  // 목차로 보낸다. enterSection 의 직행 판정과 동일 기준(matrix·리프 1개)으로 맞춘다.
+  // (이 경로는 scalar/list 가 위에서 early-return 되어 항상 matrix)
+  const isSingleLeaf = s.leaves.length === 1;
+  const backToLeaves = () => (isSingleLeaf ? backToRoot() : setNav({ sec: nav.sec, leaf: null }));
   let k = 0; // colGroups flat 순서 = leaf.inputCellIds 순서
   // 하단 네비: disabled 로 죽이지 않고 위치별로 라벨·이동을 바꿔 항상 빠져나갈 길을 둔다.
   const leafIdx = nav.leaf;
@@ -320,9 +332,11 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
     <div ref={rootRef}>
       <Crumb
         label={
-          leaf.subGroup && leaf.subGroup !== leaf.label
-            ? `${leaf.subGroup} › ${leaf.label}`
-            : leaf.label
+          isSingleLeaf
+            ? s.label || '항목'
+            : leaf.subGroup && leaf.subGroup !== leaf.label
+              ? `${leaf.subGroup} › ${leaf.label}`
+              : leaf.label
         }
         onBack={backToLeaves}
       />
@@ -394,7 +408,7 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
           ) : hasNextSection ? (
             <button
               type="button"
-              onClick={() => setNav({ sec: secIdx + 1, leaf: null })}
+              onClick={() => enterSection(secIdx + 1)}
               className={navBlue}
             >
               다음 섹션
