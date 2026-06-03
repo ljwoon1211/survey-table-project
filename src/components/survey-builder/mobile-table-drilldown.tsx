@@ -64,6 +64,17 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
     leaf: null,
   });
 
+  // 사용자가 거쳐가며 비워둔 입력 칸(빈 응답으로 확정) 집합.
+  // 값이 없어도 이 집합에 들면 진행률·완료 표시에서 "채운 것"으로 카운트한다.
+  // 컴포넌트 로컬 상태라 새로고침 시 초기화된다(실제 입력값은 value에 보존).
+  const [acknowledged, setAcknowledged] = useState<Set<string>>(new Set());
+  const ackCells = (cellIds: string[]) =>
+    setAcknowledged((prev) => {
+      const next = new Set(prev);
+      for (const id of cellIds) next.add(id);
+      return next;
+    });
+
   // 리프가 1개뿐인 matrix 섹션은 "리프 목록" 군더더기 단계를 건너뛰고 바로 입력 폼으로 진입한다.
   // (scalar/list 섹션은 원래 목록 없이 바로 폼이라 leaf:null 그대로 둔다.)
   const enterSection = (si: number) => {
@@ -85,10 +96,24 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
     rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [nav.sec, nav.leaf]);
 
+  // 들어갔던 섹션을 빠져나오는 순간(다음 섹션·목차로·다른 섹션 진입) 그 섹션의 모든
+  // 입력 칸을 거쳐간 것으로 확정한다. 나가는 경로와 무관하게 nav.sec 변화 한 곳에서 처리하므로
+  // "다음 섹션" 버튼이 없는 마지막 섹션도 목차로 빠져나올 때 100%까지 채워진다.
+  // 단, TOC→섹션 첫 진입(이전 sec이 null)과 뒤로 가기는 확정하지 않는다(앞으로 나아간 게 아님).
+  const prevSecRef = useRef<number | null>(null);
+  useEffect(() => {
+    const prev = prevSecRef.current;
+    if (prev !== null && prev !== nav.sec && sections[prev]) {
+      ackCells(sections[prev].leaves.flatMap((l) => l.inputCellIds));
+    }
+    prevSecRef.current = nav.sec;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nav.sec, sections]);
+
   // ── 응답 채움 계산 ──
   // emptyDefault(숫자 셀 첫 진입 시 자동 채워지는 초기값)와 동일한 값은 사용자가
   // 실제로 입력한 게 아니므로 미입력으로 간주한다.
-  const filled = (cellId: string) => {
+  const hasValue = (cellId: string) => {
     const v = String(value?.[cellId] ?? '').trim();
     if (v === '') return false;
     const cell = cellById.get(cellId);
@@ -97,7 +122,9 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
     }
     return true;
   };
-  const leafFilled = (l: ClassifiedLeaf) => l.inputCellIds.filter(filled).length;
+  // 실제 입력했거나(hasValue) 거쳐가며 비워둔(acknowledged) 칸을 "채운 것"으로 본다.
+  const counted = (cellId: string) => hasValue(cellId) || acknowledged.has(cellId);
+  const leafFilled = (l: ClassifiedLeaf) => l.inputCellIds.filter(counted).length;
   const leafDone = (l: ClassifiedLeaf) =>
     l.inputCellIds.length > 0 && leafFilled(l) === l.inputCellIds.length;
   const secFilled = (s: ClassifiedSection) => s.leaves.reduce((a, l) => a + leafFilled(l), 0);
@@ -358,11 +385,19 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
                   const cellId = leaf.inputCellIds[k++];
                   const cell = cellById.get(cellId);
                   if (!cell) return null;
+                  // 일반 테이블 카드(mobile-row-card)와 동일한 라벨 위계:
+                  // 파란 점 불릿 + text-sm gray-900. 라벨이 주, 문항(cell.content)이 보조.
+                  const label = cell.exportLabel?.trim() || c.label;
                   return (
-                    <div key={c.col}>
-                      <label className="mb-1 block pl-0.5 text-xs font-medium text-gray-500">
-                        {cell.exportLabel?.trim() || c.label}
-                      </label>
+                    <div key={c.col} className="space-y-1">
+                      {label && (
+                        <div className="flex items-start gap-1.5">
+                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
+                          <span className="line-clamp-2 text-sm font-medium text-gray-900">
+                            {label}
+                          </span>
+                        </div>
+                      )}
                       {renderCell(cellId)}
                     </div>
                   );
@@ -399,7 +434,10 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
           {!isLastLeaf ? (
             <button
               type="button"
-              onClick={() => setNav({ sec: nav.sec, leaf: leafIdx + 1 })}
+              onClick={() => {
+                ackCells(leaf.inputCellIds);
+                setNav({ sec: nav.sec, leaf: leafIdx + 1 });
+              }}
               className={navBlue}
             >
               다음 항목
