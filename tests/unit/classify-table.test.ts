@@ -25,6 +25,7 @@ const I = (id: string, o: { cs?: number; ph?: string } = {}): TableCell => ({
   colspan: o.cs,
   placeholder: o.ph ?? 'ex) 100',
 });
+const S = (id: string): TableCell => ({ id, type: 'select', content: '' });
 const C = (label: string): TableColumn => ({ id: cid(), label });
 const HC = (label: string, cs = 1, rs = 1): HeaderCell => ({ id: cid(), label, colspan: cs, rowspan: rs });
 
@@ -115,6 +116,25 @@ function bigList(): ClassifyInput {
   };
 }
 
+// ── 표 6: 수출 국가 및 비중 (라벨 1열 rowspan 병합 + 행마다 row.label "_n") ──
+// 라벨 셀이 rowspan 으로 병합돼 있어 첫 행 셀 content 는 그룹 전체 라벨(풀 텍스트)이고,
+// 나머지 행은 가려진(isHidden) 연속 셀이다. 개별 행 식별은 row.label "_1"~"_n" 에만 있다.
+function exportCountry(n = 3): ClassifyInput {
+  const cols = [C('구분'), C('국가코드'), C('비중'), C('국가코드'), C('비중')];
+  const rows: TableRow[] = Array.from({ length: n }, (_, i) => ({
+    id: `ec${i}`,
+    label: `수출 국가 및 비중(%)_${i + 1}`,
+    cells: [
+      i === 0 ? T('수출 국가 및 비중(%) (국가 코드 참조)', { rs: n }) : H(),
+      S(`ec${i}-c1`),
+      I(`ec${i}-v1`),
+      S(`ec${i}-c2`),
+      I(`ec${i}-v2`),
+    ],
+  }));
+  return { tableColumns: cols, tableRowsData: rows };
+}
+
 beforeEach(() => {
   _id = 0;
 });
@@ -175,6 +195,20 @@ describe('classifyTable — 평면 단순', () => {
     expect(secs).toHaveLength(3);
     expect(secs.every((s) => s.kind === 'scalar')).toBe(true);
     expect(secs.every((s) => s.leaves.length === 1)).toBe(true);
+  });
+});
+
+describe('classifyTable — 수출 국가 (라벨 rowspan 병합)', () => {
+  it('rowspan 병합 라벨 셀의 첫 행도 row.label 기반으로 일관되게 매겨진다', () => {
+    const secs = classifyTable(exportCountry(3));
+    expect(secs).toHaveLength(1);
+    expect(secs[0].kind).toBe('matrix');
+    // 첫 리프가 병합 셀의 풀 텍스트가 아니라 row.label "_1" 이어야 한다.
+    expect(secs[0].leaves.map((l) => l.label)).toEqual([
+      '수출 국가 및 비중(%)_1',
+      '수출 국가 및 비중(%)_2',
+      '수출 국가 및 비중(%)_3',
+    ]);
   });
 });
 
