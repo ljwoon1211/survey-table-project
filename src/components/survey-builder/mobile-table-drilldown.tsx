@@ -304,6 +304,18 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
   const leaf = s.leaves[nav.leaf];
   const backToLeaves = () => setNav({ sec: nav.sec, leaf: null });
   let k = 0; // colGroups flat 순서 = leaf.inputCellIds 순서
+  // 하단 네비: disabled 로 죽이지 않고 위치별로 라벨·이동을 바꿔 항상 빠져나갈 길을 둔다.
+  const leafIdx = nav.leaf;
+  const secIdx = nav.sec;
+  const isFirstLeaf = leafIdx <= 0;
+  const isLastLeaf = leafIdx >= s.leaves.length - 1;
+  const hasNextSection = secIdx < sections.length - 1;
+  // 리프 1개 + 마지막 섹션: 좌·우 모두 '목차로'가 되어 중복 → 단일 버튼으로 합친다.
+  const onlyRootExit = isFirstLeaf && isLastLeaf && !hasNextSection;
+  const navGray =
+    'flex flex-1 items-center justify-center gap-1 rounded-xl border border-gray-200 bg-white py-3 text-sm font-semibold text-gray-600 active:bg-gray-50';
+  const navBlue =
+    'flex flex-1 items-center justify-center gap-1 rounded-xl border border-blue-200 bg-blue-50 py-3 text-sm font-semibold text-blue-600 active:bg-blue-100';
   return (
     <div ref={rootRef}>
       <Crumb
@@ -346,24 +358,56 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
           ))}
         </div>
       </div>
-      <div className="mt-3 flex gap-2.5">
-        <button
-          type="button"
-          disabled={nav.leaf <= 0}
-          onClick={() => setNav({ sec: nav.sec, leaf: (nav.leaf ?? 0) - 1 })}
-          className="flex-1 rounded-xl border border-gray-200 bg-white py-3 text-sm font-semibold text-gray-600 disabled:opacity-40"
-        >
-          ‹ 이전 항목
-        </button>
-        <button
-          type="button"
-          disabled={nav.leaf >= s.leaves.length - 1}
-          onClick={() => setNav({ sec: nav.sec, leaf: (nav.leaf ?? 0) + 1 })}
-          className="flex-1 rounded-xl border border-blue-200 bg-blue-50 py-3 text-sm font-semibold text-blue-600 disabled:opacity-40"
-        >
-          다음 항목 ›
-        </button>
-      </div>
+      {onlyRootExit ? (
+        <div className="mt-3">
+          <button type="button" onClick={backToRoot} className={cn(navGray, 'w-full')}>
+            <ChevronLeft className="h-4 w-4" />
+            목차로
+          </button>
+        </div>
+      ) : (
+        <div className="mt-3 flex gap-2.5">
+          {isFirstLeaf ? (
+            <button type="button" onClick={backToRoot} className={navGray}>
+              <ChevronLeft className="h-4 w-4" />
+              목차로
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setNav({ sec: nav.sec, leaf: leafIdx - 1 })}
+              className={navGray}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              이전 항목
+            </button>
+          )}
+          {!isLastLeaf ? (
+            <button
+              type="button"
+              onClick={() => setNav({ sec: nav.sec, leaf: leafIdx + 1 })}
+              className={navBlue}
+            >
+              다음 항목
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          ) : hasNextSection ? (
+            <button
+              type="button"
+              onClick={() => setNav({ sec: secIdx + 1, leaf: null })}
+              className={navBlue}
+            >
+              다음 섹션
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          ) : (
+            <button type="button" onClick={backToRoot} className={navBlue}>
+              목차로
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      )}
       <ProgressBar />
     </div>
   );
