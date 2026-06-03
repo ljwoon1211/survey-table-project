@@ -101,7 +101,9 @@ function buildColGroups(q: ClassifyInput, vcols: number[]): ColGroup[] {
 const rightmostLabel = (row: TableRow, labelCols: number[]) => {
   for (let k = labelCols.length - 1; k >= 0; k--) {
     const c = row.cells[labelCols[k]];
-    if (isLabel(c) && c!.content.trim()) return c!.content.trim();
+    // rowspan 으로 병합된 라벨 셀의 첫 행 content 는 그룹 전체를 대표하는 라벨이라
+    // 개별 행(리프)을 구분하지 못한다. 이런 셀은 건너뛰고 row.label 로 떨어진다.
+    if (isLabel(c) && c!.content.trim() && (c!.rowspan ?? 1) <= 1) return c!.content.trim();
   }
   return row.label || '';
 };
