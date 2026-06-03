@@ -356,9 +356,12 @@ export function generateRawDataWorkbook(
   const idValue = (row: RawExportResponseRow, idx: number): string | number =>
     identifierMode === 'systemId' ? (row.resid ?? '') : idx + 1;
 
-  const columns = generateSPSSColumns(questions);
-  const dataMatrix = buildDataRows(columns, questions, rows as unknown as SurveySubmission[]);
-  const questionMap = new Map(questions.map((q) => [q.id, q]));
+  // 질문은 order 순으로 정렬해 컬럼/코딩북 순서를 설문 표시 순서와 일치시킨다.
+  // (Summary/VariableMap 워크북도 동일하게 order 정렬을 적용한다.)
+  const sortedQuestions = [...questions].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const columns = generateSPSSColumns(sortedQuestions);
+  const dataMatrix = buildDataRows(columns, sortedQuestions, rows as unknown as SurveySubmission[]);
+  const questionMap = new Map(sortedQuestions.map((q) => [q.id, q]));
 
   const workbook = XLSX.utils.book_new();
 

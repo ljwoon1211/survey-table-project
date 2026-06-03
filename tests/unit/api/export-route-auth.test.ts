@@ -67,4 +67,16 @@ describe('GET /api/surveys/[surveyId]/export requires authentication', () => {
 
     expect(response.status).toBe(401);
   });
+
+  it('returns 401 without auth (raw type)', async () => {
+    const request = new NextRequest(
+      'http://localhost/api/surveys/test-id/export?type=raw',
+    );
+
+    const response = await GET(request, {
+      params: Promise.resolve({ surveyId: 'test-id' }),
+    });
+
+    expect(response.status).toBe(401);
+  });
 });
