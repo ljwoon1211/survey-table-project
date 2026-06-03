@@ -19,12 +19,14 @@ vi.mock('@/db', () => ({
 
 vi.mock('@/db/schema', () => ({
   surveys: { id: 'surveys.id' },
-  surveyResponses: { surveyId: 'survey_responses.survey_id' },
+  surveyResponses: { surveyId: 'survey_responses.survey_id', deletedAt: 'deleted_at', status: 'status' },
+  contactTargets: { id: 'contact_targets.id', resid: 'resid', groupValue: 'group_value' },
 }));
 
 vi.mock('@/lib/excel-transformer', () => ({
   generateSummaryWorkbook: vi.fn(),
   generateVariableMapWorkbook: vi.fn(),
+  generateRawDataWorkbook: vi.fn(),
 }));
 
 import { GET } from '@/app/api/surveys/[surveyId]/export/route';
