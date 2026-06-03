@@ -13,7 +13,7 @@ import {
   transformRankingOtherText,
   transformRankingWithOptions,
   transformSingleChoice,
-  transformTableCell,
+  transformTableChoiceCell,
   transformText,
   transformNumericText,
 } from '@/lib/spss/data-transformer';
@@ -333,6 +333,9 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
               cellSpssVarType: cell.spssVarType,
               cellSpssMeasure: cell.spssMeasure,
               cellExportLabel: cell.exportLabel,
+              // radio/select 셀의 응답값을 spssNumericCode로 매핑하기 위한 옵션.
+              // RadioOption은 QuestionOption과 구조적으로 호환되어 그대로 widening.
+              cellOptions: cell.radioOptions || cell.selectOptions,
             });
 
             // radio/select 셀의 allowTextInput 옵션마다 STRING 사이드카 텍스트 변수 생성
@@ -616,7 +619,11 @@ export function buildDataRows(
             return isSelected ? code : null;
           }
 
-          return transformTableCell(col.tableCellType || 'input', cellVal);
+          return transformTableChoiceCell(
+            col.tableCellType || 'input',
+            cellVal,
+            col.cellOptions,
+          );
         }
 
         case 'radio-group': {

@@ -229,5 +229,33 @@ describe('buildDataRows', () => {
     expect(rows[0][0]).toBe(1);
     expect(rows[1][0]).toBe(2);
   });
+
+  it('테이블 radio 셀 응답을 옵션 spssNumericCode로 변환한다', () => {
+    const q: Question = {
+      id: 'q1', type: 'table', title: 'Q1', order: 1, required: false,
+      questionCode: 'Q1',
+      tableColumns: [{ id: 'c2', label: '값', columnCode: 'c2' }],
+      tableRowsData: [
+        { id: 'row1', label: '행1', rowCode: 'r1', cells: [
+          { id: 'cellB', type: 'radio', content: '', cellCode: 'Q1_r1_c2',
+            radioOptions: [
+              { id: 'oA', label: '예', value: 'opt1', spssNumericCode: 1 },
+              { id: 'oB', label: '아니오', value: 'opt2', spssNumericCode: 2 },
+            ] },
+        ] },
+      ],
+    } as unknown as Question;
+
+    const cols = generateSPSSColumns([q]);
+    const submissions = [
+      { questionResponses: { q1: { cellB: 'opt2' } } },
+      { questionResponses: { q1: { cellB: 'oA' } } }, // id로 저장된 경우도 매핑
+    ] as unknown as SurveySubmission[];
+
+    const rows = buildDataRows(cols, [q], submissions);
+    const colIdx = cols.findIndex((c) => c.spssVarName === 'Q1_r1_c2');
+    expect(rows[0][colIdx]).toBe(2);
+    expect(rows[1][colIdx]).toBe(1);
+  });
 });
 
