@@ -116,12 +116,20 @@ export function planSplit(
 
   const common = generateSPSSColumns(bucketQuestions(questions, basisQuestionId, 'common')).length;
 
-  const sheets: SplitSheetPlan[] = [];
+  const rawSheets: Array<{ token: string; rawName: string; vars: number; resp: number }> = [];
   for (const t of tokens) {
     const vars = generateSPSSColumns(bucketQuestions(questions, basisQuestionId, t)).length;
     if (vars === 0) continue; // 빈 버킷 제외
-    sheets.push({ token: t, name: labelMap.get(t) ?? t, vars, resp: respCounts[t] ?? 0 });
+    rawSheets.push({ token: t, rawName: labelMap.get(t) ?? t, vars, resp: respCounts[t] ?? 0 });
   }
+
+  const finalNames = assignSplitSheetNames(rawSheets.map((s) => s.rawName));
+  const sheets: SplitSheetPlan[] = rawSheets.map((s, i) => ({
+    token: s.token,
+    name: finalNames[i],
+    vars: s.vars,
+    resp: s.resp,
+  }));
 
   const maxVars = Math.max(common, 0, ...sheets.map((s) => s.vars));
   return {
@@ -134,6 +142,22 @@ export function planSplit(
     exceedsSoftLimit: maxVars > SPLIT_SOFT_LIMIT,
     exceedsExcelLimit: maxVars > SPLIT_EXCEL_LIMIT,
   };
+}
+
+/** Excel 시트명 제약(31자, []:*?/\ 제거)을 적용하고, 중복은 ~N 접미사로 유일화한다. 입력 순서 보존. */
+export function assignSplitSheetNames(rawNames: string[]): string[] {
+  const used = new Set<string>();
+  return rawNames.map((raw) => {
+    let base = (raw || '').replace(/[[\]:*?/\\]/g, ' ').trim().slice(0, 31) || '시트';
+    let candidate = base;
+    let n = 2;
+    while (used.has(candidate)) {
+      const suf = `~${n++}`;
+      candidate = base.slice(0, 31 - suf.length) + suf;
+    }
+    used.add(candidate);
+    return candidate;
+  });
 }
 
 const SPLIT_BASIS_TYPES = ['radio', 'checkbox', 'select', 'multiselect'];

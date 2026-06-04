@@ -5,7 +5,7 @@ import { HEADER_BORDER, HEADER_FILL, HEADER_FONT } from '@/lib/analytics/cleanin
 import { isCellInputable } from '@/lib/analytics/excel-export-utils';
 import { generateSPSSColumns, buildDataRows, type SPSSExportColumn } from '@/lib/analytics/spss-excel-export';
 import { formatExcelDateTime, buildCodebookValueLabel } from '@/lib/analytics/raw-export-helpers';
-import { bucketQuestions, optionTokensForBasis } from '@/lib/analytics/split-export';
+import { bucketQuestions, planSplit } from '@/lib/analytics/split-export';
 import { formatTotalTime, mapStatusPill } from '@/lib/operations/profiles';
 import { formatPlatformKo, type Platform } from '@/lib/operations/parse-ua';
 import { Question, Survey, SurveySubmission } from '@/types/survey';
@@ -447,44 +447,22 @@ export function buildSplitWorkbook(
     identifierMode === 'systemId' ? (row.resid ?? '') : idx + 1;
 
   const sortedQuestions = [...questions].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  const basis = sortedQuestions.find((q) => q.id === basisQuestionId);
-  if (!basis) throw new Error(`기준 문항을 찾을 수 없습니다: ${basisQuestionId}`);
+
+  // planSplit이 assignSplitSheetNames 적용 후 최종 시트명을 s.name에 보관한다.
+  // buildSplitWorkbook은 plan.sheets를 그대로 따라 옵션 시트를 생성해 이름 일관성을 보장한다.
+  const plan = planSplit(sortedQuestions, basisQuestionId);
 
   const workbook = new ExcelJS.Workbook();
-  const usedNames = new Set<string>();
-
-  // Excel 시트명 제약(31자, [];:*?/\ 제거) + 중복 접미사
-  const sheetName = (raw: string): string => {
-    let name = (raw || '시트').replace(/[[\]:*?/\\]/g, ' ').trim().slice(0, 28) || '시트';
-    let candidate = name;
-    let n = 2;
-    while (usedNames.has(candidate)) candidate = `${name}~${n++}`.slice(0, 31);
-    usedNames.add(candidate);
-    return candidate;
-  };
-
-  // 시트 1: 응답 내역 (전체 응답자)
-  const ws1 = workbook.addWorksheet(sheetName('응답 내역'));
-  ws1.addRow([idHeader, '조사 대상 그룹', '접속 단말', '브라우저', '상태', '시작일시', '종료일시', '소요시간']);
-  rows.forEach((row, i) => {
-    ws1.addRow([
-      idValue(row, i),
-      row.groupValue ?? '공개링크',
-      formatPlatformKo(row.platform as Platform | null),
-      row.browser ?? 'Other',
-      mapStatusPill({ status: row.status }).label,
-      formatExcelDateTime(row.startedAt),
-      formatExcelDateTime(row.completedAt),
-      formatTotalTime(row.totalSeconds, row.status),
-    ]);
-  });
-  styleHeaderRows(ws1, [1], 8);
-  autoFitRawColumns(ws1, 8);
 
   // 변수 시트(공통/옵션) — bucketQuestions 결과로 헤더 3행 + 전체 응답자 데이터
   const addVariableSheet = (name: string, bucketQs: Question[]) => {
+    // 예약 이름(응답 내역/공통/코딩북)과 충돌하는 극단적 엣지케이스 방어
+    let nm = name;
+    let k = 2;
+    while (workbook.getWorksheet(nm)) nm = `${name.slice(0, 28)} ${k++}`;
+
     const columns = generateSPSSColumns(bucketQs);
-    const ws = workbook.addWorksheet(sheetName(name));
+    const ws = workbook.addWorksheet(nm);
     const colCount = columns.length + 1;
     ws.addRow([idHeader, ...columns.map((c) => c.questionText)]);
     ws.addRow(['', ...columns.map((c) => row2Label(c))]);
@@ -508,27 +486,42 @@ export function buildSplitWorkbook(
     });
   };
 
-  // 시트 2: 공통
+  // 시트 1: 응답 내역 (전체 응답자) — 고정 이름
+  const ws1 = workbook.addWorksheet('응답 내역');
+  ws1.addRow([idHeader, '조사 대상 그룹', '접속 단말', '브라우저', '상태', '시작일시', '종료일시', '소요시간']);
+  rows.forEach((row, i) => {
+    ws1.addRow([
+      idValue(row, i),
+      row.groupValue ?? '공개링크',
+      formatPlatformKo(row.platform as Platform | null),
+      row.browser ?? 'Other',
+      mapStatusPill({ status: row.status }).label,
+      formatExcelDateTime(row.startedAt),
+      formatExcelDateTime(row.completedAt),
+      formatTotalTime(row.totalSeconds, row.status),
+    ]);
+  });
+  styleHeaderRows(ws1, [1], 8);
+  autoFitRawColumns(ws1, 8);
+
+  // 시트 2: 공통 — 고정 이름
   addVariableSheet('공통', bucketQuestions(sortedQuestions, basisQuestionId, 'common'));
 
-  // 시트 3..N: 옵션별
-  const labelMap = new Map((basis.options ?? []).map((o) => [o.value, o.label]));
-  for (const token of optionTokensForBasis(sortedQuestions, basis)) {
-    const bucketQs = bucketQuestions(sortedQuestions, basisQuestionId, token);
-    if (generateSPSSColumns(bucketQs).length === 0) continue; // 빈 버킷 제외 (planSplit과 동일)
-    addVariableSheet(labelMap.get(token) ?? token, bucketQs);
+  // 시트 3..N: 옵션별 — plan.sheets 순서와 이름을 그대로 사용 (BY CONSTRUCTION 일치)
+  for (const s of plan.sheets) {
+    addVariableSheet(s.name, bucketQuestions(sortedQuestions, basisQuestionId, s.token));
   }
 
-  // 마지막 시트: 코딩북 (전체 변수)
+  // 마지막 시트: 코딩북 (전체 변수) — 고정 이름
   const allColumns = generateSPSSColumns(sortedQuestions);
   const questionMap = new Map(sortedQuestions.map((q) => [q.id, q]));
-  const ws3 = workbook.addWorksheet(sheetName('코딩북'));
-  ws3.addRow(['변수번호', 'SPSS 변수명', '질문 제목', '셀라벨', '값 라벨']);
+  const wsCb = workbook.addWorksheet('코딩북');
+  wsCb.addRow(['변수번호', 'SPSS 변수명', '질문 제목', '셀라벨', '값 라벨']);
   allColumns.forEach((c, i) => {
-    ws3.addRow([i + 1, c.spssVarName, c.questionText, c.cellExportLabel ?? '', buildCodebookValueLabel(c, questionMap)]);
+    wsCb.addRow([i + 1, c.spssVarName, c.questionText, c.cellExportLabel ?? '', buildCodebookValueLabel(c, questionMap)]);
   });
-  styleHeaderRows(ws3, [1], 5);
-  autoFitRawColumns(ws3, 5);
+  styleHeaderRows(wsCb, [1], 5);
+  autoFitRawColumns(wsCb, 5);
 
   return workbook;
 }

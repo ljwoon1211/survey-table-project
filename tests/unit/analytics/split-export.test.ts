@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { valueMatchSet, bucketQuestions, optionTokensForBasis, planSplit, detectSplitCandidates } from '@/lib/analytics/split-export';
+import { valueMatchSet, bucketQuestions, optionTokensForBasis, planSplit, detectSplitCandidates, assignSplitSheetNames } from '@/lib/analytics/split-export';
 import { buildSplitWorkbook } from '@/lib/excel-transformer';
 import type { RawExportResponseRow } from '@/lib/excel-transformer';
 import type { Question, QuestionConditionGroup } from '@/types/survey';
@@ -202,6 +202,126 @@ describe('buildSplitWorkbook ↔ planSplit 일관성', () => {
     for (const s of plan.sheets) {
       const ws = wb.getWorksheet(s.name)!;
       expect(ws.getRow(1).cellCount - 1).toBe(s.vars);
+    }
+  });
+});
+
+describe('assignSplitSheetNames', () => {
+  it('금지 문자([]:*?/\\)를 공백으로 치환한다', () => {
+    const result = assignSplitSheetNames(['제재목/원목']);
+    expect(result).toEqual(['제재목 원목']);
+  });
+
+  it('31자를 초과하는 이름은 31자로 자른다', () => {
+    const longName = 'A'.repeat(40);
+    const result = assignSplitSheetNames([longName]);
+    expect(result[0].length).toBeLessThanOrEqual(31);
+  });
+
+  it('중복 이름에 ~N 접미사를 붙여 유일화한다', () => {
+    const result = assignSplitSheetNames(['합판', '합판', '합판']);
+    expect(result).toEqual(['합판', '합판~2', '합판~3']);
+    expect(new Set(result).size).toBe(3);
+  });
+
+  it('기본 이름이 길어도 ~N 접미사 자리를 올바르게 확보한다 (접미사 비잘림)', () => {
+    // 정확히 31자인 기본 이름 두 개
+    const base = 'B'.repeat(31);
+    const result = assignSplitSheetNames([base, base]);
+    expect(result[0]).toBe(base);
+    expect(result[1].endsWith('~2')).toBe(true);
+    expect(result[1].length).toBeLessThanOrEqual(31);
+    // 결과가 실제로 서로 다른지 확인
+    expect(result[0]).not.toBe(result[1]);
+  });
+
+  it('빈 문자열은 시트 로 대체한다', () => {
+    const result = assignSplitSheetNames(['']);
+    expect(result[0]).toBe('시트');
+  });
+
+  it('입력 순서를 보존한다', () => {
+    const inputs = ['C', 'A', 'B'];
+    const result = assignSplitSheetNames(inputs);
+    expect(result).toEqual(['C', 'A', 'B']);
+  });
+});
+
+describe('buildSplitWorkbook ↔ planSplit 일관성 (금지문자/장이름/중복 엣지케이스)', () => {
+  // 옵션 라벨: 금지 문자 포함, 28자 초과, 중복 두 개
+  const basisEdge = q({
+    id: 'QE', type: 'radio', questionCode: 'QE', title: '품목엣지', order: 0,
+    options: [
+      { id: 'e1', value: 'tok1', label: '제재목/원목' },           // 금지 문자 포함
+      { id: 'e2', value: 'tok2', label: 'A'.repeat(35) },          // 35자 (31자 초과)
+      { id: 'e3', value: 'tok3', label: '중복라벨' },
+      { id: 'e4', value: 'tok4', label: '중복라벨' },              // tok3과 동일 라벨
+    ],
+  } as Partial<Question>);
+
+  // tok1 전용 질문
+  const eOnly1 = q({ id: 'E1', type: 'text', title: 'tok1전용', order: 1, questionCode: 'E1',
+    displayCondition: vm('QE', ['tok1']) });
+  // tok2 전용 질문
+  const eOnly2 = q({ id: 'E2', type: 'text', title: 'tok2전용', order: 2, questionCode: 'E2',
+    displayCondition: vm('QE', ['tok2']) });
+  // tok3/tok4 전용 질문 (각각)
+  const eOnly3 = q({ id: 'E3', type: 'text', title: 'tok3전용', order: 3, questionCode: 'E3',
+    displayCondition: vm('QE', ['tok3']) });
+  const eOnly4 = q({ id: 'E4', type: 'text', title: 'tok4전용', order: 4, questionCode: 'E4',
+    displayCondition: vm('QE', ['tok4']) });
+
+  // 테이블 질문 — 행마다 displayCondition으로 tok1/tok2에 분기
+  const tableQ = q({
+    id: 'TQ', type: 'table', title: '테이블', order: 5, questionCode: 'TQ',
+    tableColumns: [{ id: 'col1', label: '열1' }],
+    tableRowsData: [
+      { id: 'row1', label: '행1', cells: [{ id: 'c1', type: 'input', exportLabel: 'TQ_열1_행1' }],
+        displayCondition: vm('QE', ['tok1']) },
+      { id: 'row2', label: '행2', cells: [{ id: 'c2', type: 'input', exportLabel: 'TQ_열1_행2' }],
+        displayCondition: vm('QE', ['tok2']) },
+    ],
+  } as Partial<Question>);
+
+  const edgeQuestions = [basisEdge, eOnly1, eOnly2, eOnly3, eOnly4, tableQ];
+  const edgeRows: RawExportResponseRow[] = [
+    { id: 'r1', questionResponses: { QE: 'tok1', E1: 'v' }, groupValue: null, resid: null,
+      platform: null, browser: null, status: 'completed', startedAt: new Date('2026-06-04T02:00:00Z'),
+      completedAt: new Date('2026-06-04T02:05:00Z'), totalSeconds: 300 },
+  ];
+
+  it('금지문자/장이름/중복 라벨에서도 planSplit 시트명과 워크북 시트명이 일치한다', () => {
+    const plan = planSplit(edgeQuestions, 'QE');
+    const wb = buildSplitWorkbook(edgeQuestions, edgeRows, 'QE', 'sequence');
+
+    const allNames = wb.worksheets.map((w) => w.name);
+    expect(allNames[0]).toBe('응답 내역');
+    expect(allNames[1]).toBe('공통');
+    expect(allNames[allNames.length - 1]).toBe('코딩북');
+
+    // 옵션 시트 이름이 plan.sheets[].name과 순서·내용 모두 일치
+    const optionNames = allNames.slice(2, allNames.length - 1);
+    expect(optionNames).toEqual(plan.sheets.map((s) => s.name));
+
+    // plan.sheets[].name으로 wb.getWorksheet 조회 가능
+    for (const s of plan.sheets) {
+      const ws = wb.getWorksheet(s.name);
+      expect(ws).toBeDefined();
+      // 변수 수 일치 (헤더 1행 셀 수 - 식별자 1)
+      expect(ws!.getRow(1).cellCount - 1).toBe(s.vars);
+    }
+
+    // 시트명이 31자 이하임을 보장
+    for (const nm of allNames) {
+      expect(nm.length).toBeLessThanOrEqual(31);
+    }
+
+    // 중복 없음
+    expect(new Set(allNames).size).toBe(allNames.length);
+
+    // 금지 문자가 시트명에 없음
+    for (const nm of allNames) {
+      expect(nm).not.toMatch(/[[\]:*?/\\]/);
     }
   });
 });
