@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 
 import { valueMatchSet, bucketQuestions, optionTokensForBasis, planSplit, detectSplitCandidates } from '@/lib/analytics/split-export';
+import { buildSplitWorkbook } from '@/lib/excel-transformer';
+import type { RawExportResponseRow } from '@/lib/excel-transformer';
 import type { Question, QuestionConditionGroup } from '@/types/survey';
 
 const vm = (sourceQuestionId: string, requiredValues: string[]): QuestionConditionGroup => ({
@@ -160,5 +162,46 @@ describe('detectSplitCandidates', () => {
     } as Partial<Question>);
     const b1 = q({ id: 'B1', type: 'text', displayCondition: vm('Q2', ['opt1']) });
     expect(detectSplitCandidates([basis, b1])).toHaveLength(0);
+  });
+});
+
+describe('buildSplitWorkbook ↔ planSplit 일관성', () => {
+  const basis = q({
+    id: 'Q2', type: 'radio', questionCode: 'Q2', title: '품목', order: 0,
+    options: [
+      { id: 'o1', value: 'opt1', label: '제재목' },
+      { id: 'o2', value: 'opt2', label: '합판' },
+    ],
+  } as Partial<Question>);
+  const commonQ = q({ id: 'A', type: 'text', title: '공통', order: 1 });
+  const only1 = q({ id: 'B', type: 'text', title: 'opt1전용', order: 2, displayCondition: vm('Q2', ['opt1']) });
+  const only2 = q({ id: 'C', type: 'text', title: 'opt2전용', order: 3, displayCondition: vm('Q2', ['opt2']) });
+  const questions = [basis, commonQ, only1, only2];
+
+  const rows: RawExportResponseRow[] = [
+    { id: 'r1', questionResponses: { Q2: 'opt1', A: 'x', B: 'y' }, groupValue: null, resid: null,
+      platform: null, browser: null, status: 'completed', startedAt: new Date('2026-06-04T01:00:00Z'),
+      completedAt: new Date('2026-06-04T01:05:00Z'), totalSeconds: 300 },
+  ];
+
+  it('시트 구성과 각 시트 변수 수가 planSplit과 일치한다', () => {
+    const plan = planSplit(questions, 'Q2');
+    const wb = buildSplitWorkbook(questions, rows, 'Q2', 'sequence');
+    const names = wb.worksheets.map((w) => w.name);
+    expect(names[0]).toBe('응답 내역');
+    expect(names[1]).toBe('공통');
+    expect(names[names.length - 1]).toBe('코딩북');
+    // 옵션 시트는 plan.sheets 순서대로 그 사이에 위치
+    expect(names.slice(2, names.length - 1)).toEqual(plan.sheets.map((s) => s.name));
+
+    // 공통 시트 변수 수(헤더 1행 셀 수 - 식별자 1) == plan.common
+    const commonWs = wb.getWorksheet('공통')!;
+    expect(commonWs.getRow(1).cellCount - 1).toBe(plan.common);
+
+    // 각 옵션 시트 변수 수 == plan.sheets[].vars
+    for (const s of plan.sheets) {
+      const ws = wb.getWorksheet(s.name)!;
+      expect(ws.getRow(1).cellCount - 1).toBe(s.vars);
+    }
   });
 });
