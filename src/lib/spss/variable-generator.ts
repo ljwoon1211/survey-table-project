@@ -22,7 +22,8 @@ function assignVarNames(questions: Question[]): Question[] {
         noticeIndex++;
         return { ...q, questionCode: varName };
       }
-      return { ...q, questionCode: undefined };
+      const { questionCode: _qc, ...qWithout } = q;
+      return qWithout as Question;
     }
 
     if (q.isCustomSpssVarName && q.questionCode) {

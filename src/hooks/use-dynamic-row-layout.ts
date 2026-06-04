@@ -12,7 +12,7 @@ interface UseDynamicRowLayoutParams {
   hasDynamicRows: boolean;
   headerRowCount: number;
   expandedGroupIds: Set<string>;
-  hiddenGroupIds?: Set<string>;
+  hiddenGroupIds?: Set<string> | undefined;
 }
 
 interface UseDynamicRowLayoutReturn {
@@ -118,7 +118,7 @@ export function useDynamicRowLayout({
         // 첫 번째 세그먼트: 원래 시작 ~ 첫 앵커까지
         const seg1Span = intersecting[0] - rowIdx + 1;
         setOvr(rowIdx, colIdx, {
-          rowspan: seg1Span > 1 ? seg1Span : undefined,
+          ...(seg1Span > 1 ? { rowspan: seg1Span } : {}),
         });
 
         // 후속 세그먼트들: 각 앵커 바로 다음 행에서 시작
@@ -135,10 +135,10 @@ export function useDynamicRowLayout({
             isHidden: false,
             type: isInteractive ? 'text' : cell.type,
             content: isInteractive ? '' : cell.content,
-            colspan: cell.colspan,
-            horizontalAlign: cell.horizontalAlign,
-            verticalAlign: cell.verticalAlign,
-            rowspan: segSpan > 1 ? segSpan : undefined,
+            ...(cell.colspan !== undefined ? { colspan: cell.colspan } : {}),
+            ...(cell.horizontalAlign !== undefined ? { horizontalAlign: cell.horizontalAlign } : {}),
+            ...(cell.verticalAlign !== undefined ? { verticalAlign: cell.verticalAlign } : {}),
+            ...(segSpan > 1 ? { rowspan: segSpan } : {}),
             _isContinuation: true,
           });
         }

@@ -15,6 +15,7 @@
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true,
     "noPropertyAccessFromIndexSignature": true,
+    "exactOptionalPropertyTypes": true,
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",

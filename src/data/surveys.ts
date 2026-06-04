@@ -115,57 +115,57 @@ export async function getSurveyWithDetails(surveyId: string): Promise<SurveyType
   const surveyData: SurveyType = {
     id: survey.id,
     title: survey.title,
-    description: survey.description ?? undefined,
-    slug: survey.slug ?? undefined,
-    privateToken: survey.privateToken ?? undefined,
+    ...(survey.description != null ? { description: survey.description } : {}),
+    ...(survey.slug != null ? { slug: survey.slug } : {}),
+    ...(survey.privateToken != null ? { privateToken: survey.privateToken } : {}),
     groups: groups.map((g) => ({
       id: g.id,
       surveyId: g.surveyId,
       name: g.name,
-      description: g.description ?? undefined,
+      ...(g.description != null ? { description: g.description } : {}),
       order: g.order,
-      parentGroupId: g.parentGroupId ?? undefined,
-      color: g.color ?? undefined,
-      collapsed: g.collapsed ?? undefined,
-      displayCondition: g.displayCondition as QuestionGroup['displayCondition'],
+      ...(g.parentGroupId != null ? { parentGroupId: g.parentGroupId } : {}),
+      ...(g.color != null ? { color: g.color } : {}),
+      ...(g.collapsed != null ? { collapsed: g.collapsed } : {}),
+      ...(g.displayCondition != null ? { displayCondition: g.displayCondition as NonNullable<QuestionGroup['displayCondition']> } : {}),
     })),
     questions: questionList.map((q) => {
       const mapped: QuestionType = {
         id: q.id,
         type: q.type as QuestionType['type'],
         title: q.title,
-        description: q.description ?? undefined,
+        ...(q.description != null ? { description: q.description } : {}),
         required: q.required,
-        groupId: q.groupId ?? undefined,
-        options: q.options as QuestionType['options'],
-        selectLevels: q.selectLevels as QuestionType['selectLevels'],
-        tableTitle: q.tableTitle ?? undefined,
-        tableColumns: q.tableColumns as QuestionType['tableColumns'],
-        tableRowsData: q.tableRowsData as QuestionType['tableRowsData'],
-        tableHeaderGrid: q.tableHeaderGrid as QuestionType['tableHeaderGrid'],
-        imageUrl: q.imageUrl ?? undefined,
-        videoUrl: q.videoUrl ?? undefined,
+        ...(q.groupId != null ? { groupId: q.groupId } : {}),
+        ...(q.options != null ? { options: q.options as NonNullable<QuestionType['options']> } : {}),
+        ...(q.selectLevels != null ? { selectLevels: q.selectLevels as NonNullable<QuestionType['selectLevels']> } : {}),
+        ...(q.tableTitle != null ? { tableTitle: q.tableTitle } : {}),
+        ...(q.tableColumns != null ? { tableColumns: q.tableColumns as NonNullable<QuestionType['tableColumns']> } : {}),
+        ...(q.tableRowsData != null ? { tableRowsData: q.tableRowsData as NonNullable<QuestionType['tableRowsData']> } : {}),
+        ...(q.tableHeaderGrid != null ? { tableHeaderGrid: q.tableHeaderGrid as NonNullable<QuestionType['tableHeaderGrid']> } : {}),
+        ...(q.imageUrl != null ? { imageUrl: q.imageUrl } : {}),
+        ...(q.videoUrl != null ? { videoUrl: q.videoUrl } : {}),
         order: q.order,
-        allowOtherOption: q.allowOtherOption ?? undefined,
-        optionsColumns: q.optionsColumns ?? undefined,
-        rankingConfig: (q as any).rankingConfig as QuestionType['rankingConfig'],
-        minSelections: q.minSelections ?? undefined,
-        maxSelections: q.maxSelections ?? undefined,
-        noticeContent: q.noticeContent ?? undefined,
-        requiresAcknowledgment: q.requiresAcknowledgment ?? undefined,
-        placeholder: q.placeholder ?? undefined,
-        defaultValueTemplate: q.defaultValueTemplate ?? undefined,
-        inputType: (q.inputType as 'text' | 'number' | null) ?? undefined,
-        emptyDefault: q.emptyDefault ?? undefined,
-        tableValidationRules: q.tableValidationRules as QuestionType['tableValidationRules'],
-        dynamicRowConfigs: q.dynamicRowConfigs as QuestionType['dynamicRowConfigs'],
-        hideColumnLabels: q.hideColumnLabels ?? undefined,
-        displayCondition: q.displayCondition as QuestionType['displayCondition'],
-        questionCode: q.questionCode ?? undefined,
-        isCustomSpssVarName: q.isCustomSpssVarName ?? undefined,
-        exportLabel: q.exportLabel ?? undefined,
-        spssVarType: (q as any).spssVarType ?? undefined,
-        spssMeasure: (q as any).spssMeasure ?? undefined,
+        ...(q.allowOtherOption != null ? { allowOtherOption: q.allowOtherOption } : {}),
+        ...(q.optionsColumns != null ? { optionsColumns: q.optionsColumns } : {}),
+        ...(q.rankingConfig != null ? { rankingConfig: q.rankingConfig } : {}),
+        ...(q.minSelections != null ? { minSelections: q.minSelections } : {}),
+        ...(q.maxSelections != null ? { maxSelections: q.maxSelections } : {}),
+        ...(q.noticeContent != null ? { noticeContent: q.noticeContent } : {}),
+        ...(q.requiresAcknowledgment != null ? { requiresAcknowledgment: q.requiresAcknowledgment } : {}),
+        ...(q.placeholder != null ? { placeholder: q.placeholder } : {}),
+        ...(q.defaultValueTemplate != null ? { defaultValueTemplate: q.defaultValueTemplate } : {}),
+        ...((q.inputType as 'text' | 'number' | null) != null ? { inputType: q.inputType as 'text' | 'number' } : {}),
+        ...(q.emptyDefault != null ? { emptyDefault: q.emptyDefault } : {}),
+        ...(q.tableValidationRules != null ? { tableValidationRules: q.tableValidationRules as NonNullable<QuestionType['tableValidationRules']> } : {}),
+        ...(q.dynamicRowConfigs != null ? { dynamicRowConfigs: q.dynamicRowConfigs as NonNullable<QuestionType['dynamicRowConfigs']> } : {}),
+        ...(q.hideColumnLabels != null ? { hideColumnLabels: q.hideColumnLabels } : {}),
+        ...(q.displayCondition != null ? { displayCondition: q.displayCondition as NonNullable<QuestionType['displayCondition']> } : {}),
+        ...(q.questionCode != null ? { questionCode: q.questionCode } : {}),
+        ...(q.isCustomSpssVarName != null ? { isCustomSpssVarName: q.isCustomSpssVarName } : {}),
+        ...(q.exportLabel != null ? { exportLabel: q.exportLabel } : {}),
+        ...(q.spssVarType != null ? { spssVarType: q.spssVarType as NonNullable<QuestionType['spssVarType']> } : {}),
+        ...(q.spssMeasure != null ? { spssMeasure: q.spssMeasure as NonNullable<QuestionType['spssMeasure']> } : {}),
       };
       // strip된 셀 데이터를 hydrate (cellCode, exportLabel, spssVarType 등 복원)
       if (mapped.type === 'table' && mapped.tableRowsData && mapped.tableColumns) {
@@ -185,13 +185,13 @@ export async function getSurveyWithDetails(surveyId: string): Promise<SurveyType
       showProgressBar: survey.showProgressBar,
       shuffleQuestions: survey.shuffleQuestions,
       requireLogin: survey.requireLogin,
-      endDate: survey.endDate ?? undefined,
-      maxResponses: survey.maxResponses ?? undefined,
+      ...(survey.endDate != null ? { endDate: survey.endDate } : {}),
+      ...(survey.maxResponses != null ? { maxResponses: survey.maxResponses } : {}),
       thankYouMessage: survey.thankYouMessage,
       requireInviteToken: survey.requireInviteToken,
     },
     lookups: survey.lookups ?? [],
-    contactColumns: survey.contactColumns ?? undefined,
+    ...(survey.contactColumns != null ? { contactColumns: survey.contactColumns } : {}),
     contactEmail: survey.contactEmail ?? null,
     createdAt: survey.createdAt,
     updatedAt: survey.updatedAt,
@@ -218,17 +218,7 @@ export async function getSurveyForResponse(
         title: string;
         description?: string;
         questions: QuestionType[];
-        groups: Array<{
-          id: string;
-          surveyId: string;
-          name: string;
-          description?: string;
-          order: number;
-          parentGroupId?: string;
-          color?: string;
-          collapsed?: boolean;
-          displayCondition?: QuestionGroup['displayCondition'];
-        }>;
+        groups: QuestionGroup[];
         settings: {
           isPublic: boolean;
           allowMultipleResponses: boolean;
@@ -243,12 +233,15 @@ export async function getSurveyForResponse(
         lookups?: SurveyType['lookups'];
       };
 
+      // endDate 는 snapshot 에서 string 으로 보관되므로 spread 전에 분리해 Date 로 재구성한다
+      // (base spread 가 string endDate 를 끌고오면 string | Date 로 충돌).
+      const { endDate: snapshotEndDate, ...snapshotSettingsRest } = snapshot.settings;
       const surveyData: SurveyType = {
         id: survey.id,
         title: snapshot.title,
-        description: snapshot.description,
-        slug: survey.slug ?? undefined,
-        privateToken: survey.privateToken ?? undefined,
+        ...(snapshot.description != null ? { description: snapshot.description } : {}),
+        ...(survey.slug != null ? { slug: survey.slug } : {}),
+        ...(survey.privateToken != null ? { privateToken: survey.privateToken } : {}),
         groups: snapshot.groups,
         questions: snapshot.questions.map((q) => {
           if (q.type === 'table' && q.tableRowsData && q.tableColumns) {
@@ -262,14 +255,12 @@ export async function getSurveyForResponse(
           return q;
         }),
         settings: {
-          ...snapshot.settings,
-          endDate: snapshot.settings.endDate
-            ? new Date(snapshot.settings.endDate)
-            : undefined,
+          ...snapshotSettingsRest,
+          ...(snapshotEndDate ? { endDate: new Date(snapshotEndDate) } : {}),
           requireInviteToken: survey.requireInviteToken,
         },
         lookups: snapshot.lookups ?? survey.lookups ?? [],
-        contactColumns: survey.contactColumns ?? undefined,
+        ...(survey.contactColumns != null ? { contactColumns: survey.contactColumns } : {}),
         contactEmail: survey.contactEmail ?? null,
         createdAt: survey.createdAt,
         updatedAt: survey.updatedAt,

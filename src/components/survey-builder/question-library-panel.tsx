@@ -211,10 +211,8 @@ export function QuestionLibraryPanel({
       }
 
       // 라이브러리에서 가져온 질문은 그룹 ID를 제거
-      questionToAdd = {
-        ...questionToAdd,
-        groupId: undefined,
-      };
+      const { groupId: _removedGroupId, ...questionWithoutGroup } = questionToAdd;
+      questionToAdd = questionWithoutGroup as Question;
 
       if (onAddQuestion) {
         onAddQuestion(questionToAdd);

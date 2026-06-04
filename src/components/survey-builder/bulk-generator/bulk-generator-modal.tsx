@@ -148,16 +148,16 @@ export function BulkGeneratorModal(props: BulkGeneratorModalProps) {
       const rows: BulkRowDef[] = items.map((item) => ({
         label: item.label,
         rowCode: item.code,
-        displayCondition: item.displayCondition,
-        dynamicGroupId: dynamicGroupId || undefined,
+        ...(item.displayCondition !== undefined ? { displayCondition: item.displayCondition } : {}),
+        ...(dynamicGroupId !== undefined ? { dynamicGroupId } : {}),
       }));
       (props as BulkGeneratorModalRowProps).onGenerate(rows);
     } else {
       const cols: BulkColumnDef[] = items.map((item) => ({
         label: item.label,
         columnCode: item.code,
-        displayCondition: item.displayCondition,
-        cellType: 'text',
+        ...(item.displayCondition !== undefined ? { displayCondition: item.displayCondition } : {}),
+        cellType: 'text' as const,
       }));
       (props as BulkGeneratorModalColumnProps).onGenerate(cols);
     }

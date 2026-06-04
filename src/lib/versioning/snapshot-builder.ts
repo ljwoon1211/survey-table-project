@@ -9,7 +9,7 @@ import { stripTableRowsData } from '@/utils/table-cell-optimizer';
 
 export interface SurveySnapshot {
   title: string;
-  description?: string;
+  description?: string | undefined;
   questions: SnapshotQuestion[];
   groups: SnapshotGroup[];
   settings: {
@@ -18,8 +18,8 @@ export interface SurveySnapshot {
     showProgressBar: boolean;
     shuffleQuestions: boolean;
     requireLogin: boolean;
-    endDate?: string;
-    maxResponses?: number;
+    endDate?: string | undefined;
+    maxResponses?: number | undefined;
     thankYouMessage: string;
   };
   // 외부 데이터 LUT 사본 — publish 시점 freeze. 응답 페이지가 분기 조건 우변 룩업을 평가할 때 사용.
@@ -30,46 +30,46 @@ interface SnapshotQuestion {
   id: string;
   type: string;
   title: string;
-  description?: string;
+  description?: string | undefined;
   required: boolean;
-  groupId?: string;
-  options?: Question['options'];
-  selectLevels?: Question['selectLevels'];
-  tableTitle?: string;
-  tableColumns?: Question['tableColumns'];
-  tableRowsData?: Question['tableRowsData'];
-  tableHeaderGrid?: Question['tableHeaderGrid'];
-  imageUrl?: string;
-  videoUrl?: string;
+  groupId?: string | undefined;
+  options?: Question['options'] | undefined;
+  selectLevels?: Question['selectLevels'] | undefined;
+  tableTitle?: string | undefined;
+  tableColumns?: Question['tableColumns'] | undefined;
+  tableRowsData?: Question['tableRowsData'] | undefined;
+  tableHeaderGrid?: Question['tableHeaderGrid'] | undefined;
+  imageUrl?: string | undefined;
+  videoUrl?: string | undefined;
   order: number;
-  allowOtherOption?: boolean;
-  optionsColumns?: number;
-  rankingConfig?: Question['rankingConfig'];
-  minSelections?: number;
-  maxSelections?: number;
-  noticeContent?: string;
-  requiresAcknowledgment?: boolean;
-  placeholder?: string;
-  tableValidationRules?: Question['tableValidationRules'];
-  dynamicRowConfigs?: Question['dynamicRowConfigs'];
-  hideColumnLabels?: boolean;
-  displayCondition?: Question['displayCondition'];
-  questionCode?: string;
-  defaultValueTemplate?: string | null;
-  inputType?: 'text' | 'number';
-  emptyDefault?: number;
+  allowOtherOption?: boolean | undefined;
+  optionsColumns?: number | undefined;
+  rankingConfig?: Question['rankingConfig'] | undefined;
+  minSelections?: number | undefined;
+  maxSelections?: number | undefined;
+  noticeContent?: string | undefined;
+  requiresAcknowledgment?: boolean | undefined;
+  placeholder?: string | undefined;
+  tableValidationRules?: Question['tableValidationRules'] | undefined;
+  dynamicRowConfigs?: Question['dynamicRowConfigs'] | undefined;
+  hideColumnLabels?: boolean | undefined;
+  displayCondition?: Question['displayCondition'] | undefined;
+  questionCode?: string | undefined;
+  defaultValueTemplate?: string | null | undefined;
+  inputType?: 'text' | 'number' | undefined;
+  emptyDefault?: number | undefined;
 }
 
 interface SnapshotGroup {
   id: string;
   surveyId: string;
   name: string;
-  description?: string;
+  description?: string | undefined;
   order: number;
-  parentGroupId?: string;
-  color?: string;
-  collapsed?: boolean;
-  displayCondition?: QuestionGroup['displayCondition'];
+  parentGroupId?: string | undefined;
+  color?: string | undefined;
+  collapsed?: boolean | undefined;
+  displayCondition?: QuestionGroup['displayCondition'] | undefined;
 }
 
 /**

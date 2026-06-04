@@ -335,6 +335,7 @@ function toSavVariable(
     || varType === VariableType.Date
     || varType === VariableType.DateTime;
 
+  const valueLabels = buildValueLabels(col, question);
   return {
     name: sanitizeSpssVarName(col.spssVarName),
     short: sanitizeSpssVarName(shortName),
@@ -345,7 +346,7 @@ function toSavVariable(
     alignment: VariableAlignment.Centre,
     measure: resolveMeasure(col, question),
     columns: isNumeric ? 8 : Math.min(maxWidth, 32),
-    valueLabels: buildValueLabels(col, question),
+    ...(valueLabels !== undefined ? { valueLabels } : {}),
   };
 }
 

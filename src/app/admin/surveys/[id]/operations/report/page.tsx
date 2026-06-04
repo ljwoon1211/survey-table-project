@@ -97,7 +97,7 @@ export default async function ReportProgressPage({ params, searchParams }: PageP
     .map((c) => ({
       source: c.source,
       label: c.label,
-      piiType: c.piiType,
+      ...(c.piiType !== undefined ? { piiType: c.piiType } : {}),
     }));
 
   const rawCol = typeof sp.col === 'string' ? sp.col : null;

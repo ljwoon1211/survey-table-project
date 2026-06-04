@@ -10,7 +10,7 @@ import { TableColumn, TableRow } from '@/types/survey';
 /** 병합 실행 결과 */
 export interface MergeResult {
   updatedRows: TableRow[];
-  newSelectedCell?: { rowId: string; cellId: string };
+  newSelectedCell?: { rowId: string; cellId: string } | undefined;
 }
 
 /**
@@ -77,17 +77,11 @@ export function checkCanMerge(
 
 /** 병합 대상 셀을 빈 텍스트 셀로 초기화 */
 function resetCell(cell: TableRow['cells'][number]): TableRow['cells'][number] {
+  const { checkboxOptions: _cb, radioOptions: _ro, selectOptions: _so, imageUrl: _iu, videoUrl: _vu, rowspan: _rs, colspan: _cs, ...rest } = cell;
   return {
-    ...cell,
+    ...rest,
     content: '',
     type: 'text',
-    checkboxOptions: undefined,
-    radioOptions: undefined,
-    selectOptions: undefined,
-    imageUrl: undefined,
-    videoUrl: undefined,
-    rowspan: undefined,
-    colspan: undefined,
   };
 }
 
@@ -176,10 +170,8 @@ export function executeUnmerge(
   if (rowspan <= 1 && colspan <= 1) return rows;
 
   const newRows = structuredClone(rows);
-  const targetCell = newRows[rowIndex].cells[cellIndex];
-
-  targetCell.rowspan = undefined;
-  targetCell.colspan = undefined;
+  const { rowspan: _rs, colspan: _cs, ...restCell } = newRows[rowIndex].cells[cellIndex];
+  newRows[rowIndex].cells[cellIndex] = restCell;
 
   return newRows;
 }

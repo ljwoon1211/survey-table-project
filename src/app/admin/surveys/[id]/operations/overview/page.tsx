@@ -92,7 +92,7 @@ export default async function OperationsOverviewPage({
   const [statusCounts, dailyBuckets, dailyStats, responseTime, dropFunnel, pageDwell] =
     await Promise.all([
       aggregateStatus(surveyId),
-      aggregateDaily({ surveyId, mode, hourModeDate: effectiveDate }),
+      aggregateDaily({ surveyId, mode, ...(effectiveDate !== undefined ? { hourModeDate: effectiveDate } : {}) }),
       getDailyStats(surveyId),
       getResponseTime(surveyId),
       getDropFunnel(surveyId),
@@ -113,7 +113,7 @@ export default async function OperationsOverviewPage({
       <DailyParticipationChart
         data={dailyBuckets}
         mode={mode}
-        hourModeDate={effectiveDate}
+        {...(effectiveDate !== undefined ? { hourModeDate: effectiveDate } : {})}
         availableDates={availableDates}
         weekOffset={weekOffset}
       />

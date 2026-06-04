@@ -13,8 +13,8 @@ const T = (content: string, o: { rs?: number; cs?: number } = {}): TableCell => 
   id: cid(),
   type: 'text',
   content,
-  rowspan: o.rs,
-  colspan: o.cs,
+  ...(o.rs !== undefined ? { rowspan: o.rs } : {}),
+  ...(o.cs !== undefined ? { colspan: o.cs } : {}),
 });
 const H = (): TableCell => ({ id: cid(), type: 'text', content: '', isHidden: true });
 const I = (id: string, o: { cs?: number; ph?: string } = {}): TableCell => ({
@@ -22,7 +22,7 @@ const I = (id: string, o: { cs?: number; ph?: string } = {}): TableCell => ({
   type: 'input',
   inputType: 'number',
   content: '',
-  colspan: o.cs,
+  ...(o.cs !== undefined ? { colspan: o.cs } : {}),
   placeholder: o.ph ?? 'ex) 100',
 });
 const S = (id: string): TableCell => ({ id, type: 'select', content: '' });

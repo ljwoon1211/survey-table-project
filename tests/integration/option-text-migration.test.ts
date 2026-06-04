@@ -79,7 +79,8 @@ describe('migrateQuestionOptions', () => {
     };
 
     const first = migrateQuestionOptions(question);
-    const second = migrateQuestionOptions({ ...first, allowOtherOption: undefined });
+    const { allowOtherOption: _ao1, ...firstWithoutOther1 } = first;
+    const second = migrateQuestionOptions(firstWithoutOther1);
 
     expect(second.options).toHaveLength(first.options!.length);
     expect(second.migratedOtherOptionId).toBeNull();
@@ -115,7 +116,8 @@ describe('migrateQuestionOptions', () => {
     const otherOptionId = first.options![1].id;
 
     // 두 번째 호출 -- 이미 마이그레이션된 결과 (allowOtherOption 없음) 를 그대로 줌
-    const second = migrateQuestionOptions({ ...first, allowOtherOption: undefined });
+    const { allowOtherOption: _ao2, ...firstWithoutOther2 } = first;
+    const second = migrateQuestionOptions(firstWithoutOther2);
 
     expect(second.options).toHaveLength(2);
     expect(second.options![1].id).toBe(otherOptionId);

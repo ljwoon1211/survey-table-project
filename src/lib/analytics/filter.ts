@@ -266,7 +266,6 @@ export function createFilterCondition(questionId: string): FilterCondition {
     id: crypto.randomUUID(),
     questionId,
     operator: 'equals',
-    value: undefined,
   };
 }
 

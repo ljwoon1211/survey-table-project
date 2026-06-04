@@ -231,11 +231,11 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
       >
         <Toolbar
           editor={editor}
-          variableCatalog={variableCatalog}
+          {...(variableCatalog !== undefined ? { variableCatalog } : {})}
           onPickImage={onPickImage}
           onPickLink={onPickLink}
-          onPickFile={kind === 'survey' ? onPickFile : undefined}
-          onReplaceFile={kind === 'survey' ? onReplaceFile : undefined}
+          {...(kind === 'survey' && onPickFile !== undefined ? { onPickFile } : {})}
+          {...(kind === 'survey' && onReplaceFile !== undefined ? { onReplaceFile } : {})}
         />
         <div
           className="flex flex-col overflow-y-auto max-h-[calc(100vh-260px)]"

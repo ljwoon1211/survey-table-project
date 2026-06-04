@@ -14,7 +14,12 @@ import { inngest, type MailCampaignDispatchedData } from '../client';
  */
 export const campaignReconciler = inngest.createFunction(
   { id: 'campaign-reconciler', triggers: [{ event: 'mail/campaign.dispatched' }], retries: 2 },
-  async ({ event, step, logger }) => {
+  async ({ event, step, ...inngestCtx }) => {
+    // inngest 4.x triggers-API 컨텍스트 타입에는 logger 가 노출되지 않지만,
+    // 런타임에는 미들웨어가 ctx.logger 를 주입한다. console 과 호환되는 좁은 형태로 단언.
+    const logger =
+      (inngestCtx as { logger?: Pick<Console, 'info' | 'warn' | 'error' | 'debug'> })
+        .logger ?? console;
     const { campaignId } = event.data as MailCampaignDispatchedData;
 
     await step.sleep('wait-1m', '1m');

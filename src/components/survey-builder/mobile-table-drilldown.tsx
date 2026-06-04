@@ -18,11 +18,11 @@ interface MobileTableDrilldownProps {
   questionId: string;
   displayRows: TableRow[];
   visibleColumns: TableColumn[];
-  visibleHeaderGrid?: HeaderCell[][] | null;
+  visibleHeaderGrid?: HeaderCell[][] | null | undefined;
   currentResponse: Record<string, unknown>;
   hideColumnLabels: boolean;
   isTestMode: boolean;
-  value?: Record<string, unknown>;
+  value?: Record<string, unknown> | undefined;
   onChange?: (value: Record<string, unknown>) => void;
   // 동적 행 props (drop-in 호환용 — 드릴다운은 이미 필터링된 displayRows 사용)
   hasDynamicRows: boolean;

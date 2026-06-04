@@ -102,7 +102,7 @@ export function ChoiceOptCellTab({
       </div>
 
       <BranchRuleEditor
-        branchRule={branchRule}
+        {...(branchRule !== undefined ? { branchRule } : {})}
         allQuestions={allQuestions}
         currentQuestionId={currentQuestionId}
         onChange={onBranchRuleChange}

@@ -12,7 +12,7 @@ import type { TableCell, TableColumn, TableRow, HeaderCell } from '@/types/surve
 export interface ClassifyInput {
   tableColumns: TableColumn[];
   tableRowsData: TableRow[];
-  tableHeaderGrid?: HeaderCell[][] | null;
+  tableHeaderGrid?: HeaderCell[][] | null | undefined;
 }
 
 const INPUT_TYPES = new Set<TableCell['type']>(['input', 'radio', 'checkbox', 'select', 'ranking']);

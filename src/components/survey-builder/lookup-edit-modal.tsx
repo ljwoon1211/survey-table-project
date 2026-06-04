@@ -22,7 +22,7 @@ const DEFAULT_CATEGORY = 'custom';
 
 interface Props {
   isOpen: boolean;
-  initialValue?: Partial<LookupDraft>;
+  initialValue?: Partial<LookupDraft> | undefined;
   onClose: () => void;
   onSave: (draft: LookupDraft) => Promise<void> | void;
 }
@@ -147,7 +147,7 @@ export function LookupEditModal({ isOpen, initialValue, onClose, onSave }: Props
     try {
       await onSave({
         name: name.trim(),
-        description: description.trim() || undefined,
+        ...(description.trim() ? { description: description.trim() } : {}),
         category,
         tags: initialValue?.tags ?? [],
         columns: columns.map((c) => c.trim()),

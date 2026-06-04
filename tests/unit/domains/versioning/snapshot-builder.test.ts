@@ -109,9 +109,10 @@ describe('buildSurveySnapshot', () => {
   });
 
   it('endDate가 없으면 undefined', () => {
+    const { endDate: _ed, ...settingsWithoutEndDate } = mockSurvey.settings;
     const surveyNoEndDate: Survey = {
       ...mockSurvey,
-      settings: { ...mockSurvey.settings, endDate: undefined },
+      settings: settingsWithoutEndDate,
     };
     const snapshot = buildSurveySnapshot(surveyNoEndDate);
 

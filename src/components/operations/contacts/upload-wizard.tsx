@@ -142,7 +142,7 @@ export function UploadWizard({ surveyId, existingContactsCount }: UploadWizardPr
       try {
         const m: ContactUploadMapping = {
           systemFields: {
-            group: mapping.groupCol ?? undefined,
+            ...(mapping.groupCol != null ? { group: mapping.groupCol } : {}),
           },
           piiMapping: mapping.piiMapping,
           selectedAttrsKeys: Array.from(mapping.selectedAttrs),

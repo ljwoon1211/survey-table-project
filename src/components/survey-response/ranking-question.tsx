@@ -97,11 +97,11 @@ export function RankingQuestion({ question, value, onChange }: RankingQuestionPr
           </div>
         ) : (
           <TablePreview
-            tableTitle={question.tableTitle}
-            columns={question.tableColumns}
-            rows={question.tableRowsData}
-            tableHeaderGrid={question.tableHeaderGrid}
-            hideColumnLabels={question.hideColumnLabels}
+            {...(question.tableTitle !== undefined ? { tableTitle: question.tableTitle } : {})}
+            {...(question.tableColumns !== undefined ? { columns: question.tableColumns } : {})}
+            {...(question.tableRowsData !== undefined ? { rows: question.tableRowsData } : {})}
+            {...(question.tableHeaderGrid !== undefined ? { tableHeaderGrid: question.tableHeaderGrid } : {})}
+            {...(question.hideColumnLabels !== undefined ? { hideColumnLabels: question.hideColumnLabels } : {})}
           />
         )
       ) : (

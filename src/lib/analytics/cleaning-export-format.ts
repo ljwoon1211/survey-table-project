@@ -62,7 +62,7 @@ export function parseCheckboxRawValue(rawValue: unknown): { selectedIds: string[
     const obj = rawValue as Record<string, unknown>;
     return {
       selectedIds: Array.isArray(obj['selectedValues']) ? (obj['selectedValues'] as string[]) : [],
-      otherText: obj['otherValue'] ? String(obj['otherValue']) : undefined,
+      ...(obj['otherValue'] ? { otherText: String(obj['otherValue']) } : {}),
     };
   }
   return { selectedIds: [] };
@@ -77,7 +77,7 @@ function parseSingleChoiceRawValue(rawValue: unknown): { optionId: string; other
     const obj = rawValue as Record<string, unknown>;
     return {
       optionId: String(obj['selectedValue'] ?? obj['optionId'] ?? ''),
-      otherText: obj['otherValue'] ? String(obj['otherValue']) : undefined,
+      ...(obj['otherValue'] ? { otherText: String(obj['otherValue']) } : {}),
     };
   }
   return { optionId: String(rawValue) };
@@ -437,7 +437,7 @@ export function expandMeasurements(
           colIndex,
           columnKind: 'binary',
           checkboxOptionIndex: i,
-          optionValue: opt?.value,
+          ...(opt?.value !== undefined ? { optionValue: opt.value } : {}),
           spssNumericCode: varying ? (i + 1) : (opt?.spssNumericCode ?? (i + 1)),
           optionLabel: varying ? `옵션${i + 1}` : (opt?.label ?? `옵션${i + 1}`),
           h1Label: colLabel,
@@ -543,7 +543,7 @@ export function expandGeneralCheckboxQuestion(
       }
     : undefined;
 
-  return { label, binaries, otherText };
+  return { label, binaries, ...(otherText !== undefined ? { otherText } : {}) };
 }
 
 export function shouldUseSemiLong(
@@ -792,7 +792,7 @@ export function buildSemiLongRows(
         cellIds,
         isUnexposed: false,
         unexposedColumns: unexposedExpandedIndices,
-        computedLabels: computedLabels.size > 0 ? computedLabels : undefined,
+        ...(computedLabels.size > 0 ? { computedLabels } : {}),
       });
     }
   }

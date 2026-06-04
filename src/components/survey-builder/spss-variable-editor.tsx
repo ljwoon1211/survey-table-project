@@ -11,7 +11,7 @@ interface OptionDisplay {
   id: string;
   label: string;
   value: string;
-  spssNumericCode?: number;
+  spssNumericCode?: number | undefined;
 }
 
 interface SpssVariableEditorProps {
@@ -20,8 +20,8 @@ interface SpssVariableEditorProps {
   isCustom: boolean;
   onChangeCode: (code: string, isCustom: boolean) => void;
   onReset: () => void;
-  options?: OptionDisplay[];
-  allowOtherOption?: boolean;
+  options?: OptionDisplay[] | undefined;
+  allowOtherOption?: boolean | undefined;
 }
 
 export function SpssVariableEditor({

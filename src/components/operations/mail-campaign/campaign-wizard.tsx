@@ -550,7 +550,9 @@ function buildFilterSnapshot(current: CampaignFilterSnapshot): CampaignFilterSna
   if (current.unrespondedOnly) out.unrespondedOnly = true;
   if (current.unopenedFromCampaignId) {
     out.unopenedFromCampaignId = current.unopenedFromCampaignId;
-    out.unopenedAfterDays = current.unopenedAfterDays;
+    if (current.unopenedAfterDays !== undefined) {
+      out.unopenedAfterDays = current.unopenedAfterDays;
+    }
   }
   return out;
 }

@@ -133,7 +133,9 @@ export function GroupEditModal({
                 title: editingGroup.name,
                 required: false,
                 order: 0,
-                displayCondition: editingGroup.displayCondition,
+                ...(editingGroup.displayCondition !== undefined
+                  ? { displayCondition: editingGroup.displayCondition }
+                  : {}),
               }}
               onUpdate={onConditionUpdate}
               allQuestions={allQuestions}

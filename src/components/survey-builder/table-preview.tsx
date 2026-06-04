@@ -30,12 +30,12 @@ const HEADER_CELL_CLASS =
 const EMPTY_LABEL = <span className="text-sm text-gray-400 italic" />;
 
 interface TablePreviewProps {
-  tableTitle?: string;
-  columns?: TableColumn[];
-  rows?: TableRow[];
-  tableHeaderGrid?: HeaderCell[][];
-  className?: string;
-  hideColumnLabels?: boolean;
+  tableTitle?: string | undefined;
+  columns?: TableColumn[] | undefined;
+  rows?: TableRow[] | undefined;
+  tableHeaderGrid?: HeaderCell[][] | undefined;
+  className?: string | undefined;
+  hideColumnLabels?: boolean | undefined;
   /** 셀 콘텐츠 렌더 오버라이드. undefined/null 반환 시 기본 PreviewCell 로 폴백. */
   renderCell?: (cell: TableCell) => React.ReactNode;
 }

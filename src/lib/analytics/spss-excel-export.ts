@@ -119,7 +119,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
           optionIndex: i,
           optionValue: opt.value,
           // 테이블-소스 옵션 셀의 exportLabel이 있으면 헤더 행2/코딩북 셀라벨에 우선 사용.
-          cellExportLabel: opt.exportLabel,
+          ...(opt.exportLabel !== undefined ? { cellExportLabel: opt.exportLabel } : {}),
         });
         // allowTextInput 옵션마다 STRING 사이드카 텍스트 변수 생성
         if (opt.allowTextInput) {
@@ -267,7 +267,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
                 rowLabel,
                 colLabel,
                 cellOptions,
-                cellExportLabel: autoExportLabel,
+                ...(autoExportLabel !== undefined ? { cellExportLabel: autoExportLabel } : {}),
               });
               if (cell.allowOtherOption) {
                 columns.push({
@@ -281,7 +281,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
                   rankIndex: k,
                   rowLabel,
                   colLabel,
-                  cellExportLabel: autoExportLabel,
+                  ...(autoExportLabel !== undefined ? { cellExportLabel: autoExportLabel } : {}),
                 });
               }
             }
@@ -302,9 +302,9 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
                 tableCellType: 'checkbox',
                 optionIndex: optIdx,
                 optionValue: opt.value,
-                cellSpssVarType: cell.spssVarType,
-                cellSpssMeasure: cell.spssMeasure,
-                cellExportLabel: autoExportLabel,
+                ...(cell.spssVarType !== undefined ? { cellSpssVarType: cell.spssVarType } : {}),
+                ...(cell.spssMeasure !== undefined ? { cellSpssMeasure: cell.spssMeasure } : {}),
+                ...(autoExportLabel !== undefined ? { cellExportLabel: autoExportLabel } : {}),
               });
               // allowTextInput 옵션마다 STRING 사이드카 텍스트 변수 생성
               if (opt.allowTextInput) {
@@ -317,7 +317,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
                   type: 'table-cell-option-text',
                   tableCellId: cell.id,
                   optionId: opt.id,
-                  cellExportLabel: autoExportLabel,
+                  ...(autoExportLabel !== undefined ? { cellExportLabel: autoExportLabel } : {}),
                 });
               }
             }
@@ -337,12 +337,12 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
               type: 'table-cell',
               tableCellId: cell.id,
               tableCellType: cell.type,
-              cellSpssVarType: cell.spssVarType,
-              cellSpssMeasure: cell.spssMeasure,
-              cellExportLabel: autoExportLabel,
+              ...(cell.spssVarType !== undefined ? { cellSpssVarType: cell.spssVarType } : {}),
+              ...(cell.spssMeasure !== undefined ? { cellSpssMeasure: cell.spssMeasure } : {}),
+              ...(autoExportLabel !== undefined ? { cellExportLabel: autoExportLabel } : {}),
               // radio/select 셀의 응답값을 spssNumericCode로 매핑하기 위한 옵션.
               // RadioOption은 QuestionOption과 구조적으로 호환되어 그대로 widening.
-              cellOptions: cell.radioOptions || cell.selectOptions,
+              ...(opts ? { cellOptions: opts } : {}),
             });
 
             // radio/select 셀의 allowTextInput 옵션마다 STRING 사이드카 텍스트 변수 생성
@@ -359,7 +359,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
                     type: 'table-cell-option-text',
                     tableCellId: cell.id,
                     optionId: opt.id,
-                    cellExportLabel: autoExportLabel,
+                    ...(autoExportLabel !== undefined ? { cellExportLabel: autoExportLabel } : {}),
                   });
                 }
               }
@@ -376,7 +376,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
                     type: 'table-cell-option-text',
                     tableCellId: cell.id,
                     optionId: opt.id,
-                    cellExportLabel: autoExportLabel,
+                    ...(autoExportLabel !== undefined ? { cellExportLabel: autoExportLabel } : {}),
                   });
                 }
               }
@@ -504,9 +504,9 @@ function collectAndEmitRadioGroupColumns(
       // 그룹 멤버들의 셀 단위 SPSS 오버라이드를 그룹 컬럼에 전파.
       // 사용자가 5점 척도 셀에 spssMeasure='Continuous'를 명시한 경우 등을 보존.
       // 멤버들이 서로 다른 값을 가질 가능성은 낮으므로 첫 멤버의 값을 채택.
-      cellSpssVarType: members[0].cell.spssVarType,
-      cellSpssMeasure: members[0].cell.spssMeasure,
-      cellExportLabel: members[0].cell.exportLabel,
+      ...(members[0].cell.spssVarType !== undefined ? { cellSpssVarType: members[0].cell.spssVarType } : {}),
+      ...(members[0].cell.spssMeasure !== undefined ? { cellSpssMeasure: members[0].cell.spssMeasure } : {}),
+      ...(members[0].cell.exportLabel !== undefined ? { cellExportLabel: members[0].cell.exportLabel } : {}),
     });
 
     members.forEach((m) => groupedCellIds.add(m.cell.id));

@@ -88,7 +88,7 @@ export function FilterConditionRow({
       <Combobox
         options={questionComboboxOptions}
         value={condition.questionId}
-        onValueChange={(value) => onUpdate({ questionId: value, value: undefined })}
+        onValueChange={(value) => onUpdate({ questionId: value })}
         placeholder="질문 선택"
         searchPlaceholder="질문 검색..."
         emptyText="질문을 찾을 수 없습니다"

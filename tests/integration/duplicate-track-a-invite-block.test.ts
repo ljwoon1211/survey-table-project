@@ -122,7 +122,6 @@ describe('Track A: invite_token 차단', () => {
     // inviteToken 없으므로 checkTrackB 가 호출되고 findContactMock 은 호출 안 됨
     const result = await checkDuplicateOnEntry({
       surveyId: TEST_SURVEY_ID,
-      inviteToken: undefined,
       clientSignals: BASE_CLIENT_SIGNALS,
     });
 

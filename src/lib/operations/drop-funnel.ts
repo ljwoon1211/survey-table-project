@@ -267,6 +267,6 @@ export function shapeDropFunnel(input: DropFunnelInput): DropFunnelOutput {
     counts: aggregated.counts,
     legacyCount: aggregated.legacyCount,
     totalDrops: aggregated.totalDrops,
-    topN: input.topN,
+    ...(input.topN !== undefined ? { topN: input.topN } : {}),
   });
 }

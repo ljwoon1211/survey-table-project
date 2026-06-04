@@ -14,7 +14,7 @@ interface GroupCreateModalProps {
   setGroupName: (name: string) => void;
   groupDescription: string;
   setGroupDescription: (description: string) => void;
-  parentGroupId?: string;
+  parentGroupId?: string | undefined;
   groups: QuestionGroup[];
 }
 

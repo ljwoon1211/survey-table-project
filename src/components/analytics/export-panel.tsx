@@ -65,7 +65,7 @@ export function ExportPanel({
           <ExportDataModal
             surveyId={surveyId}
             surveyTitle={surveyTitle}
-            onExportCleaningExcel={onExportCleaningExcel}
+            {...(onExportCleaningExcel !== undefined ? { onExportCleaningExcel } : {})}
           />
 
           <Button

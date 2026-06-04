@@ -141,7 +141,7 @@ export async function dispatchCampaignChunk(
     from,
     replyTo,
     campaignId,
-    attachments,
+    ...(attachments !== undefined ? { attachments } : {}),
     recipients: bulkInputs,
   });
 

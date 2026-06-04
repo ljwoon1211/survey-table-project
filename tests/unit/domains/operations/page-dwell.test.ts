@@ -43,7 +43,7 @@ function makeGroup(
   order: number,
   parentGroupId?: string,
 ): QuestionGroupData {
-  return { id, surveyId: 'survey-1', name, order, parentGroupId };
+  return { id, surveyId: 'survey-1', name, order, ...(parentGroupId !== undefined ? { parentGroupId } : {}) };
 }
 
 function makeQuestion(
@@ -59,9 +59,9 @@ function makeQuestion(
     title: id.toUpperCase(),
     required: false,
     order,
-    groupId,
+    ...(groupId !== undefined ? { groupId } : {}),
     ...extras,
-  };
+  } as QuestionData;
 }
 
 /** PageVisit 생성: 시작 후 dwellSeconds초 머물렀다고 가정. */

@@ -23,18 +23,18 @@ import { useDragCopy } from './use-drag-copy';
 // ── 타입 ──
 
 interface UseTableEditorParams {
-  tableTitle?: string;
-  columns?: TableColumn[];
-  rows?: TableRow[];
-  tableHeaderGrid?: HeaderCell[][];
-  currentQuestionId?: string;
-  questionCode?: string;
-  questionTitle?: string;
+  tableTitle?: string | undefined;
+  columns?: TableColumn[] | undefined;
+  rows?: TableRow[] | undefined;
+  tableHeaderGrid?: HeaderCell[][] | undefined;
+  currentQuestionId?: string | undefined;
+  questionCode?: string | undefined;
+  questionTitle?: string | undefined;
   onTableChange: (data: {
     tableTitle: string;
     tableColumns: TableColumn[];
     tableRowsData: TableRow[];
-    tableHeaderGrid?: HeaderCell[][];
+    tableHeaderGrid?: HeaderCell[][] | undefined;
   }) => void;
 }
 
@@ -79,7 +79,11 @@ function recalculateHiddenHeaders(cols: TableColumn[]): TableColumn[] {
         break;
       }
     }
-    return { ...col, isHeaderHidden: shouldBeHidden || undefined };
+    if (shouldBeHidden) {
+      return { ...col, isHeaderHidden: true };
+    }
+    const { isHeaderHidden: _, ...colWithoutHidden } = col;
+    return colWithoutHidden;
   });
 }
 
@@ -216,7 +220,7 @@ export function useTableEditor({
         tableTitle: title,
         tableColumns: cols,
         tableRowsData: rowsData,
-        tableHeaderGrid: headerGridRef.current,
+        ...(headerGridRef.current !== undefined ? { tableHeaderGrid: headerGridRef.current } : {}),
       });
     },
     [],
@@ -248,7 +252,7 @@ export function useTableEditor({
           tableTitle: title,
           tableColumns: cols,
           tableRowsData: rowsData,
-          tableHeaderGrid: headerGridRef.current,
+          ...(headerGridRef.current !== undefined ? { tableHeaderGrid: headerGridRef.current } : {}),
         });
         pendingChangeRef.current = null;
         pendingArgsRef.current = null;
@@ -282,7 +286,7 @@ export function useTableEditor({
             tableTitle: title,
             tableColumns: cols,
             tableRowsData: rowsData,
-            tableHeaderGrid: headerGridRef.current,
+            ...(headerGridRef.current !== undefined ? { tableHeaderGrid: headerGridRef.current } : {}),
           });
         }
       }
@@ -332,7 +336,8 @@ export function useTableEditor({
       const targetColspan = targetCol.colspan || 1;
 
       cols[columnIndex] = { ...currentCol, colspan: currentColspan + targetColspan };
-      cols[nextVisibleIndex] = { ...targetCol, colspan: undefined };
+      const { colspan: _, ...targetColWithoutColspan } = targetCol;
+      cols[nextVisibleIndex] = targetColWithoutColspan;
 
       const updatedCols = recalculateHiddenHeaders(cols);
       commitColumns(updatedCols);
@@ -344,7 +349,8 @@ export function useTableEditor({
   const unmergeColumnHeader = useCallback(
     (columnIndex: number) => {
       const cols = [...currentColumnsRef.current];
-      cols[columnIndex] = { ...cols[columnIndex], colspan: undefined };
+      const { colspan: _, ...colWithoutColspan } = cols[columnIndex];
+      cols[columnIndex] = colWithoutColspan;
 
       const updatedCols = recalculateHiddenHeaders(cols);
       commitColumns(updatedCols);
@@ -481,7 +487,11 @@ export function useTableEditor({
               const colspan = cell.colspan || 1;
               if (cIndex + colspan > columnIndex) {
                 const newColspan = Math.max(1, colspan - 1);
-                return { ...cell, colspan: newColspan > 1 ? newColspan : undefined };
+                if (newColspan > 1) {
+                  return { ...cell, colspan: newColspan };
+                }
+                const { colspan: _, ...cellWithoutColspan } = cell;
+                return cellWithoutColspan;
               }
             }
             return cell;
@@ -652,8 +662,8 @@ export function useTableEditor({
           height: 60,
           minHeight: 40,
           cells,
-          displayCondition: def.displayCondition,
-          dynamicGroupId: def.dynamicGroupId,
+          ...(def.displayCondition !== undefined ? { displayCondition: def.displayCondition } : {}),
+          ...(def.dynamicGroupId !== undefined ? { dynamicGroupId: def.dynamicGroupId } : {}),
         };
 
         return generateCellCodesForRow(
@@ -695,7 +705,7 @@ export function useTableEditor({
         label: def.label,
         columnCode: def.columnCode,
         width: def.width ?? 150,
-        displayCondition: def.displayCondition,
+        ...(def.displayCondition !== undefined ? { displayCondition: def.displayCondition } : {}),
       }));
 
       // 2. 삽입 위치 결정
@@ -716,7 +726,7 @@ export function useTableEditor({
             content: '',
             type: def.cellType ?? ('text' as const),
             ...def.cellTemplate,
-          };
+          } as TableCell;
         });
         return {
           ...row,
@@ -756,16 +766,16 @@ export function useTableEditor({
         ...sourceRow,
         id: newRowId,
         label: `${sourceRow.label} (복사)`,
-        rowCode: sourceRow.rowCode ? `${sourceRow.rowCode}_copy` : undefined,
+        ...(sourceRow.rowCode ? { rowCode: `${sourceRow.rowCode}_copy` } : {}),
         cells: sourceRow.cells.map((cell, colIndex) => {
-          const cloned = JSON.parse(JSON.stringify(cell));
+          const cloned: TableCell = JSON.parse(JSON.stringify(cell));
           cloned.id = `cell-${newRowId}-${columns[colIndex]?.id ?? colIndex}`;
-          cloned.rowspan = undefined;
+          delete cloned.rowspan;
           return cloned;
         }),
-        displayCondition: sourceRow.displayCondition
-          ? JSON.parse(JSON.stringify(sourceRow.displayCondition))
-          : undefined,
+        ...(sourceRow.displayCondition
+          ? { displayCondition: JSON.parse(JSON.stringify(sourceRow.displayCondition)) }
+          : {}),
       };
 
       const newRowWithCodes = generateCellCodesForRow(
@@ -810,7 +820,11 @@ export function useTableEditor({
                 const rowspan = cell.rowspan || 1;
                 if (rIndex + rowspan > rowIndex) {
                   const newRowspan = Math.max(1, rowspan - 1);
-                  return { ...cell, rowspan: newRowspan > 1 ? newRowspan : undefined };
+                  if (newRowspan > 1) {
+                    return { ...cell, rowspan: newRowspan };
+                  }
+                  const { rowspan: _, ...cellWithoutRowspan } = cell;
+                  return cellWithoutRowspan;
                 }
                 return cell;
               }),
@@ -863,9 +877,14 @@ export function useTableEditor({
 
   const updateRowCondition = useCallback(
     (rowIndex: number, conditionGroup: QuestionConditionGroup | undefined) => {
-      const updatedRows = currentRowsRef.current.map((row, index) =>
-        index === rowIndex ? { ...row, displayCondition: conditionGroup } : row,
-      );
+      const updatedRows = currentRowsRef.current.map((row, index) => {
+        if (index !== rowIndex) return row;
+        if (conditionGroup !== undefined) {
+          return { ...row, displayCondition: conditionGroup };
+        }
+        const { displayCondition: _, ...rowWithoutCondition } = row;
+        return rowWithoutCondition;
+      });
       commitRows(updatedRows);
       notifyChange(currentTitleRef.current, currentColumnsRef.current, updatedRows);
     },
@@ -876,11 +895,15 @@ export function useTableEditor({
 
   const setDynamicGroupId = useCallback(
     (rowId: string, groupId: string | undefined) => {
-      const updatedRows = currentRowsRef.current.map((row) =>
-        row.id === rowId
-          ? { ...row, dynamicGroupId: groupId, showWhenDynamicGroupId: undefined }
-          : row,
-      );
+      const updatedRows = currentRowsRef.current.map((row) => {
+        if (row.id !== rowId) return row;
+        const { showWhenDynamicGroupId: _, ...rowWithoutShow } = row;
+        if (groupId !== undefined) {
+          return { ...rowWithoutShow, dynamicGroupId: groupId };
+        }
+        const { dynamicGroupId: __, ...rowWithoutBoth } = rowWithoutShow;
+        return rowWithoutBoth;
+      });
       commitRows(updatedRows);
       notifyChange(currentTitleRef.current, currentColumnsRef.current, updatedRows);
     },
@@ -889,11 +912,15 @@ export function useTableEditor({
 
   const setShowWhenDynamicGroupId = useCallback(
     (rowId: string, groupId: string | undefined) => {
-      const updatedRows = currentRowsRef.current.map((row) =>
-        row.id === rowId
-          ? { ...row, showWhenDynamicGroupId: groupId, dynamicGroupId: undefined }
-          : row,
-      );
+      const updatedRows = currentRowsRef.current.map((row) => {
+        if (row.id !== rowId) return row;
+        const { dynamicGroupId: _, ...rowWithoutDynamic } = row;
+        if (groupId !== undefined) {
+          return { ...rowWithoutDynamic, showWhenDynamicGroupId: groupId };
+        }
+        const { showWhenDynamicGroupId: __, ...rowWithoutBoth } = rowWithoutDynamic;
+        return rowWithoutBoth;
+      });
       commitRows(updatedRows);
       notifyChange(currentTitleRef.current, currentColumnsRef.current, updatedRows);
     },
@@ -909,9 +936,14 @@ export function useTableEditor({
 
   const updateColumnCondition = useCallback(
     (columnIndex: number, conditionGroup: QuestionConditionGroup | undefined) => {
-      const updatedColumns = currentColumnsRef.current.map((col, index) =>
-        index === columnIndex ? { ...col, displayCondition: conditionGroup } : col,
-      );
+      const updatedColumns = currentColumnsRef.current.map((col, index) => {
+        if (index !== columnIndex) return col;
+        if (conditionGroup !== undefined) {
+          return { ...col, displayCondition: conditionGroup };
+        }
+        const { displayCondition: _, ...colWithoutCondition } = col;
+        return colWithoutCondition;
+      });
       commitColumns(updatedColumns);
       notifyChange(currentTitleRef.current, updatedColumns, currentRowsRef.current);
     },
@@ -990,7 +1022,8 @@ export function useTableEditor({
         && copied.isOtherRankingCell === true
         && hasExistingOtherRankingCell(rows, targetCell.id)
       ) {
-        sanitizedCopy = { ...copied, isOtherRankingCell: undefined };
+        const { isOtherRankingCell: _, ...copiedWithoutOther } = copied;
+        sanitizedCopy = copiedWithoutOther;
       }
       const pastedCell: TableCell = regenerateCellCodeForPaste(
         { ...sanitizedCopy, id: targetCell.id },
@@ -1018,7 +1051,8 @@ export function useTableEditor({
             const isInRowRange = rIndex >= rowIndex && rIndex < rowIndex + rowspan;
             const isInColRange = cIndex >= cellIndex && cIndex < cellIndex + colspan;
             if (isInRowRange && isInColRange && !(rIndex === rowIndex && cIndex === cellIndex)) {
-              return { ...pastedCell, id: c.id, rowspan: undefined, colspan: undefined };
+              const { rowspan: _rs, colspan: _cs, ...pastedWithoutSpan } = pastedCell;
+              return { ...pastedWithoutSpan, id: c.id };
             }
             return c;
           }),
@@ -1053,7 +1087,8 @@ export function useTableEditor({
             const isInRowRange = rIndex >= rowIndex && rIndex < rowIndex + rowspan;
             const isInColRange = cIndex >= cellIndex && cIndex < cellIndex + colspan;
             if (isInRowRange && isInColRange && !(rIndex === rowIndex && cIndex === cellIndex)) {
-              return { ...cell, id: c.id, rowspan: undefined, colspan: undefined };
+              const { rowspan: _rs, colspan: _cs, ...cellWithoutSpan } = cell;
+              return { ...cellWithoutSpan, id: c.id };
             }
             return c;
           }),
@@ -1077,10 +1112,10 @@ export function useTableEditor({
         id: cell.id,
         content: '',
         type: 'text',
-        rowspan: cell.rowspan,
-        colspan: cell.colspan,
-        horizontalAlign: cell.horizontalAlign,
-        verticalAlign: cell.verticalAlign,
+        ...(cell.rowspan !== undefined ? { rowspan: cell.rowspan } : {}),
+        ...(cell.colspan !== undefined ? { colspan: cell.colspan } : {}),
+        ...(cell.horizontalAlign !== undefined ? { horizontalAlign: cell.horizontalAlign } : {}),
+        ...(cell.verticalAlign !== undefined ? { verticalAlign: cell.verticalAlign } : {}),
       };
 
       updateCell(rowIndex, cellIndex, emptyCell);
@@ -1195,7 +1230,6 @@ export function useTableEditor({
           tableTitle: currentTitleRef.current,
           tableColumns: currentColumnsRef.current,
           tableRowsData: currentRowsRef.current,
-          tableHeaderGrid: undefined,
         });
       }
     },

@@ -124,7 +124,8 @@ export function CellChoiceEditor({
                           onChange={(e) => {
                             const v = e.target.value.replace(/\D/g, '');
                             const updated = [...checkboxOptions];
-                            updated[index] = { ...option, spssNumericCode: v ? parseInt(v, 10) : undefined };
+                            const base = (({ spssNumericCode: _, ...o }) => o)(option);
+                            updated[index] = v ? { ...base, spssNumericCode: parseInt(v, 10) } : base;
                             onCheckboxOptionsChange(updated);
                           }}
                           placeholder={String(index + 1)}
@@ -181,7 +182,8 @@ export function CellChoiceEditor({
                       currentQuestionId={currentQuestionId}
                       onChange={(branchRule) => {
                         const updated = [...checkboxOptions];
-                        updated[index] = { ...option, branchRule };
+                        const { branchRule: _br, ...rest } = option;
+                        updated[index] = branchRule !== undefined ? { ...option, branchRule } : rest;
                         onCheckboxOptionsChange(updated);
                       }}
                     />
@@ -395,7 +397,8 @@ export function CellChoiceEditor({
                           onChange={(e) => {
                             const v = e.target.value.replace(/\D/g, '');
                             const updated = [...radioOptions];
-                            updated[index] = { ...option, spssNumericCode: v ? parseInt(v, 10) : undefined };
+                            const base = (({ spssNumericCode: _, ...o }) => o)(option);
+                            updated[index] = v ? { ...base, spssNumericCode: parseInt(v, 10) } : base;
                             onRadioOptionsChange(updated);
                           }}
                           placeholder={String(index + 1)}
@@ -452,7 +455,8 @@ export function CellChoiceEditor({
                       currentQuestionId={currentQuestionId}
                       onChange={(branchRule) => {
                         const updated = [...radioOptions];
-                        updated[index] = { ...option, branchRule };
+                        const { branchRule: _br, ...rest } = option;
+                        updated[index] = branchRule !== undefined ? { ...option, branchRule } : rest;
                         onRadioOptionsChange(updated);
                       }}
                     />
@@ -567,7 +571,8 @@ export function CellChoiceEditor({
                         onChange={(e) => {
                           const v = e.target.value.replace(/\D/g, '');
                           const updated = [...selectOptions];
-                          updated[index] = { ...option, spssNumericCode: v ? parseInt(v, 10) : undefined };
+                          const base = (({ spssNumericCode: _, ...o }) => o)(option);
+                          updated[index] = v ? { ...base, spssNumericCode: parseInt(v, 10) } : base;
                           onSelectOptionsChange(updated);
                         }}
                         placeholder={String(index + 1)}
@@ -624,7 +629,8 @@ export function CellChoiceEditor({
                     currentQuestionId={currentQuestionId}
                     onChange={(branchRule) => {
                       const updated = [...selectOptions];
-                      updated[index] = { ...option, branchRule };
+                      const { branchRule: _br, ...rest } = option;
+                      updated[index] = branchRule !== undefined ? { ...option, branchRule } : rest;
                       onSelectOptionsChange(updated);
                     }}
                   />

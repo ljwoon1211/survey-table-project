@@ -872,7 +872,7 @@ export function getTableValidationBranchRule(
         id: rule.id,
         value: 'table-validation',
         action: rule.action,
-        targetQuestionId,
+        ...(targetQuestionId !== undefined ? { targetQuestionId } : {}),
       };
     }
   }

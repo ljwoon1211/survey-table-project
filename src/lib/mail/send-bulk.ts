@@ -174,7 +174,7 @@ async function sendOneByOneInternal(
           { name: 'kind', value: 'campaign' },
           { name: 'campaign_id', value: input.campaignId },
         ],
-        attachments: input.attachments,
+        ...(input.attachments !== undefined ? { attachments: input.attachments } : {}),
       });
       if (error) {
         results.push({ recipientId: r.recipientId, errorReason: error.message });

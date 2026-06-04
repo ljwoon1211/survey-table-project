@@ -299,7 +299,9 @@ export function SurveyResponseFlow({
             const builtSurvey: Survey = {
               id: adminContext.surveyId,
               title: snapshot.title,
-              description: snapshot.description,
+              ...(snapshot.description !== undefined
+                ? { description: snapshot.description }
+                : {}),
               groups: snapshot.groups as QuestionGroup[],
               questions: snapshot.questions as unknown as Question[],
               settings: {
@@ -308,12 +310,12 @@ export function SurveyResponseFlow({
                 showProgressBar: snapshot.settings.showProgressBar,
                 shuffleQuestions: snapshot.settings.shuffleQuestions,
                 requireLogin: snapshot.settings.requireLogin,
-                endDate: snapshot.settings.endDate
-                  ? new Date(snapshot.settings.endDate)
-                  : undefined,
-                maxResponses: snapshot.settings.maxResponses,
+                ...(snapshot.settings.endDate
+                  ? { endDate: new Date(snapshot.settings.endDate) }
+                  : {}),
+                ...(snapshot.settings.maxResponses !== undefined ? { maxResponses: snapshot.settings.maxResponses } : {}),
                 thankYouMessage: snapshot.settings.thankYouMessage,
-                requireInviteToken: snapshot.settings.requireInviteToken,
+                ...(snapshot.settings.requireInviteToken !== undefined ? { requireInviteToken: snapshot.settings.requireInviteToken } : {}),
               },
               lookups: (snapshot as { lookups?: Survey['lookups'] }).lookups ?? [],
               createdAt: new Date(),
@@ -424,7 +426,7 @@ export function SurveyResponseFlow({
       try {
         const r = await checkDuplicateOnEntry({
           surveyId: loadedSurvey.id,
-          inviteToken: inviteToken ?? undefined,
+          ...(inviteToken != null ? { inviteToken } : {}),
           clientSignals: signals,
         });
         if (cancelled) return;
@@ -613,7 +615,7 @@ export function SurveyResponseFlow({
     resumeOrCreateResponse({
       surveyId: loadedSurvey.id,
       sessionId: savedSessionId,
-      inviteToken: inviteToken ?? undefined,
+      ...(inviteToken != null ? { inviteToken } : {}),
     })
       .then((result) => {
         if (!result) {
@@ -772,7 +774,7 @@ export function SurveyResponseFlow({
           questionId,
           value,
           currentStepId: stepIdOf(currentStep),
-          inviteToken: inviteToken ?? undefined,
+          ...(inviteToken != null ? { inviteToken } : {}),
           clientSignals: signals,
         })
           .then((result) => {
@@ -874,7 +876,7 @@ export function SurveyResponseFlow({
             sessionId,
             versionId: versionId ?? null,
             currentStepId: stepIdOf(currentStep),
-            inviteToken: inviteToken ?? undefined,
+            ...(inviteToken != null ? { inviteToken } : {}),
             clientSignals: signals,
           });
           if (created.kind === 'blocked') {

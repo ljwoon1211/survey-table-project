@@ -9,9 +9,9 @@ interface TableOptionSelectorProps {
   colIndex: number | undefined;
   expectedValues: string[] | undefined;
   onChange: (values: string[] | undefined) => void;
-  label?: string;
-  helpText?: string;
-  multipleRows?: boolean;
+  label?: string | undefined;
+  helpText?: string | undefined;
+  multipleRows?: boolean | undefined;
 }
 
 export function TableOptionSelector({

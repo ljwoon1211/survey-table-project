@@ -18,10 +18,10 @@ import { isPartialNumericInput, parseNumericInput } from '@/utils/numeric-input'
 import { LookupComparandEditor } from './lookup-comparand-editor';
 
 interface NumericComparisonEditorProps {
-  value?: NumericComparison;
+  value?: NumericComparison | undefined;
   onChange: (value: NumericComparison) => void;
   idPrefix: string;
-  onMigrate?: () => void;
+  onMigrate?: (() => void) | undefined;
 }
 
 const OPERATOR_OPTIONS: Array<{ value: NumericComparison['operator']; label: string }> = [
@@ -54,7 +54,7 @@ function BinopReadonlyLabel({
   onMigrate,
 }: {
   left: NonNullable<NumericComparison['left']>;
-  onMigrate?: () => void;
+  onMigrate?: (() => void) | undefined;
 }) {
   const questions = useSurveyBuilderStore((s) => s.currentSurvey.questions);
 
@@ -130,13 +130,10 @@ export function NumericComparisonEditor({
 
   const emit = useCallback(
     (patch: Partial<NumericComparison>) => {
-      const next: NumericComparison = {
-        operator,
-        left,
-        right,
-        ...patch,
-        comparand: undefined,
-      };
+      // comparand는 하위 호환 필드이므로 새로 저장 시 키 자체를 제거 (exactOptionalPropertyTypes 준수)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { comparand: _removed, ...nextBase } = { operator, left, right, ...patch } as NumericComparison & { comparand?: unknown };
+      const next: NumericComparison = nextBase;
       onChange(next);
     },
     [operator, left, right, onChange],

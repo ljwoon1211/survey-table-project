@@ -44,7 +44,7 @@ export const RankingCell = React.memo(function RankingCell({
           allowDuplicates={allowDuplicates}
           allowOther={false}
           onChange={(next) => onUpdateValue(next)}
-          columns={cell.optionsColumns}
+          {...(cell.optionsColumns !== undefined ? { columns: cell.optionsColumns } : {})}
           compact
         />
         {positions < requestedPositions && (

@@ -29,7 +29,7 @@ const CellRouter = React.memo(function CellRouter({
     case 'checkbox':
       return <CheckboxCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} questionId={questionId} />;
     case 'radio':
-      return <RadioCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} questionId={questionId} groupName={groupName} />;
+      return <RadioCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} questionId={questionId} {...(groupName !== undefined ? { groupName } : {})} />;
     case 'select':
       return <SelectCell cell={cell} cellResponse={cellResponse} onUpdateValue={onUpdateValue} questionId={questionId} />;
     case 'input':
@@ -54,18 +54,18 @@ interface InteractiveCellContainerProps {
   cell: TableCell;
   questionId: string;
   isTestMode: boolean;
-  value?: Record<string, unknown>;
-  onChange?: (value: Record<string, unknown>) => void;
+  value?: Record<string, unknown> | undefined;
+  onChange?: ((value: Record<string, unknown>) => void) | undefined;
   /**
    * Phase 5-D: 같은 행 + 같은 radioGroupName 셀들의 공통 HTML name 키.
    * 브라우저 native single-select 동작을 활성화한다 (시각적 처리).
    */
-  groupName?: string;
+  groupName?: string | undefined;
   /**
    * Phase 5-D: 같은 그룹의 다른 셀 id 목록.
    * 이 셀이 응답될 때 sibling 셀들의 응답을 자동으로 빈값('')으로 클리어한다 (state 처리).
    */
-  siblingCellIds?: string[];
+  siblingCellIds?: string[] | undefined;
 }
 
 export const InteractiveCell = React.memo(function InteractiveCell({
@@ -92,7 +92,7 @@ export const InteractiveCell = React.memo(function InteractiveCell({
       cellResponse={cellResponse}
       onUpdateValue={updateValue}
       questionId={questionId}
-      groupName={groupName}
+      {...(groupName !== undefined ? { groupName } : {})}
     />
   );
 });

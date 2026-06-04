@@ -233,7 +233,7 @@ export function ResultCodesEditor({ surveyId, initialCodes }: ResultCodesEditorP
                 <td className="px-3 py-2">
                   <Select
                     value={c.tone ?? 'slate'}
-                    onValueChange={(v) => update(i, { tone: v as ContactResultCode['tone'] })}
+                    onValueChange={(v) => update(i, { tone: v as NonNullable<ContactResultCode['tone']> })}
                   >
                     <SelectTrigger className="h-8 w-28">
                       <SelectValue />

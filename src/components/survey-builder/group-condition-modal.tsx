@@ -52,7 +52,9 @@ export function GroupConditionModal({
         {group && (
           <QuestionConditionEditor
             question={currentQuestion}
-            initialCondition={group.displayCondition}
+            {...(group.displayCondition !== undefined
+              ? { initialCondition: group.displayCondition }
+              : {})}
             onUpdate={(conditionGroup) => {
               onUpdateCondition(group.groupId, conditionGroup);
             }}

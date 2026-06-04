@@ -319,7 +319,6 @@ export async function createResponseWithFirstAnswer(input: {
   const firstVisit: PageVisit = {
     stepId: currentStepId,
     enteredAt: new Date().toISOString(),
-    leftAt: undefined,
   };
 
   const newResponse: NewSurveyResponse = {
@@ -403,7 +402,6 @@ export async function createBlankResponse(input: {
   const firstVisit: PageVisit = {
     stepId: currentStepId,
     enteredAt: new Date().toISOString(),
-    leftAt: undefined,
   };
 
   const newResponse: NewSurveyResponse = {

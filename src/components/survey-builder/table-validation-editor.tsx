@@ -295,10 +295,12 @@ export function TableValidationEditor({
                       value={rule.conditions.cellColumnIndex ?? ''}
                       onChange={(e) =>
                         updateRule(rule.id, {
-                          conditions: {
-                            ...rule.conditions,
-                            cellColumnIndex: e.target.value ? parseInt(e.target.value) : undefined,
-                          },
+                          conditions: (() => {
+                            const { cellColumnIndex: _ci, ...rest } = rule.conditions;
+                            return e.target.value
+                              ? { ...rest, cellColumnIndex: parseInt(e.target.value) }
+                              : rest;
+                          })(),
                         })
                       }
                       placeholder="전체 열 확인 (비워두면 모든 열 확인)"
@@ -349,10 +351,10 @@ export function TableValidationEditor({
                               .map((v) => v.trim())
                               .filter((v) => v);
                             updateRule(rule.id, {
-                              conditions: {
-                                ...rule.conditions,
-                                expectedValues: values.length > 0 ? values : undefined,
-                              },
+                              conditions: (() => {
+                                const { expectedValues: _ev, ...rest } = rule.conditions;
+                                return values.length > 0 ? { ...rest, expectedValues: values } : rest;
+                              })(),
                             });
                           }}
                           placeholder="예: 5, 10, 15 (쉼표로 구분)"
@@ -377,10 +379,10 @@ export function TableValidationEditor({
                         expectedValues={rule.conditions.expectedValues}
                         onChange={(values) => {
                           updateRule(rule.id, {
-                            conditions: {
-                              ...rule.conditions,
-                              expectedValues: values,
-                            },
+                            conditions: (() => {
+                              const { expectedValues: _ev, ...rest } = rule.conditions;
+                              return values !== undefined ? { ...rest, expectedValues: values } : rest;
+                            })(),
                           });
                         }}
                         helpText={
@@ -407,7 +409,15 @@ export function TableValidationEditor({
                               },
                             });
                           } else {
-                            updateRule(rule.id, { additionalConditions: undefined });
+                            // additionalConditions 키 자체를 제거 (exactOptionalPropertyTypes 준수)
+                            setRules((prev) =>
+                              prev.map((r) => {
+                                if (r.id !== rule.id) return r;
+                                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                                const { additionalConditions: _ac, ...rest } = r;
+                                return rest;
+                              }),
+                            );
                           }
                         }}
                       />
@@ -477,11 +487,11 @@ export function TableValidationEditor({
                               colIndex={rule.additionalConditions.cellColumnIndex}
                               expectedValues={rule.additionalConditions.expectedValues}
                               onChange={(values) => {
+                                const { expectedValues: _ev, ...rest } = rule.additionalConditions!;
                                 updateRule(rule.id, {
-                                  additionalConditions: {
-                                    ...rule.additionalConditions!,
-                                    expectedValues: values,
-                                  },
+                                  additionalConditions: values !== undefined
+                                    ? { ...rest, expectedValues: values }
+                                    : rest,
                                 });
                               }}
                               helpText="선택한 옵션들 중 하나가 선택되었는지 확인합니다. 비워두면 아무거나 선택되었는지만 확인합니다."
@@ -519,7 +529,15 @@ export function TableValidationEditor({
                           <button
                             type="button"
                             onClick={() => {
-                              updateRule(rule.id, { targetQuestionMap: undefined });
+                              // targetQuestionMap 키 자체를 제거 (exactOptionalPropertyTypes 준수)
+                            setRules((prev) =>
+                              prev.map((r) => {
+                                if (r.id !== rule.id) return r;
+                                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                                const { targetQuestionMap: _tqm, ...rest } = r;
+                                return rest;
+                              }),
+                            );
                             }}
                             className={`flex-1 rounded-lg border-2 px-3 py-2 text-sm transition-all ${
                               !rule.targetQuestionMap

@@ -52,7 +52,6 @@ export function resolveRankingOptions(question: Question): QuestionOption[] {
         id: cell.id,
         value: RANKING_OTHER_VALUE,
         label: buildRankingOptLabel(cell, '기타 (직접 입력)'),
-        spssNumericCode: undefined,
       };
     }
     return {

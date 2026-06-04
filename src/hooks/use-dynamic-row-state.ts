@@ -8,10 +8,10 @@ import type { DynamicRowGroupConfig, TableRow } from '@/types/survey';
 interface UseDynamicRowStateParams {
   questionId: string;
   rows: TableRow[];
-  dynamicRowConfigs?: DynamicRowGroupConfig[];
+  dynamicRowConfigs?: DynamicRowGroupConfig[] | undefined;
   isTestMode: boolean;
-  value?: Record<string, any>;
-  onChange?: (v: Record<string, any>) => void;
+  value?: Record<string, any> | undefined;
+  onChange?: ((v: Record<string, any>) => void) | undefined;
 }
 
 interface UseDynamicRowStateReturn {

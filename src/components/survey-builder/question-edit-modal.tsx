@@ -126,19 +126,17 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
       const optionsWithDeepBranchRule = question.options
         ? question.options.map((option) => ({
             ...option,
-            branchRule: option.branchRule
-              ? {
-                  ...option.branchRule,
-                }
-              : undefined,
+            ...(option.branchRule !== undefined
+              ? { branchRule: { ...option.branchRule } }
+              : {}),
           }))
         : [];
 
       setFormData({
         title: question.title,
-        description: question.description,
+        ...(question.description !== undefined ? { description: question.description } : {}),
         required: question.required,
-        groupId: question.groupId,
+        ...(question.groupId !== undefined ? { groupId: question.groupId } : {}),
         questionCode: (question as any).questionCode || '',
         isCustomSpssVarName: (question as any).isCustomSpssVarName || false,
         exportLabel: (question as any).exportLabel || '',
@@ -160,10 +158,10 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         placeholder: question.placeholder || '',
         defaultValueTemplate: question.defaultValueTemplate ?? null,
         inputType: question.inputType ?? 'text',
-        emptyDefault: question.emptyDefault,
+        ...(question.emptyDefault !== undefined ? { emptyDefault: question.emptyDefault } : {}),
         tableValidationRules: (question as any).tableValidationRules || [],
         dynamicRowConfigs: (question as any).dynamicRowConfigs || undefined,
-        displayCondition: question.displayCondition,
+        ...(question.displayCondition !== undefined ? { displayCondition: question.displayCondition } : {}),
         spssVarType: (question as any).spssVarType,
         spssMeasure: (question as any).spssMeasure,
       });
@@ -270,7 +268,12 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
     // store에서 hideColumnLabels 최신값 머지 (silentUpdateQuestion으로 토글한 값)
     const storeQuestion = useSurveyBuilderStore.getState()
       .currentSurvey.questions.find((q) => q.id === questionId);
-    const currentFormData = { ...formDataRef.current, hideColumnLabels: storeQuestion?.hideColumnLabels };
+    const currentFormData: Partial<Question> = {
+      ...formDataRef.current,
+      ...(storeQuestion?.hideColumnLabels !== undefined
+        ? { hideColumnLabels: storeQuestion.hideColumnLabels }
+        : {}),
+    };
     didSaveRef.current = true;
     setIsSaving(true);
     try {
@@ -301,11 +304,12 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
 
           if (!isNewQuestion) {
             // 기존 질문: UPDATE 경로
-            const updateData = {
-              ...currentFormData,
-              placeholder:
-                currentFormData.placeholder !== undefined ? currentFormData.placeholder : question?.placeholder,
-            };
+            const resolvedPlaceholder =
+              currentFormData.placeholder !== undefined ? currentFormData.placeholder : question?.placeholder;
+            const updateData: Partial<Question> = { ...currentFormData };
+            if (resolvedPlaceholder !== undefined) {
+              updateData.placeholder = resolvedPlaceholder;
+            }
             await updateQuestionAction(questionId, updateData);
           } else {
             // 새 질문: CREATE 경로
@@ -519,7 +523,15 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
               <QuestionConditionEditor
                 question={question}
                 onUpdate={async (conditionGroup) => {
-                  setFormData((prev) => ({ ...prev, displayCondition: conditionGroup }));
+                  setFormData((prev) => {
+                    const next: Partial<Question> = { ...prev };
+                    if (conditionGroup !== undefined) {
+                      next.displayCondition = conditionGroup;
+                    } else {
+                      delete next.displayCondition;
+                    }
+                    return next;
+                  });
 
                   // 조건 변경 시 즉시 DB에 저장 (질문 ID가 UUID이고 이미 DB에 존재하는 경우에만)
                   const store = useSurveyBuilderStore.getState();

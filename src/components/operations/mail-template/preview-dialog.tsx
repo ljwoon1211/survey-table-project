@@ -212,7 +212,7 @@ export function MailPreviewDialog({
       attachments,
     });
     if (res.ok) {
-      setSendState({ status: 'sent', to: testTo.trim(), id: res.id });
+      setSendState({ status: 'sent', to: testTo.trim(), ...(res.id !== undefined ? { id: res.id } : {}) });
     } else {
       setSendState({ status: 'error', message: res.error ?? '발송 실패' });
     }

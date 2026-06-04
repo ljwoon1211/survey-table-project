@@ -85,7 +85,7 @@ export function QuestionInput({
       return (
         <NoticeRenderer
           content={substituteTokens(question.noticeContent || '', attrs)}
-          requiresAcknowledgment={question.requiresAcknowledgment}
+          {...(question.requiresAcknowledgment !== undefined ? { requiresAcknowledgment: question.requiresAcknowledgment } : {})}
           value={noticeVal.agreed}
           onChange={(v) =>
             onChange(v ? { agreed: true, agreedAt: new Date().toISOString() } : { agreed: false })
@@ -161,22 +161,18 @@ export function QuestionInput({
       return question.tableColumns && question.tableRowsData ? (
         <InteractiveTableResponse
           questionId={question.id}
-          tableTitle={question.tableTitle}
+          {...(question.tableTitle !== undefined ? { tableTitle: question.tableTitle } : {})}
           columns={question.tableColumns}
           rows={question.tableRowsData}
-          tableHeaderGrid={question.tableHeaderGrid}
-          value={
-            typeof value === 'object' && value !== null
-              ? (value as Record<string, unknown>)
-              : undefined
-          }
+          {...(question.tableHeaderGrid !== undefined ? { tableHeaderGrid: question.tableHeaderGrid } : {})}
+          {...(typeof value === 'object' && value !== null ? { value: value as Record<string, unknown> } : {})}
           onChange={onChange as (v: Record<string, unknown>) => void}
           isTestMode={false}
           className="border-0 shadow-none"
           allResponses={allResponses}
           allQuestions={allQuestions}
-          dynamicRowConfigs={question.dynamicRowConfigs}
-          hideColumnLabels={question.hideColumnLabels}
+          {...(question.dynamicRowConfigs !== undefined ? { dynamicRowConfigs: question.dynamicRowConfigs } : {})}
+          {...(question.hideColumnLabels !== undefined ? { hideColumnLabels: question.hideColumnLabels } : {})}
         />
       ) : (
         <div className="py-4 text-center text-gray-500">테이블이 구성되지 않았습니다.</div>

@@ -262,7 +262,7 @@ function analyzeText(
   const textResponses = responses.map((r) => ({
     id: r.responseId,
     value: formatValue(r.value),
-    submittedAt: r.submittedAt || undefined,
+    ...(r.submittedAt ? { submittedAt: r.submittedAt } : {}),
   }));
 
   const totalLength = textResponses.reduce((sum, r) => sum + r.value.length, 0);
@@ -301,7 +301,7 @@ function analyzeText(
     avgLength,
     responses: textResponses,
     wordFrequency,
-    numericStats: numericStats ?? undefined,
+    ...(numericStats != null ? { numericStats } : {}),
   };
 }
 
@@ -419,7 +419,7 @@ function analyzeTable(
         // 분모가 0이면 0%, 아니면 100% 넘지 않도록 Cap
         interactionRate:
           validDenominator > 0 ? Math.min((interactionCount / validDenominator) * 100, 100) : 0,
-        details: Object.keys(details).length > 0 ? details : undefined,
+        ...(Object.keys(details).length > 0 ? { details } : {}),
       };
     })
     .sort((a, b) => b.interactionRate - a.interactionRate);
@@ -682,7 +682,7 @@ export function computeRankingDistribution(
         value: key,
         label,
         totalScore: totalScores[key],
-        avgRank: sums && sums.n > 0 ? sums.sum / sums.n : undefined,
+        ...(sums && sums.n > 0 ? { avgRank: sums.sum / sums.n } : {}),
         rankCounts: rankCounts[key],
       };
     })
@@ -817,7 +817,7 @@ export function analyzeSurvey(
     completedResponses: completedResponses.length,
     completionRate: responses.length > 0 ? (completedResponses.length / responses.length) * 100 : 0,
     avgCompletionTime,
-    lastResponseAt: completedResponses[0]?.completedAt || undefined,
+    ...(completedResponses[0]?.completedAt ? { lastResponseAt: completedResponses[0].completedAt } : {}),
     todayResponses,
     weekResponses,
   };

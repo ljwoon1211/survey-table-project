@@ -243,15 +243,14 @@ export function recalculateRowspansForVisibleRows(
         isHidden: false,
         content: group.cellContent.content,
         type: group.cellContent.type,
-        rowspan: visibleInGroup.length > 1 ? visibleInGroup.length : undefined,
+        ...(visibleInGroup.length > 1 ? { rowspan: visibleInGroup.length } : {}),
       });
 
       // 나머지 가시 행의 해당 열 셀은 isHidden
       for (let i = 1; i < visibleInGroup.length; i++) {
-        setMod(visibleInGroup[i], colIdx, {
-          isHidden: true,
-          rowspan: undefined,
-        });
+        const mod: Partial<TableRow['cells'][0]> = { isHidden: true };
+        delete mod.rowspan;
+        setMod(visibleInGroup[i], colIdx, mod);
       }
     }
   }
@@ -305,7 +304,7 @@ export function recalculateColspansForVisibleColumns(
       for (let j = i; j < i + col.colspan && j < originalColumns.length; j++) {
         if (visibleColIndices.has(j)) newColspan++;
       }
-      col.colspan = newColspan > 1 ? newColspan : undefined;
+      if (newColspan > 1) { col.colspan = newColspan; } else { delete col.colspan; }
     }
     col.isHeaderHidden = false; // 필터링 후에는 모두 표시
     filteredColumns.push(col);
@@ -324,7 +323,7 @@ export function recalculateColspansForVisibleColumns(
         for (let j = i; j < i + cell.colspan && j < row.cells.length; j++) {
           if (visibleColIndices.has(j)) newColspan++;
         }
-        cell.colspan = newColspan > 1 ? newColspan : undefined;
+        if (newColspan > 1) { cell.colspan = newColspan; } else { delete cell.colspan; }
         cell.isHidden = false;
       }
 
@@ -389,7 +388,7 @@ export function recalculateColspansForVisibleColumns(
     if (filteredHeaderGrid.length === 0) filteredHeaderGrid = undefined;
   }
 
-  return { columns: filteredColumns, rows: filteredRows, headerGrid: filteredHeaderGrid };
+  return { columns: filteredColumns, rows: filteredRows, ...(filteredHeaderGrid !== undefined ? { headerGrid: filteredHeaderGrid } : {}) };
 }
 
 /**

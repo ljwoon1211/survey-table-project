@@ -54,7 +54,9 @@ export function ColumnConditionModal({
         {editingColumnIndex !== null && columns[editingColumnIndex] && (
           <QuestionConditionEditor
             question={currentQuestion}
-            initialCondition={columns[editingColumnIndex].displayCondition}
+            {...(columns[editingColumnIndex].displayCondition !== undefined
+              ? { initialCondition: columns[editingColumnIndex].displayCondition }
+              : {})}
             onUpdate={(conditionGroup) => {
               onUpdateCondition(editingColumnIndex, conditionGroup);
             }}

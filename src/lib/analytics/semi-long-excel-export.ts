@@ -231,7 +231,7 @@ export async function generateCleaningWorkbook(
   const ctx = {
     workbook,
     sheetNames,
-    onProgress,
+    ...(onProgress !== undefined ? { onProgress } : {}),
     currentSheet: 0,
     totalSheets,
   };

@@ -58,15 +58,15 @@ const HEADER_CELL_BASE_CLASS =
 
 interface SelectorRowProps {
   groupId: string;
-  label?: string;
-  buttonAlign?: 'left' | 'center' | 'right';
+  label?: string | undefined;
+  buttonAlign?: 'left' | 'center' | 'right' | undefined;
   selectedCount: number;
   onSelect: (groupId: string) => void;
-  gridRow?: number;
+  gridRow?: number | undefined;
   isExpanded: boolean;
   onToggleExpand: (groupId: string) => void;
   /** 좌측 sticky 열 영역이 덮는 폭만큼 padding-left 부여 */
-  stickyLeftPadding?: number;
+  stickyLeftPadding?: number | undefined;
 }
 
 const SelectorRow = React.memo(function SelectorRow({
@@ -123,11 +123,11 @@ const SelectorRow = React.memo(function SelectorRow({
 // ── 헤더 셀 렌더링 (다단계 + 단일 폴백) ──
 
 interface HeaderCellsProps {
-  visibleHeaderGrid?: HeaderCell[][];
+  visibleHeaderGrid?: HeaderCell[][] | undefined;
   visibleColumns: TableColumn[];
   hideColumnLabels: boolean;
   /** sticky 비활성화 시 undefined (헬퍼도 전원 OFF) */
-  stickyInfo?: StickyLeftInfo;
+  stickyInfo?: StickyLeftInfo | undefined;
 }
 
 function HeaderCells({
@@ -236,9 +236,9 @@ interface RenderRowCellsProps {
   completed: boolean;
   questionId: string;
   isTestMode: boolean;
-  value?: Record<string, any>;
-  onChange?: (v: Record<string, any>) => void;
-  stickyInfo?: StickyLeftInfo;
+  value?: Record<string, any> | undefined;
+  onChange?: ((v: Record<string, any>) => void) | undefined;
+  stickyInfo?: StickyLeftInfo | undefined;
 }
 
 function renderRowCells({
@@ -340,20 +340,20 @@ function resolveRadioGroupProps(
 
 interface InteractiveTableResponseProps {
   questionId: string;
-  tableTitle?: string;
-  columns?: TableColumn[];
-  rows?: TableRow[];
-  tableHeaderGrid?: HeaderCell[][];
-  value?: Record<string, any>;
+  tableTitle?: string | undefined;
+  columns?: TableColumn[] | undefined;
+  rows?: TableRow[] | undefined;
+  tableHeaderGrid?: HeaderCell[][] | undefined;
+  value?: Record<string, any> | undefined;
   onChange?: (value: Record<string, any>) => void;
-  className?: string;
-  isTestMode?: boolean;
-  allResponses?: Record<string, unknown>;
-  allQuestions?: Question[];
-  dynamicRowConfigs?: DynamicRowGroupConfig[];
-  hideColumnLabels?: boolean;
+  className?: string | undefined;
+  isTestMode?: boolean | undefined;
+  allResponses?: Record<string, unknown> | undefined;
+  allQuestions?: Question[] | undefined;
+  dynamicRowConfigs?: DynamicRowGroupConfig[] | undefined;
+  hideColumnLabels?: boolean | undefined;
   /** 헤더·좌측 열 sticky 동작 활성화. 기본 true. 빌더 프리뷰 등에서 끌 수 있음 */
-  enableSticky?: boolean;
+  enableSticky?: boolean | undefined;
 }
 
 export const InteractiveTableResponse = React.memo(function InteractiveTableResponse({

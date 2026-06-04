@@ -155,7 +155,7 @@ interface Profile {
   patentAbroad: number;
   capitalM: number;          // 자본금 (백만원)
   domain: AiDomain;          // 주력 도메인
-  domainSecondary?: AiDomain; // 보조 도메인 (일부 회사)
+  domainSecondary?: AiDomain | undefined; // 보조 도메인 (일부 회사)
   selfInfraRatio: number;    // Q7-1 자체 인프라 비율 (0~100, 정수)
   selfInfraRatio3y: number;  // Q7-2 3년 후 자체 인프라 비율
   // 분기 결정
@@ -408,28 +408,28 @@ interface Question {
   title: string;
   required: boolean;
   order: number;
-  options?: QOption[];
-  tableRowsData?: TableRow[];
-  tableColumns?: { id: string; label: string }[];
-  displayCondition?: QConditionGroup;
-  tableValidationRules?: unknown[];
-  groupId?: string;
-  allowOtherOption?: boolean;
-  questionCode?: string;
+  options?: QOption[] | undefined;
+  tableRowsData?: TableRow[] | undefined;
+  tableColumns?: { id: string; label: string }[] | undefined;
+  displayCondition?: QConditionGroup | undefined;
+  tableValidationRules?: unknown[] | undefined;
+  groupId?: string | undefined;
+  allowOtherOption?: boolean | undefined;
+  questionCode?: string | undefined;
   rankingConfig?: {
     positions: number;
-    branchRankPosition?: number;
-    optionsSource?: 'manual' | 'table';
-    positionsColumns?: number;
-    allowDuplicateRanks?: boolean;
-    requireAllPositions?: boolean;
-  };
+    branchRankPosition?: number | undefined;
+    optionsSource?: 'manual' | 'table' | undefined;
+    positionsColumns?: number | undefined;
+    allowDuplicateRanks?: boolean | undefined;
+    requireAllPositions?: boolean | undefined;
+  } | undefined;
 }
 interface QGroup {
   id: string;
-  parentGroupId?: string;
+  parentGroupId?: string | undefined;
   order: number;
-  displayCondition?: QConditionGroup;
+  displayCondition?: QConditionGroup | undefined;
 }
 
 // ========================================

@@ -175,7 +175,7 @@ export function FilterPanel({ questions, responses, filter, onFilterChange }: Fi
                       questions={questions}
                       onUpdate={(updates) => handleUpdateCondition(condition.id, updates)}
                       onRemove={() => handleRemoveCondition(condition.id)}
-                      showLogicBadge={index > 0 ? filter.groupLogic : undefined}
+                      {...(index > 0 ? { showLogicBadge: filter.groupLogic } : {})}
                     />
                   ))}
                 </div>

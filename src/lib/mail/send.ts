@@ -98,7 +98,7 @@ export async function sendTestMail(input: SendTestMailInput): Promise<SendTestMa
     html: input.html,
     headers: { 'X-Entity-Ref-ID': randomUUID() },
     tags: [{ name: 'kind', value: 'template-test' }],
-    attachments: resolvedAttachments,
+    ...(resolvedAttachments !== undefined ? { attachments: resolvedAttachments } : {}),
   });
 
   if (error) return { ok: false, error: error.message };

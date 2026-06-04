@@ -24,7 +24,12 @@ export const campaignDispatcher = inngest.createFunction(
     concurrency: { key: 'event.data.surveyId', limit: 1 },
     retries: 2,
   },
-  async ({ event, step, logger }) => {
+  async ({ event, step, ...inngestCtx }) => {
+    // inngest 4.x triggers-API 컨텍스트 타입에는 logger 가 노출되지 않지만,
+    // 런타임에는 미들웨어가 ctx.logger 를 주입한다. console 과 호환되는 좁은 형태로 단언.
+    const logger =
+      (inngestCtx as { logger?: Pick<Console, 'info' | 'warn' | 'error' | 'debug'> })
+        .logger ?? console;
     const data = event.data as MailCampaignQueuedData;
     const { campaignId } = data;
 

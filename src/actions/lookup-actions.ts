@@ -362,7 +362,7 @@ function toSavedLookup(row: typeof savedLookups.$inferSelect): SavedLookup {
   return {
     id: row.id,
     name: row.name,
-    description: row.description ?? undefined,
+    ...(row.description != null ? { description: row.description } : {}),
     category: row.category,
     tags: row.tags,
     columns: row.columns,

@@ -74,7 +74,7 @@ export function restoreCellFromLibrary(
     && data.isOtherRankingCell === true
     && hasExistingOtherRankingCell(currentRows, targetCell.id)
   ) {
-    data.isOtherRankingCell = undefined;
+    delete data.isOtherRankingCell;
   }
 
   if (data.checkboxOptions) {
@@ -102,24 +102,26 @@ export function restoreCellFromLibrary(
     }));
   }
 
-  return {
+  const result: Partial<TableCell> = {
     // 보관함에서 가져오는 속성 (기본값 포함)
     type: 'text',
     content: '',
     ...data,
     // 대상 셀에서 보존하는 구조적 속성
     id: targetCell.id,
-    cellCode: targetCell.cellCode,
-    isCustomCellCode: targetCell.isCustomCellCode,
-    exportLabel: targetCell.exportLabel,
-    isCustomExportLabel: targetCell.isCustomExportLabel,
-    rowspan: targetCell.rowspan,
-    colspan: targetCell.colspan,
-    isHidden: targetCell.isHidden,
-    radioGroupName: targetCell.radioGroupName,
-    // 순위별 수동 변수명은 셀 위치 종속이라 로드 시 강제 초기화 (legacy 라이브러리 데이터 가드)
-    rankVarNames: undefined,
-  } as TableCell;
+  };
+  // optional 프로퍼티: 값이 있을 때만 할당
+  if (targetCell.isHidden !== undefined) result.isHidden = targetCell.isHidden;
+  if (targetCell.cellCode !== undefined) result.cellCode = targetCell.cellCode;
+  if (targetCell.isCustomCellCode !== undefined) result.isCustomCellCode = targetCell.isCustomCellCode;
+  if (targetCell.exportLabel !== undefined) result.exportLabel = targetCell.exportLabel;
+  if (targetCell.isCustomExportLabel !== undefined) result.isCustomExportLabel = targetCell.isCustomExportLabel;
+  if (targetCell.rowspan !== undefined) result.rowspan = targetCell.rowspan;
+  if (targetCell.colspan !== undefined) result.colspan = targetCell.colspan;
+  if (targetCell.radioGroupName !== undefined) result.radioGroupName = targetCell.radioGroupName;
+  // 순위별 수동 변수명은 셀 위치 종속이라 로드 시 강제 초기화 (legacy 라이브러리 데이터 가드)
+  delete result.rankVarNames;
+  return result as TableCell;
 }
 
 /**

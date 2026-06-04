@@ -181,7 +181,8 @@ function applyAutoCodeToCell(
   if (!isEffectivelyCustom(cell)) {
     const newCellCode = generateCellCode(questionCode, rowCode, columnCode);
     if (cell.cellCode !== newCellCode || cell.isCustomCellCode !== false) {
-      updates.cellCode = newCellCode;
+      if (newCellCode !== undefined) updates.cellCode = newCellCode;
+      else delete updates.cellCode;
       updates.isCustomCellCode = false;
       hasChanges = true;
     }
@@ -190,7 +191,8 @@ function applyAutoCodeToCell(
   if (!isEffectivelyCustomLabel(cell)) {
     const newExportLabel = generateExportLabel(questionCode, columnLabel, rowLabel);
     if (cell.exportLabel !== newExportLabel || cell.isCustomExportLabel !== false) {
-      updates.exportLabel = newExportLabel;
+      if (newExportLabel !== undefined) updates.exportLabel = newExportLabel;
+      else delete updates.exportLabel;
       updates.isCustomExportLabel = false;
       hasChanges = true;
     }
@@ -198,11 +200,13 @@ function applyAutoCodeToCell(
 
   // 변수 타입/측정 수준이 아직 없으면 자동 설정 (interactive 셀만)
   if (!cell.spssVarType && INTERACTIVE_CELL_TYPES.has(cell.type)) {
-    updates.spssVarType = inferSpssVarType(cell.type);
+    const inferred = inferSpssVarType(cell.type);
+    if (inferred !== undefined) updates.spssVarType = inferred;
     hasChanges = true;
   }
   if (!cell.spssMeasure && INTERACTIVE_CELL_TYPES.has(cell.type)) {
-    updates.spssMeasure = inferSpssMeasure(cell.type);
+    const inferred = inferSpssMeasure(cell.type);
+    if (inferred !== undefined) updates.spssMeasure = inferred;
     hasChanges = true;
   }
 
@@ -321,13 +325,15 @@ export function regenerateCellCodeForPaste(
 ): TableCell {
   if (!isAutoGeneratable(cell)) return cell;
 
+  const { rankVarNames: _rv, ...cellWithoutRankVarNames } = cell;
+  const generatedCellCode = generateCellCode(questionCode, rowCode, columnCode);
+  const generatedExportLabel = generateExportLabel(questionCode, columnLabel, rowLabel);
   return {
-    ...cell,
-    cellCode: generateCellCode(questionCode, rowCode, columnCode),
+    ...cellWithoutRankVarNames,
+    ...(generatedCellCode !== undefined ? { cellCode: generatedCellCode } : {}),
     isCustomCellCode: false,
-    exportLabel: generateExportLabel(questionCode, columnLabel, rowLabel),
+    ...(generatedExportLabel !== undefined ? { exportLabel: generatedExportLabel } : {}),
     isCustomExportLabel: false,
     // ranking 셀: 순위별 수동 변수명은 원본 셀 전용이므로 새 셀에서 제거 → 자동 생성 폴백
-    rankVarNames: undefined,
-  };
+  } as TableCell;
 }

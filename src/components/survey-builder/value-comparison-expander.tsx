@@ -14,8 +14,8 @@ import { NumericComparisonEditor } from './numeric-comparison-editor';
 import { TableOptionSelector } from './table-option-selector';
 
 export interface ValueComparisonState {
-  expectedValues?: string[];
-  numericComparison?: NumericComparison;
+  expectedValues?: string[] | undefined;
+  numericComparison?: NumericComparison | undefined;
 }
 
 interface ValueComparisonExpanderProps {
@@ -36,9 +36,9 @@ interface ValueComparisonExpanderProps {
   /** TableOptionSelector 의 multipleRows 플래그. */
   multipleRows: boolean;
   /** option 케이스 helpText. */
-  helpText?: string;
+  helpText?: string | undefined;
   /** legacy binop 좌변이 있을 때 장기 계산식으로 변환 트리거. */
-  onMigrateToExpression?: () => void;
+  onMigrateToExpression?: (() => void) | undefined;
 }
 
 const EMPTY_NUMERIC: NumericComparison = {
@@ -72,9 +72,9 @@ export function ValueComparisonExpander({
           disabled={disabled}
           onClick={() => {
             if (kind === 'option') {
-              onChange({ expectedValues: [], numericComparison: undefined });
+              onChange({ expectedValues: [] });
             } else if (kind === 'numeric-input') {
-              onChange({ expectedValues: undefined, numericComparison: EMPTY_NUMERIC });
+              onChange({ numericComparison: EMPTY_NUMERIC });
             }
           }}
         >
@@ -106,7 +106,7 @@ export function ValueComparisonExpander({
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() => onChange({ expectedValues: undefined, numericComparison: undefined })}
+          onClick={() => onChange({})}
           aria-label="값 비교 조건 해제"
         >
           <X className="h-4 w-4" />
@@ -117,7 +117,7 @@ export function ValueComparisonExpander({
           idPrefix={idPrefix}
           value={comparison.numericComparison}
           onChange={(nc) =>
-            onChange({ expectedValues: undefined, numericComparison: nc })
+            onChange({ numericComparison: nc })
           }
           onMigrate={onMigrateToExpression}
         />
@@ -128,7 +128,7 @@ export function ValueComparisonExpander({
           colIndex={colIndex}
           expectedValues={comparison.expectedValues}
           onChange={(values) =>
-            onChange({ expectedValues: values, numericComparison: undefined })
+            onChange({ expectedValues: values })
           }
           helpText={helpText}
           multipleRows={multipleRows}

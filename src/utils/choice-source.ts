@@ -50,11 +50,10 @@ export function resolveChoiceOptions(question: Question): QuestionOption[] {
     id: cell.id,
     value: cell.id,
     label: buildChoiceOptLabel(cell, '(라벨 없음)'),
-    optionCode: undefined,
     spssNumericCode: cell.spssNumericCode ?? idx + 1,
-    exportLabel: cell.exportLabel,
-    branchRule: cell.branchRule,
-    allowTextInput: cell.allowTextInput,
-    textInputPlaceholder: cell.textInputPlaceholder,
+    ...(cell.exportLabel !== undefined ? { exportLabel: cell.exportLabel } : {}),
+    ...(cell.branchRule !== undefined ? { branchRule: cell.branchRule } : {}),
+    ...(cell.allowTextInput !== undefined ? { allowTextInput: cell.allowTextInput } : {}),
+    ...(cell.textInputPlaceholder !== undefined ? { textInputPlaceholder: cell.textInputPlaceholder } : {}),
   }));
 }
