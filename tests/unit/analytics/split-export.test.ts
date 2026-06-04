@@ -50,9 +50,9 @@ describe('bucketQuestions', () => {
   const T = q({
     id: 'T', type: 'table',
     tableRowsData: [
-      { id: 'r0', cells: [] },
-      { id: 'r1', cells: [], displayCondition: vm('Q2', ['opt1']) },
-      { id: 'r2', cells: [], displayCondition: vm('Q2', ['opt2']) },
+      { id: 'r0', label: '', cells: [] },
+      { id: 'r1', label: '', cells: [], displayCondition: vm('Q2', ['opt1']) },
+      { id: 'r2', label: '', cells: [], displayCondition: vm('Q2', ['opt2']) },
     ],
   } as Partial<Question>);
   const all = [basis, A, B, T];
