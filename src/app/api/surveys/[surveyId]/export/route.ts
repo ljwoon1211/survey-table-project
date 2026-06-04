@@ -162,6 +162,11 @@ export async function GET(
         return NextResponse.json({ error: '분할 기준 문항이 필요합니다.' }, { status: 400 });
       }
 
+      const basisQuestion = (surveyData.questions as unknown as Question[]).find((q) => q.id === basis);
+      if (!basisQuestion) {
+        return NextResponse.json({ error: '유효하지 않은 분할 기준 문항입니다.' }, { status: 400 });
+      }
+
       const rawResponses = await db.query.surveyResponses.findMany({
         where: and(
           eq(surveyResponses.surveyId, surveyId),
@@ -215,11 +220,11 @@ export async function GET(
         identifierMode,
       );
       const buffer = await workbook.xlsx.writeBuffer();
-      const basisCode = (surveyData.questions as unknown as Question[]).find((q) => q.id === basis)?.questionCode ?? 'split';
+      const basisCode = basisQuestion.questionCode ?? 'split';
       const filename = `${safeTitle}_분할_${basisCode}_${dateSlice}.xlsx`;
       return new NextResponse(buffer as ArrayBuffer, {
         headers: {
-          'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
+          'Content-Disposition': `attachment; filename="${filename}"`,
           'Content-Type': XLSX_MIME,
         },
       });
