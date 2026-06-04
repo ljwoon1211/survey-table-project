@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { valueMatchSet, bucketQuestions, optionTokensForBasis, planSplit } from '@/lib/analytics/split-export';
+import { valueMatchSet, bucketQuestions, optionTokensForBasis, planSplit, detectSplitCandidates } from '@/lib/analytics/split-export';
 import type { Question, QuestionConditionGroup } from '@/types/survey';
 
 const vm = (sourceQuestionId: string, requiredValues: string[]): QuestionConditionGroup => ({
@@ -120,5 +120,35 @@ describe('planSplit', () => {
     expect(plan.sheets.find((s) => s.token === 'opt2')).toBeUndefined(); // 빈 버킷 제외
     expect(plan.maxVars).toBe(2); // 공통이 최대
     expect(plan.exceedsSoftLimit).toBe(false);
+  });
+});
+
+describe('detectSplitCandidates', () => {
+  it('value-match 참조 문항을 후보로, maxVars 오름차순 정렬·권장 표시한다', () => {
+    const basis = q({
+      id: 'Q2', type: 'radio', questionCode: 'Q2', title: '품목',
+      options: [
+        { id: 'o1', value: 'opt1', label: '제재목' },
+        { id: 'o2', value: 'opt2', label: '합판' },
+      ],
+    } as Partial<Question>);
+    const b1 = q({ id: 'B1', type: 'text', displayCondition: vm('Q2', ['opt1']) });
+    const b2 = q({ id: 'B2', type: 'text', displayCondition: vm('Q2', ['opt2']) });
+    const cands = detectSplitCandidates([basis, b1, b2]);
+    expect(cands).toHaveLength(1);
+    expect(cands[0].questionId).toBe('Q2');
+    expect(cands[0].refCount).toBe(2);
+    expect(cands[0].buckets).toBe(2);
+    expect(cands[0].recommended).toBe(true);
+    expect(cands[0].note).not.toBe('');
+  });
+
+  it('시트가 2개 미만이면 후보에서 제외한다', () => {
+    const basis = q({
+      id: 'Q2', type: 'radio', questionCode: 'Q2',
+      options: [{ id: 'o1', value: 'opt1', label: 'A' }],
+    } as Partial<Question>);
+    const b1 = q({ id: 'B1', type: 'text', displayCondition: vm('Q2', ['opt1']) });
+    expect(detectSplitCandidates([basis, b1])).toHaveLength(0);
   });
 });

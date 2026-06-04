@@ -135,3 +135,73 @@ export function planSplit(
     exceedsExcelLimit: maxVars > SPLIT_EXCEL_LIMIT,
   };
 }
+
+const SPLIT_BASIS_TYPES = ['radio', 'checkbox', 'select', 'multiselect'];
+
+export interface SplitCandidate {
+  questionId: string;
+  code: string;
+  label: string;
+  type: string;
+  refCount: number;
+  buckets: number;
+  maxVars: number;
+  recommended: boolean;
+  note: string;
+}
+
+export function detectSplitCandidates(questions: Question[]): SplitCandidate[] {
+  // 1) value-match sourceQuestionId 빈도 집계 (질문 + 테이블 행)
+  const refCount = new Map<string, number>();
+  const bump = (dc: QuestionConditionGroup | undefined) => {
+    if (!dc || !Array.isArray(dc.conditions)) return;
+    for (const c of dc.conditions) {
+      if (c.conditionType === 'value-match' && c.sourceQuestionId &&
+        Array.isArray(c.requiredValues) && c.requiredValues.length > 0) {
+        refCount.set(c.sourceQuestionId, (refCount.get(c.sourceQuestionId) ?? 0) + 1);
+      }
+    }
+  };
+  for (const q of questions) {
+    bump(q.displayCondition);
+    if (q.type === 'table' && Array.isArray(q.tableRowsData)) {
+      for (const r of q.tableRowsData) bump(r.displayCondition);
+    }
+  }
+
+  // 2) 후보 생성
+  const qmap = new Map(questions.map((q) => [q.id, q]));
+  const candidates: SplitCandidate[] = [];
+  for (const [qid, refs] of refCount) {
+    const basis = qmap.get(qid);
+    if (!basis || !SPLIT_BASIS_TYPES.includes(basis.type)) continue;
+    const plan = planSplit(questions, qid);
+    if (plan.sheets.length < 2) continue; // 분할 효과 없음
+    candidates.push({
+      questionId: qid, code: basis.questionCode ?? '', label: basis.title, type: basis.type,
+      refCount: refs, buckets: plan.sheets.length, maxVars: plan.maxVars,
+      recommended: false, note: '',
+    });
+  }
+
+  // 3) 정렬: maxVars 작을수록 → buckets 적을수록
+  candidates.sort((a, b) => a.maxVars - b.maxVars || a.buckets - b.buckets);
+
+  // 4) 권장 + note
+  for (const c of candidates) {
+    c.recommended = c.maxVars <= SPLIT_SOFT_LIMIT;
+    if (c.maxVars <= SPLIT_SOFT_LIMIT) {
+      c.note = c.buckets >= 10
+        ? `시트가 ${c.buckets}개로 많지만 시트당 변수는 가장 적음`
+        : '분기 경계가 깔끔해 시트 변수가 고르게 작아짐';
+    } else if (c.maxVars <= SPLIT_EXCEL_LIMIT) {
+      c.note = '일부 시트가 한계에 근접';
+    } else {
+      c.note = '일부 시트가 Excel 한계를 초과';
+    }
+  }
+  // 모두 임계 초과면 1순위에만 권장
+  if (!candidates.some((c) => c.recommended) && candidates[0]) candidates[0].recommended = true;
+
+  return candidates;
+}
