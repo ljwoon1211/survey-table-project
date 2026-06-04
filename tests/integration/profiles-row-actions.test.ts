@@ -63,7 +63,7 @@ const h = vi.hoisted(() => {
   const answerStore = new Map<string, ResponseAnswerRow>();
   const surveyStore = new Map<string, SurveyRow>();
   const questionStore = new Map<string, QuestionRow>();
-  let authed = true;
+  const authed = true;
 
   return { responseStore, contactStore, answerStore, surveyStore, questionStore, authed };
 });
