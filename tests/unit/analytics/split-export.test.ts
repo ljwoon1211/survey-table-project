@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { valueMatchSet, bucketQuestions } from '@/lib/analytics/split-export';
+import { valueMatchSet, bucketQuestions, optionTokensForBasis } from '@/lib/analytics/split-export';
 import type { Question, QuestionConditionGroup } from '@/types/survey';
 
 const vm = (sourceQuestionId: string, requiredValues: string[]): QuestionConditionGroup => ({
@@ -74,5 +74,21 @@ describe('bucketQuestions', () => {
     const out = bucketQuestions(all, 'Q2', 'opt2');
     expect(out.map((x) => x.id)).toEqual(['T']);
     expect(out[0].tableRowsData!.map((r) => r.id)).toEqual(['r2']);
+  });
+});
+
+describe('optionTokensForBasis', () => {
+  it('basis.options 순서로 정렬하고, 옵션에 없는 토큰(other)은 뒤에 붙인다', () => {
+    const basis = q({
+      id: 'Q2', type: 'checkbox', questionCode: 'Q2',
+      options: [
+        { id: 'o1', value: 'opt1', label: '제재목' },
+        { id: 'o2', value: 'opt2', label: '합판' },
+      ],
+    } as Partial<Question>);
+    const B = q({ id: 'B', displayCondition: vm('Q2', ['opt2']) });
+    const C = q({ id: 'C', displayCondition: vm('Q2', ['opt1', 'other']) });
+    const tokens = optionTokensForBasis([basis, B, C], basis);
+    expect(tokens).toEqual(['opt1', 'opt2', 'other']);
   });
 });

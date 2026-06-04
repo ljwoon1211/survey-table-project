@@ -60,3 +60,26 @@ export function bucketQuestions(
   }
   return out;
 }
+
+/** displayCondition들에 실제 등장하는 basis 옵션 토큰을, options 순서로 정렬해 반환 */
+export function optionTokensForBasis(questions: Question[], basis: Question): string[] {
+  const present = new Set<string>();
+  for (const q of questions) {
+    const qs = valueMatchSet(q.displayCondition, basis.id);
+    qs?.forEach((t) => present.add(t));
+    if (q.type === 'table' && Array.isArray(q.tableRowsData)) {
+      for (const r of q.tableRowsData) {
+        valueMatchSet(r.displayCondition, basis.id)?.forEach((t) => present.add(t));
+      }
+    }
+  }
+  const ordered: string[] = [];
+  for (const o of basis.options ?? []) {
+    if (present.has(o.value)) {
+      ordered.push(o.value);
+      present.delete(o.value);
+    }
+  }
+  for (const t of present) ordered.push(t); // 옵션 목록에 없는 토큰(other 등)
+  return ordered;
+}
