@@ -123,10 +123,11 @@ export function calculateCrossTab(
   const colTotals: Record<string, number> = {};
 
   rowOptions.forEach((row) => {
-    matrix[row.value] = {};
+    const rowMap: Record<string, number> = {};
+    matrix[row.value] = rowMap;
     rowTotals[row.value] = 0;
     colOptions.forEach((col) => {
-      matrix[row.value][col.value] = 0;
+      rowMap[col.value] = 0;
     });
   });
 
@@ -150,10 +151,11 @@ export function calculateCrossTab(
     // 다중 선택의 경우 모든 조합 카운트
     rowValues.forEach((rv) => {
       colValues.forEach((cv) => {
-        if (matrix[rv] && matrix[rv][cv] !== undefined) {
-          matrix[rv][cv]++;
-          rowTotals[rv]++;
-          colTotals[cv]++;
+        const rowEntry = matrix[rv];
+        if (rowEntry && rowEntry[cv] !== undefined) {
+          rowEntry[cv] = (rowEntry[cv] ?? 0) + 1;
+          rowTotals[rv] = (rowTotals[rv] ?? 0) + 1;
+          colTotals[cv] = (colTotals[cv] ?? 0) + 1;
           grandTotal++;
         }
       });
@@ -176,9 +178,9 @@ export function calculateCrossTab(
     label: rowOpt.label,
     value: rowOpt.value,
     cells: colOptions.map((colOpt) => {
-      const count = matrix[rowOpt.value][colOpt.value];
-      const rowTotal = rowTotals[rowOpt.value] || 0;
-      const colTotal = colTotals[colOpt.value] || 0;
+      const count = matrix[rowOpt.value]?.[colOpt.value] ?? 0;
+      const rowTotal = rowTotals[rowOpt.value] ?? 0;
+      const colTotal = colTotals[colOpt.value] ?? 0;
 
       return {
         count,
@@ -187,8 +189,8 @@ export function calculateCrossTab(
         totalPercent: grandTotal > 0 ? (count / grandTotal) * 100 : 0,
       };
     }),
-    total: rowTotals[rowOpt.value] || 0,
-    rowPercent: grandTotal > 0 ? ((rowTotals[rowOpt.value] || 0) / grandTotal) * 100 : 0,
+    total: rowTotals[rowOpt.value] ?? 0,
+    rowPercent: grandTotal > 0 ? ((rowTotals[rowOpt.value] ?? 0) / grandTotal) * 100 : 0,
   }));
 
   const columns: CrossTabColumn[] = colOptions.map((colOpt) => ({
@@ -238,7 +240,8 @@ export function toCrossTabChartData(
     const dataItem: CrossTabChartData = { name: row.label };
 
     row.cells.forEach((cell, index) => {
-      const colLabel = result.columns[index].label;
+      const colLabel = result.columns[index]?.label;
+      if (colLabel === undefined) return;
       switch (percentageBase) {
         case 'row':
           dataItem[colLabel] = Math.round(cell.rowPercent * 10) / 10;
@@ -287,9 +290,11 @@ export function toHeatmapData(
           break;
       }
 
+      const colLabel = result.columns[colIndex]?.label;
+      if (colLabel === undefined) return;
       cells.push({
         rowLabel: row.label,
-        colLabel: result.columns[colIndex].label,
+        colLabel,
         value,
         count: cell.count,
       });

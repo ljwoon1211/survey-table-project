@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { generateId } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
-import { DynamicRowGroupConfig, HeaderCell, Question, QuestionConditionGroup, TableCell, TableColumn, TableRow } from '@/types/survey';
+import { DynamicRowGroupConfig, HeaderCell, QuestionConditionGroup, TableCell, TableColumn, TableRow } from '@/types/survey';
 
 import { BulkGeneratorModal, BulkColumnDef } from './bulk-generator';
 import { CellContentModal } from './cell-content-modal';
@@ -28,19 +28,19 @@ import { TableSummaryCard } from './table-summary-card';
 // ── Props ──
 
 interface DynamicTableEditorProps {
-  tableTitle?: string;
-  columns?: TableColumn[];
-  rows?: TableRow[];
-  tableHeaderGrid?: HeaderCell[][];
-  currentQuestionId?: string;
-  questionCode?: string;
-  questionTitle?: string;
-  dynamicRowConfigs?: DynamicRowGroupConfig[];
+  tableTitle?: string | undefined;
+  columns?: TableColumn[] | undefined;
+  rows?: TableRow[] | undefined;
+  tableHeaderGrid?: HeaderCell[][] | undefined;
+  currentQuestionId?: string | undefined;
+  questionCode?: string | undefined;
+  questionTitle?: string | undefined;
+  dynamicRowConfigs?: DynamicRowGroupConfig[] | undefined;
   onTableChange: (data: {
     tableTitle: string;
     tableColumns: TableColumn[];
     tableRowsData: TableRow[];
-    tableHeaderGrid?: HeaderCell[][];
+    tableHeaderGrid?: HeaderCell[][] | undefined;
   }) => void;
   onDynamicRowConfigsChange?: (configs: DynamicRowGroupConfig[] | undefined) => void;
 }
@@ -134,7 +134,6 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
   } = actions;
 
   // ── 동적 행 감지 ──
-  const hasDynamicRows = currentRows.some((r) => r.dynamicGroupId);
   const nonDynamicRows = currentRows.filter((r) => !r.dynamicGroupId && !r.showWhenDynamicGroupId);
 
   // ── 행 일괄 생성 상태 ──
@@ -175,9 +174,11 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
 
   const handleUpdateGroupCondition = useCallback(
     (groupId: string, condition: QuestionConditionGroup | undefined) => {
-      const updated = dynamicRowConfigs.map((g) =>
-        g.groupId === groupId ? { ...g, displayCondition: condition } : g,
-      );
+      const updated = dynamicRowConfigs.map((g) => {
+        if (g.groupId !== groupId) return g;
+        const { displayCondition: _dc, ...rest } = g;
+        return condition !== undefined ? { ...rest, displayCondition: condition } : rest;
+      });
       onDynamicRowConfigsChange?.(updated);
     },
     [dynamicRowConfigs, onDynamicRowConfigsChange],
@@ -612,7 +613,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
             <p className="text-xs text-gray-400">그룹을 추가하면 행을 동적으로 선택/표시할 수 있습니다.</p>
           )}
 
-          {dynamicRowConfigs.map((group, idx) => {
+          {dynamicRowConfigs.map((group) => {
             const groupRowCount = currentRows.filter((r) => r.dynamicGroupId === group.groupId).length;
             return (
               <div key={group.groupId} className="space-y-2 rounded-md border border-purple-200 bg-purple-50/30 p-3">
@@ -662,9 +663,12 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
                       <Input
                         value={group.label ?? ''}
                         onChange={(e) => {
-                          const updated = dynamicRowConfigs.map((g) =>
-                            g.groupId === group.groupId ? { ...g, label: e.target.value || undefined } : g,
-                          );
+                          const updated = dynamicRowConfigs.map((g) => {
+                            if (g.groupId !== group.groupId) return g;
+                            const newLabel = e.target.value;
+                            const { label: _l, ...rest } = g;
+                            return newLabel ? { ...rest, label: newLabel } : rest;
+                          });
                           onDynamicRowConfigsChange?.(updated);
                         }}
                         placeholder="항목 선택"
@@ -676,9 +680,12 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
                       <select
                         value={group.insertAfterRowId ?? ''}
                         onChange={(e) => {
-                          const updated = dynamicRowConfigs.map((g) =>
-                            g.groupId === group.groupId ? { ...g, insertAfterRowId: e.target.value || undefined } : g,
-                          );
+                          const updated = dynamicRowConfigs.map((g) => {
+                            if (g.groupId !== group.groupId) return g;
+                            const newId = e.target.value;
+                            const { insertAfterRowId: _iid, ...rest } = g;
+                            return newId ? { ...rest, insertAfterRowId: newId } : rest;
+                          });
                           onDynamicRowConfigsChange?.(updated);
                         }}
                         className="h-7 w-full rounded-md border border-input bg-background px-1 text-xs"

@@ -6,7 +6,7 @@ import { and, desc, eq } from 'drizzle-orm';
 
 import { getSurveyWithDetails } from '@/data/surveys';
 import { db } from '@/db';
-import { surveys, surveyVersions } from '@/db/schema';
+import { surveys, surveyVersions, type SurveyVersionSnapshot } from '@/db/schema';
 import { requireAuth } from '@/lib/auth';
 import { buildSurveySnapshot } from '@/lib/versioning/snapshot-builder';
 
@@ -46,16 +46,20 @@ export async function publishSurvey(surveyId: string, changeNote?: string) {
     });
     const nextVersionNumber = (latestVersion?.versionNumber ?? 0) + 1;
 
-    const [newVersion] = await tx
+    const versionRows = await tx
       .insert(surveyVersions)
       .values({
         surveyId,
         versionNumber: nextVersionNumber,
         status: 'published',
-        snapshot,
+        // buildSurveySnapshot 의 SurveySnapshot 은 DB 컬럼 타입 SurveyVersionSnapshot 과
+        // 런타임 형태가 동일하다(차이는 exactOptional 수식자 + lookups 추가 필드뿐, JSONB 직렬화 안전).
+        snapshot: snapshot as SurveyVersionSnapshot,
         changeNote: changeNote || null,
       })
       .returning();
+    const newVersion = versionRows[0];
+    if (!newVersion) throw new Error('publishSurvey: 버전 생성 실패');
 
     await tx
       .update(surveys)

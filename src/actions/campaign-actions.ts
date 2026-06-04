@@ -85,7 +85,7 @@ export async function createCampaignAction(
     return { ok: false, error: parsed.error.issues[0]?.message ?? '입력값이 올바르지 않습니다.' };
   }
   const input = parsed.data;
-  const filterSnapshot: CampaignFilterSnapshot = input.filterSnapshot ?? {};
+  const filterSnapshot: CampaignFilterSnapshot = (input.filterSnapshot ?? {}) as CampaignFilterSnapshot;
 
   let result: { campaignId: string; queuedCount: number; skippedCount: number } | null = null;
 

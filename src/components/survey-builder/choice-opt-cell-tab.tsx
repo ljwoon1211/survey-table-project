@@ -1,7 +1,5 @@
 'use client';
 
-import React from 'react';
-
 import { Tag } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
@@ -104,7 +102,7 @@ export function ChoiceOptCellTab({
       </div>
 
       <BranchRuleEditor
-        branchRule={branchRule}
+        {...(branchRule !== undefined ? { branchRule } : {})}
         allQuestions={allQuestions}
         currentQuestionId={currentQuestionId}
         onChange={onBranchRuleChange}

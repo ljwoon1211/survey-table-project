@@ -266,7 +266,6 @@ export function createFilterCondition(questionId: string): FilterCondition {
     id: crypto.randomUUID(),
     questionId,
     operator: 'equals',
-    value: undefined,
   };
 }
 
@@ -286,7 +285,9 @@ export function addConditionToFilter(filter: FilterState, condition: FilterCondi
 
   // 마지막 그룹에 조건 추가
   const updatedGroups = [...filter.groups];
-  const lastGroup = { ...updatedGroups[updatedGroups.length - 1] };
+  const lastGroupSrc = updatedGroups[updatedGroups.length - 1];
+  if (!lastGroupSrc) return filter;
+  const lastGroup: FilterGroup = { ...lastGroupSrc };
   lastGroup.conditions = [...lastGroup.conditions, condition];
   updatedGroups[updatedGroups.length - 1] = lastGroup;
 

@@ -20,7 +20,9 @@ interface RankingOptionsEditorProps {
 export function RankingOptionsEditor({ options, onChange }: RankingOptionsEditorProps) {
   const updateAt = (index: number, patch: Partial<QuestionOption>) => {
     const next = [...options];
-    next[index] = { ...next[index], ...patch };
+    const current = next[index];
+    if (!current) return;
+    next[index] = { ...current, ...patch };
     onChange(next);
   };
 
@@ -72,7 +74,7 @@ export function RankingOptionsEditor({ options, onChange }: RankingOptionsEditor
                     value={option.spssNumericCode ?? ''}
                     onChange={(e) => {
                       const v = e.target.value.replace(/\D/g, '');
-                      updateAt(index, { spssNumericCode: v ? parseInt(v, 10) : undefined });
+                      updateAt(index, v ? { spssNumericCode: parseInt(v, 10) } : {});
                     }}
                     placeholder={String(index + 1)}
                     className="w-14 text-center text-xs placeholder:text-gray-300"

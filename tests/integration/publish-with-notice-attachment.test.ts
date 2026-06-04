@@ -12,11 +12,11 @@ import { promoteSurveyImages } from '@/lib/survey/survey-image-promote';
 
 describe('publish 통합 — survey 이미지 + notice 첨부 동시 처리', () => {
   beforeEach(() => {
-    process.env.CLOUDFLARE_R2_PUBLIC_URL = 'https://cdn.test';
+    process.env['CLOUDFLARE_R2_PUBLIC_URL'] = 'https://cdn.test';
     vi.mocked(moveR2Objects).mockReset();
   });
   afterEach(() => {
-    delete process.env.CLOUDFLARE_R2_PUBLIC_URL;
+    delete process.env['CLOUDFLARE_R2_PUBLIC_URL'];
   });
 
   it('이미지 promote 후 첨부 promote 직렬 — noticeContent 안 양쪽 모두 영구 prefix 로', async () => {
@@ -39,7 +39,9 @@ describe('publish 통합 — survey 이미지 + notice 첨부 동시 처리', ()
     const promoted = await promoteNoticeAttachments(
       await promoteSurveyImages(draftQuestions),
     );
-    const html = promoted[0].noticeContent ?? '';
+    const promoted0 = promoted[0];
+    if (!promoted0) throw new Error('promoted[0] 없음');
+    const html = promoted0.noticeContent ?? '';
     expect(html).toContain('https://cdn.test/survey/img1.webp');
     expect(html).toContain('https://cdn.test/notice-attachment/x.pdf');
     expect(html).not.toContain('tmp/survey/');

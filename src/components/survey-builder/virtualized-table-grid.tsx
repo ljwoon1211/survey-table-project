@@ -11,13 +11,11 @@
 import React, { useMemo } from 'react';
 
 import { cn } from '@/lib/utils';
-import type { CellHeightCache } from '@/hooks/use-cell-height-cache';
 import { useCellHeightCache } from '@/hooks/use-cell-height-cache';
 import { useRowHeights } from '@/hooks/use-row-heights';
-import type { RowVisibilityResult } from '@/hooks/use-row-visibility';
 import { useRowVisibility } from '@/hooks/use-row-visibility';
 import { useTablePerf } from '@/hooks/use-table-perf';
-import type { TableCell, TableColumn, TableRow } from '@/types/survey';
+import type { TableColumn, TableRow } from '@/types/survey';
 import {
   getAlignmentClasses,
   getGridCellAria,
@@ -40,11 +38,11 @@ interface VirtualizedRowProps {
   estimatedHeight: number;
   questionId: string;
   isTestMode: boolean;
-  value?: Record<string, any>;
-  onChange?: (value: Record<string, any>) => void;
+  value?: Record<string, any> | undefined;
+  onChange?: ((value: Record<string, any>) => void) | undefined;
   sentinelRef: (el: HTMLElement | null) => void;
   measureRef: (el: HTMLElement | null) => void;
-  stickyInfo?: StickyLeftInfo;
+  stickyInfo?: StickyLeftInfo | undefined;
 }
 
 const VirtualizedRow = React.memo(
@@ -153,15 +151,15 @@ interface VirtualizedTableGridProps {
   visibleColumns: TableColumn[];
   rowCompletionMap: Map<string, boolean>;
   rowGridMap: Map<string, number>;
-  isTestMode?: boolean;
-  value?: Record<string, any>;
-  onChange?: (value: Record<string, any>) => void;
-  renderSelectorRows?: () => React.ReactNode;
+  isTestMode?: boolean | undefined;
+  value?: Record<string, any> | undefined;
+  onChange?: ((value: Record<string, any>) => void) | undefined;
+  renderSelectorRows?: (() => React.ReactNode) | undefined;
   gridTemplateCols: string;
   totalWidth: number;
-  stickyInfo?: StickyLeftInfo;
+  stickyInfo?: StickyLeftInfo | undefined;
   // 컨테이너가 내부 세로 스크롤 영역일 때 IntersectionObserver root로 사용 (미지정 시 뷰포트)
-  scrollRootRef?: React.RefObject<HTMLElement | null>;
+  scrollRootRef?: React.RefObject<HTMLElement | null> | undefined;
 }
 
 // ── 메인 컴포넌트 ──

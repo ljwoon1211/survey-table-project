@@ -118,7 +118,7 @@ export function UserDefinedMultiSelectPreview({
 }: UserDefinedMultiSelectPreviewProps) {
   return (
     <div className={`space-y-3 ${className}`}>
-      {levels.map((level, index) => (
+      {levels.map((level) => (
         <div key={level.id} className="space-y-1">
           <label className="block text-sm font-medium text-gray-700">{level.label}</label>
           <div className="relative">
@@ -133,12 +133,16 @@ export function UserDefinedMultiSelectPreview({
         </div>
       ))}
 
-      {levels.length > 0 && levels[0].options && levels[0].options.length > 0 && (
-        <div className="mt-3 text-xs text-gray-500">
-          {levels[0].label}: {levels[0].options.map((opt) => opt.label).join(', ')}
-          {levels[0].options.length > 3 && '...'}
-        </div>
-      )}
+      {(() => {
+        const firstLevel = levels[0];
+        if (!firstLevel?.options || firstLevel.options.length === 0) return null;
+        return (
+          <div className="mt-3 text-xs text-gray-500">
+            {firstLevel.label}: {firstLevel.options.map((opt) => opt.label).join(', ')}
+            {firstLevel.options.length > 3 && '...'}
+          </div>
+        );
+      })()}
     </div>
   );
 }

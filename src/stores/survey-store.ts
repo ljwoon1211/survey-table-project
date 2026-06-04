@@ -286,8 +286,8 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           id: generateId(),
           surveyId: get().currentSurvey.id,
           name,
-          description,
-          parentGroupId,
+          ...(description !== undefined ? { description } : {}),
+          ...(parentGroupId !== undefined ? { parentGroupId } : {}),
           order: maxOrder + 1,
           collapsed: false,
         };
@@ -340,7 +340,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           // 그룹 삭제 시 소속 질문들의 groupId도 변경됨 → updated 추가
           state.currentSurvey.questions.forEach((q) => {
             if (q.groupId && groupsToDelete.has(q.groupId)) {
-              q.groupId = undefined;
+              delete q.groupId;
               if (!state.questionChanges.added[q.id]) {
                 state.questionChanges.updated[q.id] = true;
               }
@@ -387,7 +387,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           }
         }),
 
-      reorderGroupChildren: (parentGroupId: string, items: Array<{ kind: 'question' | 'subgroup'; id: string }>) =>
+      reorderGroupChildren: (_parentGroupId: string, items: Array<{ kind: 'question' | 'subgroup'; id: string }>) =>
         set((state) => {
           const oldCodes = new Map(state.currentSurvey.questions.map((q) => [q.id, q.questionCode]));
           const groups = state.currentSurvey.groups || [];
@@ -440,7 +440,7 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           title: getDefaultQuestionTitle(type),
           required: false,
           order: calculateNextOrder(groupId, questions, groups),
-          groupId,
+          ...(groupId !== undefined ? { groupId } : {}),
           ...(needsOptions(type) && {
             options: [
               { id: generateId(), label: '옵션 1', value: '옵션1', spssNumericCode: 1 },

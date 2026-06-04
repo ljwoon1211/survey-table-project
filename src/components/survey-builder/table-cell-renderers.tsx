@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Image } from 'lucide-react';
 
@@ -13,8 +13,9 @@ import { Image } from 'lucide-react';
 export function getYouTubeEmbedUrl(url: string) {
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
   const match = url.match(regExp);
-  if (match && match[2].length === 11) {
-    return `https://www.youtube.com/embed/${match[2]}`;
+  const videoId = match?.[2];
+  if (match && videoId && videoId.length === 11) {
+    return `https://www.youtube.com/embed/${videoId}`;
   }
   return url;
 }

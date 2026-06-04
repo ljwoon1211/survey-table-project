@@ -58,9 +58,11 @@ describe('migrateNumericComparisonToExpression', () => {
       right: { kind: 'literal', value: 0 },
     };
     const result = migrateNumericComparisonToExpression(nc, OUTER_CELL);
-    expect(result.clauses[0].kind).toBe('comparison');
-    if (result.clauses[0].kind === 'comparison') {
-      expect(result.clauses[0].comparison.left).toEqual({
+    const clause0 = result.clauses[0];
+    if (!clause0) throw new Error('clauses[0] is undefined');
+    expect(clause0.kind).toBe('comparison');
+    if (clause0.kind === 'comparison') {
+      expect(clause0.comparison.left).toEqual({
         kind: 'cell', questionId: 'q2', cellId: 'cell-x',
       });
     }
@@ -78,8 +80,10 @@ describe('migrateNumericComparisonToExpression', () => {
       right: { kind: 'literal', value: 100 },
     };
     const result = migrateNumericComparisonToExpression(nc, OUTER_CELL);
-    if (result.clauses[0].kind === 'comparison') {
-      expect(result.clauses[0].comparison.left).toEqual({
+    const clause0 = result.clauses[0];
+    if (!clause0) throw new Error('clauses[0] is undefined');
+    if (clause0.kind === 'comparison') {
+      expect(clause0.comparison.left).toEqual({
         kind: 'binop',
         op: '/',
         left:  { kind: 'cell', questionId: 'q1', cellId: 'a' },
@@ -94,11 +98,13 @@ describe('migrateNumericComparisonToExpression', () => {
       comparand: { kind: 'literal', value: 0 },
     };
     const result = migrateNumericComparisonToExpression(nc, OUTER_CELL);
-    if (result.clauses[0].kind === 'comparison') {
-      expect(result.clauses[0].comparison.left).toEqual({
+    const clause0 = result.clauses[0];
+    if (!clause0) throw new Error('clauses[0] is undefined');
+    if (clause0.kind === 'comparison') {
+      expect(clause0.comparison.left).toEqual({
         kind: 'cell', ...OUTER_CELL,
       });
-      expect(result.clauses[0].comparison.right).toEqual({
+      expect(clause0.comparison.right).toEqual({
         kind: 'literal', value: 0,
       });
     }

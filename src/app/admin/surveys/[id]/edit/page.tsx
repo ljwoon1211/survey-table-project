@@ -156,7 +156,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   );
   // TanStack Query 훅 사용
   const { data: survey, isLoading: isSurveyLoading, isError } = useSurvey(id);
-  const { saveSurvey, isSaving: isSavingSurvey } = useSurveySync();
+  const { saveSurvey } = useSurveySync();
 
   const [titleInput, setTitleInput] = useState('');
   const [questionNumberInput, setQuestionNumberInput] = useState('');
@@ -361,10 +361,11 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
     const questions = useSurveyBuilderStore.getState().currentSurvey.questions;
     const questionIndex = questionNumber - 1;
     if (questionIndex >= 0 && questionIndex < questions.length) {
+      const targetQuestion = questions[questionIndex];
       const questionElement = document.querySelector(`[data-question-index="${questionIndex}"]`);
-      if (questionElement) {
+      if (questionElement && targetQuestion) {
         questionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        selectQuestion(questions[questionIndex].id);
+        selectQuestion(targetQuestion.id);
       }
     }
   };

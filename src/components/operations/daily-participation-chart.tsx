@@ -135,8 +135,8 @@ export function DailyParticipationChart({
                   ‹
                 </button>
                 <span className="tabular-nums">
-                  {formatRangeLabel(visibleData[0].bucket)} ~{' '}
-                  {formatRangeLabel(visibleData[visibleData.length - 1].bucket)}
+                  {formatRangeLabel(visibleData[0]?.bucket ?? '')} ~{' '}
+                  {formatRangeLabel(visibleData[visibleData.length - 1]?.bucket ?? '')}
                 </span>
                 <button
                   type="button"
@@ -241,7 +241,7 @@ interface ToggleButtonProps {
 /** 'YYYY-MM-DD' → 'MM-DD' 로 단축. 다른 형식은 그대로 (M-2). */
 function formatRangeLabel(bucket: string): string {
   const m = bucket.match(/^(\d{4})-(\d{2}-\d{2})$/);
-  return m ? m[2] : bucket;
+  return m ? (m[2] ?? bucket) : bucket;
 }
 
 const KOREAN_WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const;
@@ -250,7 +250,7 @@ const KOREAN_WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as con
 function formatDayLabel(ymd: string): string {
   const [, mm, dd] = ymd.split('-');
   const date = new Date(`${ymd}T00:00:00Z`);
-  const weekday = KOREAN_WEEKDAYS[date.getUTCDay()];
+  const weekday = KOREAN_WEEKDAYS[date.getUTCDay()] ?? '';
   return `${mm}-${dd} (${weekday})`;
 }
 
@@ -275,7 +275,9 @@ function padLeftWithEmptyDays(
   limit: number,
 ): DailyBucket[] {
   if (data.length === 0 || data.length >= limit) return data;
-  const firstBucket = data[0].bucket;
+  const firstEntry = data[0];
+  if (!firstEntry) return data;
+  const firstBucket = firstEntry.bucket;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(firstBucket)) return data;
   const padCount = limit - data.length;
   const padding: DailyBucket[] = [];

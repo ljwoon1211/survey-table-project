@@ -335,6 +335,7 @@ function toSavVariable(
     || varType === VariableType.Date
     || varType === VariableType.DateTime;
 
+  const valueLabels = buildValueLabels(col, question);
   return {
     name: sanitizeSpssVarName(col.spssVarName),
     short: sanitizeSpssVarName(shortName),
@@ -345,7 +346,7 @@ function toSavVariable(
     alignment: VariableAlignment.Centre,
     measure: resolveMeasure(col, question),
     columns: isNumeric ? 8 : Math.min(maxWidth, 32),
-    valueLabels: buildValueLabels(col, question),
+    ...(valueLabels !== undefined ? { valueLabels } : {}),
   };
 }
 
@@ -362,6 +363,7 @@ function buildSavRecords(
     const record: { [key: string]: unknown } = {};
     for (let i = 0; i < columns.length; i++) {
       const col = columns[i];
+      if (!col) continue;
       let val = row[i];
 
       // notice-agree: '동의' → 1 (Numeric 타입)
@@ -397,7 +399,7 @@ export async function generateSavBuffer(
 
   // SavVariable[] 생성
   const variables = columns.map((col, i) =>
-    toSavVariable(col, questionMap.get(col.questionId), maxWidths[i], shortNames[i]),
+    toSavVariable(col, questionMap.get(col.questionId), maxWidths[i] ?? 0, shortNames[i] ?? col.spssVarName),
   );
 
   const tmpPath = join(tmpdir(), `sav_${randomUUID()}.sav`);

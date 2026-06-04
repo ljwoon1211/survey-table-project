@@ -135,12 +135,13 @@ export async function applyQuestion(id: string) {
   // 새 ID로 복제된 질문 반환
   const question = updated.question as unknown as Question;
 
+  // 보관함에서 추가할 때는 그룹 없이 추가
+  const { groupId: _g, ...questionWithoutGroup } = question;
   return {
-    ...question,
+    ...questionWithoutGroup,
     id: generateId(),
     order: 0,
-    groupId: undefined, // 보관함에서 추가할 때는 그룹 없이 추가
-  };
+  } as Question;
 }
 
 // 여러 질문 사용 (일괄 처리 최적화)
@@ -168,12 +169,13 @@ export async function applyMultipleQuestions(ids: string[]) {
   // 3. 메모리에서 데이터 가공 (새 ID 부여)
   return savedItems.map((saved) => {
     const question = saved.question as unknown as Question;
+    // 보관함에서 추가할 때는 그룹 없이 추가
+    const { groupId: _g, ...questionWithoutGroup } = question;
     return {
-      ...question,
+      ...questionWithoutGroup,
       id: generateId(),
       order: 0,
-      groupId: undefined,
-    };
+    } as Question;
   });
 }
 

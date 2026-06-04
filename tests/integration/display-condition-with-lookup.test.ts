@@ -44,8 +44,10 @@ describe('displayCondition with lookup E2E', () => {
     const survey = buildSurveyWithLookups();
     const snap = buildSurveySnapshot(survey);
     expect(snap.lookups).toHaveLength(1);
-    expect(snap.lookups[0].id).toBe('lut-airfare');
-    expect(snap.lookups[0].columns).toEqual(['대륙', '적용액']);
+    const firstLookup = snap.lookups[0];
+    if (!firstLookup) throw new Error('snap.lookups[0] 없음');
+    expect(firstLookup.id).toBe('lut-airfare');
+    expect(firstLookup.columns).toEqual(['대륙', '적용액']);
   });
 
   it('binop / lookup 조건 평가: 1인당 출장비 ≤ 평균 항공비 → 만족 (SHOW)', () => {

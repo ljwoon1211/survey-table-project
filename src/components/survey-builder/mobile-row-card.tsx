@@ -33,8 +33,8 @@ interface MobileRowCardProps {
   hideColumnLabels: boolean;
   questionId: string;
   isTestMode: boolean;
-  value?: Record<string, unknown>;
-  onChange?: (value: Record<string, unknown>) => void;
+  value?: Record<string, unknown> | undefined;
+  onChange?: ((value: Record<string, unknown>) => void) | undefined;
 }
 
 export const MobileRowCard = React.memo(function MobileRowCard({

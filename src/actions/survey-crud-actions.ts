@@ -164,7 +164,7 @@ export async function duplicateSurvey(surveyId: string) {
       orderBy: [questions.order],
     });
 
-    const [newSurvey] = await tx
+    const newSurveyRows = await tx
       .insert(surveys)
       .values({
         title: `${original.title} (복사본)`,
@@ -179,6 +179,8 @@ export async function duplicateSurvey(surveyId: string) {
         thankYouMessage: original.thankYouMessage,
       })
       .returning();
+    const newSurvey = newSurveyRows[0];
+    if (!newSurvey) throw new Error('copySurvey: 새 설문 생성 실패');
 
     // 그룹 정렬 (상위 그룹부터 하위 그룹 순으로)
     const sortedGroups: typeof originalGroups = [];

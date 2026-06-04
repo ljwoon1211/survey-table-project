@@ -8,10 +8,8 @@ import {
   NumericComparison,
   Question,
   QuestionCondition,
-  QuestionConditionGroup,
   QuestionGroup,
   SurveyLookup,
-  SurveyResponse,
   TableColumn,
   TableRow,
   TableValidationRule,
@@ -302,7 +300,7 @@ export function questionNumberToId(questionNumber: number): string {
  */
 export function questionIdToNumber(questionId: string): number | null {
   const match = questionId.match(/question-(\d+)/);
-  return match ? parseInt(match[1], 10) : null;
+  return match && match[1] !== undefined ? parseInt(match[1], 10) : null;
 }
 
 /**
@@ -874,7 +872,7 @@ export function getTableValidationBranchRule(
         id: rule.id,
         value: 'table-validation',
         action: rule.action,
-        targetQuestionId,
+        ...(targetQuestionId !== undefined ? { targetQuestionId } : {}),
       };
     }
   }
@@ -1183,13 +1181,17 @@ function evaluateExpressionConfig(
   ctx: BranchEvalCtx,
 ): boolean {
   if (config.clauses.length === 0) return true;
-  let acc = evaluateExpressionClause(config.clauses[0], responses, ctx);
+  const firstClause = config.clauses[0];
+  if (!firstClause) return true;
+  let acc = evaluateExpressionClause(firstClause, responses, ctx);
   for (let i = 1; i < config.clauses.length; i++) {
     const op = config.joinOps[i - 1] ?? 'AND';
     // 단락 평가 — lookup 평가까지 포함된 clause 의 비용을 무료로 절약
     if (op === 'AND' && !acc) break;
     if (op === 'OR' && acc) break;
-    const next = evaluateExpressionClause(config.clauses[i], responses, ctx);
+    const clause = config.clauses[i];
+    if (!clause) break;
+    const next = evaluateExpressionClause(clause, responses, ctx);
     acc = op === 'AND' ? acc && next : acc || next;
   }
   return acc;

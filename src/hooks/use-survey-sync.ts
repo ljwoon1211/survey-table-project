@@ -28,7 +28,6 @@ import { surveyKeys } from '@/hooks/queries/use-surveys';
 import {
   useSurveyBuilderStore,
   useSurveyListStore,
-  useSurveyResponseStore,
   useSurveyUIStore,
   useTestResponseStore,
 } from '@/stores';
@@ -92,14 +91,16 @@ export function useSurveySync() {
         if (isMetadataDirty) {
           payload.metadata = {
             title: survey.title,
-            description: survey.description,
-            slug: survey.slug,
-            privateToken: survey.privateToken,
+            ...(survey.description !== undefined ? { description: survey.description } : {}),
+            ...(survey.slug !== undefined ? { slug: survey.slug } : {}),
+            ...(survey.privateToken !== undefined ? { privateToken: survey.privateToken } : {}),
             contactEmail: survey.contactEmail ?? null,
             settings: survey.settings,
             thankYouMessage: survey.settings.thankYouMessage,
           };
-          payload.groups = survey.groups;
+          if (survey.groups !== undefined) {
+            payload.groups = survey.groups;
+          }
         }
 
         if (hasQuestionChanges) {
@@ -112,9 +113,9 @@ export function useSurveySync() {
           payload.questionChanges = {
             upserted,
             deleted: Object.keys(qc.deleted),
-            reorderedIds: qc.reordered
-              ? survey.questions.map((q) => q.id)
-              : undefined,
+            ...(qc.reordered
+              ? { reorderedIds: survey.questions.map((q) => q.id) }
+              : {}),
           };
         }
 
@@ -331,7 +332,7 @@ export function useResponseSync() {
 /**
  * 자동 저장 훅 (디바운스 적용)
  */
-export function useAutoSave(delay: number = 3000) {
+export function useAutoSave(_delay: number = 3000) {
   const currentSurveyId = useSurveyBuilderStore((s) => s.currentSurvey.id);
   const { saveSurvey } = useSurveySync();
 

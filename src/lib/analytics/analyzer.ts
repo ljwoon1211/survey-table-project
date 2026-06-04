@@ -1,6 +1,6 @@
 // src/lib/analytics/analyzer.ts
 import type { SurveyResponse } from '@/db/schema';
-import type { Question, QuestionOption, QuestionType, RankingAnswer } from '@/types/survey';
+import type { Question, QuestionOption, RankingAnswer } from '@/types/survey';
 import { resolveChoiceOptions } from '@/utils/choice-source';
 import { resolveRankingOptions } from '@/utils/ranking-source';
 import { computeNumericStats } from './numeric-stats';
@@ -51,19 +51,19 @@ function formatValue(value: unknown): string {
     const v = value as Record<string, unknown>;
 
     // ✨ 핵심: '기타' 응답 객체 감지 및 포맷팅
-    if (v.hasOther === true) {
-      const selected = String(v.selectedValue || '');
-      const input = String(v.otherValue || '').trim();
+    if (v['hasOther'] === true) {
+      const selected = String(v['selectedValue'] || '');
+      const input = String(v['otherValue'] || '').trim();
       // 입력값이 있으면 "값 (입력내용)", 없으면 그냥 "값" 반환
       return input ? `${selected} (${input})` : selected;
     }
 
     // 기존 로직 유지
-    if (v.inputValue && typeof v.inputValue === 'string') return v.inputValue;
-    if (v.text && typeof v.text === 'string') return v.text;
-    if (v.label && typeof v.label === 'string') return v.label;
-    if (v.value && (typeof v.value === 'string' || typeof v.value === 'number'))
-      return String(v.value);
+    if (v['inputValue'] && typeof v['inputValue'] === 'string') return v['inputValue'];
+    if (v['text'] && typeof v['text'] === 'string') return v['text'];
+    if (v['label'] && typeof v['label'] === 'string') return v['label'];
+    if (v['value'] && (typeof v['value'] === 'string' || typeof v['value'] === 'number'))
+      return String(v['value']);
 
     // 최후의 수단
     const firstVal = Object.values(v)[0];
@@ -175,11 +175,12 @@ function analyzeSingleChoice(
   // 옵션에 없는 값 (기타 등) 추가
   Object.keys(counts).forEach((value) => {
     if (!distribution.find((d) => d.value === value)) {
+      const cnt = counts[value] ?? 0;
       distribution.push({
         label: value,
         value,
-        count: counts[value],
-        percentage: (counts[value] / totalResponses) * 100,
+        count: cnt,
+        percentage: (cnt / totalResponses) * 100,
       });
     }
   });
@@ -229,11 +230,12 @@ function analyzeMultipleChoice(
   // 옵션에 없는 값 추가
   Object.keys(counts).forEach((value) => {
     if (!distribution.find((d) => d.value === value)) {
+      const cnt = counts[value] ?? 0;
       distribution.push({
         label: value,
         value,
-        count: counts[value],
-        percentage: (counts[value] / totalResponses) * 100,
+        count: cnt,
+        percentage: (cnt / totalResponses) * 100,
       });
     }
   });
@@ -262,7 +264,7 @@ function analyzeText(
   const textResponses = responses.map((r) => ({
     id: r.responseId,
     value: formatValue(r.value),
-    submittedAt: r.submittedAt || undefined,
+    ...(r.submittedAt ? { submittedAt: r.submittedAt } : {}),
   }));
 
   const totalLength = textResponses.reduce((sum, r) => sum + r.value.length, 0);
@@ -301,7 +303,7 @@ function analyzeText(
     avgLength,
     responses: textResponses,
     wordFrequency,
-    numericStats: numericStats ?? undefined,
+    ...(numericStats != null ? { numericStats } : {}),
   };
 }
 
@@ -391,24 +393,27 @@ function analyzeTable(
 
       // 1-3. 병합(Merge) 상속 처리 (낙수 효과)
       row.cells.forEach((cell, colIndex) => {
-        if (columnMergeState[colIndex].rowsLeft > 0) {
-          if (columnMergeState[colIndex].interactionInherited) {
+        const mergeCol = columnMergeState[colIndex];
+        if (!mergeCol) return;
+
+        if (mergeCol.rowsLeft > 0) {
+          if (mergeCol.interactionInherited) {
             // 상속받은 데이터도 details에 합산
-            const inherited = columnMergeState[colIndex].details;
+            const inherited = mergeCol.details;
             Object.entries(inherited).forEach(([k, v]) => {
               details[k] = (details[k] || 0) + v;
             });
             // 상속받았으면 시각적으로 Interacted 된 것으로 처리될 수 있으나,
             // 논리적 비율 100% 초과 방지를 위해 단순 가산은 주의 필요
           }
-          columnMergeState[colIndex].rowsLeft--;
+          mergeCol.rowsLeft--;
         }
 
         // 다음 행을 위해 상태 갱신
         if ((cell.rowspan || 1) > 1) {
-          columnMergeState[colIndex].rowsLeft = (cell.rowspan || 1) - 1;
-          columnMergeState[colIndex].details = details; // (약식: 현재 행 전체 details를 상속 - 셀 단위가 더 정확하나 summary용으로 충분)
-          columnMergeState[colIndex].interactionInherited = interactionCount > 0;
+          mergeCol.rowsLeft = (cell.rowspan || 1) - 1;
+          mergeCol.details = details; // (약식: 현재 행 전체 details를 상속 - 셀 단위가 더 정확하나 summary용으로 충분)
+          mergeCol.interactionInherited = interactionCount > 0;
         }
       });
 
@@ -419,7 +424,7 @@ function analyzeTable(
         // 분모가 0이면 0%, 아니면 100% 넘지 않도록 Cap
         interactionRate:
           validDenominator > 0 ? Math.min((interactionCount / validDenominator) * 100, 100) : 0,
-        details: Object.keys(details).length > 0 ? details : undefined,
+        ...(Object.keys(details).length > 0 ? { details } : {}),
       };
     })
     .sort((a, b) => b.interactionRate - a.interactionRate);
@@ -448,8 +453,6 @@ function analyzeTable(
       rowLabel: row.label,
       cells: row.cells.map((cell, colIndex) => {
         let currentAnalytics: any = null;
-         
-        let isInherited = false;
 
         // ---------------------------------------------------------
         // CASE A: 가로 병합(Colspan) 중인가?
@@ -462,20 +465,19 @@ function analyzeTable(
             columnLabel: columns[colIndex]?.label || `열 ${colIndex + 1}`,
             cellType: 'merged-horizontal',
           };
-          isInherited = true;
         }
         // ---------------------------------------------------------
         // CASE B: 세로 병합(Rowspan) 중인가?
         // ---------------------------------------------------------
-        else if (cellMergeState[colIndex].rowsLeft > 0) {
-          cellMergeState[colIndex].rowsLeft--;
+        else if ((cellMergeState[colIndex]?.rowsLeft ?? 0) > 0) {
+          const cellCol = cellMergeState[colIndex];
+          if (cellCol) cellCol.rowsLeft--;
           currentAnalytics = {
-            ...cellMergeState[colIndex].inheritedAnalytics,
+            ...(cellMergeState[colIndex]?.inheritedAnalytics),
             cellId: cell.id,
             columnLabel: columns[colIndex]?.label || `열 ${colIndex + 1}`,
             cellType: 'merged-vertical',
           };
-          isInherited = true;
         }
         // ---------------------------------------------------------
         // CASE C: 일반 셀 (데이터 원본)
@@ -553,8 +555,11 @@ function analyzeTable(
           activeHorizontalAnalytics = currentAnalytics;
         }
         if (currentAnalytics && (cell.rowspan || 1) > 1) {
-          cellMergeState[colIndex].rowsLeft = (cell.rowspan || 1) - 1;
-          cellMergeState[colIndex].inheritedAnalytics = currentAnalytics;
+          const cellColState = cellMergeState[colIndex];
+          if (cellColState) {
+            cellColState.rowsLeft = (cell.rowspan || 1) - 1;
+            cellColState.inheritedAnalytics = currentAnalytics;
+          }
         }
 
         return currentAnalytics;
@@ -662,8 +667,9 @@ export function computeRankingDistribution(
         : a.optionValue;
 
       totalScores[key] = (totalScores[key] ?? 0) + (N - a.rank + 1);
-      if (!rankCounts[key]) rankCounts[key] = new Array(N).fill(0);
-      rankCounts[key][a.rank - 1] += 1;
+      if (!rankCounts[key]) rankCounts[key] = new Array<number>(N).fill(0);
+      const rankArr = rankCounts[key];
+      if (rankArr) rankArr[a.rank - 1] = (rankArr[a.rank - 1] ?? 0) + 1;
       const prev = rankSums[key] ?? { sum: 0, n: 0 };
       rankSums[key] = { sum: prev.sum + a.rank, n: prev.n + 1 };
     }
@@ -682,12 +688,14 @@ export function computeRankingDistribution(
         label = optionMeta.get(key) ?? `(삭제된 옵션) ${key}`;
       }
       const sums = rankSums[key];
+      const totalScore = totalScores[key] ?? 0;
+      const rankCountsForKey = rankCounts[key] ?? [];
       return {
         value: key,
         label,
-        totalScore: totalScores[key],
-        avgRank: sums && sums.n > 0 ? sums.sum / sums.n : undefined,
-        rankCounts: rankCounts[key],
+        totalScore,
+        ...(sums && sums.n > 0 ? { avgRank: sums.sum / sums.n } : {}),
+        rankCounts: rankCountsForKey,
       };
     })
     .sort((a, b) => b.totalScore - a.totalScore);
@@ -769,13 +777,16 @@ export function analyzeSurvey(
   const timelineMap: Record<string, { responses: number; completed: number }> = {};
 
   responses.forEach((r) => {
-    const date = new Date(r.startedAt).toISOString().split('T')[0];
+    const date = new Date(r.startedAt).toISOString().split('T')[0] ?? '';
     if (!timelineMap[date]) {
       timelineMap[date] = { responses: 0, completed: 0 };
     }
-    timelineMap[date].responses++;
-    if (r.isCompleted) {
-      timelineMap[date].completed++;
+    const dayEntry = timelineMap[date];
+    if (dayEntry) {
+      dayEntry.responses++;
+      if (r.isCompleted) {
+        dayEntry.completed++;
+      }
     }
   });
 
@@ -821,7 +832,7 @@ export function analyzeSurvey(
     completedResponses: completedResponses.length,
     completionRate: responses.length > 0 ? (completedResponses.length / responses.length) * 100 : 0,
     avgCompletionTime,
-    lastResponseAt: completedResponses[0]?.completedAt || undefined,
+    ...(completedResponses[0]?.completedAt ? { lastResponseAt: completedResponses[0].completedAt } : {}),
     todayResponses,
     weekResponses,
   };

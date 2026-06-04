@@ -60,7 +60,9 @@ describe('choice-source', () => {
       type: 'radio',
       tableRowsData: [row([cell({ id: 's', type: 'choice_opt', content: '본문라벨' })])],
     });
-    expect(resolveChoiceOptions(question)[0].label).toBe('본문라벨');
+    const opt0 = resolveChoiceOptions(question)[0];
+    if (!opt0) throw new Error('resolveChoiceOptions[0] is undefined');
+    expect(opt0.label).toBe('본문라벨');
   });
 
   it('spssNumericCode 없으면 수집 순서 1-based 인덱스로 폴백', () => {
@@ -72,8 +74,11 @@ describe('choice-source', () => {
       ],
     });
     const opts = resolveChoiceOptions(question);
-    expect(opts[0].spssNumericCode).toBe(1);
-    expect(opts[1].spssNumericCode).toBe(2);
+    const opt0 = opts[0];
+    const opt1 = opts[1];
+    if (!opt0 || !opt1) throw new Error('opts 요소가 undefined');
+    expect(opt0.spssNumericCode).toBe(1);
+    expect(opt1.spssNumericCode).toBe(2);
   });
 
   it('isHidden 셀(rowspan/colspan continuation)은 제외', () => {
@@ -107,6 +112,7 @@ describe('choice-source', () => {
       ],
     });
     const opt = resolveChoiceOptions(question)[0];
+    if (!opt) throw new Error('resolveChoiceOptions[0] is undefined');
     expect(opt.branchRule).toEqual(branch);
     expect(opt.allowTextInput).toBe(true);
     expect(opt.textInputPlaceholder).toBe('상세');

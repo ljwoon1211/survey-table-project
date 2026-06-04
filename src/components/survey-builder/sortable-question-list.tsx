@@ -93,8 +93,9 @@ export function LazyMount({
     const el = ref.current;
     if (!el) return;
     const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting) {
           setMounted(true);
           io.disconnect();
         }
@@ -127,8 +128,8 @@ interface SortableQuestionProps {
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
-  onSaveToLibrary?: (question: Question) => void;
-  isDragOverlay?: boolean;
+  onSaveToLibrary?: ((question: Question) => void) | undefined;
+  isDragOverlay?: boolean | undefined;
 }
 
 const SortableQuestion = React.memo(function SortableQuestion({
@@ -616,25 +617,31 @@ export function SortableQuestionList({
                 return {
                   ...cell,
                   id: newCellId,
-                  // 셀 내부의 옵션들도 복사
-                  checkboxOptions: cell.checkboxOptions
-                    ? cell.checkboxOptions.map((opt) => ({
-                        ...opt,
-                        id: generateId(),
-                      }))
-                    : undefined,
-                  radioOptions: cell.radioOptions
-                    ? cell.radioOptions.map((opt) => ({
-                        ...opt,
-                        id: generateId(),
-                      }))
-                    : undefined,
-                  selectOptions: cell.selectOptions
-                    ? cell.selectOptions.map((opt) => ({
-                        ...opt,
-                        id: generateId(),
-                      }))
-                    : undefined,
+                  // 셀 내부의 옵션들도 복사 (없으면 키 자체를 제거)
+                  ...(cell.checkboxOptions
+                    ? {
+                        checkboxOptions: cell.checkboxOptions.map((opt) => ({
+                          ...opt,
+                          id: generateId(),
+                        })),
+                      }
+                    : {}),
+                  ...(cell.radioOptions
+                    ? {
+                        radioOptions: cell.radioOptions.map((opt) => ({
+                          ...opt,
+                          id: generateId(),
+                        })),
+                      }
+                    : {}),
+                  ...(cell.selectOptions
+                    ? {
+                        selectOptions: cell.selectOptions.map((opt) => ({
+                          ...opt,
+                          id: generateId(),
+                        })),
+                      }
+                    : {}),
                 };
               }),
             };
@@ -643,12 +650,13 @@ export function SortableQuestionList({
 
       // dynamicRowConfigs 복사 (insertAfterRowId를 새 행 ID로 매핑)
       const newDynamicRowConfigs = questionToDuplicate.dynamicRowConfigs
-        ? questionToDuplicate.dynamicRowConfigs.map((config) => ({
-            ...config,
-            insertAfterRowId: config.insertAfterRowId
+        ? questionToDuplicate.dynamicRowConfigs.map((config) => {
+            const { insertAfterRowId: _old, ...rest } = config;
+            const mappedId = config.insertAfterRowId
               ? rowIdMap.get(config.insertAfterRowId) ?? config.insertAfterRowId
-              : undefined,
-          }))
+              : undefined;
+            return mappedId !== undefined ? { ...rest, insertAfterRowId: mappedId } : rest;
+          })
         : undefined;
 
       // 기존 질문들의 최대 order를 찾아서 +1 (없으면 1부터 시작)
@@ -661,28 +669,34 @@ export function SortableQuestionList({
         id: generateId(),
         title: `${questionToDuplicate.title} (복사본)`,
         order: maxOrder + 1, // 1부터 시작하는 실제 질문 번호
-        // options 복사 (새 ID 부여)
-        options: questionToDuplicate.options
-          ? questionToDuplicate.options.map((opt) => ({
-              ...opt,
-              id: generateId(),
-            }))
-          : undefined,
-        // selectLevels 복사 (새 ID 부여)
-        selectLevels: questionToDuplicate.selectLevels
-          ? questionToDuplicate.selectLevels.map((level) => ({
-              ...level,
-              id: generateId(),
-              options: level.options.map((opt) => ({
+        // options 복사 (새 ID 부여) — 값이 있을 때만 키 유지
+        ...(questionToDuplicate.options
+          ? {
+              options: questionToDuplicate.options.map((opt) => ({
                 ...opt,
                 id: generateId(),
               })),
-            }))
-          : undefined,
+            }
+          : {}),
+        // selectLevels 복사 (새 ID 부여)
+        ...(questionToDuplicate.selectLevels
+          ? {
+              selectLevels: questionToDuplicate.selectLevels.map((level) => ({
+                ...level,
+                id: generateId(),
+                options: level.options.map((opt) => ({
+                  ...opt,
+                  id: generateId(),
+                })),
+              })),
+            }
+          : {}),
         // tableColumns 복사 (위에서 생성한 새 컬럼 사용)
-        tableColumns: newTableColumns,
-        tableRowsData: newTableRowsData,
-        dynamicRowConfigs: newDynamicRowConfigs,
+        ...(newTableColumns !== undefined ? { tableColumns: newTableColumns } : {}),
+        ...(newTableRowsData !== undefined ? { tableRowsData: newTableRowsData } : {}),
+        ...(newDynamicRowConfigs !== undefined
+          ? { dynamicRowConfigs: newDynamicRowConfigs }
+          : {}),
       };
 
       // 로컬 스토어에 추가 (DB 저장은 saveSurveyDiff에서 일괄 처리)

@@ -78,17 +78,24 @@ describe('buildSurveySnapshot', () => {
     const snapshot = buildSurveySnapshot(mockSurvey);
 
     expect(snapshot.questions).toHaveLength(3);
-    expect(snapshot.questions[0].id).toBe('q-1');
-    expect(snapshot.questions[1].id).toBe('q-2');
-    expect(snapshot.questions[2].id).toBe('q-3');
+    const q0 = snapshot.questions[0];
+    const q1 = snapshot.questions[1];
+    const q2 = snapshot.questions[2];
+    if (!q0 || !q1 || !q2) throw new Error('snapshot.questions 요소가 undefined');
+    expect(q0.id).toBe('q-1');
+    expect(q1.id).toBe('q-2');
+    expect(q2.id).toBe('q-3');
   });
 
   it('그룹을 order 순으로 정렬', () => {
     const snapshot = buildSurveySnapshot(mockSurvey);
 
     expect(snapshot.groups).toHaveLength(2);
-    expect(snapshot.groups[0].id).toBe('g-1');
-    expect(snapshot.groups[1].id).toBe('g-2');
+    const g0 = snapshot.groups[0];
+    const g1 = snapshot.groups[1];
+    if (!g0 || !g1) throw new Error('snapshot.groups 요소가 undefined');
+    expect(g0.id).toBe('g-1');
+    expect(g1.id).toBe('g-2');
   });
 
   it('설문 제목과 설명을 포함', () => {
@@ -109,9 +116,10 @@ describe('buildSurveySnapshot', () => {
   });
 
   it('endDate가 없으면 undefined', () => {
+    const { endDate: _ed, ...settingsWithoutEndDate } = mockSurvey.settings;
     const surveyNoEndDate: Survey = {
       ...mockSurvey,
-      settings: { ...mockSurvey.settings, endDate: undefined },
+      settings: settingsWithoutEndDate,
     };
     const snapshot = buildSurveySnapshot(surveyNoEndDate);
 
@@ -131,8 +139,11 @@ describe('buildSurveySnapshot', () => {
     const snapshot = buildSurveySnapshot(mockSurvey);
 
     const radioQ = snapshot.questions.find((q) => q.id === 'q-2');
-    expect(radioQ!.options).toHaveLength(2);
-    expect(radioQ!.options![0].value).toBe('male');
+    if (!radioQ) throw new Error('radioQ is undefined');
+    const firstOption = radioQ.options?.[0];
+    if (!firstOption) throw new Error('radioQ.options[0] is undefined');
+    expect(radioQ.options).toHaveLength(2);
+    expect(firstOption.value).toBe('male');
   });
 
   it('질문/그룹이 빈 배열이어도 정상 동작', () => {

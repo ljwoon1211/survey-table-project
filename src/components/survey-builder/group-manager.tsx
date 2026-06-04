@@ -60,16 +60,15 @@ export function GroupManager({ className }: GroupManagerProps) {
   const [parentGroupIdForNew, setParentGroupIdForNew] = useState<string | undefined>(undefined);
   const [parentGroupIdForEdit, setParentGroupIdForEdit] = useState<string | undefined>(undefined);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [overId, setOverId] = useState<string | null>(null);
+  const [, setActiveId] = useState<string | null>(null);
+  const [, setOverId] = useState<string | null>(null);
 
   const groupsOrEmpty = useMemo(() => groups || [], [groups]);
 
   // Store의 collapsed 상태와 expandedGroups 동기화
   useEffect(() => {
     if (groupsOrEmpty.length === 0) return;
-    setExpandedGroups((prev) => {
-      const groupIds = new Set(groupsOrEmpty.map((g) => g.id));
+    setExpandedGroups(() => {
       const next = new Set<string>();
       for (const g of groupsOrEmpty) {
         if (!g.collapsed) next.add(g.id);
@@ -190,10 +189,10 @@ export function GroupManager({ className }: GroupManagerProps) {
           const createdGroup = await createQuestionGroup({
             surveyId: surveyId,
             name: groupName.trim(),
-            description: groupDescription.trim() || undefined,
-            parentGroupId: parentGroupIdForNew,
+            ...(groupDescription.trim() ? { description: groupDescription.trim() } : {}),
+            ...(parentGroupIdForNew ? { parentGroupId: parentGroupIdForNew } : {}),
           });
-          createdGroupId = createdGroup.id;
+          if (createdGroup) createdGroupId = createdGroup.id;
         } catch (error) {
           console.error('그룹 생성 실패:', error);
           alert('그룹 생성에 실패했습니다. 다시 시도해주세요.');
@@ -213,10 +212,9 @@ export function GroupManager({ className }: GroupManagerProps) {
           id: createdGroupId,
           surveyId: surveyId!,
           name: groupName.trim(),
-          description: groupDescription.trim() || undefined,
+          ...(groupDescription.trim() ? { description: groupDescription.trim() } : {}),
           order: maxOrder + 1,
-          parentGroupId: parentGroupIdForNew || undefined,
-          color: undefined,
+          ...(parentGroupIdForNew ? { parentGroupId: parentGroupIdForNew } : {}),
           collapsed: false,
         };
 
@@ -274,14 +272,14 @@ export function GroupManager({ className }: GroupManagerProps) {
 
   const handleGroupConditionUpdate = (conditionGroup: QuestionConditionGroup | undefined) => {
     if (editingGroup) {
-      updateGroup(editingGroup.id, { displayCondition: conditionGroup });
+      updateGroup(editingGroup.id, { ...(conditionGroup !== undefined ? { displayCondition: conditionGroup } : {}) });
 
       // DB에 저장 (그룹 ID가 UUID인 경우에만)
       if (surveyId && isUUID(surveyId) && isUUID(editingGroup.id)) {
         ensureSurvey().then(() =>
           import('@/actions/question-group-actions').then(({ updateQuestionGroup }) => {
             updateQuestionGroup(editingGroup.id, {
-              displayCondition: conditionGroup,
+              ...(conditionGroup !== undefined ? { displayCondition: conditionGroup } : {}),
             }).catch((error) => {
               console.error('그룹 표시 조건 저장 실패:', error);
             });
@@ -326,8 +324,8 @@ export function GroupManager({ className }: GroupManagerProps) {
 
         updateGroup(editingGroup.id, {
           name: groupName.trim(),
-          description: groupDescription.trim() || undefined,
-          parentGroupId: newParentGroupId,
+          ...(groupDescription.trim() ? { description: groupDescription.trim() } : {}),
+          ...(newParentGroupId !== undefined ? { parentGroupId: newParentGroupId } : {}),
           order: newOrder,
         });
 
@@ -343,10 +341,10 @@ export function GroupManager({ className }: GroupManagerProps) {
             const { updateQuestionGroup } = await import('@/actions/question-group-actions');
             await updateQuestionGroup(editingGroup.id, {
               name: groupName.trim(),
-              description: groupDescription.trim() || undefined,
+              ...(groupDescription.trim() ? { description: groupDescription.trim() } : {}),
               parentGroupId: newParentGroupId ?? null,
               order: newOrder,
-              displayCondition: finalDisplayCondition,
+              ...(finalDisplayCondition !== undefined ? { displayCondition: finalDisplayCondition } : {}),
             });
           } catch (error) {
             console.error('그룹 업데이트 저장 실패:', error);
@@ -361,7 +359,7 @@ export function GroupManager({ className }: GroupManagerProps) {
         // 이름/설명만 변경된 경우
         updateGroup(editingGroup.id, {
           name: groupName.trim(),
-          description: groupDescription.trim() || undefined,
+          ...(groupDescription.trim() ? { description: groupDescription.trim() } : {}),
         });
 
         // DB에 저장 (그룹 ID가 UUID인 경우에만)
@@ -371,8 +369,8 @@ export function GroupManager({ className }: GroupManagerProps) {
             const { updateQuestionGroup } = await import('@/actions/question-group-actions');
             await updateQuestionGroup(editingGroup.id, {
               name: groupName.trim(),
-              description: groupDescription.trim() || undefined,
-              displayCondition: finalDisplayCondition,
+              ...(groupDescription.trim() ? { description: groupDescription.trim() } : {}),
+              ...(finalDisplayCondition !== undefined ? { displayCondition: finalDisplayCondition } : {}),
             });
           } catch (error) {
             console.error('그룹 업데이트 저장 실패:', error);

@@ -27,7 +27,7 @@ function buildWrapperStyle(widthPct: number | null): string {
 function readWidthPct(wrapperStyle: string, containerStyle: string): number | null {
   const tryMatch = (s: string) => {
     const m = s.match(/width:\s*([0-9.]+)%/);
-    return m ? parseFloat(m[1]) : null;
+    return m?.[1] != null ? parseFloat(m[1]) : null;
   };
   return tryMatch(wrapperStyle) ?? tryMatch(containerStyle);
 }
@@ -40,8 +40,8 @@ export function ImageContextToolbar({ editor }: Props) {
         return { active: false, widthPct: null as number | null };
       }
       const attrs = editor.getAttributes(IMAGE_NODE);
-      const wrapperStyle = (attrs.wrapperStyle ?? '') as string;
-      const containerStyle = (attrs.containerStyle ?? '') as string;
+      const wrapperStyle = (attrs['wrapperStyle'] ?? '') as string;
+      const containerStyle = (attrs['containerStyle'] ?? '') as string;
       return {
         active: editor.isActive(IMAGE_NODE),
         widthPct: readWidthPct(wrapperStyle, containerStyle),

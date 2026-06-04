@@ -1,7 +1,5 @@
 'use client';
 
-import React from 'react';
-
 import { ListOrdered } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
@@ -122,8 +120,8 @@ export function RankingCellTab({
             {Array.from({ length: positions }, (_, i) => i + 1).map((rank) => {
               const auto = buildRankVarName(baseVar, rankSuffixPattern, rank);
               const override = rankVarNames[rank - 1] ?? '';
-              const finalName = finalNames[rank - 1];
-              const isDup = countMap[finalName.toLowerCase()] > 1;
+              const finalName = finalNames[rank - 1] ?? '';
+              const isDup = (countMap[finalName.toLowerCase()] ?? 0) > 1;
               return (
                 <div key={rank} className="space-y-1">
                   <div className="flex items-center gap-2">

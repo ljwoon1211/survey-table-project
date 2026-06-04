@@ -222,7 +222,7 @@ export function buildColumnCandidates(
         c.source.startsWith(FILTER_SOURCE.ATTRS_PREFIX) ||
         c.source.startsWith(FILTER_SOURCE.PII_PREFIX),
     )
-    .map((c) => ({ source: c.source, label: c.label, piiType: c.piiType }));
+    .map((c) => ({ source: c.source, label: c.label, ...(c.piiType !== undefined ? { piiType: c.piiType } : {}) }));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

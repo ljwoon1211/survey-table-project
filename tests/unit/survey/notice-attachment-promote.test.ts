@@ -17,10 +17,10 @@ import {
 
 describe('isTmpNoticeAttachmentUrl', () => {
   beforeEach(() => {
-    process.env.CLOUDFLARE_R2_PUBLIC_URL = 'https://cdn.test';
+    process.env['CLOUDFLARE_R2_PUBLIC_URL'] = 'https://cdn.test';
   });
   afterEach(() => {
-    delete process.env.CLOUDFLARE_R2_PUBLIC_URL;
+    delete process.env['CLOUDFLARE_R2_PUBLIC_URL'];
   });
 
   it('tmp/notice-attachment/ prefix 는 true', () => {
@@ -39,10 +39,10 @@ describe('isTmpNoticeAttachmentUrl', () => {
 
 describe('extractTmpNoticeAttachmentUrlsFromHtml', () => {
   beforeEach(() => {
-    process.env.CLOUDFLARE_R2_PUBLIC_URL = 'https://cdn.test';
+    process.env['CLOUDFLARE_R2_PUBLIC_URL'] = 'https://cdn.test';
   });
   afterEach(() => {
-    delete process.env.CLOUDFLARE_R2_PUBLIC_URL;
+    delete process.env['CLOUDFLARE_R2_PUBLIC_URL'];
   });
 
   it('a[data-file-attachment] 의 href 만 추출', () => {
@@ -109,12 +109,12 @@ describe('replaceNoticeAttachmentUrlsInQuestion', () => {
 
 describe('promoteNoticeAttachments', () => {
   beforeEach(() => {
-    process.env.CLOUDFLARE_R2_PUBLIC_URL = 'https://cdn.test';
+    process.env['CLOUDFLARE_R2_PUBLIC_URL'] = 'https://cdn.test';
     vi.mocked(moveR2Objects).mockReset();
     vi.mocked(deleteR2ObjectsByKey).mockReset();
   });
   afterEach(() => {
-    delete process.env.CLOUDFLARE_R2_PUBLIC_URL;
+    delete process.env['CLOUDFLARE_R2_PUBLIC_URL'];
   });
 
   it('R2 move 성공 시 모든 tmp URL 영구 URL 치환', async () => {
@@ -132,8 +132,10 @@ describe('promoteNoticeAttachments', () => {
       },
     ];
     const out = await promoteNoticeAttachments(questions);
-    expect(out[0].noticeContent).toContain('https://cdn.test/notice-attachment/a.pdf');
-    expect(out[0].noticeContent).not.toContain('tmp/notice-attachment/a.pdf');
+    const out0 = out[0];
+    if (!out0) throw new Error('out[0] is undefined');
+    expect(out0.noticeContent).toContain('https://cdn.test/notice-attachment/a.pdf');
+    expect(out0.noticeContent).not.toContain('tmp/notice-attachment/a.pdf');
   });
 
   it('tmp URL 없으면 same reference', async () => {
@@ -150,9 +152,12 @@ describe('promoteNoticeAttachments', () => {
       callCount += 1;
       if (callCount === 1) {
         // 1차: 하나만 성공, 하나 실패
+        const pair0 = pairs[0];
+        const pair1 = pairs[1];
+        if (!pair0 || !pair1) throw new Error('pairs 요소가 undefined');
         return {
-          movedKeys: [{ srcKey: pairs[0].srcKey, dstKey: pairs[0].dstKey }],
-          failed: [pairs[1].srcKey],
+          movedKeys: [{ srcKey: pair0.srcKey, dstKey: pair0.dstKey }],
+          failed: [pair1.srcKey],
         };
       }
       // 2차 retry: 나머지 성공
@@ -171,9 +176,11 @@ describe('promoteNoticeAttachments', () => {
       },
     ];
     const out = await promoteNoticeAttachments(questions);
-    expect(out[0].noticeContent).toContain('notice-attachment/a.pdf');
-    expect(out[0].noticeContent).toContain('notice-attachment/b.pdf');
-    expect(out[0].noticeContent).not.toContain('tmp/notice-attachment/');
+    const out0 = out[0];
+    if (!out0) throw new Error('out[0] is undefined');
+    expect(out0.noticeContent).toContain('notice-attachment/a.pdf');
+    expect(out0.noticeContent).toContain('notice-attachment/b.pdf');
+    expect(out0.noticeContent).not.toContain('tmp/notice-attachment/');
     expect(callCount).toBe(2);
   });
 
@@ -183,11 +190,14 @@ describe('promoteNoticeAttachments', () => {
       callCount += 1;
       if (callCount === 1) {
         // 1차: a 성공, b 실패
+        const pair0 = pairs[0];
+        const pair1 = pairs[1];
+        if (!pair0 || !pair1) throw new Error('pairs 요소가 undefined');
         return {
           movedKeys: [
-            { srcKey: pairs[0].srcKey, dstKey: pairs[0].dstKey },
+            { srcKey: pair0.srcKey, dstKey: pair0.dstKey },
           ],
-          failed: [pairs[1].srcKey],
+          failed: [pair1.srcKey],
         };
       }
       // retry: pairs 는 stillFailed (b) 만 포함 — 여전히 실패

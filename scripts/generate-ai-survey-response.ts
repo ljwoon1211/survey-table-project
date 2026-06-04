@@ -17,8 +17,8 @@ import { normalizeToAnswers } from '../src/lib/response-normalizer';
 
 dotenv.config({ path: '.env.local' });
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://uyfahntiitrcuizdnlbq.supabase.co';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env['NEXT_PUBLIC_SUPABASE_URL'] || 'https://uyfahntiitrcuizdnlbq.supabase.co';
+const supabaseServiceKey = process.env['SUPABASE_SERVICE_ROLE_KEY'];
 if (!supabaseServiceKey) {
   console.error('❌ SUPABASE_SERVICE_ROLE_KEY 환경변수가 필요합니다. .env.local 확인');
   process.exit(1);
@@ -155,7 +155,7 @@ interface Profile {
   patentAbroad: number;
   capitalM: number;          // 자본금 (백만원)
   domain: AiDomain;          // 주력 도메인
-  domainSecondary?: AiDomain; // 보조 도메인 (일부 회사)
+  domainSecondary?: AiDomain | undefined; // 보조 도메인 (일부 회사)
   selfInfraRatio: number;    // Q7-1 자체 인프라 비율 (0~100, 정수)
   selfInfraRatio3y: number;  // Q7-2 3년 후 자체 인프라 비율
   // 분기 결정
@@ -238,16 +238,19 @@ function generateProfile(idx: number): Profile {
   const pick = <T>(arr: T[]) => arr[Math.floor(rng() * arr.length)];
   const randi = (min: number, max: number) => Math.floor(rng() * (max - min + 1)) + min;
 
-  const companyName = COMPANY_NAMES[idx];
+  const companyName = COMPANY_NAMES[idx] ?? `(주)AI기업${idx + 1}`;
   const isMaleCeo = idx % 5 !== 0; // 약 80% 남성 (AI 업계 현실 반영)
-  const ceoName = isMaleCeo ? CEO_NAMES_M[idx % CEO_NAMES_M.length] : CEO_NAMES_F[idx % CEO_NAMES_F.length];
+  const ceoName = isMaleCeo
+    ? (CEO_NAMES_M[idx % CEO_NAMES_M.length] ?? '김대표')
+    : (CEO_NAMES_F[idx % CEO_NAMES_F.length] ?? '이대표');
 
   // 도메인: 50건을 10개 도메인에 균등 분포(각 5건). 일부 회사에 보조 도메인 부여.
-  const domain: AiDomain = DOMAINS[idx % DOMAINS.length];
+  const domainRaw = DOMAINS[idx % DOMAINS.length];
+  if (!domainRaw) throw new Error(`DOMAINS 배열이 비어있습니다 (idx=${idx})`);
+  const domain: AiDomain = domainRaw;
   const hasSecondary = rng() < 0.35;
-  const domainSecondary: AiDomain | undefined = hasSecondary
-    ? DOMAINS[(idx + 3 + Math.floor(rng() * (DOMAINS.length - 1))) % DOMAINS.length]
-    : undefined;
+  const secondaryRaw = DOMAINS[(idx + 3 + Math.floor(rng() * (DOMAINS.length - 1))) % DOMAINS.length];
+  const domainSecondary: AiDomain | undefined = hasSecondary ? secondaryRaw : undefined;
 
   // 규모 계층 (소-중-중견) — 120건 기준 40%/40%/20% 분포
   // idx 0~47: 소형(10~40), 48~95: 중형(40~120), 96~119: 중견(120~300)
@@ -329,9 +332,9 @@ function generateProfile(idx: number): Profile {
     companyName,
     ceoName,
     ceoGender: isMaleCeo ? '남' : '여',
-    contactName: CONTACT_NAMES[idx % CONTACT_NAMES.length],
-    contactTitle: pick(TITLES),
-    contactDept: pick(DEPTS),
+    contactName: CONTACT_NAMES[idx % CONTACT_NAMES.length] ?? '담당자',
+    contactTitle: pick(TITLES) ?? '경영기획팀 팀장',
+    contactDept: pick(DEPTS) ?? '경영기획팀',
     contactPhone,
     contactMobile,
     contactEmail,
@@ -343,7 +346,7 @@ function generateProfile(idx: number): Profile {
     planDevMonth,
     launchYear,
     launchMonth,
-    address: ADDRESSES[idx % ADDRESSES.length],
+    address: ADDRESSES[idx % ADDRESSES.length] ?? '서울특별시 강남구 테헤란로 427',
     homepage,
     employees,
     aiEmployees,
@@ -408,28 +411,28 @@ interface Question {
   title: string;
   required: boolean;
   order: number;
-  options?: QOption[];
-  tableRowsData?: TableRow[];
-  tableColumns?: { id: string; label: string }[];
-  displayCondition?: QConditionGroup;
-  tableValidationRules?: unknown[];
-  groupId?: string;
-  allowOtherOption?: boolean;
-  questionCode?: string;
+  options?: QOption[] | undefined;
+  tableRowsData?: TableRow[] | undefined;
+  tableColumns?: { id: string; label: string }[] | undefined;
+  displayCondition?: QConditionGroup | undefined;
+  tableValidationRules?: unknown[] | undefined;
+  groupId?: string | undefined;
+  allowOtherOption?: boolean | undefined;
+  questionCode?: string | undefined;
   rankingConfig?: {
     positions: number;
-    branchRankPosition?: number;
-    optionsSource?: 'manual' | 'table';
-    positionsColumns?: number;
-    allowDuplicateRanks?: boolean;
-    requireAllPositions?: boolean;
-  };
+    branchRankPosition?: number | undefined;
+    optionsSource?: 'manual' | 'table' | undefined;
+    positionsColumns?: number | undefined;
+    allowDuplicateRanks?: boolean | undefined;
+    requireAllPositions?: boolean | undefined;
+  } | undefined;
 }
 interface QGroup {
   id: string;
-  parentGroupId?: string;
+  parentGroupId?: string | undefined;
   order: number;
-  displayCondition?: QConditionGroup;
+  displayCondition?: QConditionGroup | undefined;
 }
 
 // ========================================
@@ -437,29 +440,29 @@ interface QGroup {
 // ========================================
 function mapQuestion(q: Record<string, unknown>): Question {
   return {
-    id: q.id as string,
-    type: q.type as QType,
-    title: (q.title as string) || '',
-    required: Boolean(q.required),
-    order: (q.order as number) || 0,
-    options: (q.options as QOption[]) || [],
-    tableRowsData: (q.table_rows_data as TableRow[]) || [],
-    tableColumns: (q.table_columns as { id: string; label: string }[]) || [],
-    displayCondition: (q.display_condition as QConditionGroup) || undefined,
-    tableValidationRules: (q.table_validation_rules as unknown[]) || [],
-    groupId: (q.group_id as string) || undefined,
-    allowOtherOption: Boolean(q.allow_other_option),
-    questionCode: (q.question_code as string) || undefined,
-    rankingConfig: (q.ranking_config as Question['rankingConfig']) || undefined,
+    id: q['id'] as string,
+    type: q['type'] as QType,
+    title: (q['title'] as string) || '',
+    required: Boolean(q['required']),
+    order: (q['order'] as number) || 0,
+    options: (q['options'] as QOption[]) || [],
+    tableRowsData: (q['table_rows_data'] as TableRow[]) || [],
+    tableColumns: (q['table_columns'] as { id: string; label: string }[]) || [],
+    displayCondition: (q['display_condition'] as QConditionGroup) || undefined,
+    tableValidationRules: (q['table_validation_rules'] as unknown[]) || [],
+    groupId: (q['group_id'] as string) || undefined,
+    allowOtherOption: Boolean(q['allow_other_option']),
+    questionCode: (q['question_code'] as string) || undefined,
+    rankingConfig: (q['ranking_config'] as Question['rankingConfig']) || undefined,
   };
 }
 
 function mapGroup(g: Record<string, unknown>): QGroup {
   return {
-    id: g.id as string,
-    parentGroupId: (g.parent_group_id as string) || undefined,
-    order: (g.order as number) || 0,
-    displayCondition: (g.display_condition as QConditionGroup) || undefined,
+    id: g['id'] as string,
+    parentGroupId: (g['parent_group_id'] as string) || undefined,
+    order: (g['order'] as number) || 0,
+    displayCondition: (g['display_condition'] as QConditionGroup) || undefined,
   };
 }
 
@@ -581,7 +584,10 @@ function deterministicShuffle<T>(arr: T[], seed: number): T[] {
   for (let i = out.length - 1; i > 0; i--) {
     s = (s * 9301 + 49297) % 233280;
     const j = s % (i + 1);
-    [out[i], out[j]] = [out[j], out[i]];
+    const tmp = out[i];
+    const src = out[j];
+    if (tmp !== undefined) out[j] = tmp;
+    if (src !== undefined) out[i] = src;
   }
   return out;
 }
@@ -675,7 +681,8 @@ function pickRanking(
       };
       const opt = (q.options || []).find((o) => o.value === v);
       if (opt?.allowTextInput) {
-        entry.optionText = RANKING_OPTION_TEXTS[(seed + i) % RANKING_OPTION_TEXTS.length];
+        const txt = RANKING_OPTION_TEXTS[(seed + i) % RANKING_OPTION_TEXTS.length];
+        if (txt !== undefined) entry.optionText = txt;
       }
       return entry;
     });
@@ -755,9 +762,9 @@ function parseCellIntent(cell: TableCell, rowLabel: string): CellIntent {
 /** intent에 따라 프로필/현실값 생성. 시드로 행마다 편차. */
 function valueFromIntent(
   intent: CellIntent,
-  cell: TableCell,
+  _cell: TableCell,
   rowLabel: string,
-  qTitle: string,
+  _qTitle: string,
   seed: number,
 ): string {
   const row = (rowLabel || '').toLowerCase();
@@ -840,7 +847,7 @@ const Q33_1_TEMPLATES: string[] = [
 ];
 
 function renderTemplate(templates: string[], seed: number): string {
-  const tpl = templates[Math.abs(seed) % templates.length];
+  const tpl = templates[Math.abs(seed) % templates.length] ?? '';
   const domainKo = DOMAIN_KO[P.domain] ?? '인공지능';
   return tpl
     .replace(/\{COMPANY\}/g, P.companyName)
@@ -855,7 +862,7 @@ function renderTemplate(templates: string[], seed: number): string {
 type ScenarioFn = (q: Question, responses: Record<string, unknown>, questions: Question[]) => unknown;
 const SCENARIOS: Record<string, ScenarioFn> = {
   // --------- radio/checkbox (플랜 분기 결정표) ---------
-  [QID.Q5]: (q) => {
+  [QID.Q5]: (_q) => {
     // 프로필별로 1~3개 도구 조합
     const combos = [
       ['옵션1', '옵션2', '옵션3'], // 자체+오픈소스+AI솔루션
@@ -900,7 +907,8 @@ const SCENARIOS: Record<string, ScenarioFn> = {
   [QID.Q21]: (q) => {
     const opts = nonOtherOptions(q);
     if (opts.length === 0) return null;
-    return opts[profileSeed() % opts.length].value;
+    const picked = opts[profileSeed() % opts.length];
+    return picked?.value ?? null;
   },
   [QID.Q21_1]: (q) => pickOptionSubset(q, profileSeed() + 83, 1, 4),     // 희망 수출 지역 1~4개
   [QID.Q27]: () => (P.hasTraining ? '옵션1' : '옵션2'),
@@ -954,10 +962,12 @@ function fillTableDefault(q: Question, responses: Record<string, unknown>, quest
       cellSeed++;
       if (cell.type === 'radio' && cell.radioOptions?.length) {
         const idx = (pSeed + seed * 7 + cellSeed) % cell.radioOptions.length;
-        out[cell.id] = cell.radioOptions[idx].value;
+        const opt = cell.radioOptions[idx];
+        if (opt) out[cell.id] = opt.value;
       } else if (cell.type === 'select' && cell.selectOptions?.length) {
         const idx = (pSeed + seed * 11 + cellSeed * 2) % cell.selectOptions.length;
-        out[cell.id] = cell.selectOptions[idx].value;
+        const opt = cell.selectOptions[idx];
+        if (opt) out[cell.id] = opt.value;
       } else if (cell.type === 'checkbox' && cell.checkboxOptions?.length) {
         // 응답자×행 단위로 셔플 후 1~min(3, len)개 선택
         const shuffled = deterministicShuffle(cell.checkboxOptions, pSeed + seed * 13 + cellSeed);
@@ -971,42 +981,6 @@ function fillTableDefault(q: Question, responses: Record<string, unknown>, quest
   return out;
 }
 
-/** 라벨에 특정 키워드가 포함된 인풋 셀 찾아 값 주입 */
-function fillInputByRowHint(
-  out: Record<string, unknown>,
-  rows: TableRow[],
-  hints: string[],
-  value: string | number,
-) {
-  for (const row of rows) {
-    const lbl = (row.label || '').toLowerCase();
-    if (!hints.every(h => lbl.includes(h.toLowerCase()))) continue;
-    for (const cell of row.cells) {
-      if (cell.type === 'input') {
-        out[cell.id] = String(value);
-        return;
-      }
-    }
-  }
-}
-
-/** 테이블에서 열 인덱스별로 input 셀을 찾아 값 주입 (연도별 컬럼) */
-function fillInputByRowAndCol(
-  out: Record<string, unknown>,
-  rows: TableRow[],
-  rowHints: string[],
-  colIdx: number,
-  value: string | number,
-) {
-  for (const row of rows) {
-    const lbl = (row.label || '').toLowerCase();
-    if (!rowHints.every(h => lbl.includes(h.toLowerCase()))) continue;
-    const inputCells = row.cells.filter(c => c.type === 'input');
-    if (inputCells[colIdx]) {
-      out[inputCells[colIdx].id] = String(value);
-    }
-  }
-}
 
 /**
  * 기업 소개/일반현황 테이블 공통 필러.
@@ -1068,23 +1042,29 @@ function fillCompanyInfoTable(q: Question): Record<string, unknown> {
         const idx = MEANING_KEEP_FIRST(lbl)
           ? 0
           : (pSeed + seed * 7 + cellSeed) % cell.radioOptions.length;
-        out[cell.id] = cell.radioOptions[idx].value;
+        const rOpt = cell.radioOptions[idx];
+        if (rOpt) out[cell.id] = rOpt.value;
       } else if (cell.type === 'select' && cell.selectOptions?.length) {
         const lower = lbl.toLowerCase();
         if (lower.includes('성별')) {
           // 성별 셀: 대표 프로필 성별과 일치
           const want = P.ceoGender === '남' ? /남|m/i : /여|f/i;
           const found = cell.selectOptions.find(o => want.test(o.label));
-          out[cell.id] = (found || cell.selectOptions[0]).value;
+          const fallback = cell.selectOptions[0];
+          if (found) out[cell.id] = found.value;
+          else if (fallback) out[cell.id] = fallback.value;
         } else if (MEANING_KEEP_FIRST(lbl)) {
-          out[cell.id] = cell.selectOptions[0].value;
+          const first = cell.selectOptions[0];
+          if (first) out[cell.id] = first.value;
         } else {
           const idx = (pSeed + seed * 11 + cellSeed * 3) % cell.selectOptions.length;
-          out[cell.id] = cell.selectOptions[idx].value;
+          const sOpt = cell.selectOptions[idx];
+          if (sOpt) out[cell.id] = sOpt.value;
         }
       } else if (cell.type === 'checkbox' && cell.checkboxOptions?.length) {
         if (MEANING_KEEP_FIRST(lbl)) {
-          out[cell.id] = [cell.checkboxOptions[0].value];
+          const firstCb = cell.checkboxOptions[0];
+          out[cell.id] = firstCb ? [firstCb.value] : [];
         } else {
           const shuffled = deterministicShuffle(cell.checkboxOptions, pSeed + seed * 13 + cellSeed);
           const count = 1 + ((pSeed + seed) % Math.min(2, shuffled.length));
@@ -1114,19 +1094,26 @@ function fillRevenueTable(q: Question): Record<string, unknown> {
     const isAi = lbl.includes('인공지능') || lbl.includes('ai');
     const isTotal = lbl.includes('전체') || (!isAi && (lbl.includes('매출') || lbl.includes('총')));
     // 2개 input 열 가정: [0]=2024, [1]=2025(E)
-    if (inputCells.length >= 2) {
+    const cell0 = inputCells[0];
+    const cell1 = inputCells[1];
+    if (cell0 && cell1) {
       if (isAi) {
-        out[inputCells[0].id] = String(P.revenueAi2024 * 100); // 백만원 단위 추정
-        out[inputCells[1].id] = String(P.revenueAi2025 * 100);
+        out[cell0.id] = String(P.revenueAi2024 * 100); // 백만원 단위 추정
+        out[cell1.id] = String(P.revenueAi2025 * 100);
       } else if (isTotal) {
-        out[inputCells[0].id] = String(P.revenueTotal2024 * 100);
-        out[inputCells[1].id] = String(P.revenueTotal2025 * 100);
+        out[cell0.id] = String(P.revenueTotal2024 * 100);
+        out[cell1.id] = String(P.revenueTotal2025 * 100);
       }
     } else {
       // 비인터랙티브 셀 처리
       for (const c of row.cells) {
-        if (c.type === 'radio' && c.radioOptions?.length) out[c.id] = c.radioOptions[0].value;
-        else if (c.type === 'select' && c.selectOptions?.length) out[c.id] = c.selectOptions[0].value;
+        if (c.type === 'radio' && c.radioOptions?.length) {
+          const first = c.radioOptions[0];
+          if (first) out[c.id] = first.value;
+        } else if (c.type === 'select' && c.selectOptions?.length) {
+          const first = c.selectOptions[0];
+          if (first) out[c.id] = first.value;
+        }
       }
     }
   }
@@ -1139,8 +1126,10 @@ function fillExportAmountTable(q: Question): Record<string, unknown> {
   for (const row of rows) {
     const inputCells = row.cells.filter(c => c.type === 'input');
     // 단순 1~2 입력 — 총 수출액 12억 = 1200백만원
-    if (inputCells[0]) out[inputCells[0].id] = String(P.export2024Total * 100);
-    if (inputCells[1]) out[inputCells[1].id] = String(Math.round(P.export2024Total * P.revenueAi2024 / P.revenueTotal2024 * 100));
+    const ea0 = inputCells[0];
+    const ea1 = inputCells[1];
+    if (ea0) out[ea0.id] = String(P.export2024Total * 100);
+    if (ea1) out[ea1.id] = String(Math.round(P.export2024Total * P.revenueAi2024 / P.revenueTotal2024 * 100));
   }
   return out;
 }
@@ -1163,17 +1152,25 @@ function fillExportByCountryTable(q: Question): Record<string, unknown> {
         if (c.selectOptions?.length) {
           const opts = c.selectOptions;
           // 일본/미국/싱가포르 우선, 없으면 첫 옵션
-          const prefer = opts.find(o => /일본|싱가포르|미국|US|JP|SG/i.test(o.label)) || opts[0];
-          out[c.id] = prefer.value;
+          const prefer = opts.find(o => /일본|싱가포르|미국|US|JP|SG/i.test(o.label));
+          const fallback = opts[0];
+          if (prefer) out[c.id] = prefer.value;
+          else if (fallback) out[c.id] = fallback.value;
         }
       }
       for (const c of radioCells) {
-        if (c.radioOptions?.length) out[c.id] = c.radioOptions[0].value;
+        if (c.radioOptions?.length) {
+          const first = c.radioOptions[0];
+          if (first) out[c.id] = first.value;
+        }
       }
       // 입력 값들 (수출액/비중)
-      if (inputCells.length >= 1) out[inputCells[0].id] = String(amounts2024[seed] || rand(100, 500));
-      if (inputCells.length >= 2) out[inputCells[1].id] = String(amounts2025[seed] || rand(200, 800));
-      if (inputCells.length >= 3) out[inputCells[2].id] = String(shares[seed] || rand(5, 20));
+      const ic0 = inputCells[0];
+      const ic1 = inputCells[1];
+      const ic2 = inputCells[2];
+      if (ic0) out[ic0.id] = String(amounts2024[seed] ?? rand(100, 500));
+      if (ic1) out[ic1.id] = String(amounts2025[seed] ?? rand(200, 800));
+      if (ic2) out[ic2.id] = String(shares[seed] ?? rand(5, 20));
     }
     seed++;
   }
@@ -1187,13 +1184,15 @@ function fillHumanResourceTable(q: Question): Record<string, unknown> {
     const lbl = (row.label || '').toLowerCase();
     const inputCells = row.cells.filter(c => c.type === 'input');
     const isAi = lbl.includes('인공지능') || lbl.includes('ai');
-    if (inputCells.length >= 2) {
+    const hc0 = inputCells[0];
+    const hc1 = inputCells[1];
+    if (hc0 && hc1) {
       if (isAi) {
-        out[inputCells[0].id] = String(P.aiEmployees);
-        out[inputCells[1].id] = String(P.aiEmployees + 8); // 2025(E)
+        out[hc0.id] = String(P.aiEmployees);
+        out[hc1.id] = String(P.aiEmployees + 8); // 2025(E)
       } else {
-        out[inputCells[0].id] = String(P.employees);
-        out[inputCells[1].id] = String(P.employees + 12);
+        out[hc0.id] = String(P.employees);
+        out[hc1.id] = String(P.employees + 12);
       }
     }
   }
@@ -1220,10 +1219,12 @@ function fillJobBreakdownTable(q: Question): Record<string, unknown> {
     }
     if (match === 0) match = Math.max(1, Math.floor((P.aiEmployees - assigned) / Math.max(1, rows.length)));
     assigned += match;
-    if (inputCells[0]) out[inputCells[0].id] = String(match);
+    const jc0 = inputCells[0];
+    if (jc0) out[jc0.id] = String(match);
     // 추가 열(성별 분포 등) 자동 분배
     for (let i = 1; i < inputCells.length; i++) {
-      out[inputCells[i].id] = String(Math.max(1, Math.floor(match / (i + 1))));
+      const jci = inputCells[i];
+      if (jci) out[jci.id] = String(Math.max(1, Math.floor(match / (i + 1))));
     }
   }
   return out;
@@ -1258,7 +1259,8 @@ function fillEducationBreakdownTable(q: Question): Record<string, unknown> {
     }
     if (match === 0) match = rand(3, 12);
     for (let i = 0; i < inputCells.length; i++) {
-      out[inputCells[i].id] = String(i === 0 ? match : Math.max(1, Math.floor(match / 2)));
+      const ec = inputCells[i];
+      if (ec) out[ec.id] = String(i === 0 ? match : Math.max(1, Math.floor(match / 2)));
     }
   }
   return out;
@@ -1277,8 +1279,10 @@ function fillFinanceTable(q: Question): Record<string, unknown> {
     else if (lbl.includes('마케팅') || lbl.includes('영업')) { y2024 = 500; y2025 = 800; }
     else if (lbl.includes('기타') || lbl.includes('일반')) { y2024 = 900; y2025 = 1200; }
     else if (lbl.includes('시설') || lbl.includes('설비') || lbl.includes('인프라')) { y2024 = 600; y2025 = 1000; }
-    if (inputCells[0]) out[inputCells[0].id] = String(y2024);
-    if (inputCells[1]) out[inputCells[1].id] = String(y2025);
+    const fc0 = inputCells[0];
+    const fc1 = inputCells[1];
+    if (fc0) out[fc0.id] = String(y2024);
+    if (fc1) out[fc1.id] = String(y2025);
   }
   return out;
 }
@@ -1291,19 +1295,23 @@ function fillInvestmentDealsTable(q: Question): Record<string, unknown> {
     const lbl = (row.label || '').toLowerCase();
     const inputCells = row.cells.filter(c => c.type === 'input');
     const isAi = lbl.includes('인공지능') || lbl.includes('ai');
-    if (inputCells.length >= 2) {
+    const inv0 = inputCells[0];
+    const inv1 = inputCells[1];
+    const inv2 = inputCells[2];
+    const inv3 = inputCells[3];
+    if (inv0 && inv1) {
       if (isAi) {
-        out[inputCells[0].id] = '1'; // 건수
-        out[inputCells[1].id] = '8500'; // 백만원 (85억)
+        out[inv0.id] = '1'; // 건수
+        out[inv1.id] = '8500'; // 백만원 (85억)
       } else {
-        out[inputCells[0].id] = '1';
-        out[inputCells[1].id] = '8500';
+        out[inv0.id] = '1';
+        out[inv1.id] = '8500';
       }
     }
-    if (inputCells.length >= 4) {
+    if (inv2 && inv3) {
       // 2025(E) 건수/금액 — 없음
-      out[inputCells[2].id] = '0';
-      out[inputCells[3].id] = '0';
+      out[inv2.id] = '0';
+      out[inv3.id] = '0';
     }
   }
   return out;
@@ -1345,11 +1353,13 @@ function fillInfraRatioTable(q: Question, ratio: { self: number; cloud: number }
     if (row.displayCondition) continue; // row-level cond이 있다면 외부 로직에 맡김
     if (selfColIdx >= 0 || cloudColIdx >= 0) {
       // 열 인덱스 기반: 행의 cells[colIdx] 가 input이면 채움
-      if (selfColIdx >= 0 && row.cells[selfColIdx]?.type === 'input') {
-        out[row.cells[selfColIdx].id] = String(ratio.self);
+      const selfCell = selfColIdx >= 0 ? row.cells[selfColIdx] : undefined;
+      const cloudCell = cloudColIdx >= 0 ? row.cells[cloudColIdx] : undefined;
+      if (selfCell?.type === 'input') {
+        out[selfCell.id] = String(ratio.self);
       }
-      if (cloudColIdx >= 0 && row.cells[cloudColIdx]?.type === 'input') {
-        out[row.cells[cloudColIdx].id] = String(ratio.cloud);
+      if (cloudCell?.type === 'input') {
+        out[cloudCell.id] = String(ratio.cloud);
       }
     } else {
       // fallback — 행 라벨로 매칭 (예전 동작)
@@ -1390,19 +1400,23 @@ function fillGpuTable(
     else if (lbl.includes('a6000') || lbl.includes('a40') || lbl.includes('rtx')) { holding = 6; demand = 2; }
     else if (lbl.includes('기타') || lbl.includes('consumer')) { holding = 4; demand = 0; }
     else { holding = rand(0, 2); demand = rand(0, 3); }
-    if (inputCells[0]) out[inputCells[0].id] = String(holding);
-    if (inputCells[1]) out[inputCells[1].id] = String(demand);
+    const gc0 = inputCells[0];
+    const gc1 = inputCells[1];
+    if (gc0) out[gc0.id] = String(holding);
+    if (gc1) out[gc1.id] = String(demand);
     // radio/select 셀 처리 — 첫옵션 편향 제거
     let cellSeed = 0;
     for (const c of row.cells) {
       if (c.type === 'radio' && c.radioOptions?.length) {
         cellSeed++;
         const idx = (pSeed + rowSeed * 7 + cellSeed) % c.radioOptions.length;
-        out[c.id] = c.radioOptions[idx].value;
+        const gro = c.radioOptions[idx];
+        if (gro) out[c.id] = gro.value;
       } else if (c.type === 'select' && c.selectOptions?.length) {
         cellSeed++;
         const idx = (pSeed + rowSeed * 11 + cellSeed * 3) % c.selectOptions.length;
-        out[c.id] = c.selectOptions[idx].value;
+        const gso = c.selectOptions[idx];
+        if (gso) out[c.id] = gso.value;
       }
     }
   }
@@ -1455,10 +1469,12 @@ function fillExportPlanTable(
     cellSeed++;
     if (cell.type === 'radio' && cell.radioOptions?.length) {
       const idx = (pSeed + cellSeed * 7) % cell.radioOptions.length;
-      out[cell.id] = cell.radioOptions[idx].value;
+      const ero = cell.radioOptions[idx];
+      if (ero) out[cell.id] = ero.value;
     } else if (cell.type === 'select' && cell.selectOptions?.length) {
       const idx = (pSeed + cellSeed * 11) % cell.selectOptions.length;
-      out[cell.id] = cell.selectOptions[idx].value;
+      const eso = cell.selectOptions[idx];
+      if (eso) out[cell.id] = eso.value;
     } else if (cell.type === 'checkbox' && cell.checkboxOptions?.length) {
       const shuffled = deterministicShuffle(cell.checkboxOptions, pSeed + cellSeed * 13);
       const count = 1 + (pSeed % Math.min(2, shuffled.length));
@@ -1481,9 +1497,11 @@ function fillPublicDataPortionTable(q: Question): Record<string, unknown> {
       if (c.type === 'radio' && c.radioOptions?.length) {
         // 중간 옵션 선택
         const midIdx = Math.min(Math.floor(c.radioOptions.length / 2), c.radioOptions.length - 1);
-        out[c.id] = c.radioOptions[midIdx].value;
+        const pmo = c.radioOptions[midIdx];
+        if (pmo) out[c.id] = pmo.value;
       } else if (c.type === 'select' && c.selectOptions?.length) {
-        out[c.id] = c.selectOptions[Math.floor(c.selectOptions.length / 2)].value;
+        const pso = c.selectOptions[Math.floor(c.selectOptions.length / 2)];
+        if (pso) out[c.id] = pso.value;
       }
     }
   }
@@ -1556,6 +1574,7 @@ function runSurvey(questions: Question[], groups: QGroup[]): RunResult {
   while (idx >= 0 && idx < total && guard < maxGuard) {
     guard++;
     const q = questions[idx];
+    if (!q) { idx++; continue; }
 
     if (!shouldDisplayQuestion(q, responses, questions, groups)) {
       idx++;
@@ -1604,7 +1623,7 @@ function pickOtherText(q: Question, seed: number): string {
   else if (/제품|서비스|도구|개발/.test(t)) pool = ['자체 개발 프레임워크', '상용 MLOps 플랫폼', '클라우드 매니지드 서비스'];
   else if (/가이드라인|프레임워크/.test(t)) pool = ['도입 검토 중', '내부 정책 수립 예정'];
   else pool = ['기타 내부 검토 사항', '자체 방식으로 대응'];
-  return pool[Math.abs(seed) % pool.length];
+  return pool[Math.abs(seed) % pool.length] ?? '';
 }
 
 /**
@@ -1631,9 +1650,12 @@ function applyOtherInputs(
         : [];
       let chosen = otherOpts.find(o => arr.includes(o.value));
       if (!chosen && seed % 10 < 3) {
-        chosen = otherOpts[seed % otherOpts.length];
-        arr.push(chosen.value);
-        responses[q.id] = arr;
+        const candidate = otherOpts[seed % otherOpts.length];
+        if (candidate) {
+          chosen = candidate;
+          arr.push(candidate.value);
+          responses[q.id] = arr;
+        }
       }
       if (chosen) optTexts[q.id] = { [chosen.id]: pickOtherText(q, seed) };
     } else if (q.type === 'radio' || q.type === 'select') {
@@ -1710,19 +1732,20 @@ function buildPageVisits(
       pageOrder.push(stepId);
       pageQCount[stepId] = 0;
     }
-    pageQCount[stepId]++;
+    pageQCount[stepId] = (pageQCount[stepId] ?? 0) + 1;
   }
   if (pageOrder.length === 0) return [];
 
   // 가중치: 질문 수 + 결정적 노이즈(0.5~1.5배)
   const rng = seededRand(noiseSeed);
-  const weights = pageOrder.map(s => pageQCount[s] * (0.7 + rng() * 0.8));
+  const weights = pageOrder.map(s => (pageQCount[s] ?? 1) * (0.7 + rng() * 0.8));
   const sumW = weights.reduce((a, b) => a + b, 0);
 
   const visits: PageVisit[] = [];
   let cursorMs = startedAt.getTime();
   pageOrder.forEach((stepId, i) => {
-    const ms = Math.round((totalMs * weights[i]) / sumW);
+    const w = weights[i] ?? 1;
+    const ms = Math.round((totalMs * w) / sumW);
     const enteredAt = new Date(cursorMs).toISOString();
     cursorMs = i === pageOrder.length - 1 ? completedAt.getTime() : cursorMs + ms;
     const leftAt = new Date(cursorMs).toISOString();
@@ -1770,7 +1793,10 @@ function buildStatusSequence(): ResponseStatus[] {
   for (let i = seq.length - 1; i > 0; i--) {
     s = (s * 9301 + 49297) % 233280;
     const j = s % (i + 1);
-    [seq[i], seq[j]] = [seq[j], seq[i]];
+    const tmp = seq[i];
+    const src = seq[j];
+    if (tmp !== undefined) seq[j] = tmp;
+    if (src !== undefined) seq[i] = src;
   }
   return seq;
 }
@@ -1786,6 +1812,7 @@ function calcProgressPct(
 ): number | null {
   if (exposedIds.length === 0 || totalQuestions === 0) return null;
   const lastId = exposedIds[exposedIds.length - 1];
+  if (!lastId) return null;
   const pos = positionMap.get(lastId) ?? 0;
   if (pos === 0) return null;
   const pct = Math.round((pos / totalQuestions) * 100);
@@ -1864,9 +1891,9 @@ async function main() {
     .filter((i) => i >= 0);
   // 이상치 3건: 매우 김(150분=9000s), 김(75분=4500s), 매우 짧음(40초)
   const outlierMap = new Map<number, number>();
-  if (completedIdx[0] !== undefined) outlierMap.set(completedIdx[0], 9000);
-  if (completedIdx[1] !== undefined) outlierMap.set(completedIdx[1], 4500);
-  if (completedIdx[2] !== undefined) outlierMap.set(completedIdx[2], 40);
+  const ci0 = completedIdx[0]; if (ci0 !== undefined) outlierMap.set(ci0, 9000);
+  const ci1 = completedIdx[1]; if (ci1 !== undefined) outlierMap.set(ci1, 4500);
+  const ci2 = completedIdx[2]; if (ci2 !== undefined) outlierMap.set(ci2, 40);
 
   const statusCount: Record<ResponseStatus, number> = { completed: 0, in_progress: 0, drop: 0 };
 
@@ -1875,7 +1902,7 @@ async function main() {
   );
   for (let i = 0; i < TOTAL; i++) {
     P = generateProfile(i);
-    const status = statusSeq[i];
+    const status: ResponseStatus = statusSeq[i] ?? 'completed';
     statusCount[status]++;
 
     const full = runSurvey(questions, groups);
@@ -1911,6 +1938,7 @@ async function main() {
     const responseId = crypto.randomUUID();
     const sessionId = `session-ai-${String(i + 1).padStart(3, '0')}-${anchorAt.getTime()}`;
     const userAgent = USER_AGENTS[i % USER_AGENTS.length];
+    if (!userAgent) throw new Error('USER_AGENTS 비어있음');
     const platform = derivePlatform(userAgent);
 
     // 상태별 종결 필드
@@ -1921,14 +1949,15 @@ async function main() {
       ? Math.round((anchorAt.getTime() - startedAt.getTime()) / 1000)
       : null; // 진행중/일탈은 응답시간 미집계(현황 통계 정책과 일치)
     if (isCompleted && outlierMap.has(i)) {
-      totalSeconds = outlierMap.get(i)!; // 절사평균 검증용 이상치
+      totalSeconds = outlierMap.get(i) ?? totalSeconds; // 절사평균 검증용 이상치
     }
 
     // page_visits: 노출 구간만 — 부분 응답은 마지막 stepId 가 이탈 위치
     const pageVisits = buildPageVisits(
       exposedIds, questions, groups, startedAt, lastActivityAt, i * 211 + 17,
     );
-    const currentStepId = pageVisits.length > 0 ? pageVisits[pageVisits.length - 1].stepId : null;
+    const lastVisit = pageVisits[pageVisits.length - 1];
+    const currentStepId = lastVisit?.stepId ?? null;
     const progressPct = isCompleted
       ? 100
       : calcProgressPct(exposedIds, positionMap, questions.length);
@@ -1977,8 +2006,8 @@ async function main() {
     if (P.hasGuideline) stats.guide_yes++; else stats.guide_no++;
     if (P.hasTraining) stats.train_yes++; else stats.train_no++;
     if (P.hasIntlStandard) stats.std_yes++; else stats.std_no++;
-    stats.npu[P.npuChoice]++;
-    stats.infra[P.infraChoice]++;
+    stats.npu[P.npuChoice] = (stats.npu[P.npuChoice] ?? 0) + 1;
+    stats.infra[P.infraChoice] = (stats.infra[P.infraChoice] ?? 0) + 1;
     if (exposedIds.includes(QID.Q20)) stats.q20_shown++;
 
     if ((i + 1) % 20 === 0) {

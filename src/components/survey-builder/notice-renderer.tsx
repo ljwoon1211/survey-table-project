@@ -7,10 +7,10 @@ import { sanitizeRichHtml } from '@/lib/sanitize';
 
 interface NoticeRendererProps {
   content: string;
-  requiresAcknowledgment?: boolean;
-  value?: boolean;
+  requiresAcknowledgment?: boolean | undefined;
+  value?: boolean | undefined;
   onChange?: (acknowledged: boolean) => void;
-  isTestMode?: boolean;
+  isTestMode?: boolean | undefined;
 }
 
 export function NoticeRenderer({

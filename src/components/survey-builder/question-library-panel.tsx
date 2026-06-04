@@ -103,12 +103,11 @@ interface QuestionLibraryPanelProps {
 
 export function QuestionLibraryPanel({
   onAddQuestion,
-  targetGroupId,
   className,
 }: QuestionLibraryPanelProps) {
   // TanStack Query 훅들
-  const { data: savedQuestions = [], isLoading: isLoadingQuestions } = useSavedQuestions();
-  const { data: categories = [], isLoading: isLoadingCategories } = useCategories();
+  const { data: savedQuestions = [] } = useSavedQuestions();
+  const { data: categories = [] } = useCategories();
   const { data: recentlyUsed = [] } = useRecentlyUsedQuestions(5);
   const { data: mostUsed = [] } = useMostUsedQuestions(5);
 
@@ -212,10 +211,8 @@ export function QuestionLibraryPanel({
       }
 
       // 라이브러리에서 가져온 질문은 그룹 ID를 제거
-      questionToAdd = {
-        ...questionToAdd,
-        groupId: undefined,
-      };
+      const { groupId: _removedGroupId, ...questionWithoutGroup } = questionToAdd;
+      questionToAdd = questionWithoutGroup as Question;
 
       if (onAddQuestion) {
         onAddQuestion(questionToAdd);

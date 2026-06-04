@@ -100,7 +100,10 @@ export function UploadWizard({ surveyId, existingContactsCount }: UploadWizardPr
       try {
         const r = await parseExcelPreview({ file, sheetName, headerRow });
         setPreview(r);
-        if (!sheetName && r.sheetNames.length > 0) setSheetName(r.sheetNames[0]);
+        if (!sheetName && r.sheetNames.length > 0) {
+          const firstSheet = r.sheetNames[0];
+          if (firstSheet) setSheetName(firstSheet);
+        }
 
         const detected = autoDetectSystemFields(r.headers);
         const piiAuto = autoDetectPiiMapping(r.headers);
@@ -142,7 +145,7 @@ export function UploadWizard({ surveyId, existingContactsCount }: UploadWizardPr
       try {
         const m: ContactUploadMapping = {
           systemFields: {
-            group: mapping.groupCol ?? undefined,
+            ...(mapping.groupCol != null ? { group: mapping.groupCol } : {}),
           },
           piiMapping: mapping.piiMapping,
           selectedAttrsKeys: Array.from(mapping.selectedAttrs),

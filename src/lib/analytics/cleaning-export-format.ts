@@ -61,8 +61,8 @@ export function parseCheckboxRawValue(rawValue: unknown): { selectedIds: string[
   if (typeof rawValue === 'object' && rawValue !== null) {
     const obj = rawValue as Record<string, unknown>;
     return {
-      selectedIds: Array.isArray(obj.selectedValues) ? (obj.selectedValues as string[]) : [],
-      otherText: obj.otherValue ? String(obj.otherValue) : undefined,
+      selectedIds: Array.isArray(obj['selectedValues']) ? (obj['selectedValues'] as string[]) : [],
+      ...(obj['otherValue'] ? { otherText: String(obj['otherValue']) } : {}),
     };
   }
   return { selectedIds: [] };
@@ -76,8 +76,8 @@ function parseSingleChoiceRawValue(rawValue: unknown): { optionId: string; other
   if (typeof rawValue === 'object' && rawValue !== null) {
     const obj = rawValue as Record<string, unknown>;
     return {
-      optionId: String(obj.selectedValue ?? obj.optionId ?? ''),
-      otherText: obj.otherValue ? String(obj.otherValue) : undefined,
+      optionId: String(obj['selectedValue'] ?? obj['optionId'] ?? ''),
+      ...(obj['otherValue'] ? { otherText: String(obj['otherValue']) } : {}),
     };
   }
   return { optionId: String(rawValue) };
@@ -188,7 +188,7 @@ export function formatGeneralQuestionValue(
 
     case 'notice': {
       if (typeof rawValue === 'object' && rawValue !== null) {
-        return (rawValue as Record<string, unknown>).acknowledged ? '동의' : '미동의';
+        return (rawValue as Record<string, unknown>)['acknowledged'] ? '동의' : '미동의';
       }
       return String(rawValue);
     }
@@ -227,6 +227,7 @@ export function formatExpandedCellValue(
         const actualOpts = actualCell.checkboxOptions ?? [];
         if (optIdx >= actualOpts.length) return null;
         const actualOpt = actualOpts[optIdx];
+        if (!actualOpt) return null;
         const { selectedIds } = parseCheckboxRawValue(rawValue);
         const isSelected = selectedIds.some((sid) => sid === actualOpt.value);
         return isSelected ? (actualOpt.spssNumericCode ?? (optIdx + 1)) : 0;
@@ -307,18 +308,18 @@ export function classifyTableCells(
   rows: TableRow[],
   columns: TableColumn[],
 ): ClassifiedCells {
-  if (!rows.length || !rows[0].cells.length) {
+  const firstRow = rows[0];
+  if (!firstRow || !firstRow.cells.length) {
     return { identifiers: [], measurements: [] };
   }
 
-  const firstRow = rows[0];
   const identifiers: ClassifiedCells['identifiers'] = [];
   const measurements: ClassifiedCells['measurements'] = [];
   let passedIdentifiers = false;
 
   for (let i = 0; i < firstRow.cells.length; i++) {
     const cell = firstRow.cells[i];
-    if (cell.isHidden || cell._isContinuation) continue;
+    if (!cell || cell.isHidden || cell._isContinuation) continue;
 
     // radio/select는 input/checkbox 앞에 오면 식별자(depth-2+)로 분류
     const isDataInputCell = cell.type === 'input' || cell.type === 'checkbox';
@@ -368,7 +369,9 @@ export function hasVaryingCheckboxOptions(
       const opts = cell.checkboxOptions ?? [];
       if (opts.length !== firstValues.length) return true;
       for (let oi = 0; oi < opts.length; oi++) {
-        if (opts[oi].value !== firstValues[oi]) return true;
+        const opt = opts[oi];
+        const fv = firstValues[oi];
+        if (!opt || opt.value !== fv) return true;
       }
     }
   }
@@ -437,7 +440,7 @@ export function expandMeasurements(
           colIndex,
           columnKind: 'binary',
           checkboxOptionIndex: i,
-          optionValue: opt?.value,
+          ...(opt?.value !== undefined ? { optionValue: opt.value } : {}),
           spssNumericCode: varying ? (i + 1) : (opt?.spssNumericCode ?? (i + 1)),
           optionLabel: varying ? `옵션${i + 1}` : (opt?.label ?? `옵션${i + 1}`),
           h1Label: colLabel,
@@ -543,7 +546,7 @@ export function expandGeneralCheckboxQuestion(
       }
     : undefined;
 
-  return { label, binaries, otherText };
+  return { label, binaries, ...(otherText !== undefined ? { otherText } : {}) };
 }
 
 export function shouldUseSemiLong(
@@ -580,6 +583,7 @@ function extractIdentifierValues(
   rowspanTracker: Map<number, { value: string; remaining: number }>,
 ): string[] {
   const row = rows[rowIndex];
+  if (!row) return identifierColIndices.map(() => '');
   const values: string[] = [];
 
   for (const colIdx of identifierColIndices) {
@@ -618,7 +622,7 @@ function getVisibleRows(
     dynamicRowConfigs.filter((g) => g.enabled).map((g) => g.groupId),
   );
   const selectedRowIds = new Set(
-    (tableResponse.__selectedRowIds as string[] | undefined) ?? [],
+    (tableResponse['__selectedRowIds'] as string[] | undefined) ?? [],
   );
 
   return rows.filter((row) => {
@@ -685,8 +689,8 @@ export function buildSemiLongRows(
       }
     }
     const unexposedExpandedIndices = new Set<number>();
-    for (let ei = 0; ei < expandedColumns.length; ei++) {
-      if (unexposedOrigColIndices.has(expandedColumns[ei].colIndex)) {
+    for (const [ei, ec] of expandedColumns.entries()) {
+      if (unexposedOrigColIndices.has(ec.colIndex)) {
         unexposedExpandedIndices.add(ei);
       }
     }
@@ -713,8 +717,7 @@ export function buildSemiLongRows(
     let seqNum = 0;
     let prevDepth1 = '';
 
-    for (let origRi = 0; origRi < allRows.length; origRi++) {
-      const row = allRows[origRi];
+    for (const [origRi, row] of allRows.entries()) {
       const identifierValues = hasVirtual
         ? []
         : extractIdentifierValues(allRows, origRi, identifierColIndices, rowspanTracker);
@@ -753,8 +756,7 @@ export function buildSemiLongRows(
       const cellIds: string[] = [];
       const computedLabels = new Map<number, string>();
 
-      for (let ei = 0; ei < expandedColumns.length; ei++) {
-        const ec = expandedColumns[ei];
+      for (const [ei, ec] of expandedColumns.entries()) {
         const actualCell = row.cells[ec.colIndex];
         cellIds.push(buildCellIdKey(ec, actualCell?.id ?? ''));
 
@@ -792,7 +794,7 @@ export function buildSemiLongRows(
         cellIds,
         isUnexposed: false,
         unexposedColumns: unexposedExpandedIndices,
-        computedLabels: computedLabels.size > 0 ? computedLabels : undefined,
+        ...(computedLabels.size > 0 ? { computedLabels } : {}),
       });
     }
   }

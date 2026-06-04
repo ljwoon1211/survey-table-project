@@ -26,7 +26,11 @@ export function ColumnSchemeEditor({ surveyId, scheme }: ColumnSchemeEditorProps
     const newCols = [...columns];
     const target = index + dir;
     if (target < 0 || target >= newCols.length) return;
-    [newCols[index], newCols[target]] = [newCols[target], newCols[index]];
+    const a = newCols[index];
+    const b = newCols[target];
+    if (!a || !b) return;
+    newCols[index] = b;
+    newCols[target] = a;
     newCols.forEach((c, i) => { c.order = i + 1; });
     setColumns(newCols);
   }

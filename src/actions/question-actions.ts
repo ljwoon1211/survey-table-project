@@ -10,7 +10,7 @@ import { NewQuestion, questions } from '@/db/schema';
 import { requireAuth } from '@/lib/auth';
 import { extractImageUrlsFromQuestion } from '@/lib/image-extractor';
 import { deleteImagesFromR2Server } from '@/lib/image-utils-server';
-import { promoteSurveyImages } from '@/lib/survey/survey-image-promote';
+import { promoteSurveyImages, type PromotableQuestion } from '@/lib/survey/survey-image-promote';
 import { generateId, isValidUUID } from '@/lib/utils';
 import type { Question, Question as QuestionType } from '@/types/survey';
 
@@ -21,38 +21,38 @@ import type { Question, Question as QuestionType } from '@/types/survey';
 // 질문 생성
 export async function createQuestion(data: {
   surveyId: string;
-  id?: string;
-  groupId?: string;
+  id?: string | undefined;
+  groupId?: string | undefined;
   type: string;
   title: string;
-  description?: string;
-  required?: boolean;
-  order?: number;
-  options?: QuestionType['options'];
-  selectLevels?: QuestionType['selectLevels'];
-  tableTitle?: string;
-  tableColumns?: QuestionType['tableColumns'];
-  tableRowsData?: QuestionType['tableRowsData'];
-  tableHeaderGrid?: QuestionType['tableHeaderGrid'];
-  imageUrl?: string;
-  videoUrl?: string;
-  allowOtherOption?: boolean;
-  optionsColumns?: number;
-  minSelections?: number;
-  maxSelections?: number;
-  noticeContent?: string;
-  requiresAcknowledgment?: boolean;
-  placeholder?: string;
-  tableValidationRules?: QuestionType['tableValidationRules'];
-  displayCondition?: QuestionType['displayCondition'];
-  dynamicRowConfigs?: QuestionType['dynamicRowConfigs'];
-  hideColumnLabels?: boolean;
-  rankingConfig?: QuestionType['rankingConfig'];
-  questionCode?: string;
-  isCustomSpssVarName?: boolean;
-  exportLabel?: string;
-  spssVarType?: string;
-  spssMeasure?: string;
+  description?: string | undefined;
+  required?: boolean | undefined;
+  order?: number | undefined;
+  options?: QuestionType['options'] | undefined;
+  selectLevels?: QuestionType['selectLevels'] | undefined;
+  tableTitle?: string | undefined;
+  tableColumns?: QuestionType['tableColumns'] | undefined;
+  tableRowsData?: QuestionType['tableRowsData'] | undefined;
+  tableHeaderGrid?: QuestionType['tableHeaderGrid'] | undefined;
+  imageUrl?: string | undefined;
+  videoUrl?: string | undefined;
+  allowOtherOption?: boolean | undefined;
+  optionsColumns?: number | undefined;
+  minSelections?: number | undefined;
+  maxSelections?: number | undefined;
+  noticeContent?: string | undefined;
+  requiresAcknowledgment?: boolean | undefined;
+  placeholder?: string | undefined;
+  tableValidationRules?: QuestionType['tableValidationRules'] | undefined;
+  displayCondition?: QuestionType['displayCondition'] | undefined;
+  dynamicRowConfigs?: QuestionType['dynamicRowConfigs'] | undefined;
+  hideColumnLabels?: boolean | undefined;
+  rankingConfig?: QuestionType['rankingConfig'] | undefined;
+  questionCode?: string | undefined;
+  isCustomSpssVarName?: boolean | undefined;
+  exportLabel?: string | undefined;
+  spssVarType?: string | undefined;
+  spssMeasure?: string | undefined;
 }) {
   await requireAuth();
 
@@ -98,9 +98,9 @@ export async function createQuestion(data: {
   };
 
   // tmp/survey/ 이미지를 영구 prefix로 promote (R2 move + URL 치환)
-  const [questionToInsert] = await promoteSurveyImages([newQuestion]);
+  const [questionToInsert] = await promoteSurveyImages([newQuestion as PromotableQuestion]);
 
-  const [question] = await db.insert(questions).values(questionToInsert).returning();
+  const [question] = await db.insert(questions).values(questionToInsert as NewQuestion).returning();
 
   revalidatePath(`/admin/surveys/${data.surveyId}`);
   return question;
@@ -109,39 +109,39 @@ export async function createQuestion(data: {
 // 질문 업데이트 (허용 필드만 화이트리스트로 추출)
 export async function updateQuestion(
   questionId: string,
-  data: Partial<{
-    groupId: string | null;
-    type: string;
-    title: string;
-    description: string;
-    required: boolean;
-    order: number;
-    options: QuestionType['options'];
-    selectLevels: QuestionType['selectLevels'];
-    tableTitle: string;
-    tableColumns: QuestionType['tableColumns'];
-    tableRowsData: QuestionType['tableRowsData'];
-    tableHeaderGrid: QuestionType['tableHeaderGrid'];
-    imageUrl: string;
-    videoUrl: string;
-    allowOtherOption: boolean;
-    optionsColumns: number;
-    minSelections: number;
-    maxSelections: number;
-    noticeContent: string;
-    requiresAcknowledgment: boolean;
-    placeholder: string;
-    tableValidationRules: QuestionType['tableValidationRules'];
-    dynamicRowConfigs: QuestionType['dynamicRowConfigs'];
-    hideColumnLabels: boolean;
-    rankingConfig: QuestionType['rankingConfig'];
-    displayCondition: QuestionType['displayCondition'];
-    questionCode: string;
-    isCustomSpssVarName: boolean;
-    exportLabel: string;
-    spssVarType: string;
-    spssMeasure: string;
-  }>,
+  data: {
+    groupId?: string | null | undefined;
+    type?: string | undefined;
+    title?: string | undefined;
+    description?: string | undefined;
+    required?: boolean | undefined;
+    order?: number | undefined;
+    options?: QuestionType['options'] | undefined;
+    selectLevels?: QuestionType['selectLevels'] | undefined;
+    tableTitle?: string | undefined;
+    tableColumns?: QuestionType['tableColumns'] | undefined;
+    tableRowsData?: QuestionType['tableRowsData'] | undefined;
+    tableHeaderGrid?: QuestionType['tableHeaderGrid'] | undefined;
+    imageUrl?: string | undefined;
+    videoUrl?: string | undefined;
+    allowOtherOption?: boolean | undefined;
+    optionsColumns?: number | undefined;
+    minSelections?: number | undefined;
+    maxSelections?: number | undefined;
+    noticeContent?: string | undefined;
+    requiresAcknowledgment?: boolean | undefined;
+    placeholder?: string | undefined;
+    tableValidationRules?: QuestionType['tableValidationRules'] | undefined;
+    dynamicRowConfigs?: QuestionType['dynamicRowConfigs'] | undefined;
+    hideColumnLabels?: boolean | undefined;
+    rankingConfig?: QuestionType['rankingConfig'] | undefined;
+    displayCondition?: QuestionType['displayCondition'] | undefined;
+    questionCode?: string | undefined;
+    isCustomSpssVarName?: boolean | undefined;
+    exportLabel?: string | undefined;
+    spssVarType?: string | undefined;
+    spssMeasure?: string | undefined;
+  },
 ) {
   await requireAuth();
 
@@ -180,11 +180,11 @@ export async function updateQuestion(
   if (data.spssMeasure !== undefined) allowed.spssMeasure = data.spssMeasure;
 
   // tmp/survey/ 이미지를 영구 prefix로 promote (R2 move + URL 치환)
-  const [allowedToUpdate] = await promoteSurveyImages([allowed]);
+  const [allowedToUpdate] = await promoteSurveyImages([allowed as PromotableQuestion]);
 
   const [updated] = await db
     .update(questions)
-    .set(allowedToUpdate)
+    .set(allowedToUpdate as Partial<NewQuestion>)
     .where(eq(questions.id, questionId))
     .returning();
 

@@ -107,10 +107,13 @@ export function ProfilesFilterBar({
     });
   };
 
+  const _q = searchParams?.get('q') ?? undefined;
+  const _col = searchParams?.get('col') ?? undefined;
+  const _status = searchParams?.get('status') ?? undefined;
   const showReset = hasActiveFilters({
-    q: searchParams?.get('q') ?? undefined,
-    col: searchParams?.get('col') ?? undefined,
-    status: searchParams?.get('status') ?? undefined,
+    ...(_q !== undefined ? { q: _q } : {}),
+    ...(_col !== undefined ? { col: _col } : {}),
+    ...(_status !== undefined ? { status: _status } : {}),
   });
 
   return (

@@ -108,12 +108,12 @@ vi.mock('@/db', () => {
         const now = new Date();
         const row: SavedLookupRow = {
           id,
-          name: vals.name as string,
-          description: (vals.description as string | undefined) ?? null,
-          category: vals.category as string,
-          tags: (vals.tags as string[]) ?? [],
-          columns: vals.columns as string[],
-          rows: vals.rows as Array<Record<string, string | number>>,
+          name: vals['name'] as string,
+          description: (vals['description'] as string | undefined) ?? null,
+          category: vals['category'] as string,
+          tags: (vals['tags'] as string[]) ?? [],
+          columns: vals['columns'] as string[],
+          rows: vals['rows'] as Array<Record<string, string | number>>,
           usageCount: 0,
           isPreset: false,
           createdAt: now,
@@ -142,9 +142,9 @@ vi.mock('@/db', () => {
               } as SavedLookupRow;
               // usageCount sql increment 처리
               if (
-                patch.usageCount &&
-                typeof patch.usageCount === 'object' &&
-                (patch.usageCount as { __sql?: boolean }).__sql
+                patch['usageCount'] &&
+                typeof patch['usageCount'] === 'object' &&
+                (patch['usageCount'] as { __sql?: boolean }).__sql
               ) {
                 updated.usageCount = existing.usageCount + 1;
               }
@@ -339,7 +339,9 @@ describe('lookup-actions integration', () => {
     // survey 의 lookups 에 1건 추가됨
     const survey = h.surveyStore.get(TEST_SURVEY_ID)!;
     expect(survey.lookups).toHaveLength(1);
-    expect(survey.lookups[0].sourceSavedLookupId).toBe(created.id);
+    const surveyLookup0 = survey.lookups[0];
+    if (!surveyLookup0) throw new Error('survey.lookups[0] 없음');
+    expect(surveyLookup0.sourceSavedLookupId).toBe(created.id);
 
     // saved_lookups 의 usageCount +1
     const saved = h.savedLookupStore.get(created.id)!;
@@ -358,16 +360,22 @@ describe('lookup-actions integration', () => {
 
     const survey = h.surveyStore.get(TEST_SURVEY_ID)!;
     const existing = survey.lookups[0];
+    if (!existing) throw new Error('survey.lookups[0] 없음');
 
     const updated = await upsertSurveyLookupAction(TEST_SURVEY_ID, {
-      ...existing,
+      id: existing.id,
+      name: existing.name,
+      ...(existing.sourceSavedLookupId !== undefined && { sourceSavedLookupId: existing.sourceSavedLookupId }),
+      columns: existing.columns,
       rows: [...existing.rows, { 대륙: '북미', value: 2 }],
     });
     expect(updated.rows).toHaveLength(2);
 
     const after = h.surveyStore.get(TEST_SURVEY_ID)!;
     expect(after.lookups).toHaveLength(1);
-    expect(after.lookups[0].rows).toHaveLength(2);
+    const afterLookup0 = after.lookups[0];
+    if (!afterLookup0) throw new Error('after.lookups[0] 없음');
+    expect(afterLookup0.rows).toHaveLength(2);
   });
 
   it('deleteSurveyLookupAction → 사본 제거', async () => {
@@ -381,7 +389,9 @@ describe('lookup-actions integration', () => {
     await copySavedLookupToSurveyAction(TEST_SURVEY_ID, created.id);
 
     const survey = h.surveyStore.get(TEST_SURVEY_ID)!;
-    const surveyLookupId = survey.lookups[0].id;
+    const deleteLookup0 = survey.lookups[0];
+    if (!deleteLookup0) throw new Error('survey.lookups[0] 없음');
+    const surveyLookupId = deleteLookup0.id;
 
     await deleteSurveyLookupAction(TEST_SURVEY_ID, surveyLookupId);
 
@@ -433,7 +443,9 @@ describe('lookup-actions integration', () => {
     // 사본은 여전히 1건
     expect(survey.lookups).toHaveLength(1);
     // rows 는 최신 보관함 데이터로 갱신
-    expect(survey.lookups[0].rows).toHaveLength(2);
+    const dedupeCheck0 = survey.lookups[0];
+    if (!dedupeCheck0) throw new Error('survey.lookups[0] 없음');
+    expect(dedupeCheck0.rows).toHaveLength(2);
     // usageCount 는 최초 1회만 증가
     expect(h.savedLookupStore.get(created.id)!.usageCount).toBe(1);
   });
@@ -461,9 +473,13 @@ describe('lookup-actions integration', () => {
 
     const survey = h.surveyStore.get(TEST_SURVEY_ID)!;
     expect(survey.lookups).toHaveLength(1);
-    expect(survey.lookups[0].name).toBe('lut-1-renamed');
-    expect(survey.lookups[0].columns).toEqual(['대륙', 'value', 'extra']);
-    expect(survey.lookups[0].rows[0]).toEqual({ 대륙: '유럽', value: 100, extra: 'x' });
+    const propagatedLookup = survey.lookups[0];
+    if (!propagatedLookup) throw new Error('survey.lookups[0] 없음');
+    expect(propagatedLookup.name).toBe('lut-1-renamed');
+    expect(propagatedLookup.columns).toEqual(['대륙', 'value', 'extra']);
+    const propagatedRow0 = propagatedLookup.rows[0];
+    if (!propagatedRow0) throw new Error('propagatedLookup.rows[0] 없음');
+    expect(propagatedRow0).toEqual({ 대륙: '유럽', value: 100, extra: 'x' });
   });
 
   it('deleteSavedLookupAction: 보관함 삭제 시 모든 설문 사본도 자동 cleanup', async () => {

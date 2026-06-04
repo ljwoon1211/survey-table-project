@@ -49,7 +49,12 @@ import { RankingConfigEditorForQuestion } from './ranking-config-editor';
 import { SpssVariableEditor } from './spss-variable-editor';
 import { TablePreview } from './table-preview';
 import { UserDefinedMultiSelectPreview } from './user-defined-multi-select';
-import { OTHER_OPTION_ID, createTextInputOption, getParentLevelOptions } from './question-option-helpers';
+import {
+  OTHER_OPTION_ID,
+  createTextInputOption,
+  getParentLevelOptions,
+  type OptionalOptionKey,
+} from './question-option-helpers';
 
 interface QuestionBasicTabProps {
   question: Question;
@@ -70,7 +75,11 @@ interface QuestionBasicTabProps {
   debouncedExportLabelRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
   // option helpers
   addOption: () => void;
-  updateOption: (optionId: string, updates: Partial<QuestionOption>) => void;
+  updateOption: (
+    optionId: string,
+    updates: Partial<QuestionOption>,
+    clear?: OptionalOptionKey[],
+  ) => void;
   removeOption: (optionId: string) => void;
   // select level helpers
   addSelectLevel: () => void;
@@ -181,7 +190,7 @@ export function QuestionBasicTab({
               onChange={(e) => {
                 const value = e.target.value;
                 setLocalTitle(value);
-                if (validationErrors.title) {
+                if (validationErrors['title']) {
                   setValidationErrors((prev) => ({ ...prev, title: '' }));
                 }
                 // 300ms debounce 후 formData에 반영
@@ -193,7 +202,7 @@ export function QuestionBasicTab({
               }}
               placeholder="질문을 입력하세요"
               className={`flex-1 ${
-                validationErrors.title ? 'border-red-500 focus:border-red-500' : ''
+                validationErrors['title'] ? 'border-red-500 focus:border-red-500' : ''
               }`}
             />
             {variableCatalog.length > 0 && (
@@ -202,7 +211,7 @@ export function QuestionBasicTab({
                 inputRef={titleRef}
                 onChange={(v) => {
                   setLocalTitle(v);
-                  if (validationErrors.title) {
+                  if (validationErrors['title']) {
                     setValidationErrors((prev) => ({ ...prev, title: '' }));
                   }
                   // 토큰 삽입은 명시적 액션이므로 debounce 우회 — 즉시 반영
@@ -215,8 +224,8 @@ export function QuestionBasicTab({
               />
             )}
           </div>
-          {validationErrors.title && (
-            <p className="mt-1 text-sm text-red-500">{validationErrors.title}</p>
+          {validationErrors['title'] && (
+            <p className="mt-1 text-sm text-red-500">{validationErrors['title']}</p>
           )}
         </div>
 
@@ -364,12 +373,18 @@ export function QuestionBasicTab({
           <select
             id="group"
             value={formData.groupId || ''}
-            onChange={(e) =>
-              setFormData((prev) => ({
-                ...prev,
-                groupId: e.target.value || undefined,
-              }))
-            }
+            onChange={(e) => {
+              const gid = e.target.value || undefined;
+              setFormData((prev) => {
+                const next: Partial<Question> = { ...prev };
+                if (gid !== undefined) {
+                  next.groupId = gid;
+                } else {
+                  delete next.groupId;
+                }
+                return next;
+              });
+            }}
             className="mt-2 w-full rounded-lg border border-gray-300 p-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
           >
             <option value="">그룹 없음</option>
@@ -502,11 +517,11 @@ export function QuestionBasicTab({
                     checked={formData.inputType === 'number'}
                     onChange={(e) => {
                       const checked = e.target.checked;
-                      setFormData((prev) => ({
-                        ...prev,
-                        inputType: checked ? 'number' : 'text',
-                        emptyDefault: checked ? prev.emptyDefault : undefined,
-                      }));
+                      setFormData((prev) => {
+                        const next: Partial<Question> = { ...prev, inputType: checked ? 'number' : 'text' };
+                        if (!checked) delete next.emptyDefault;
+                        return next;
+                      });
                     }}
                     className="mt-0.5 h-4 w-4"
                   />
@@ -529,12 +544,18 @@ export function QuestionBasicTab({
                       id="text-empty-default-enabled"
                       checked={formData.emptyDefault !== undefined}
                       disabled={hasTokenPrefill}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          emptyDefault: e.target.checked ? (prev.emptyDefault ?? 0) : undefined,
-                        }))
-                      }
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setFormData((prev) => {
+                          const next: Partial<Question> = { ...prev };
+                          if (checked) {
+                            next.emptyDefault = prev.emptyDefault ?? 0;
+                          } else {
+                            delete next.emptyDefault;
+                          }
+                          return next;
+                        });
+                      }}
                       className="h-4 w-4"
                     />
                     <label htmlFor="text-empty-default-enabled" className="cursor-pointer">
@@ -658,7 +679,7 @@ export function QuestionBasicTab({
                 size="sm"
                 onClick={() => {
                   addOption();
-                  if (validationErrors.options) {
+                  if (validationErrors['options']) {
                     setValidationErrors((prev) => ({ ...prev, options: '' }));
                   }
                 }}
@@ -677,7 +698,7 @@ export function QuestionBasicTab({
                     ...prev,
                     options: [...(prev.options ?? []), newOption],
                   }));
-                  if (validationErrors.options) {
+                  if (validationErrors['options']) {
                     setValidationErrors((prev) => ({ ...prev, options: '' }));
                   }
                 }}
@@ -688,8 +709,8 @@ export function QuestionBasicTab({
               </Button>
             </div>
           </div>
-          {validationErrors.options && (
-            <p className="text-sm text-red-500">{validationErrors.options}</p>
+          {validationErrors['options'] && (
+            <p className="text-sm text-red-500">{validationErrors['options']}</p>
           )}
 
           {/* 응답 페이지에서 옵션 배치 방식 (select 는 드롭다운이라 의미 없어 숨김) */}
@@ -756,7 +777,11 @@ export function QuestionBasicTab({
                 onChange={(e) => {
                   const value =
                     e.target.value === '' ? undefined : parseInt(e.target.value, 10);
-                  setFormData((prev) => ({ ...prev, minSelections: value }));
+                  setFormData((prev) => {
+                    const next: Partial<Question> = { ...prev };
+                    if (value !== undefined) { next.minSelections = value; } else { delete next.minSelections; }
+                    return next;
+                  });
                   // 최소값이 최대값보다 크면 최대값 조정
                   if (
                     value !== undefined &&
@@ -787,7 +812,11 @@ export function QuestionBasicTab({
                 onChange={(e) => {
                   const value =
                     e.target.value === '' ? undefined : parseInt(e.target.value, 10);
-                  setFormData((prev) => ({ ...prev, maxSelections: value }));
+                  setFormData((prev) => {
+                    const next: Partial<Question> = { ...prev };
+                    if (value !== undefined) { next.maxSelections = value; } else { delete next.maxSelections; }
+                    return next;
+                  });
                 }}
                 placeholder="제한 없음"
                 className="w-full"
@@ -838,7 +867,7 @@ export function QuestionBasicTab({
               size="sm"
               onClick={() => {
                 addSelectLevel();
-                if (validationErrors.selectLevels) {
+                if (validationErrors['selectLevels']) {
                   setValidationErrors((prev) => ({ ...prev, selectLevels: '' }));
                 }
               }}
@@ -848,8 +877,8 @@ export function QuestionBasicTab({
               <span>레벨 추가</span>
             </Button>
           </div>
-          {validationErrors.selectLevels && (
-            <p className="text-sm text-red-500">{validationErrors.selectLevels}</p>
+          {validationErrors['selectLevels'] && (
+            <p className="text-sm text-red-500">{validationErrors['selectLevels']}</p>
           )}
 
           {formData.selectLevels && formData.selectLevels.length > 0 ? (
@@ -1127,19 +1156,31 @@ export function QuestionBasicTab({
             questionTitle={formData.title}
             dynamicRowConfigs={formData.dynamicRowConfigs}
             onTableChange={(data) => {
-              setFormData((prev) => ({
-                ...prev,
-                tableTitle: data.tableTitle,
-                tableColumns: data.tableColumns,
-                tableRowsData: data.tableRowsData,
-                tableHeaderGrid: data.tableHeaderGrid,
-              }));
+              setFormData((prev) => {
+                const next: Partial<Question> = {
+                  ...prev,
+                  tableTitle: data.tableTitle,
+                  tableColumns: data.tableColumns,
+                  tableRowsData: data.tableRowsData,
+                };
+                if (data.tableHeaderGrid !== undefined) {
+                  next.tableHeaderGrid = data.tableHeaderGrid;
+                } else {
+                  delete next.tableHeaderGrid;
+                }
+                return next;
+              });
             }}
             onDynamicRowConfigsChange={(configs) => {
-              setFormData((prev) => ({
-                ...prev,
-                dynamicRowConfigs: configs,
-              }));
+              setFormData((prev) => {
+                const next: Partial<Question> = { ...prev };
+                if (configs !== undefined) {
+                  next.dynamicRowConfigs = configs;
+                } else {
+                  delete next.dynamicRowConfigs;
+                }
+                return next;
+              });
             }}
           />
 
@@ -1198,7 +1239,11 @@ interface SortableOptionItemProps {
   option: QuestionOption;
   index: number;
   totalCount: number;
-  updateOption: (optionId: string, updates: Partial<QuestionOption>) => void;
+  updateOption: (
+    optionId: string,
+    updates: Partial<QuestionOption>,
+    clear?: OptionalOptionKey[],
+  ) => void;
   removeOption: (optionId: string) => void;
   showBranchSettings: boolean;
   questions: Question[];
@@ -1269,8 +1314,8 @@ function SortableOptionItem({
             onChange={(e) => {
               const v = e.target.value.replace(/\D/g, '');
               updateOption(option.id, {
-                spssNumericCode: v ? parseInt(v, 10) : undefined,
-              });
+                ...(v ? { spssNumericCode: parseInt(v, 10) } : {}),
+              } as Partial<QuestionOption>);
             }}
             className="h-8 w-14 text-center text-xs placeholder:text-gray-300"
             placeholder={String(index + 1)}
@@ -1292,10 +1337,11 @@ function SortableOptionItem({
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => updateOption(option.id, {
-              optionCode: undefined,
-              isCustomOptionCode: false,
-            } as Partial<QuestionOption>)}
+            onClick={() =>
+              updateOption(option.id, { isCustomOptionCode: false }, [
+                'optionCode',
+              ])
+            }
             className="px-1 text-xs text-gray-400 hover:text-blue-500"
             title="자동 코드로 복원"
           >
@@ -1331,7 +1377,9 @@ function SortableOptionItem({
             branchRule={option.branchRule}
             allQuestions={questions}
             currentQuestionId={questionId || ''}
-            onChange={(branchRule) => updateOption(option.id, { branchRule })}
+            onChange={(branchRule) => updateOption(option.id, {
+              ...(branchRule !== undefined ? { branchRule } : {}),
+            } as Partial<QuestionOption>)}
           />
         </div>
       )}

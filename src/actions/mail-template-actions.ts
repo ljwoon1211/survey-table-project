@@ -103,7 +103,7 @@ export async function createMailTemplateAction(
   const { bodyHtml, attachments } = promoted;
   const variablesUsed = extractVariableKeys(subject, bodyHtml, fromName);
 
-  const [row] = await db
+  const insertedRows = await db
     .insert(mailTemplates)
     .values({
       surveyId,
@@ -117,6 +117,8 @@ export async function createMailTemplateAction(
       variablesUsed,
     })
     .returning({ id: mailTemplates.id });
+  const row = insertedRows[0];
+  if (!row) throw new Error('createMailTemplateAction: 템플릿 생성 실패');
 
   revalidatePath(`/admin/surveys/${surveyId}/operations/mail/templates`);
   // promote 된 영구 key 를 클라이언트로 돌려줘 state 동기화 — 저장 직후 발송에서

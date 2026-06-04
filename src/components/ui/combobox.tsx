@@ -77,7 +77,7 @@ export function Combobox({
                 <CommandItem
                   key={option.value}
                   value={option.label}
-                  disabled={option.disabled}
+                  {...(option.disabled !== undefined ? { disabled: option.disabled } : {})}
                   onSelect={() => {
                     onValueChange?.(option.value);
                     setOpen(false);

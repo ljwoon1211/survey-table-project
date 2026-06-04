@@ -57,7 +57,7 @@ export async function getDropFunnel(surveyId: string): Promise<DropFunnelOutput>
     id: s.stepId,
     position: s.position,
     label: s.label,
-    page: s.page ?? undefined,
+    ...(s.page !== undefined && s.page !== null ? { page: s.page } : {}),
   }));
   if (questions.length === 0) return EMPTY_OUTPUT;
 

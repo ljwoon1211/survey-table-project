@@ -47,7 +47,7 @@ export const ContactAttemptAddCard = forwardRef<
         contactTargetId,
         surveyId,
         resultCode,
-        note: note || undefined,
+        ...(note ? { note } : {}),
       });
       router.refresh();
       setResultCode(null);

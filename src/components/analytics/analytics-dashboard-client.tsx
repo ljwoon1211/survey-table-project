@@ -90,8 +90,8 @@ export function AnalyticsDashboardClient({
       questionResponses: (r.questionResponses as Record<string, unknown>) || {},
       isCompleted: r.isCompleted ?? true,
       startedAt: r.createdAt || new Date(),
-      completedAt: r.completedAt || undefined,
-      userAgent: r.userAgent || undefined,
+      ...(r.completedAt ? { completedAt: r.completedAt } : {}),
+      ...(r.userAgent ? { userAgent: r.userAgent } : {}),
     }));
 
     const surveyData = {

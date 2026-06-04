@@ -210,7 +210,10 @@ export function buildCanonicalSteps(snapshot: SurveyVersionSnapshot): CanonicalS
       let qIdx = 0;
       for (let i = 0; i < totalSize; i++) {
         if (slots[i] === null && qIdx < directQs.length) {
-          slots[i] = { kind: 'q', data: directQs[qIdx] };
+          const qItem = directQs[qIdx];
+          if (qItem) {
+            slots[i] = { kind: 'q', data: qItem };
+          }
           qIdx++;
         }
       }

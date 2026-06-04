@@ -22,7 +22,7 @@ const DEFAULT_CATEGORY = 'custom';
 
 interface Props {
   isOpen: boolean;
-  initialValue?: Partial<LookupDraft>;
+  initialValue?: Partial<LookupDraft> | undefined;
   onClose: () => void;
   onSave: (draft: LookupDraft) => Promise<void> | void;
 }
@@ -63,6 +63,7 @@ export function LookupEditModal({ isOpen, initialValue, onClose, onSave }: Props
   // 컬럼명 변경 시 rows 안의 기존 키도 새 키로 옮겨서 데이터 손실 방지.
   const handleColumnRename = (idx: number, newName: string) => {
     const oldName = columns[idx];
+    if (oldName === undefined) return;
     const next = [...columns];
     next[idx] = newName;
     setColumns(next);
@@ -71,6 +72,7 @@ export function LookupEditModal({ isOpen, initialValue, onClose, onSave }: Props
       rows.map((r) => {
         if (!(oldName in r)) return r;
         const { [oldName]: v, ...rest } = r;
+        if (v === undefined) return rest;
         return { ...rest, [newName]: v };
       }),
     );
@@ -79,6 +81,7 @@ export function LookupEditModal({ isOpen, initialValue, onClose, onSave }: Props
   // 컬럼 삭제 시 rows 안의 해당 키도 제거.
   const handleColumnDelete = (idx: number) => {
     const removed = columns[idx];
+    if (removed === undefined) return;
     setColumns(columns.filter((_, i) => i !== idx));
     setRows(
       rows.map((r) => {
@@ -147,7 +150,7 @@ export function LookupEditModal({ isOpen, initialValue, onClose, onSave }: Props
     try {
       await onSave({
         name: name.trim(),
-        description: description.trim() || undefined,
+        ...(description.trim() ? { description: description.trim() } : {}),
         category,
         tags: initialValue?.tags ?? [],
         columns: columns.map((c) => c.trim()),

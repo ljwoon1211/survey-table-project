@@ -121,6 +121,7 @@ export function validateNoSubVarConflicts(questions: Question[]): ValidationErro
 
     for (let i = 0; i < q.options.length; i++) {
       const opt = q.options[i];
+      if (!opt) continue;
       const optCode = opt.optionCode ?? String(i + 1);
       const subVarName = `${q.questionCode}_${optCode}`;
       const subVar = subVarName.toUpperCase();

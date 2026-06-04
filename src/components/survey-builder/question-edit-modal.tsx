@@ -40,7 +40,6 @@ import {
   createAddOption,
   createUpdateOption,
   createRemoveOption,
-  createHandleOtherOptionToggle,
   createAddSelectLevel,
   createUpdateSelectLevel,
   createRemoveSelectLevel,
@@ -57,11 +56,10 @@ interface QuestionEditModalProps {
 }
 
 export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditModalProps) {
-  const { updateQuestion, setEditingQuestionId, silentUpdateQuestion } = useSurveyBuilderStore(
+  const { updateQuestion, setEditingQuestionId } = useSurveyBuilderStore(
     useShallow((s) => ({
       updateQuestion: s.updateQuestion,
       setEditingQuestionId: s.setEditingQuestionId,
-      silentUpdateQuestion: s.silentUpdateQuestion,
     })),
   );
   const questions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
@@ -128,19 +126,17 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
       const optionsWithDeepBranchRule = question.options
         ? question.options.map((option) => ({
             ...option,
-            branchRule: option.branchRule
-              ? {
-                  ...option.branchRule,
-                }
-              : undefined,
+            ...(option.branchRule !== undefined
+              ? { branchRule: { ...option.branchRule } }
+              : {}),
           }))
         : [];
 
       setFormData({
         title: question.title,
-        description: question.description,
+        ...(question.description !== undefined ? { description: question.description } : {}),
         required: question.required,
-        groupId: question.groupId,
+        ...(question.groupId !== undefined ? { groupId: question.groupId } : {}),
         questionCode: (question as any).questionCode || '',
         isCustomSpssVarName: (question as any).isCustomSpssVarName || false,
         exportLabel: (question as any).exportLabel || '',
@@ -162,10 +158,10 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         placeholder: question.placeholder || '',
         defaultValueTemplate: question.defaultValueTemplate ?? null,
         inputType: question.inputType ?? 'text',
-        emptyDefault: question.emptyDefault,
+        ...(question.emptyDefault !== undefined ? { emptyDefault: question.emptyDefault } : {}),
         tableValidationRules: (question as any).tableValidationRules || [],
         dynamicRowConfigs: (question as any).dynamicRowConfigs || undefined,
-        displayCondition: question.displayCondition,
+        ...(question.displayCondition !== undefined ? { displayCondition: question.displayCondition } : {}),
         spssVarType: (question as any).spssVarType,
         spssMeasure: (question as any).spssMeasure,
       });
@@ -215,22 +211,22 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
     const errors: Record<string, string> = {};
 
     if (!currentFormData.title?.trim()) {
-      errors.title = '질문 제목은 필수입니다.';
+      errors['title'] = '질문 제목은 필수입니다.';
     }
 
     if (needsOptions && (!currentFormData.options || currentFormData.options.length === 0)) {
-      errors.options = '최소 하나의 선택 옵션이 필요합니다.';
+      errors['options'] = '최소 하나의 선택 옵션이 필요합니다.';
     }
 
     if (needsSelectLevels && (!currentFormData.selectLevels || currentFormData.selectLevels.length === 0)) {
-      errors.selectLevels = '최소 하나의 선택 레벨이 필요합니다.';
+      errors['selectLevels'] = '최소 하나의 선택 레벨이 필요합니다.';
     }
 
     // 질문 내장 테이블 옵션: tableRowsData 에 ranking_opt 셀이 최소 1개는 있어야 함
     if (isRankingTableSource) {
       const hasRankingOpt = collectRankingOptCells(currentFormData.tableRowsData).length > 0;
       if (!hasRankingOpt) {
-        errors.rankingOptions =
+        errors['rankingOptions'] =
           '질문 내장 테이블에 "순위 옵션" 셀이 최소 1개는 있어야 합니다. 테이블 편집기에서 옵션으로 쓸 셀을 클릭 → 셀 편집 모달의 "순위 옵션" 탭으로 저장하세요.';
       }
     }
@@ -241,7 +237,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
       && (currentFormData.tableColumns?.length ?? 0) > 0
       && collectChoiceOptCells(currentFormData.tableRowsData).length === 0;
     if (choiceTableModeButEmpty) {
-      errors.options =
+      errors['options'] =
         '설명 테이블에 "보기 옵션" 셀이 최소 1개는 있어야 합니다. 선택 열 셀을 클릭 → "보기 옵션" 탭으로 저장하세요.';
     }
 
@@ -272,7 +268,12 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
     // store에서 hideColumnLabels 최신값 머지 (silentUpdateQuestion으로 토글한 값)
     const storeQuestion = useSurveyBuilderStore.getState()
       .currentSurvey.questions.find((q) => q.id === questionId);
-    const currentFormData = { ...formDataRef.current, hideColumnLabels: storeQuestion?.hideColumnLabels };
+    const currentFormData: Partial<Question> = {
+      ...formDataRef.current,
+      ...(storeQuestion?.hideColumnLabels !== undefined
+        ? { hideColumnLabels: storeQuestion.hideColumnLabels }
+        : {}),
+    };
     didSaveRef.current = true;
     setIsSaving(true);
     try {
@@ -303,11 +304,12 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
 
           if (!isNewQuestion) {
             // 기존 질문: UPDATE 경로
-            const updateData = {
-              ...currentFormData,
-              placeholder:
-                currentFormData.placeholder !== undefined ? currentFormData.placeholder : question?.placeholder,
-            };
+            const resolvedPlaceholder =
+              currentFormData.placeholder !== undefined ? currentFormData.placeholder : question?.placeholder;
+            const updateData: Partial<Question> = { ...currentFormData };
+            if (resolvedPlaceholder !== undefined) {
+              updateData.placeholder = resolvedPlaceholder;
+            }
             await updateQuestionAction(questionId, updateData);
           } else {
             // 새 질문: CREATE 경로
@@ -407,7 +409,6 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
   const addOption = useMemo(() => createAddOption(setFormData), []);
   const updateOption = useMemo(() => createUpdateOption(setFormData), []);
   const removeOption = useMemo(() => createRemoveOption(setFormData), []);
-  const handleOtherOptionToggle = useMemo(() => createHandleOtherOptionToggle(setFormData), []);
   const addSelectLevel = useMemo(() => createAddSelectLevel(setFormData), []);
   const updateSelectLevel = useMemo(() => createUpdateSelectLevel(setFormData), []);
   const removeSelectLevel = useMemo(() => createRemoveSelectLevel(setFormData), []);
@@ -522,7 +523,15 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
               <QuestionConditionEditor
                 question={question}
                 onUpdate={async (conditionGroup) => {
-                  setFormData((prev) => ({ ...prev, displayCondition: conditionGroup }));
+                  setFormData((prev) => {
+                    const next: Partial<Question> = { ...prev };
+                    if (conditionGroup !== undefined) {
+                      next.displayCondition = conditionGroup;
+                    } else {
+                      delete next.displayCondition;
+                    }
+                    return next;
+                  });
 
                   // 조건 변경 시 즉시 DB에 저장 (질문 ID가 UUID이고 이미 DB에 존재하는 경우에만)
                   const store = useSurveyBuilderStore.getState();

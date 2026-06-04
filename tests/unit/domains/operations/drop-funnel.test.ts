@@ -77,6 +77,7 @@ describe('shapeDropFunnel', () => {
     expect(result.bars.slice(0, 3).map((b) => b.cumulativeProgressPct)).toEqual([20, 40, 60]);
 
     const others = result.bars[3];
+    if (!others) throw new Error('expected bars[3]');
     expect(others.questionId).toBe('others');
     expect(others.label).toBe('기타');
     expect(others.dropCount).toBe(4);
@@ -100,10 +101,13 @@ describe('shapeDropFunnel', () => {
 
     // [q1, legacy]
     expect(result.bars).toHaveLength(2);
-    expect(result.bars[0].questionId).toBe('q1');
-    expect(result.bars[0].dropCount).toBe(1);
+    const bar0 = result.bars[0];
+    if (!bar0) throw new Error('expected bars[0]');
+    expect(bar0.questionId).toBe('q1');
+    expect(bar0.dropCount).toBe(1);
 
     const legacy = result.bars[1];
+    if (!legacy) throw new Error('expected bars[1]');
     expect(legacy.questionId).toBe('legacy');
     expect(legacy.label).toBe('(legacy)');
     expect(legacy.dropCount).toBe(2);
@@ -125,8 +129,10 @@ describe('shapeDropFunnel', () => {
     const result = shapeDropFunnel(input);
 
     expect(result.bars).toHaveLength(1);
-    expect(result.bars[0].questionId).toBe('legacy');
-    expect(result.bars[0].dropCount).toBe(2);
+    const legacyNull = result.bars[0];
+    if (!legacyNull) throw new Error('expected bars[0]');
+    expect(legacyNull.questionId).toBe('legacy');
+    expect(legacyNull.dropCount).toBe(2);
     expect(result.totalDrops).toBe(2);
   });
 
@@ -146,8 +152,10 @@ describe('shapeDropFunnel', () => {
 
     // 정상 1건만 반영. 제외된 2건은 어떤 버킷에도 들어가지 않음.
     expect(result.bars).toHaveLength(1);
-    expect(result.bars[0].questionId).toBe('q3');
-    expect(result.bars[0].dropCount).toBe(1);
+    const exposed0 = result.bars[0];
+    if (!exposed0) throw new Error('expected bars[0]');
+    expect(exposed0.questionId).toBe('q3');
+    expect(exposed0.dropCount).toBe(1);
     expect(result.totalDrops).toBe(1);
   });
 
@@ -178,8 +186,10 @@ describe('shapeDropFunnel', () => {
     const result = shapeDropFunnel(input);
 
     expect(result.bars).toHaveLength(1);
-    expect(result.bars[0].questionId).toBe('q2');
-    expect(result.bars[0].dropCount).toBe(2);
+    const nullExp0 = result.bars[0];
+    if (!nullExp0) throw new Error('expected bars[0]');
+    expect(nullExp0.questionId).toBe('q2');
+    expect(nullExp0.dropCount).toBe(2);
     expect(result.totalDrops).toBe(2);
   });
 
@@ -217,8 +227,10 @@ describe('shapeDropFunnel', () => {
 
     // 빈 questions → 어떤 id든 questionMap.has=false → legacy.
     expect(result.bars).toHaveLength(1);
-    expect(result.bars[0].questionId).toBe('legacy');
-    expect(result.bars[0].cumulativeProgressPct).toBeNull();
+    const emptyQ0 = result.bars[0];
+    if (!emptyQ0) throw new Error('expected bars[0]');
+    expect(emptyQ0.questionId).toBe('legacy');
+    expect(emptyQ0.cumulativeProgressPct).toBeNull();
   });
 
   it('position-based 진행률 — 16번 / 50문항 → 32%', () => {
@@ -235,7 +247,9 @@ describe('shapeDropFunnel', () => {
       ],
     };
     const result = shapeDropFunnel(input);
-    expect(result.bars[0].cumulativeProgressPct).toBe(32);
+    const pct0 = result.bars[0];
+    if (!pct0) throw new Error('expected bars[0]');
+    expect(pct0.cumulativeProgressPct).toBe(32);
   });
 
   it('topN 기본값 10 — 12개 위치에 drop 분산 시 10막대(position ASC) + 기타 1막대', () => {
@@ -261,6 +275,7 @@ describe('shapeDropFunnel', () => {
       'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8', 'q9', 'q10',
     ]);
     const others = result.bars[10];
+    if (!others) throw new Error('expected bars[10]');
     expect(others.questionId).toBe('others');
     expect(others.dropCount).toBe(3);
   });
@@ -290,8 +305,11 @@ describe('shapeDropFunnel', () => {
     expect(result.bars).toHaveLength(4);
     expect(result.bars.map((b) => b.questionId)).toEqual(['q1', 'q2', 'others', 'legacy']);
     expect(result.bars.map((b) => b.dropCount)).toEqual([3, 2, 1, 2]);
-    expect(result.bars[2].cumulativeProgressPct).toBeNull();
-    expect(result.bars[3].cumulativeProgressPct).toBeNull();
+    const mixedOthers = result.bars[2];
+    const mixedLegacy = result.bars[3];
+    if (!mixedOthers || !mixedLegacy) throw new Error('expected bars[2] and bars[3]');
+    expect(mixedOthers.cumulativeProgressPct).toBeNull();
+    expect(mixedLegacy.cumulativeProgressPct).toBeNull();
     expect(result.totalDrops).toBe(8);
   });
 

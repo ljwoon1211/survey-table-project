@@ -218,10 +218,10 @@ export function ContactDetailForm({
             id: initial.id,
             surveyId,
             attrs,
-            piiUpdates: updatesForAction,
+            ...(updatesForAction !== undefined ? { piiUpdates: updatesForAction } : {}),
             memo,
             contactMethod,
-            systemFieldKeys,
+            ...(systemFieldKeys !== undefined ? { systemFieldKeys } : {}),
           });
           // I2: localScheme 이 prop scheme 과 다르면 컬럼 스킴도 함께 저장
           if (!schemeEqual(localScheme, scheme)) {
@@ -236,10 +236,10 @@ export function ContactDetailForm({
           const created = await addContactTarget({
             surveyId,
             attrs,
-            piiUpdates: updatesForAction,
+            ...(updatesForAction !== undefined ? { piiUpdates: updatesForAction } : {}),
             memo,
             contactMethod,
-            systemFieldKeys,
+            ...(systemFieldKeys !== undefined ? { systemFieldKeys } : {}),
           });
           // 신규 저장 성공 → 방금 만든 대상의 상세 페이지로 이동.
           // new 페이지에 머물면 폼 입력이 남아 isDirty 가 계속 true → 목록 이동 시
@@ -301,7 +301,7 @@ export function ContactDetailForm({
             contactMethod={contactMethod}
             respondedAt={initial?.respondedAt ?? null}
             inviteToken={initial?.inviteToken ?? null}
-            onColumnToggle={isEdit ? onColumnToggle : undefined}
+            {...(isEdit && onColumnToggle !== undefined ? { onColumnToggle } : {})}
             onAttrsChange={setAttrs}
             onPiiChange={(k, v) => setPiiValues((prev) => ({ ...prev, [k]: v }))}
             onMemoChange={(m) => setMemo(m)}
@@ -394,6 +394,7 @@ function schemeEqual(a: ContactColumnScheme, b: ContactColumnScheme): boolean {
   for (let i = 0; i < a.columns.length; i++) {
     const ac = a.columns[i];
     const bc = b.columns[i];
+    if (!ac || !bc) return false;
     if (
       ac.key !== bc.key ||
       ac.source !== bc.source ||

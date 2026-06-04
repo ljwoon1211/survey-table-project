@@ -25,7 +25,7 @@ export function useEnsureSurveyInDb() {
     const promise = ensureSurveyInDb({
       id: store.currentSurvey.id,
       title: store.currentSurvey.title,
-      privateToken: store.currentSurvey.privateToken,
+      ...(store.currentSurvey.privateToken !== undefined ? { privateToken: store.currentSurvey.privateToken } : {}),
       settings: store.currentSurvey.settings,
     })
       .then(() => {

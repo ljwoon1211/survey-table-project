@@ -38,13 +38,13 @@ interface ColumnHeaderCallbacks {
   onUnmergeColumnHeader: (columnIndex: number) => void;
   onSetEditingColumnWidth: (value: EditingColumnWidth) => void;
   onColumnWidthChange: (columnIndex: number, width: number) => void;
-  onOpenColumnConditionModal?: (columnIndex: number) => void;
+  onOpenColumnConditionModal?: ((columnIndex: number) => void) | undefined;
 }
 
 export interface TableHeaderSectionProps extends ColumnHeaderCallbacks {
   columns: TableColumn[];
   editingColumnWidth: EditingColumnWidth;
-  hasQuestions?: boolean;
+  hasQuestions?: boolean | undefined;
 }
 
 interface ColumnHeaderProps extends ColumnHeaderCallbacks {
@@ -52,7 +52,7 @@ interface ColumnHeaderProps extends ColumnHeaderCallbacks {
   columnIndex: number;
   totalColumns: number;
   editingColumnWidth: EditingColumnWidth;
-  hasQuestions?: boolean;
+  hasQuestions?: boolean | undefined;
   hideColumnLabels: boolean;
 }
 

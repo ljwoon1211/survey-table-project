@@ -12,7 +12,7 @@ import { MAX_ATTACHMENT_TOTAL_BYTES } from '@/lib/mail/constants';
 let _resend: Resend | null = null;
 function getResend(): Resend {
   if (!_resend) {
-    const apiKey = process.env.RESEND_API_KEY;
+    const apiKey = process.env['RESEND_API_KEY'];
     if (!apiKey) throw new Error('RESEND_API_KEY 환경변수가 설정되지 않았습니다.');
     _resend = new Resend(apiKey);
   }
@@ -98,7 +98,7 @@ export async function sendTestMail(input: SendTestMailInput): Promise<SendTestMa
     html: input.html,
     headers: { 'X-Entity-Ref-ID': randomUUID() },
     tags: [{ name: 'kind', value: 'template-test' }],
-    attachments: resolvedAttachments,
+    ...(resolvedAttachments !== undefined ? { attachments: resolvedAttachments } : {}),
   });
 
   if (error) return { ok: false, error: error.message };

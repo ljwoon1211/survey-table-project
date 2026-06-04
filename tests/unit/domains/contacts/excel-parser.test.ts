@@ -30,7 +30,9 @@ describe('previewExcel - individual-mini.xlsx (Row 0 병합, Row 1 헤더)', () 
       '연 번', '전시회명(국문)', '개최기간', '기업명', '이메일', '사업자번호',
     ]);
     expect(result.rows.length).toBeGreaterThan(0);
-    expect(result.rows[0]['이메일']).toBe('aaa@test.com');
+    const row0 = result.rows[0];
+    if (!row0) throw new Error('expected rows[0]');
+    expect(row0['이메일']).toBe('aaa@test.com');
   });
 
   it('headerRow=1 → 병합 타이틀이 헤더로 잡힘 (사용자 실수 케이스)', async () => {
@@ -51,21 +53,29 @@ describe('parseExcelRows', () => {
     const buf = await loadFixture('group-mini.xlsx');
     const rows = await parseExcelRows(buf, { sheetName: '단체참가', headerRow: 2 });
     expect(rows).toHaveLength(5);
-    expect(rows[0]['연번']).toBe('1');
-    expect(rows[0]['담당자 이메일']).toBe('grpA@test.com');
+    const rows0 = rows[0];
+    if (!rows0) throw new Error('expected rows[0]');
+    expect(rows0['연번']).toBe('1');
+    expect(rows0['담당자 이메일']).toBe('grpA@test.com');
   });
 
   it('빈 셀 → 빈 문자열 보존 (NULL 아님)', async () => {
     const buf = await loadFixture('individual-mini.xlsx');
     const rows = await parseExcelRows(buf, { sheetName: '개별참가', headerRow: 2 });
-    expect(rows[2]['이메일']).toBe('');  // Row 3 = 이메일 비어있음
-    expect(rows[3]['사업자번호']).toBe('');  // Row 4 = 사업자번호 비어있음
+    const row2 = rows[2];
+    const row3 = rows[3];
+    if (!row2) throw new Error('expected rows[2]');
+    if (!row3) throw new Error('expected rows[3]');
+    expect(row2['이메일']).toBe('');  // Row 3 = 이메일 비어있음
+    expect(row3['사업자번호']).toBe('');  // Row 4 = 사업자번호 비어있음
   });
 
   it('숫자 셀 → 문자열로 보관', async () => {
     const buf = await loadFixture('individual-mini.xlsx');
     const rows = await parseExcelRows(buf, { sheetName: '개별참가', headerRow: 2 });
-    expect(rows[0]['연 번']).toBe('1');
-    expect(rows[0]['사업자번호']).toBe('1234567890');
+    const row0 = rows[0];
+    if (!row0) throw new Error('expected rows[0]');
+    expect(row0['연 번']).toBe('1');
+    expect(row0['사업자번호']).toBe('1234567890');
   });
 });

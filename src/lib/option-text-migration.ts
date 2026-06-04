@@ -65,12 +65,15 @@ export function migrateQuestionOptions<T extends LegacyQuestionShape>(
     allowTextInput: true,
   };
 
+  const { allowOtherOption: _ao, ...questionWithoutOther } = question;
+  // allowOtherOption 은 마이그레이션으로 옵션에 흡수되어 결과에서 제거된다(테스트가 undefined 기대).
+  // Omit<T, 'allowOtherOption'> 는 제네릭 T 와 구조적으로 동일함을 TS 가 증명하지 못하므로,
+  // 런타임상 정확히 일치하는 선언된 반환 타입으로 좁혀 단언한다.
   return {
-    ...question,
-    allowOtherOption: undefined,
+    ...questionWithoutOther,
     options: [...existing, newOption],
     migratedOtherOptionId: newOption.id,
-  };
+  } as T & MigratedQuestionShape;
 }
 
 /**
@@ -170,8 +173,10 @@ export function migrateSnapshotQuestions(snapshot: {
     // 1. 질문 레벨 옵션 마이그레이션
     if (question.allowOtherOption) {
       const r = migrateQuestionOptions(question);
-      updated.options = r.options;
-      updated.allowOtherOption = undefined;
+      if (r.options !== undefined) {
+        updated.options = r.options;
+      }
+      delete updated.allowOtherOption;
       if (r.migratedOtherOptionId) {
         otherIdMappings[question.id] = { '__other__': r.migratedOtherOptionId };
       }
@@ -208,15 +213,19 @@ export function migrateSnapshotQuestions(snapshot: {
           if (!cellOtherIdMappings[question.id]) {
             cellOtherIdMappings[question.id] = {};
           }
-          if (!cellOtherIdMappings[question.id][cell.id]) {
-            cellOtherIdMappings[question.id][cell.id] = {};
+          const questionMap = cellOtherIdMappings[question.id];
+          if (questionMap && !questionMap[cell.id]) {
+            questionMap[cell.id] = {};
           }
-          cellOtherIdMappings[question.id][cell.id]['__other__'] = newOption.id;
+          const cellMap = questionMap?.[cell.id];
+          if (cellMap) {
+            cellMap['__other__'] = newOption.id;
+          }
 
+          const { allowOtherOption: _cellAo, ...cellWithout } = cell;
           return {
-            ...cell,
+            ...cellWithout,
             [optionsField]: [...existing, newOption],
-            allowOtherOption: undefined,
           };
         }),
       }));

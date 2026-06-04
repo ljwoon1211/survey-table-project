@@ -210,7 +210,7 @@ export function buildGeneralQuestionsSheet(
     let mergeStart = measureStartCol;
     let prevQId: string | null | undefined = generalCols[0]?.question.id;
     for (let i = 1; i <= generalCols.length; i++) {
-      const currQId = i < generalCols.length ? generalCols[i].question.id : null;
+      const currQId = i < generalCols.length ? (generalCols[i]?.question.id ?? null) : null;
       if (currQId !== prevQId) {
         const mergeEnd = measureStartCol + i - 1;
         if (mergeEnd > mergeStart) {
@@ -251,13 +251,12 @@ export function buildWideTableSheet(
   }
 
   const wideCols: WideExpandedCol[] = [];
-  for (let ri = 0; ri < rows.length; ri++) {
-    for (let ci = 0; ci < rows[ri].cells.length; ci++) {
-      const cell = rows[ri].cells[ci];
+  for (const [ri, row] of rows.entries()) {
+    for (const [ci, cell] of row.cells.entries()) {
       if (cell.isHidden || cell._isContinuation) continue;
       if (!isCellInputable(cell)) continue;
 
-      const rowLabel = rows[ri].label || `행${ri + 1}`;
+      const rowLabel = row.label || `행${ri + 1}`;
       const colLabel = columns[ci]?.label ?? '';
       const cellCode = cell.cellCode ?? `r${ri}_c${ci}`;
 
@@ -271,8 +270,7 @@ export function buildWideTableSheet(
             h3Label: cellCode, cellId: cell.id, visible: true,
           },
         });
-        for (let oi = 0; oi < opts.length; oi++) {
-          const opt = opts[oi];
+        for (const [oi, opt] of opts.entries()) {
           wideCols.push({
             rowIdx: ri, colIdx: ci, cell, rowLabel,
             expanded: {
@@ -341,11 +339,11 @@ export function buildWideTableSheet(
     const unexposedRowIndices = new Set<number>();
     const unexposedColIndices = new Set<number>();
     if (isExposed) {
-      for (let ri = 0; ri < rows.length; ri++) {
-        if (!shouldDisplayRow(rows[ri], allResponses, allQuestions)) unexposedRowIndices.add(ri);
+      for (const [ri, tableRow] of rows.entries()) {
+        if (!shouldDisplayRow(tableRow, allResponses, allQuestions)) unexposedRowIndices.add(ri);
       }
-      for (let ci = 0; ci < columns.length; ci++) {
-        if (!shouldDisplayColumn(columns[ci], allResponses, allQuestions)) unexposedColIndices.add(ci);
+      for (const [ci, tableCol] of columns.entries()) {
+        if (!shouldDisplayColumn(tableCol, allResponses, allQuestions)) unexposedColIndices.add(ci);
       }
     }
 
@@ -440,8 +438,7 @@ export function buildSemiLongSheet(
   }));
 
   // varying label 열: computedLabels 값을 먼저 셀에 기록
-  for (let ri = 0; ri < dataRows.length; ri++) {
-    const semiRow = dataRows[ri];
+  for (const [ri, semiRow] of dataRows.entries()) {
     if (!semiRow.computedLabels) continue;
     const excelRowNum = HEADER_ROW_COUNT + ro + 1 + ri;
     for (const [ei, label] of semiRow.computedLabels) {

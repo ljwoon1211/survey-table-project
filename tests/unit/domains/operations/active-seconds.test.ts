@@ -5,7 +5,7 @@ import type { PageVisit } from '@/db/schema/schema-types';
 const v = (enteredAt: string, leftAt?: string, stepId = 'group:root'): PageVisit => ({
   stepId,
   enteredAt,
-  leftAt,
+  ...(leftAt !== undefined ? { leftAt } : {}),
 });
 
 describe('sumActiveSeconds', () => {

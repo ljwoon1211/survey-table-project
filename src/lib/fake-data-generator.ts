@@ -2,13 +2,10 @@ import {
   Question,
   QuestionOption,
   Survey,
-  SurveyResponse,
-  TableValidationRule,
 } from '@/types/survey';
 import {
   shouldDisplayQuestion,
   getNextQuestionIndex,
-  checkTableValidationRule,
 } from '@/utils/branch-logic';
 
 /**
@@ -27,6 +24,7 @@ export function generateFakeSurveyResponse(survey: Survey): Record<string, any> 
   while (currentIndex >= 0 && currentIndex < questions.length && loopCount < maxLoops) {
     loopCount++;
     const question = questions[currentIndex];
+    if (!question) break;
 
     // 1. 질문이 현재 응답 상태에서 표시되어야 하는지 확인
     const isVisible = shouldDisplayQuestion(
@@ -101,7 +99,7 @@ function generateRandomValueForQuestion(
 function pickRandomOptionValue(options?: QuestionOption[]): string | null {
   if (!options || options.length === 0) return null;
   const randomIndex = Math.floor(Math.random() * options.length);
-  return options[randomIndex].value;
+  return options[randomIndex]?.value ?? null;
 }
 
 /**
@@ -125,7 +123,7 @@ function pickRandomMultipleOptionValues(options?: QuestionOption[]): string[] {
  */
 function generateRandomTableResponse(
   question: Question,
-  allResponses: Record<string, any>
+  _allResponses: Record<string, any>
 ): Record<string, any> {
   if (!question.tableRowsData) return {};
 

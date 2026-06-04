@@ -354,7 +354,7 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
         updatedAt: new Date(),
       };
       if (surveyData.lookups !== undefined) {
-        updateSet.lookups = surveyData.lookups;
+        updateSet['lookups'] = surveyData.lookups;
       }
       await tx
         .update(surveys)
@@ -391,13 +391,13 @@ export async function saveSurveyWithDetails(surveyData: SurveyType) {
       surveyData.groups = surveyData.groups.map((group) => {
         if (group.displayCondition) return group;
         const existingGroup = existingGroups.find((g) => g.id === group.id);
-        if (existingGroup?.displayCondition) {
+        if (existingGroup?.displayCondition != null) {
           return {
             ...group,
             displayCondition: existingGroup.displayCondition as NonNullable<
               SurveyType['groups']
             >[0]['displayCondition'],
-          };
+          } as typeof group;
         }
         return group;
       });

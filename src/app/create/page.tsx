@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import Link from 'next/link';
 
@@ -107,17 +107,13 @@ const questionTypes = [
 export default function CreateSurveyPage() {
   const {
     updateSurveyTitle,
-    updateSurveyDescription,
     addQuestion,
-    addPreparedQuestion,
     updateSurveySettings,
     resetSurvey,
   } = useSurveyBuilderStore(
     useShallow((s) => ({
       updateSurveyTitle: s.updateSurveyTitle,
-      updateSurveyDescription: s.updateSurveyDescription,
       addQuestion: s.addQuestion,
-      addPreparedQuestion: s.addPreparedQuestion,
       updateSurveySettings: s.updateSurveySettings,
       resetSurvey: s.resetSurvey,
     })),
@@ -135,7 +131,6 @@ export default function CreateSurveyPage() {
   const [saveMessage, setSaveMessage] = useState('');
   const [questionNumberInput, setQuestionNumberInput] = useState('');
   const [showScrollButtons, setShowScrollButtons] = useState(false);
-  const mainContentRef = useRef<HTMLDivElement>(null);
 
   // 스크롤 감지
   useEffect(() => {
@@ -193,11 +188,12 @@ export default function CreateSurveyPage() {
   const scrollToQuestion = (questionNumber: number) => {
     const questionIndex = questionNumber - 1;
     if (questionIndex >= 0 && questionIndex < currentSurvey.questions.length) {
+      const targetQuestion = currentSurvey.questions[questionIndex];
       const questionElement = document.querySelector(`[data-question-index="${questionIndex}"]`);
-      if (questionElement) {
+      if (questionElement && targetQuestion) {
         questionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
         // 해당 질문 선택
-        selectQuestion(currentSurvey.questions[questionIndex].id);
+        selectQuestion(targetQuestion.id);
       }
     }
   };

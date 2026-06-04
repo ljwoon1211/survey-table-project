@@ -23,24 +23,24 @@ const {
 vi.mock('@/db', () => {
   const chainable: Record<string, unknown> = {};
   // update().set(setArg).where(...).returning() → returning resolves
-  chainable.update = vi.fn(() => chainable);
-  chainable.set = vi.fn((arg: unknown) => {
+  chainable['update'] = vi.fn(() => chainable);
+  chainable['set'] = vi.fn((arg: unknown) => {
     updateSetMock(arg);
     return chainable;
   });
-  chainable.where = vi.fn(() => chainable);
-  chainable.returning = vi.fn(() => updateReturningMock());
+  chainable['where'] = vi.fn(() => chainable);
+  chainable['returning'] = vi.fn(() => updateReturningMock());
   // select().from().where().limit()
-  chainable.select = vi.fn(() => chainable);
-  chainable.from = vi.fn(() => chainable);
-  chainable.limit = vi.fn(() => selectLimitMock());
+  chainable['select'] = vi.fn(() => chainable);
+  chainable['from'] = vi.fn(() => chainable);
+  chainable['limit'] = vi.fn(() => selectLimitMock());
   // transaction(cb) → cb(tx) where tx has same chain + delete + insert
-  chainable.transaction = vi.fn(async (cb: (tx: unknown) => Promise<unknown>) => {
+  chainable['transaction'] = vi.fn(async (cb: (tx: unknown) => Promise<unknown>) => {
     const tx = { ...chainable, delete: vi.fn(() => chainable), insert: vi.fn(() => chainable) };
     txMock(cb);
     return cb(tx);
   });
-  chainable.query = {
+  chainable['query'] = {
     surveyResponses: {
       findFirst: (...args: unknown[]) => findFirstMock(...args),
     },
@@ -76,7 +76,9 @@ describe('updateQuestionResponse — progress_pct SET', () => {
     await updateQuestionResponse('r1', 'q3', 'value');
 
     expect(updateSetMock).toHaveBeenCalledTimes(1);
-    const setArg = updateSetMock.mock.calls[0][0] as Record<string, unknown>;
+    const rawCall0 = updateSetMock.mock.calls[0];
+    if (!rawCall0) throw new Error('updateSetMock 호출 없음');
+    const setArg = rawCall0[0] as Record<string, unknown>;
     expect(setArg).toHaveProperty('progressPct');
     // drizzle sql template tag 객체 (queryChunks 보유) — 정확한 SQL 비교 대신 SET 키 존재만 검증
     expect(setArg).toHaveProperty('questionResponses');
@@ -111,8 +113,10 @@ describe('saveAdminEdit — progress_pct 재계산', () => {
     const { saveAdminEdit } = await import('@/actions/response-edit-actions');
     await saveAdminEdit('s1', 'r1', { questionResponses: { q1: 'v' } });
 
-    const setArg = updateSetMock.mock.calls[0][0] as Record<string, unknown>;
-    expect(setArg.progressPct).toBe(100);
+    const completedCall = updateSetMock.mock.calls[0];
+    if (!completedCall) throw new Error('updateSetMock 호출 없음');
+    const setArg = completedCall[0] as Record<string, unknown>;
+    expect(setArg['progressPct']).toBe(100);
   });
 
   it('status=drop + questionResponses 비어있음 → progressPct=null', async () => {
@@ -127,8 +131,10 @@ describe('saveAdminEdit — progress_pct 재계산', () => {
     const { saveAdminEdit } = await import('@/actions/response-edit-actions');
     await saveAdminEdit('s1', 'r1', { questionResponses: {} });
 
-    const setArg = updateSetMock.mock.calls[0][0] as Record<string, unknown>;
-    expect(setArg.progressPct).toBeNull();
+    const dropEmptyCall = updateSetMock.mock.calls[0];
+    if (!dropEmptyCall) throw new Error('updateSetMock 호출 없음');
+    const setArg = dropEmptyCall[0] as Record<string, unknown>;
+    expect(setArg['progressPct']).toBeNull();
   });
 
   it('status=drop + 답변 있음 → snapshot position 기반 % 계산', async () => {
@@ -150,9 +156,11 @@ describe('saveAdminEdit — progress_pct 재계산', () => {
       questionResponses: { q1: 'a', q3: 'b' },
     });
 
-    const setArg = updateSetMock.mock.calls[0][0] as Record<string, unknown>;
+    const dropAnsweredCall = updateSetMock.mock.calls[0];
+    if (!dropAnsweredCall) throw new Error('updateSetMock 호출 없음');
+    const setArg = dropAnsweredCall[0] as Record<string, unknown>;
     // max position q3 = 3, total = 4, → 75
-    expect(setArg.progressPct).toBe(75);
+    expect(setArg['progressPct']).toBe(75);
   });
 
   it('versionId=null → progressPct=null', async () => {
@@ -167,7 +175,9 @@ describe('saveAdminEdit — progress_pct 재계산', () => {
       questionResponses: { q1: 'a' },
     });
 
-    const setArg = updateSetMock.mock.calls[0][0] as Record<string, unknown>;
-    expect(setArg.progressPct).toBeNull();
+    const nullVersionCall = updateSetMock.mock.calls[0];
+    if (!nullVersionCall) throw new Error('updateSetMock 호출 없음');
+    const setArg = nullVersionCall[0] as Record<string, unknown>;
+    expect(setArg['progressPct']).toBeNull();
   });
 });

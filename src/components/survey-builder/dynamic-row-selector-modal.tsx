@@ -23,7 +23,7 @@ interface DynamicRowSelectorModalProps {
   dynamicRows: TableRow[];
   selectedRowIds: string[];
   onConfirm: (rowIds: string[]) => void;
-  label?: string;
+  label?: string | undefined;
 }
 
 export function DynamicRowSelectorModal({

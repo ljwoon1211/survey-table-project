@@ -26,14 +26,19 @@ export function computeNumericStats(
   nums.sort((a, b) => a - b);
   const count = nums.length;
   const mid = Math.floor(count / 2);
-  const median = count % 2 === 0 ? (nums[mid - 1] + nums[mid]) / 2 : nums[mid];
+  const midMinus1 = nums[mid - 1] ?? 0;
+  const midVal = nums[mid] ?? 0;
+  const median = count % 2 === 0 ? (midMinus1 + midVal) / 2 : midVal;
+
+  const first = nums[0] ?? 0;
+  const last = nums[count - 1] ?? 0;
 
   return {
     count,
     sum,
     mean: sum / count,
-    min: nums[0],
-    max: nums[count - 1],
+    min: first,
+    max: last,
     median,
   };
 }

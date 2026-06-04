@@ -44,7 +44,9 @@ import { fetchMacroTemplate, injectVbaProject } from './macro-injection';
 
 function extractQuestionNumber(title: string): string | null {
   const match = title.match(/^(Q[\d]+[-_ ][\d]+(?:[-_ ][\d]+)*|Q[\d]+)/i);
-  return match ? match[1].toUpperCase().replace(/[-\s]/g, '_') : null;
+  if (!match) return null;
+  const captured = match[1];
+  return captured ? captured.toUpperCase().replace(/[-\s]/g, '_') : null;
 }
 
 /**
@@ -60,14 +62,15 @@ function groupTableQuestions(questions: Question[]): { label: string; questions:
       groups.set(key, []);
       groupOrder.push(key);
     }
-    groups.get(key)!.push(q);
+    groups.get(key)?.push(q);
   }
 
   return groupOrder.map((key) => {
-    const qs = groups.get(key)!;
+    const qs = groups.get(key) ?? [];
+    const firstQ = qs[0];
     const label = qs.length > 1
       ? `${key}_통합`
-      : qs[0].questionCode ?? key;
+      : (firstQ?.questionCode ?? key);
     return { label, questions: qs };
   });
 }
@@ -131,7 +134,7 @@ function splitByDepth1(
     }
   }
 
-  return depth1Order.map((d) => ({ depth1Value: d, rows: buckets.get(d)! }));
+  return depth1Order.map((d) => ({ depth1Value: d, rows: buckets.get(d) ?? [] }));
 }
 
 /**
@@ -148,7 +151,9 @@ function countDepth1SplitSheets(question: Question): number {
   if (!shouldUseSemiLong(rows, classified.measurements, classified.identifiers)) return 1;
   if (classified.identifiers.length === 0) return 1;
 
-  const firstIdColIdx = classified.identifiers[0].colIndex;
+  const firstIdentifier = classified.identifiers[0];
+  if (!firstIdentifier) return 1;
+  const firstIdColIdx = firstIdentifier.colIndex;
   const uniqueDepth1 = new Set<string>();
   for (const row of rows) {
     const cell = row.cells[firstIdColIdx];
@@ -187,8 +192,8 @@ function emitSemiLongSheets(
   const depth1Groups = splitByDepth1(dataRows);
 
   if (tableRowCount > DEPTH_SPLIT_ROW_THRESHOLD && depth1Groups.length > 1) {
-    for (let i = 0; i < depth1Groups.length; i++) {
-      const { depth1Value, rows } = depth1Groups[i];
+    for (const group of depth1Groups) {
+      const { depth1Value, rows } = group;
       const label = `${baseLabel}-${depth1Value}`;
       ctx.onProgress?.(++ctx.currentSheet, ctx.totalSheets, label);
       buildSemiLongSheet(
@@ -225,13 +230,14 @@ export async function generateCleaningWorkbook(
   // progress 보정: depth-1 분리 대상은 시트 수가 늘어남
   let totalSheets = 2; // 응답자목록 + 일반문항
   for (const group of tableGroups) {
-    totalSheets += countDepth1SplitSheets(group.questions[0]);
+    const q0 = group.questions[0];
+    if (q0) totalSheets += countDepth1SplitSheets(q0);
   }
 
   const ctx = {
     workbook,
     sheetNames,
-    onProgress,
+    ...(onProgress !== undefined ? { onProgress } : {}),
     currentSheet: 0,
     totalSheets,
   };
@@ -247,6 +253,7 @@ export async function generateCleaningWorkbook(
   // 3. 테이블 문항
   for (const group of tableGroups) {
     const firstQ = group.questions[0];
+    if (!firstQ) continue;
     const rows = firstQ.tableRowsData ?? [];
     const cols = firstQ.tableColumns ?? [];
     const classified = classifyTableCells(rows, cols);

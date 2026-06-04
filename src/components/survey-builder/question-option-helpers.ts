@@ -67,23 +67,47 @@ export function createAddOption(setFormData: SetFormData) {
   };
 }
 
+// QuestionOption 중 undefined 허용(optional) 키만 clear 대상으로 한다.
+export type OptionalOptionKey = {
+  [K in keyof QuestionOption]-?: undefined extends QuestionOption[K] ? K : never;
+}[keyof QuestionOption];
+
 export function createUpdateOption(setFormData: SetFormData) {
-  return (optionId: string, updates: Partial<QuestionOption>) => {
-    setFormData((prev) => ({
-      ...prev,
-      options: prev.options?.map((option) =>
-        option.id === optionId ? { ...option, ...updates } : option,
-      ),
-    }));
+  // clear: 자동 코드 복원처럼 optionCode 등을 비워야 할 때 키 자체를 제거한다.
+  // exactOptionalPropertyTypes 하에서 spread로는 optional 키를 undefined로 둘 수 없기 때문.
+  return (
+    optionId: string,
+    updates: Partial<QuestionOption>,
+    clear?: OptionalOptionKey[],
+  ) => {
+    setFormData((prev) => {
+      const next: Partial<Question> = { ...prev };
+      if (prev.options !== undefined) {
+        next.options = prev.options.map((option) => {
+          if (option.id !== optionId) return option;
+          const merged: QuestionOption = { ...option, ...updates };
+          if (clear) {
+            for (const key of clear) {
+              delete merged[key];
+            }
+          }
+          return merged;
+        });
+      }
+      return next;
+    });
   };
 }
 
 export function createRemoveOption(setFormData: SetFormData) {
   return (optionId: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      options: prev.options?.filter((option) => option.id !== optionId),
-    }));
+    setFormData((prev) => {
+      const next: Partial<Question> = { ...prev };
+      if (prev.options !== undefined) {
+        next.options = prev.options.filter((option) => option.id !== optionId);
+      }
+      return next;
+    });
   };
 }
 
@@ -124,23 +148,29 @@ export function createAddSelectLevel(setFormData: SetFormData) {
 
 export function createUpdateSelectLevel(setFormData: SetFormData) {
   return (levelId: string, updates: Partial<SelectLevel>) => {
-    setFormData((prev) => ({
-      ...prev,
-      selectLevels: prev.selectLevels?.map((level) =>
-        level.id === levelId ? { ...level, ...updates } : level,
-      ),
-    }));
+    setFormData((prev) => {
+      const next: Partial<Question> = { ...prev };
+      if (prev.selectLevels !== undefined) {
+        next.selectLevels = prev.selectLevels.map((level) =>
+          level.id === levelId ? { ...level, ...updates } : level,
+        );
+      }
+      return next;
+    });
   };
 }
 
 export function createRemoveSelectLevel(setFormData: SetFormData) {
   return (levelId: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      selectLevels: prev.selectLevels
-        ?.filter((level) => level.id !== levelId)
-        ?.map((level, index) => ({ ...level, order: index })),
-    }));
+    setFormData((prev) => {
+      const next: Partial<Question> = { ...prev };
+      if (prev.selectLevels !== undefined) {
+        next.selectLevels = prev.selectLevels
+          .filter((level) => level.id !== levelId)
+          .map((level, index) => ({ ...level, order: index }));
+      }
+      return next;
+    });
   };
 }
 
@@ -160,12 +190,13 @@ export function createAddLevelOption(setFormData: SetFormData) {
         spssNumericCode: getMaxSpssCode(level.options) + 1,
       };
 
-      return {
-        ...prev,
-        selectLevels: prev.selectLevels?.map((l) =>
+      const next: Partial<Question> = { ...prev };
+      if (prev.selectLevels !== undefined) {
+        next.selectLevels = prev.selectLevels.map((l) =>
           l.id === levelId ? { ...l, options: [...(l.options || []), newOption] } : l,
-        ),
-      };
+        );
+      }
+      return next;
     });
   };
 }
@@ -175,21 +206,24 @@ export function createUpdateOptionWithParent(setFormData: SetFormData) {
     const sanitizedLabel = optionLabel.trim();
     const autoValue = `${parentValue}-${sanitizedLabel}`;
 
-    setFormData((prev) => ({
-      ...prev,
-      selectLevels: prev.selectLevels?.map((level) =>
-        level.id === levelId
-          ? {
-              ...level,
-              options: level.options?.map((option) =>
-                option.id === optionId
-                  ? { ...option, label: optionLabel, value: autoValue }
-                  : option,
-              ),
-            }
-          : level,
-      ),
-    }));
+    setFormData((prev) => {
+      const next: Partial<Question> = { ...prev };
+      if (prev.selectLevels !== undefined) {
+        next.selectLevels = prev.selectLevels.map((level) =>
+          level.id === levelId
+            ? {
+                ...level,
+                options: level.options?.map((option) =>
+                  option.id === optionId
+                    ? { ...option, label: optionLabel, value: autoValue }
+                    : option,
+                ),
+              }
+            : level,
+        );
+      }
+      return next;
+    });
   };
 }
 
@@ -204,34 +238,40 @@ export function getParentLevelOptions(
 
 export function createUpdateLevelOption(setFormData: SetFormData) {
   return (levelId: string, optionId: string, updates: Partial<QuestionOption>) => {
-    setFormData((prev) => ({
-      ...prev,
-      selectLevels: prev.selectLevels?.map((level) =>
-        level.id === levelId
-          ? {
-              ...level,
-              options: level.options?.map((option) =>
-                option.id === optionId ? { ...option, ...updates } : option,
-              ),
-            }
-          : level,
-      ),
-    }));
+    setFormData((prev) => {
+      const next: Partial<Question> = { ...prev };
+      if (prev.selectLevels !== undefined) {
+        next.selectLevels = prev.selectLevels.map((level) =>
+          level.id === levelId
+            ? {
+                ...level,
+                options: level.options?.map((option) =>
+                  option.id === optionId ? { ...option, ...updates } : option,
+                ),
+              }
+            : level,
+        );
+      }
+      return next;
+    });
   };
 }
 
 export function createRemoveLevelOption(setFormData: SetFormData) {
   return (levelId: string, optionId: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      selectLevels: prev.selectLevels?.map((level) =>
-        level.id === levelId
-          ? {
-              ...level,
-              options: level.options?.filter((option) => option.id !== optionId),
-            }
-          : level,
-      ),
-    }));
+    setFormData((prev) => {
+      const next: Partial<Question> = { ...prev };
+      if (prev.selectLevels !== undefined) {
+        next.selectLevels = prev.selectLevels.map((level) =>
+          level.id === levelId
+            ? {
+                ...level,
+                options: level.options?.filter((option) => option.id !== optionId),
+              }
+            : level,
+        );
+      }
+      return next;
+    });
   };
 }

@@ -101,9 +101,13 @@ describe('parseClausesFromUrl - source 분기', () => {
 
   it('system.web + true/false → boolean', () => {
     const t = parseClausesFromUrl(['system.web'], ['true'], [''], candidates, resultCodes);
-    expect(t[0].condition).toEqual({ source: 'system.web', mode: 'boolean', value: 'true' });
+    const t0 = t[0];
+    if (!t0) throw new Error('expected t[0]');
+    expect(t0.condition).toEqual({ source: 'system.web', mode: 'boolean', value: 'true' });
     const f = parseClausesFromUrl(['system.web'], ['false'], [''], candidates, resultCodes);
-    expect(f[0].condition).toEqual({ source: 'system.web', mode: 'boolean', value: 'false' });
+    const f0 = f[0];
+    if (!f0) throw new Error('expected f[0]');
+    expect(f0.condition).toEqual({ source: 'system.web', mode: 'boolean', value: 'false' });
   });
 
   it('system.web + 외 값 → drop', () => {
@@ -132,12 +136,14 @@ describe('parseClausesFromUrl - source 분기', () => {
       resultCodes,
     );
     expect(result).toHaveLength(1);
-    expect(result[0].condition.source).toBe('pii.email');
-    expect(result[0].condition.mode).toBe('exact');
-    expect(result[0].condition.value).toBe('user@example.com');
+    const clause0 = result[0];
+    if (!clause0) throw new Error('expected result[0]');
+    expect(clause0.condition.source).toBe('pii.email');
+    expect(clause0.condition.mode).toBe('exact');
+    expect(clause0.condition.value).toBe('user@example.com');
     expect(
-      result[0].condition.mode === 'exact' &&
-        /^[0-9a-f]{64}$/.test(result[0].condition.blindIndex ?? ''),
+      clause0.condition.mode === 'exact' &&
+        /^[0-9a-f]{64}$/.test(clause0.condition.blindIndex ?? ''),
     ).toBe(true);
   });
 
@@ -196,7 +202,9 @@ describe('parseClausesFromUrl - 다중 조건', () => {
       candidates,
       resultCodes,
     );
-    expect(result[0].op).toBeNull();
+    const first0 = result[0];
+    if (!first0) throw new Error('expected result[0]');
+    expect(first0.op).toBeNull();
   });
 
   it('op 가 AND/OR 외 값이면 AND 폴백', () => {
@@ -207,7 +215,9 @@ describe('parseClausesFromUrl - 다중 조건', () => {
       candidates,
       resultCodes,
     );
-    expect(result[1].op).toBe('AND');
+    const second = result[1];
+    if (!second) throw new Error('expected result[1]');
+    expect(second.op).toBe('AND');
   });
 
   it('길이 불일치 → 짧은 쪽까지만 (silent truncate)', () => {
@@ -230,9 +240,12 @@ describe('parseClausesFromUrl - 다중 조건', () => {
       resultCodes,
     );
     expect(result).toHaveLength(2);
-    expect(result[0].condition.source).toBe('attrs.전시회명');
-    expect(result[1].condition.source).toBe('attrs.지역');
-    expect(result[1].op).toBe('OR');
+    const r0 = result[0];
+    const r1 = result[1];
+    if (!r0 || !r1) throw new Error('expected result[0] and result[1]');
+    expect(r0.condition.source).toBe('attrs.전시회명');
+    expect(r1.condition.source).toBe('attrs.지역');
+    expect(r1.op).toBe('OR');
   });
 
   it('URL 첫 절이 drop 되어도 출력 첫 절의 op 는 null', () => {
@@ -246,7 +259,9 @@ describe('parseClausesFromUrl - 다중 조건', () => {
       resultCodes,
     );
     expect(result).toHaveLength(1);
-    expect(result[0].op).toBeNull();
-    expect(result[0].condition.source).toBe('attrs.지역');
+    const dropped0 = result[0];
+    if (!dropped0) throw new Error('expected result[0]');
+    expect(dropped0.op).toBeNull();
+    expect(dropped0.condition.source).toBe('attrs.지역');
   });
 });

@@ -77,7 +77,10 @@ export function resolveAttachmentType(
 ): { mime: string } | null {
   const ext = getFileExt(filename);
   if (ext && ext in EXT_TO_MIME) {
-    return { mime: mime && isAllowedMime(mime) ? mime : EXT_TO_MIME[ext] };
+    const extMime = EXT_TO_MIME[ext];
+    if (extMime !== undefined) {
+      return { mime: mime && isAllowedMime(mime) ? mime : extMime };
+    }
   }
   if (mime && isAllowedMime(mime)) {
     return { mime };

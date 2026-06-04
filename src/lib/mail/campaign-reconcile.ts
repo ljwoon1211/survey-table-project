@@ -86,7 +86,7 @@ export async function reconcileCampaignRecipients(
       group.map(async (t): Promise<ResendLookup> => {
         try {
           const { data } = await resend.emails.get(t.resendMessageId);
-          return { recipientId: t.id, lastEvent: data?.last_event };
+          return { recipientId: t.id, ...(data?.last_event !== undefined ? { lastEvent: data.last_event } : {}) };
         } catch {
           return { recipientId: t.id, error: true };
         }

@@ -85,7 +85,7 @@ export function SaveQuestionModal({
   const [newTag, setNewTag] = useState('');
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [errors, setErrors] = useState<{ name?: string }>({});
+  const [errors, setErrors] = useState<{ name?: string | undefined }>({});
 
   // 질문이 변경되면 기본값 설정
   useEffect(() => {
@@ -165,7 +165,7 @@ export function SaveQuestionModal({
         question,
         metadata: {
           name: name.trim(),
-          description: description.trim() || undefined,
+          ...(description.trim() ? { description: description.trim() } : {}),
           category: selectedCategory,
           tags,
         },

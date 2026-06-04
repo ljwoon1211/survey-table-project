@@ -43,10 +43,10 @@ export default async function GlobalMailCostPage({ searchParams }: Props) {
           <EmptyPeriodsNotice />
         ) : (
           <CostDisclaimer
-            planLabel={planForDisclaimer?.planLabel}
-            monthlyFeeKrw={planForDisclaimer?.monthlyFeeKrw}
-            includedEmails={planForDisclaimer?.includedEmails}
-            overagePer1kKrw={planForDisclaimer?.overagePer1kKrw}
+            {...(planForDisclaimer?.planLabel !== undefined ? { planLabel: planForDisclaimer.planLabel } : {})}
+            {...(planForDisclaimer?.monthlyFeeKrw !== undefined ? { monthlyFeeKrw: planForDisclaimer.monthlyFeeKrw } : {})}
+            {...(planForDisclaimer?.includedEmails !== undefined ? { includedEmails: planForDisclaimer.includedEmails } : {})}
+            {...(planForDisclaimer?.overagePer1kKrw !== undefined ? { overagePer1kKrw: planForDisclaimer.overagePer1kKrw } : {})}
           />
         )}
 

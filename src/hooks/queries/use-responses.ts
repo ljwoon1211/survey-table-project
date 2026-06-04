@@ -142,6 +142,7 @@ export function useCompleteResponse() {
   return useMutation({
     mutationFn: (responseId: string) => completeResponseAction(responseId),
     onSuccess: (data) => {
+      if (!data) return;
       queryClient.invalidateQueries({
         queryKey: responseKeys.listBySurvey(data.surveyId),
       });

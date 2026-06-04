@@ -87,7 +87,9 @@ export function shapeDailyBuckets(
     const sorted = [...rows].sort((a, b) => (a.bucket < b.bucket ? -1 : 1));
     const map = new Map<string, number>();
     for (const r of sorted) map.set(r.bucket, r.count);
-    const days = enumerateDays(sorted[0].bucket, sorted[sorted.length - 1].bucket);
+    const firstBucket = sorted[0]?.bucket ?? '';
+    const lastBucket = sorted[sorted.length - 1]?.bucket ?? '';
+    const days = enumerateDays(firstBucket, lastBucket);
     return days.map((ymd) => ({
       bucket: ymd,
       label: formatDayLabel(ymd),

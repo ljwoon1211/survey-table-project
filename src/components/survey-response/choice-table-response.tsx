@@ -162,11 +162,11 @@ export function ChoiceTableResponse({ question, value, onChange }: ChoiceTableRe
   return (
     <div className="space-y-2">
       <TablePreview
-        tableTitle={question.tableTitle}
-        columns={question.tableColumns}
-        rows={question.tableRowsData}
-        tableHeaderGrid={question.tableHeaderGrid}
-        hideColumnLabels={question.hideColumnLabels}
+        {...(question.tableTitle !== undefined ? { tableTitle: question.tableTitle } : {})}
+        {...(question.tableColumns !== undefined ? { columns: question.tableColumns } : {})}
+        {...(question.tableRowsData !== undefined ? { rows: question.tableRowsData } : {})}
+        {...(question.tableHeaderGrid !== undefined ? { tableHeaderGrid: question.tableHeaderGrid } : {})}
+        {...(question.hideColumnLabels !== undefined ? { hideColumnLabels: question.hideColumnLabels } : {})}
         renderCell={renderCell}
       />
       {counter}

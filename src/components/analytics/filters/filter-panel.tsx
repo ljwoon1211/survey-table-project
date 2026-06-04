@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { ChevronDown, ChevronUp, Filter, Plus, RotateCcw, Save, Users } from 'lucide-react';
+import { ChevronDown, ChevronUp, Filter, Plus, RotateCcw, Users } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -48,8 +48,10 @@ export function FilterPanel({ questions, responses, filter, onFilterChange }: Fi
   // 새 조건 추가
   const handleAddCondition = () => {
     if (filterableQuestions.length === 0) return;
+    const firstFilterable = filterableQuestions[0];
+    if (!firstFilterable) return;
 
-    const newCondition = createFilterCondition(filterableQuestions[0].id);
+    const newCondition = createFilterCondition(firstFilterable.id);
     const updatedFilter = addConditionToFilter(filter, newCondition);
     onFilterChange(updatedFilter);
   };
@@ -175,7 +177,7 @@ export function FilterPanel({ questions, responses, filter, onFilterChange }: Fi
                       questions={questions}
                       onUpdate={(updates) => handleUpdateCondition(condition.id, updates)}
                       onRemove={() => handleRemoveCondition(condition.id)}
-                      showLogicBadge={index > 0 ? filter.groupLogic : undefined}
+                      {...(index > 0 ? { showLogicBadge: filter.groupLogic } : {})}
                     />
                   ))}
                 </div>

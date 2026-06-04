@@ -8,12 +8,12 @@ const { setMock, whereMock } = vi.hoisted(() => ({
 
 vi.mock('@/db', () => {
   const chainable: Record<string, unknown> = {};
-  chainable.update = vi.fn(() => chainable);
-  chainable.set = vi.fn((arg: unknown) => {
+  chainable['update'] = vi.fn(() => chainable);
+  chainable['set'] = vi.fn((arg: unknown) => {
     setMock(arg);
     return chainable;
   });
-  chainable.where = vi.fn((arg: unknown) => {
+  chainable['where'] = vi.fn((arg: unknown) => {
     whereMock(arg);
     return chainable; // await 시 chainable 자신으로 resolve (no-op)
   });
@@ -30,8 +30,10 @@ describe('recordVisibilitySegment — SQL 분기', () => {
     const { recordVisibilitySegment } = await import('@/actions/response-actions');
     await recordVisibilitySegment({ responseId: 'r1', action: 'hide' });
 
-    const setArg = setMock.mock.calls[0][0] as Record<string, unknown>;
-    const pvSql = extractRawSql(setArg.pageVisits);
+    const hideSetCall = setMock.mock.calls[0];
+    if (!hideSetCall) throw new Error('setMock 호출 없음');
+    const setArg = hideSetCall[0] as Record<string, unknown>;
+    const pvSql = extractRawSql(setArg['pageVisits']);
     expect(pvSql).toContain('jsonb_set');
     expect(pvSql).toContain("'leftAt'");
     expect('lastActivityAt' in setArg).toBe(false); // hide는 떠남 → 미갱신
@@ -41,8 +43,10 @@ describe('recordVisibilitySegment — SQL 분기', () => {
     const { recordVisibilitySegment } = await import('@/actions/response-actions');
     await recordVisibilitySegment({ responseId: 'r1', action: 'show' });
 
-    const setArg = setMock.mock.calls[0][0] as Record<string, unknown>;
-    const pvSql = extractRawSql(setArg.pageVisits);
+    const showSetCall = setMock.mock.calls[0];
+    if (!showSetCall) throw new Error('setMock 호출 없음');
+    const setArg = showSetCall[0] as Record<string, unknown>;
+    const pvSql = extractRawSql(setArg['pageVisits']);
     expect(pvSql).toContain('jsonb_build_array');
     expect(pvSql).toContain('||');
     expect('lastActivityAt' in setArg).toBe(true); // show는 복귀 → 갱신
@@ -52,7 +56,9 @@ describe('recordVisibilitySegment — SQL 분기', () => {
     const { recordVisibilitySegment } = await import('@/actions/response-actions');
     await recordVisibilitySegment({ responseId: 'r1', action: 'hide' });
     expect(whereMock).toHaveBeenCalledTimes(1); // 단일 UPDATE + WHERE 가드
-    const whereSql = extractRawSql(whereMock.mock.calls[0][0]);
+    const hideWhereCall = whereMock.mock.calls[0];
+    if (!hideWhereCall) throw new Error('whereMock 호출 없음');
+    const whereSql = extractRawSql(hideWhereCall[0]);
     expect(whereSql).toContain('leftAt');
   });
 
@@ -60,7 +66,9 @@ describe('recordVisibilitySegment — SQL 분기', () => {
     const { recordVisibilitySegment } = await import('@/actions/response-actions');
     await recordVisibilitySegment({ responseId: 'r1', action: 'show' });
     expect(whereMock).toHaveBeenCalledTimes(1);
-    const whereSql = extractRawSql(whereMock.mock.calls[0][0]);
+    const showWhereCall = whereMock.mock.calls[0];
+    if (!showWhereCall) throw new Error('whereMock 호출 없음');
+    const whereSql = extractRawSql(showWhereCall[0]);
     expect(whereSql).toContain('leftAt');
     expect(whereSql).toContain('IS NOT NULL');
   });

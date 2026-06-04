@@ -37,7 +37,7 @@ export interface RankingDropdownStackProps {
   /** 셀 컨텍스트처럼 좁은 영역에 렌더할 때 compact 스타일 적용. */
   compact?: boolean;
   /** 순위 드롭다운 배치 (undefined/1=세로, 0=가로, N≥2=N열 그리드). compact 와 독립. */
-  columns?: number;
+  columns?: number | undefined;
 }
 
 /**
@@ -169,7 +169,7 @@ export function RankingDropdownStack({
         const itemCls = cn('whitespace-normal [overflow-wrap:anywhere]', isMobile && 'py-3 text-base');
         const radixSelectEl = (
           <Select
-            value={currentValue || undefined}
+            {...(currentValue ? { value: currentValue } : {})}
             onValueChange={(v) => handleSelect(rank, v)}
           >
             <SelectTrigger

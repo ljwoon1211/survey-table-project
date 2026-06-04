@@ -56,7 +56,7 @@ describe('generateVariableLabels', () => {
 
   it('notice 타입은 제외한다', () => {
     const questions = [
-      makeQuestion({ type: 'notice', order: 1, questionCode: undefined, title: '안내문' }),
+      makeQuestion({ type: 'notice', order: 1, title: '안내문' }),
     ];
     const result = generateVariableLabels(questions);
     expect(result).not.toContain('안내문');

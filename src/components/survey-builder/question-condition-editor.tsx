@@ -1,11 +1,11 @@
 'use client';
 
-import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
 
 import { AlertCircle, ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -142,14 +142,32 @@ export const QuestionConditionEditor = forwardRef<
     onUpdate(updatedGroup);
   };
 
+  // tableConditions/additionalConditions는 expression 전환·토글 해제 시 비워야 한다.
+  // exactOptionalPropertyTypes 하에서 spread로는 키 제거가 불가하므로 clear 인자로 명시한다.
+  type ClearableConditionKey = 'tableConditions' | 'additionalConditions';
+
   const updateCondition = useCallback(
-    (conditionId: string, updates: Partial<QuestionCondition>) => {
+    (
+      conditionId: string,
+      updates: Partial<QuestionCondition>,
+      clear?: ClearableConditionKey[],
+    ) => {
       if (!conditionGroup) return;
+
+      const mergeCondition = (c: QuestionCondition): QuestionCondition => {
+        const merged: QuestionCondition = { ...c, ...updates };
+        if (clear) {
+          for (const key of clear) {
+            delete merged[key];
+          }
+        }
+        return merged;
+      };
 
       const updatedGroup: QuestionConditionGroup = {
         ...conditionGroup,
         conditions: conditionGroup.conditions.map((c) =>
-          c.id === conditionId ? { ...c, ...updates } : c,
+          c.id === conditionId ? mergeCondition(c) : c,
         ),
       };
 
@@ -181,7 +199,12 @@ export const QuestionConditionEditor = forwardRef<
         const nameFromState = conditionNames[c.id];
         // conditionNames에 값이 있고, 현재 condition.name과 다르면 업데이트
         if (nameFromState !== undefined && c.name !== nameFromState) {
-          return { ...c, name: nameFromState.trim() || undefined };
+          const trimmedName = nameFromState.trim();
+          if (trimmedName) {
+            return { ...c, name: trimmedName };
+          }
+          const { name: _n, ...rest } = c;
+          return rest as typeof c;
         }
         return c;
       }),
@@ -238,8 +261,12 @@ export const QuestionConditionEditor = forwardRef<
       tableConditions: {
         rowIds: updatedRowIds,
         checkType: condition.tableConditions?.checkType || 'any',
-        cellColumnIndex: condition.tableConditions?.cellColumnIndex,
-        expectedValues: condition.tableConditions?.expectedValues,
+        ...(condition.tableConditions?.cellColumnIndex !== undefined
+          ? { cellColumnIndex: condition.tableConditions.cellColumnIndex }
+          : {}),
+        ...(condition.tableConditions?.expectedValues !== undefined
+          ? { expectedValues: condition.tableConditions.expectedValues }
+          : {}),
       },
     });
   };
@@ -329,7 +356,7 @@ export const QuestionConditionEditor = forwardRef<
                       onBlur={(e) => {
                         // 포커스를 잃을 때만 실제 업데이트
                         const value = e.target.value.trim() || undefined;
-                        updateCondition(condition.id, { name: value });
+                        updateCondition(condition.id, value !== undefined ? { name: value } : {} as Partial<QuestionCondition>);
                         // 로컬 상태도 동기화
                         setConditionNames((prev) => {
                           const next = { ...prev };
@@ -528,8 +555,12 @@ export const QuestionConditionEditor = forwardRef<
                                     tableConditions: {
                                       rowIds: condition.tableConditions?.rowIds || [],
                                       checkType: e.target.value as 'any' | 'all' | 'none',
-                                      cellColumnIndex: condition.tableConditions?.cellColumnIndex,
-                                      expectedValues: condition.tableConditions?.expectedValues,
+                                      ...(condition.tableConditions?.cellColumnIndex !== undefined
+                                        ? { cellColumnIndex: condition.tableConditions.cellColumnIndex }
+                                        : {}),
+                                      ...(condition.tableConditions?.expectedValues !== undefined
+                                        ? { expectedValues: condition.tableConditions.expectedValues }
+                                        : {}),
                                     },
                                   })
                                 }
@@ -559,8 +590,10 @@ export const QuestionConditionEditor = forwardRef<
                                     tableConditions: {
                                       rowIds: condition.tableConditions?.rowIds || [],
                                       checkType: condition.tableConditions?.checkType || 'any',
-                                      cellColumnIndex: value,
-                                      expectedValues: condition.tableConditions?.expectedValues,
+                                      ...(value !== undefined ? { cellColumnIndex: value } : {}),
+                                      ...(condition.tableConditions?.expectedValues !== undefined
+                                        ? { expectedValues: condition.tableConditions.expectedValues }
+                                        : {}),
                                     },
                                   });
                                 }}
@@ -592,8 +625,12 @@ export const QuestionConditionEditor = forwardRef<
                                     updateCondition(condition.id, {
                                       tableConditions: {
                                         ...condition.tableConditions!,
-                                        expectedValues: next.expectedValues,
-                                        numericComparison: next.numericComparison,
+                                        ...(next.expectedValues !== undefined
+                                          ? { expectedValues: next.expectedValues }
+                                          : {}),
+                                        ...(next.numericComparison !== undefined
+                                          ? { numericComparison: next.numericComparison }
+                                          : {}),
                                       },
                                     })
                                   }
@@ -603,11 +640,14 @@ export const QuestionConditionEditor = forwardRef<
                                     condition.tableConditions?.cellColumnIndex,
                                     sourceQuestion,
                                     (expressionConfig) =>
-                                      updateCondition(condition.id, {
-                                        conditionType: 'expression',
-                                        expressionConfig,
-                                        tableConditions: undefined,
-                                      }),
+                                      updateCondition(
+                                        condition.id,
+                                        {
+                                          conditionType: 'expression',
+                                          expressionConfig,
+                                        },
+                                        ['tableConditions'],
+                                      ),
                                   )}
                                 />
                               )}
@@ -631,9 +671,9 @@ export const QuestionConditionEditor = forwardRef<
                                       },
                                     });
                                   } else {
-                                    updateCondition(condition.id, {
-                                      additionalConditions: undefined,
-                                    });
+                                    updateCondition(condition.id, {}, [
+                                      'additionalConditions',
+                                    ]);
                                   }
                                 }}
                               />
@@ -732,8 +772,12 @@ export const QuestionConditionEditor = forwardRef<
                                           updateCondition(condition.id, {
                                             additionalConditions: {
                                               ...ac,
-                                              expectedValues: next.expectedValues,
-                                              numericComparison: next.numericComparison,
+                                              ...(next.expectedValues !== undefined
+                                                ? { expectedValues: next.expectedValues }
+                                                : {}),
+                                              ...(next.numericComparison !== undefined
+                                                ? { numericComparison: next.numericComparison }
+                                                : {}),
                                             },
                                           })
                                         }
@@ -743,12 +787,14 @@ export const QuestionConditionEditor = forwardRef<
                                           ac.cellColumnIndex,
                                           sourceQuestion,
                                           (expressionConfig) =>
-                                            updateCondition(condition.id, {
-                                              conditionType: 'expression',
-                                              expressionConfig,
-                                              tableConditions: undefined,
-                                              additionalConditions: undefined,
-                                            }),
+                                            updateCondition(
+                                              condition.id,
+                                              {
+                                                conditionType: 'expression',
+                                                expressionConfig,
+                                              },
+                                              ['tableConditions', 'additionalConditions'],
+                                            ),
                                         )}
                                       />
                                     );

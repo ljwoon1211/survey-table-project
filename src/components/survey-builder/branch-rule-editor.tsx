@@ -19,7 +19,7 @@ import { cn, generateId } from '@/lib/utils';
 import { BranchAction, BranchRule, Question } from '@/types/survey';
 
 interface BranchRuleEditorProps {
-  branchRule?: BranchRule;
+  branchRule?: BranchRule | undefined;
   allQuestions: Question[];
   currentQuestionId: string;
   onChange: (branchRule: BranchRule | undefined) => void;
@@ -61,7 +61,7 @@ export function BranchRuleEditor({
         id: branchRule?.id || generateId(),
         value: branchRule?.value || '',
         action,
-        targetQuestionId: action === 'goto' ? targetQuestionId : undefined,
+        ...(action === 'goto' ? { targetQuestionId } : {}),
       };
       onChange(newBranchRule);
     }

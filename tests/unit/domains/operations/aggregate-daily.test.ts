@@ -77,10 +77,12 @@ describe('shapeDailyBuckets — hour 모드', () => {
     expect(result[9]).toEqual({ bucket: '2026-04-27 09:00', label: '09시', count: 12 });
     expect(result[14]).toEqual({ bucket: '2026-04-27 14:00', label: '14시', count: 5 });
     // 인접한 시간들은 0
-    expect(result[8].count).toBe(0);
-    expect(result[10].count).toBe(0);
-    expect(result[13].count).toBe(0);
-    expect(result[15].count).toBe(0);
+    const b8 = result[8]; const b10 = result[10]; const b13 = result[13]; const b15 = result[15];
+    if (!b8 || !b10 || !b13 || !b15) throw new Error('expected buckets at indices 8,10,13,15');
+    expect(b8.count).toBe(0);
+    expect(b10.count).toBe(0);
+    expect(b13.count).toBe(0);
+    expect(b15.count).toBe(0);
     // 합계는 12+5
     expect(result.reduce((acc, b) => acc + b.count, 0)).toBe(17);
   });
@@ -95,9 +97,11 @@ describe('shapeDailyBuckets — hour 모드', () => {
     expect(result.map((b) => b.bucket.slice(11))).toEqual(
       Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`),
     );
-    expect(result[0].count).toBe(2);
-    expect(result[12].count).toBe(3);
-    expect(result[23].count).toBe(1);
+    const b0 = result[0]; const b12 = result[12]; const b23 = result[23];
+    if (!b0 || !b12 || !b23) throw new Error('expected buckets at indices 0,12,23');
+    expect(b0.count).toBe(2);
+    expect(b12.count).toBe(3);
+    expect(b23.count).toBe(1);
   });
 
   it('hourModeDate 누락 시 throw', () => {

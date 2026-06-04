@@ -10,7 +10,7 @@ import { TableColumn, TableRow } from '@/types/survey';
 /** 병합 실행 결과 */
 export interface MergeResult {
   updatedRows: TableRow[];
-  newSelectedCell?: { rowId: string; cellId: string };
+  newSelectedCell?: { rowId: string; cellId: string } | undefined;
 }
 
 /**
@@ -30,16 +30,21 @@ export function checkCanMerge(
   columns: TableColumn[],
 ): boolean {
   if (rowIndex < 0 || rowIndex >= rows.length) return false;
-  if (cellIndex < 0 || cellIndex >= rows[rowIndex].cells.length) return false;
+  const currentRow = rows[rowIndex];
+  if (!currentRow) return false;
+  if (cellIndex < 0 || cellIndex >= currentRow.cells.length) return false;
 
-  const cell = rows[rowIndex].cells[cellIndex];
+  const cell = currentRow.cells[cellIndex];
+  if (!cell) return false;
   const rowspan = cell.rowspan || 1;
   const colspan = cell.colspan || 1;
 
   if (direction === 'down') {
     if (rowIndex + rowspan >= rows.length) return false;
-    const targetCell = rows[rowIndex + rowspan].cells[cellIndex];
-    if (targetCell.isHidden) return false;
+    const targetRow = rows[rowIndex + rowspan];
+    if (!targetRow) return false;
+    const targetCell = targetRow.cells[cellIndex];
+    if (!targetCell || targetCell.isHidden) return false;
     const targetColspan = targetCell.colspan || 1;
     if (colspan !== targetColspan) return false;
     return true;
@@ -47,8 +52,8 @@ export function checkCanMerge(
 
   if (direction === 'right') {
     if (cellIndex + colspan >= columns.length) return false;
-    const targetCell = rows[rowIndex].cells[cellIndex + colspan];
-    if (targetCell.isHidden) return false;
+    const targetCell = currentRow.cells[cellIndex + colspan];
+    if (!targetCell || targetCell.isHidden) return false;
     const targetRowspan = targetCell.rowspan || 1;
     if (rowspan !== targetRowspan) return false;
     return true;
@@ -77,17 +82,11 @@ export function checkCanMerge(
 
 /** 병합 대상 셀을 빈 텍스트 셀로 초기화 */
 function resetCell(cell: TableRow['cells'][number]): TableRow['cells'][number] {
+  const { checkboxOptions: _cb, radioOptions: _ro, selectOptions: _so, imageUrl: _iu, videoUrl: _vu, rowspan: _rs, colspan: _cs, ...rest } = cell;
   return {
-    ...cell,
+    ...rest,
     content: '',
     type: 'text',
-    checkboxOptions: undefined,
-    radioOptions: undefined,
-    selectOptions: undefined,
-    imageUrl: undefined,
-    videoUrl: undefined,
-    rowspan: undefined,
-    colspan: undefined,
   };
 }
 
@@ -108,49 +107,69 @@ export function executeMerge(
   let newSelectedCell: MergeResult['newSelectedCell'] = undefined;
 
   if (direction === 'down') {
-    const cell = newRows[rowIndex].cells[cellIndex];
+    const row = newRows[rowIndex];
+    if (!row) return { updatedRows: newRows, newSelectedCell };
+    const cell = row.cells[cellIndex];
+    if (!cell) return { updatedRows: newRows, newSelectedCell };
     const currentRowspan = cell.rowspan || 1;
     const targetRowIndex = rowIndex + currentRowspan;
-    const targetCell = newRows[targetRowIndex].cells[cellIndex];
+    const targetRow = newRows[targetRowIndex];
+    if (!targetRow) return { updatedRows: newRows, newSelectedCell };
+    const targetCell = targetRow.cells[cellIndex];
+    if (!targetCell) return { updatedRows: newRows, newSelectedCell };
     const targetRowspan = targetCell.rowspan || 1;
 
     cell.rowspan = currentRowspan + targetRowspan;
-    newRows[targetRowIndex].cells[cellIndex] = resetCell(targetCell);
+    targetRow.cells[cellIndex] = resetCell(targetCell);
   } else if (direction === 'right') {
-    const cell = newRows[rowIndex].cells[cellIndex];
+    const row = newRows[rowIndex];
+    if (!row) return { updatedRows: newRows, newSelectedCell };
+    const cell = row.cells[cellIndex];
+    if (!cell) return { updatedRows: newRows, newSelectedCell };
     const currentColspan = cell.colspan || 1;
     const targetCellIndex = cellIndex + currentColspan;
-    const targetCell = newRows[rowIndex].cells[targetCellIndex];
+    const targetCell = row.cells[targetCellIndex];
+    if (!targetCell) return { updatedRows: newRows, newSelectedCell };
     const targetColspan = targetCell.colspan || 1;
 
     cell.colspan = currentColspan + targetColspan;
-    newRows[rowIndex].cells[targetCellIndex] = resetCell(targetCell);
+    row.cells[targetCellIndex] = resetCell(targetCell);
   } else if (direction === 'up') {
     const baseRowIndex = rowIndex - 1;
-    const baseCell = newRows[baseRowIndex].cells[cellIndex];
-    const targetCell = newRows[rowIndex].cells[cellIndex];
+    const baseRow = newRows[baseRowIndex];
+    if (!baseRow) return { updatedRows: newRows, newSelectedCell };
+    const baseCell = baseRow.cells[cellIndex];
+    if (!baseCell) return { updatedRows: newRows, newSelectedCell };
+    const currentRow = newRows[rowIndex];
+    if (!currentRow) return { updatedRows: newRows, newSelectedCell };
+    const targetCell = currentRow.cells[cellIndex];
+    if (!targetCell) return { updatedRows: newRows, newSelectedCell };
     const baseRowspan = baseCell.rowspan || 1;
     const targetRowspan = targetCell.rowspan || 1;
 
     baseCell.rowspan = baseRowspan + targetRowspan;
-    newRows[rowIndex].cells[cellIndex] = resetCell(targetCell);
+    currentRow.cells[cellIndex] = resetCell(targetCell);
 
     newSelectedCell = {
-      rowId: newRows[baseRowIndex].id,
+      rowId: baseRow.id,
       cellId: baseCell.id,
     };
   } else if (direction === 'left') {
+    const row = newRows[rowIndex];
+    if (!row) return { updatedRows: newRows, newSelectedCell };
     const baseCellIndex = cellIndex - 1;
-    const baseCell = newRows[rowIndex].cells[baseCellIndex];
-    const targetCell = newRows[rowIndex].cells[cellIndex];
+    const baseCell = row.cells[baseCellIndex];
+    if (!baseCell) return { updatedRows: newRows, newSelectedCell };
+    const targetCell = row.cells[cellIndex];
+    if (!targetCell) return { updatedRows: newRows, newSelectedCell };
     const baseColspan = baseCell.colspan || 1;
     const targetColspan = targetCell.colspan || 1;
 
     baseCell.colspan = baseColspan + targetColspan;
-    newRows[rowIndex].cells[cellIndex] = resetCell(targetCell);
+    row.cells[cellIndex] = resetCell(targetCell);
 
     newSelectedCell = {
-      rowId: newRows[rowIndex].id,
+      rowId: row.id,
       cellId: baseCell.id,
     };
   }
@@ -169,17 +188,22 @@ export function executeUnmerge(
   cellIndex: number,
   rows: TableRow[],
 ): TableRow[] {
-  const cell = rows[rowIndex].cells[cellIndex];
+  const row = rows[rowIndex];
+  if (!row) return rows;
+  const cell = row.cells[cellIndex];
+  if (!cell) return rows;
   const rowspan = cell.rowspan || 1;
   const colspan = cell.colspan || 1;
 
   if (rowspan <= 1 && colspan <= 1) return rows;
 
   const newRows = structuredClone(rows);
-  const targetCell = newRows[rowIndex].cells[cellIndex];
-
-  targetCell.rowspan = undefined;
-  targetCell.colspan = undefined;
+  const newRow = newRows[rowIndex];
+  if (!newRow) return rows;
+  const targetCell = newRow.cells[cellIndex];
+  if (!targetCell) return rows;
+  const { rowspan: _rs, colspan: _cs, ...restCell } = targetCell;
+  newRow.cells[cellIndex] = restCell;
 
   return newRows;
 }

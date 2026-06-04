@@ -59,7 +59,7 @@ export function LookupLibrarySection() {
     setEditingId(lut.id);
     setEditInitial({
       name: lut.name,
-      description: lut.description,
+      ...(lut.description !== undefined ? { description: lut.description } : {}),
       category: lut.category,
       tags: lut.tags,
       columns: lut.columns,

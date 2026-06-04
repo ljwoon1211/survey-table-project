@@ -21,7 +21,8 @@ function generateOptionTextVariables(
   const qVar = question.questionCode ?? `Q${question.order}`;
 
   for (let i = 0; i < (question.options ?? []).length; i++) {
-    const option = question.options![i];
+    const option = question.options?.[i];
+    if (!option) continue;
     if (!option.allowTextInput) continue;
     const varNumber = option.optionCode ?? String(i + 1);
     vars.push({
@@ -47,6 +48,7 @@ function generateCellOptionTextVariables(
   const vars: Array<{ name: string; type: 'STRING'; width: number; label: string }> = [];
   for (let i = 0; i < options.length; i++) {
     const opt = options[i];
+    if (!opt) continue;
     if (!opt.allowTextInput) continue;
     const varNumber = opt.optionCode ?? String(i + 1);
     vars.push({
@@ -100,7 +102,7 @@ function collectTableRankingCells(q: Question): TableRankingCellInfo[] {
         suffixPattern: cell.rankSuffixPattern,
         varNameOverrides: cell.rankVarNames,
         rowLabel: row.label,
-        colLabel: q.tableColumns[colIdx].label,
+        colLabel: q.tableColumns[colIdx]?.label ?? '',
         positions: Math.max(1, cell.rankingConfig?.positions ?? 3),
         options: cell.rankingOptions ?? [],
         allowOther: cell.allowOtherOption === true,
@@ -132,6 +134,7 @@ export function generateVariableLabels(questions: Question[]): string {
     if (q.type === 'checkbox' && q.options) {
       for (let i = 0; i < q.options.length; i++) {
         const opt = q.options[i];
+        if (!opt) continue;
         lines.push(`  ${q.questionCode}_${opt.optionCode ?? String(i + 1)} '${esc(q.title)} - ${i + 1}. ${esc(opt.label)}'`);
         // allowTextInput 옵션마다 STRING 사이드카 텍스트 변수 라벨 생성
         if (opt.allowTextInput) {
@@ -245,6 +248,7 @@ export function generateValueLabels(questions: Question[]): string {
     } else if (q.type === 'checkbox') {
       for (let i = 0; i < q.options.length; i++) {
         const opt = q.options[i];
+        if (!opt) continue;
         const code = opt.spssNumericCode ?? i + 1;
         entries.push(`  ${q.questionCode}_${opt.optionCode ?? String(i + 1)} ${code} '선택'`);
       }
@@ -304,6 +308,7 @@ export function generateVariableLevel(questions: Question[]): string {
     } else if (q.type === 'checkbox' && q.options) {
       for (let i = 0; i < q.options.length; i++) {
         const opt = q.options[i];
+        if (!opt) continue;
         nominal.push(`${q.questionCode}_${opt.optionCode ?? String(i + 1)}`);
         // allowTextInput 옵션 텍스트 변수 → NOMINAL (STRING 변수는 NOMINAL)
         if (opt.allowTextInput) {

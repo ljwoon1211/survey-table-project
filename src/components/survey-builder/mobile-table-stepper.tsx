@@ -23,11 +23,11 @@ interface MobileTableStepperProps {
   questionId: string;
   displayRows: TableRow[];
   visibleColumns: TableColumn[];
-  visibleHeaderGrid?: HeaderCell[][] | null;
+  visibleHeaderGrid?: HeaderCell[][] | null | undefined;
   currentResponse: Record<string, unknown>;
   hideColumnLabels: boolean;
   isTestMode: boolean;
-  value?: Record<string, unknown>;
+  value?: Record<string, unknown> | undefined;
   onChange?: (value: Record<string, unknown>) => void;
   // 동적 행
   hasDynamicRows: boolean;
@@ -104,6 +104,7 @@ export const MobileTableStepper = React.memo(function MobileTableStepper({
       return;
     }
     const group = rowGroups[currentGroupIdx];
+    if (!group) return;
     if (currentRowInGroup >= group.rows.length) {
       setCurrentRowInGroup(group.rows.length - 1);
     }
@@ -128,6 +129,7 @@ export const MobileTableStepper = React.memo(function MobileTableStepper({
       setCurrentRowInGroup((c) => c - 1);
     } else if (hasGroups && currentGroupIdx > 0) {
       const prevGroup = rowGroups[currentGroupIdx - 1];
+      if (!prevGroup) return;
       setCurrentGroupIdx((c) => c - 1);
       setCurrentRowInGroup(prevGroup.rows.length - 1);
     }

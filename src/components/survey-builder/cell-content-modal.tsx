@@ -95,13 +95,13 @@ interface CellContentModalProps {
   onClose: () => void;
   cell: TableCell;
   onSave: (cell: TableCell) => void;
-  currentQuestionId?: string;
-  questionCode?: string;
-  questionTitle?: string;
-  rowCode?: string;
-  rowLabel?: string;
-  columnCode?: string;
-  columnLabel?: string;
+  currentQuestionId?: string | undefined;
+  questionCode?: string | undefined;
+  questionTitle?: string | undefined;
+  rowCode?: string | undefined;
+  rowLabel?: string | undefined;
+  columnCode?: string | undefined;
+  columnLabel?: string | undefined;
 }
 
 export function CellContentModal({
@@ -111,7 +111,6 @@ export function CellContentModal({
   onSave,
   currentQuestionId = '',
   questionCode,
-  questionTitle,
   rowCode,
   rowLabel,
   columnCode,
@@ -283,8 +282,9 @@ export function CellContentModal({
   const getYouTubeEmbedUrl = (url: string) => {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
-    if (match && match[2].length === 11) {
-      return `https://www.youtube.com/embed/${match[2]}`;
+    const videoId = match?.[2];
+    if (videoId && videoId.length === 11) {
+      return `https://www.youtube.com/embed/${videoId}`;
     }
     return url;
   };
@@ -327,108 +327,122 @@ export function CellContentModal({
 
     setIsSaving(true);
     try {
+      // optional 필드를 조건부 spread로 처리 (exactOptionalPropertyTypes 준수)
+      const _rankVarNames = (() => {
+        if (contentType !== 'ranking') return undefined;
+        const positions = Math.max(1, rankingConfig?.positions ?? 3);
+        const trimmed = rankVarNames.slice(0, positions).map((n) => n.trim());
+        return trimmed.some((n) => n.length > 0) ? trimmed : undefined;
+      })();
+      // cell 에서 textInputPlaceholder 를 제거한 베이스 (choice_opt 타입 전환 시 클리어)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { textInputPlaceholder: _ttp, ...cellBase } = cell;
       const updatedCell: TableCell = {
-        ...cell,
+        ...cellBase,
         type: contentType,
         // 모든 타입에서 텍스트 내용 저장 (라디오/체크박스/셀렉트에서도 설명 텍스트 표시 가능)
         content: textContent || '',
-        imageUrl: contentType === 'image' ? imageUrl : undefined,
-        videoUrl: contentType === 'video' ? videoUrl : undefined,
-        checkboxOptions: contentType === 'checkbox' ? checkboxOptions : undefined,
-        radioOptions: contentType === 'radio' ? radioOptions : undefined,
-        radioGroupName: contentType === 'radio' ? radioGroupName : undefined,
-        selectOptions: contentType === 'select' ? selectOptions : undefined,
-        allowOtherOption: ['checkbox', 'radio', 'select', 'ranking'].includes(contentType)
-          ? allowOtherOption
-          : undefined,
-        optionsColumns: ['checkbox', 'radio', 'ranking'].includes(contentType)
-          ? cellOptionsColumns
-          : undefined,
-        placeholder: contentType === 'input' ? inputPlaceholder : undefined,
-        inputMaxLength:
-          contentType === 'input' && typeof inputMaxLength === 'number'
-            ? inputMaxLength
-            : undefined,
-        defaultValueTemplate:
-          contentType === 'input' && inputDefaultValueTemplate.trim().length > 0
-            ? inputDefaultValueTemplate.trim()
-            : undefined,
-        inputType: contentType === 'input' ? inputType : undefined,
-        emptyDefault:
-          contentType === 'input' && inputType === 'number' && emptyDefaultEnabled
-            ? (parseNumericInput(emptyDefaultRaw) ?? 0)
-            : undefined,
+        // optional 필드: 타입이 해당하지 않으면 키 자체를 제거(조건부 spread)
+        ...(contentType === 'image' && imageUrl ? { imageUrl } : {}),
+        ...(contentType === 'video' && videoUrl ? { videoUrl } : {}),
+        ...(contentType === 'checkbox' ? { checkboxOptions } : {}),
+        ...(contentType === 'radio' ? { radioOptions, radioGroupName } : {}),
+        ...(contentType === 'select' ? { selectOptions } : {}),
+        ...(['checkbox', 'radio', 'select', 'ranking'].includes(contentType)
+          ? {
+              allowOtherOption,
+              ...(cellOptionsColumns !== undefined
+                ? { optionsColumns: cellOptionsColumns }
+                : {}),
+            }
+          : {}),
+        ...(contentType === 'input'
+          ? {
+              ...(inputPlaceholder ? { placeholder: inputPlaceholder } : {}),
+              ...(typeof inputMaxLength === 'number' ? { inputMaxLength } : {}),
+              ...(inputDefaultValueTemplate.trim().length > 0
+                ? { defaultValueTemplate: inputDefaultValueTemplate.trim() }
+                : {}),
+              inputType,
+              ...(inputType === 'number' && emptyDefaultEnabled
+                ? { emptyDefault: parseNumericInput(emptyDefaultRaw) ?? 0 }
+                : {}),
+            }
+          : {}),
         // 체크박스 선택 개수 제한 (체크박스 타입 전용)
-        minSelections: contentType === 'checkbox' ? minSelections : undefined,
-        maxSelections: contentType === 'checkbox' ? maxSelections : undefined,
+        ...(contentType === 'checkbox'
+          ? {
+              ...(minSelections !== undefined ? { minSelections } : {}),
+              ...(maxSelections !== undefined ? { maxSelections } : {}),
+            }
+          : {}),
         // 순위형 셀 (Case 3)
-        rankingOptions: contentType === 'ranking' ? rankingOptions : undefined,
-        rankingConfig: contentType === 'ranking' ? rankingConfig : undefined,
-        rankSuffixPattern:
-          contentType === 'ranking' && rankSuffixPattern.trim().length > 0
-            ? rankSuffixPattern.trim()
-            : undefined,
-        // rankVarNames: positions 초과분은 잘라내고, 모두 빈 문자열이면 배열 자체 제거.
-        rankVarNames: (() => {
-          if (contentType !== 'ranking') return undefined;
-          const positions = Math.max(1, rankingConfig?.positions ?? 3);
-          const trimmed = rankVarNames.slice(0, positions).map((n) => n.trim());
-          return trimmed.some((n) => n.length > 0) ? trimmed : undefined;
-        })(),
+        ...(contentType === 'ranking'
+          ? {
+              rankingOptions,
+              ...(rankingConfig !== undefined ? { rankingConfig } : {}),
+              ...(rankSuffixPattern.trim().length > 0
+                ? { rankSuffixPattern: rankSuffixPattern.trim() }
+                : {}),
+              ...(_rankVarNames ? { rankVarNames: _rankVarNames } : {}),
+            }
+          : {}),
         // 순위형 옵션 소스 셀 (Case 2)
-        rankingLabel:
-          contentType === 'ranking_opt' && rankingLabel.trim().length > 0
-            ? rankingLabel.trim()
-            : undefined,
+        ...(contentType === 'ranking_opt' && rankingLabel.trim().length > 0
+          ? { rankingLabel: rankingLabel.trim() }
+          : {}),
         // ranking_opt / choice_opt 전용 spssNumericCode (Case 2/A SPSS 재-export 안정성)
         // isOther 모드면 numeric 변수가 system-missing 이라 spssNumericCode 는 의미 없음 → 강제 undefined.
-        spssNumericCode:
-          ((contentType === 'ranking_opt' && !isOtherRankingCell)
-            || contentType === 'choice_opt')
-            && typeof cellSpssNumericCode === 'number'
-            ? cellSpssNumericCode
-            : undefined,
-        // ranking_opt 셀을 질문-레벨 "기타" 엔트리로 사용할지 (타입 전환 시 undefined 로 클리어).
-        isOtherRankingCell:
-          contentType === 'ranking_opt' && isOtherRankingCell ? true : undefined,
+        ...(((contentType === 'ranking_opt' && !isOtherRankingCell) || contentType === 'choice_opt') &&
+        typeof cellSpssNumericCode === 'number'
+          ? { spssNumericCode: cellSpssNumericCode }
+          : {}),
+        // ranking_opt 셀을 질문-레벨 "기타" 엔트리로 사용할지 (타입 전환 시 키 자체 제거).
+        ...(contentType === 'ranking_opt' && isOtherRankingCell ? { isOtherRankingCell: true } : {}),
         // 보기 옵션 소스 셀 (Case A)
-        choiceLabel:
-          contentType === 'choice_opt' && choiceLabel.trim().length > 0
-            ? choiceLabel.trim()
-            : undefined,
-        allowTextInput:
-          contentType === 'choice_opt' && choiceAllowTextInput ? true : undefined,
-        // 보기 옵션 소스 셀의 조건부 분기 규칙 (Case A). value 는 셀 id(=resolveChoiceOptions
-        // 가 부여하는 옵션 value)로 강제해 응답 매칭이 일치하도록 한다.
-        branchRule:
-          contentType === 'choice_opt' && choiceBranchRule
-            ? { ...choiceBranchRule, value: cell.id }
-            : undefined,
-        textInputPlaceholder: undefined,
+        ...(contentType === 'choice_opt'
+          ? {
+              ...(choiceLabel.trim().length > 0 ? { choiceLabel: choiceLabel.trim() } : {}),
+              ...(choiceAllowTextInput ? { allowTextInput: true } : {}),
+              // 보기 옵션 소스 셀의 조건부 분기 규칙 (Case A). value 는 셀 id(=resolveChoiceOptions
+              // 가 부여하는 옵션 value)로 강제해 응답 매칭이 일치하도록 한다.
+              ...(choiceBranchRule ? { branchRule: { ...choiceBranchRule, value: cell.id } } : {}),
+            }
+          : {}),
         // 셀 병합 속성 추가
-        rowspan: isMergeEnabled && typeof rowspan === 'number' && rowspan > 1 ? rowspan : undefined,
-        colspan: isMergeEnabled && typeof colspan === 'number' && colspan > 1 ? colspan : undefined,
+        ...(isMergeEnabled && typeof rowspan === 'number' && rowspan > 1 ? { rowspan } : {}),
+        ...(isMergeEnabled && typeof colspan === 'number' && colspan > 1 ? { colspan } : {}),
         // 모바일 카드 표시 (text/image/video 셀만; 기본 'hidden' 은 저장 안 함)
-        mobileDisplay:
-          MOBILE_DISPLAY_CELL_TYPES.has(contentType) && mobileDisplay !== 'hidden'
-            ? mobileDisplay
-            : undefined,
+        ...(MOBILE_DISPLAY_CELL_TYPES.has(contentType) && mobileDisplay !== 'hidden'
+          ? { mobileDisplay }
+          : {}),
         // 정렬 속성 추가
-        horizontalAlign: horizontalAlign !== 'left' ? horizontalAlign : undefined,
-        verticalAlign: verticalAlign !== 'top' ? verticalAlign : undefined,
-        // 셀 텍스트 위치 — 적용 대상 타입이 아니거나 기본값('top') 이면 undefined 로 저장 (불필요한 데이터 회피)
-        textPosition:
-          TEXT_POSITION_CELL_TYPES.has(contentType) && textPosition !== 'top'
-            ? textPosition
-            : undefined,
+        ...(horizontalAlign !== 'left' ? { horizontalAlign } : {}),
+        ...(verticalAlign !== 'top' ? { verticalAlign } : {}),
+        // 셀 텍스트 위치
+        ...(TEXT_POSITION_CELL_TYPES.has(contentType) && textPosition !== 'top'
+          ? { textPosition }
+          : {}),
         // 셀 코드 및 엑셀 라벨 추가
-        cellCode: cellCode || undefined,
-        isCustomCellCode: isCustomCellCode === false ? false : isCustomCellCode || undefined,
-        exportLabel: exportLabel || undefined,
-        isCustomExportLabel: isCustomExportLabel === false ? false : isCustomExportLabel || undefined,
-        // SPSS 변수 타입 / 측정 수준 (입력 셀만)
-        spssVarType: INTERACTIVE_CELL_TYPES.has(contentType) ? spssVarType : undefined,
-        spssMeasure: INTERACTIVE_CELL_TYPES.has(contentType) ? spssMeasure : undefined,
+        ...(cellCode ? { cellCode } : {}),
+        ...(isCustomCellCode === false
+          ? { isCustomCellCode: false }
+          : isCustomCellCode
+            ? { isCustomCellCode }
+            : {}),
+        ...(exportLabel ? { exportLabel } : {}),
+        ...(isCustomExportLabel === false
+          ? { isCustomExportLabel: false }
+          : isCustomExportLabel
+            ? { isCustomExportLabel }
+            : {}),
+        // SPSS 변수 타입 / 측정 수준 (입력 셀만; 값이 있을 때만 키 추가)
+        ...(INTERACTIVE_CELL_TYPES.has(contentType)
+          ? {
+              ...(spssVarType !== undefined ? { spssVarType } : {}),
+              ...(spssMeasure !== undefined ? { spssMeasure } : {}),
+            }
+          : {}),
       };
 
       // 로컬 스토어 업데이트 (셀 저장)
@@ -468,25 +482,25 @@ export function CellContentModal({
               // 임시 질문: 생성하고 반환된 UUID로 로컬 스토어의 질문 ID 업데이트
               const createdQuestion = await createQuestionAction({
                 surveyId: useSurveyBuilderStore.getState().currentSurvey.id,
-                groupId: question.groupId,
+                ...(question.groupId !== undefined ? { groupId: question.groupId } : {}),
                 type: question.type,
                 title: question.title || '',
-                description: question.description,
+                ...(question.description !== undefined ? { description: question.description } : {}),
                 required: question.required ?? false,
                 order: question.order ?? 0,
-                options: question.options,
-                selectLevels: question.selectLevels,
-                tableTitle: question.tableTitle,
-                tableColumns: question.tableColumns,
+                ...(question.options !== undefined ? { options: question.options } : {}),
+                ...(question.selectLevels !== undefined ? { selectLevels: question.selectLevels } : {}),
+                ...(question.tableTitle !== undefined ? { tableTitle: question.tableTitle } : {}),
+                ...(question.tableColumns !== undefined ? { tableColumns: question.tableColumns } : {}),
                 tableRowsData: updatedRowsData,
-                imageUrl: question.imageUrl,
-                videoUrl: question.videoUrl,
-                allowOtherOption: question.allowOtherOption,
-                optionsColumns: question.optionsColumns,
-                noticeContent: question.noticeContent,
-                requiresAcknowledgment: question.requiresAcknowledgment,
-                tableValidationRules: question.tableValidationRules,
-                displayCondition: question.displayCondition,
+                ...(question.imageUrl !== undefined ? { imageUrl: question.imageUrl } : {}),
+                ...(question.videoUrl !== undefined ? { videoUrl: question.videoUrl } : {}),
+                ...(question.allowOtherOption !== undefined ? { allowOtherOption: question.allowOtherOption } : {}),
+                ...(question.optionsColumns !== undefined ? { optionsColumns: question.optionsColumns } : {}),
+                ...(question.noticeContent !== undefined ? { noticeContent: question.noticeContent } : {}),
+                ...(question.requiresAcknowledgment !== undefined ? { requiresAcknowledgment: question.requiresAcknowledgment } : {}),
+                ...(question.tableValidationRules !== undefined ? { tableValidationRules: question.tableValidationRules } : {}),
+                ...(question.displayCondition !== undefined ? { displayCondition: question.displayCondition } : {}),
               });
 
               // 반환된 UUID로 로컬 스토어의 질문 ID 업데이트 + Case 2 참조 동기화
