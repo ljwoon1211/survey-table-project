@@ -3,6 +3,7 @@
 import { Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -10,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 
 import { CUSTOM_SENTINEL, NONE_SENTINEL } from './lookup-shared';
@@ -64,7 +64,7 @@ export function LookupKeyMappingEditor({ availableLutColumns, value, onChange }:
 
       {value.length === 0 && (
         <div className="text-xs text-amber-600">
-          키가 1개 이상 필요합니다. 아래 "키 추가" 로 등록하세요.
+          키가 1개 이상 필요합니다. 아래 키 추가로 등록하세요.
         </div>
       )}
 
@@ -72,10 +72,7 @@ export function LookupKeyMappingEditor({ availableLutColumns, value, onChange }:
         const isInColumns = contactColumns.some((c) => c.key === row.attrsKey);
         const selectorValue = row.attrsKey && isInColumns ? row.attrsKey : CUSTOM_SENTINEL;
         return (
-          <div
-            key={idx}
-            className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2"
-          >
+          <div key={idx} className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2">
             <Select
               value={row.lutKey || NONE_SENTINEL}
               onValueChange={(v) => handleSetLutKey(idx, v === NONE_SENTINEL ? '' : v)}
@@ -98,9 +95,7 @@ export function LookupKeyMappingEditor({ availableLutColumns, value, onChange }:
             <div className="flex items-center gap-1">
               <Select
                 value={selectorValue}
-                onValueChange={(v) =>
-                  handleSetAttrsKey(idx, v === CUSTOM_SENTINEL ? '' : v)
-                }
+                onValueChange={(v) => handleSetAttrsKey(idx, v === CUSTOM_SENTINEL ? '' : v)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="컨택 attrs" />
@@ -138,11 +133,10 @@ export function LookupKeyMappingEditor({ availableLutColumns, value, onChange }:
         <Plus size={14} className="mr-1" /> 키 추가
       </Button>
 
-      {value.some(
-        (r) => r.attrsKey && !contactColumns.some((c) => c.key === r.attrsKey),
-      ) && (
+      {value.some((r) => r.attrsKey && !contactColumns.some((c) => c.key === r.attrsKey)) && (
         <div className="text-xs text-amber-600">
-          컨택 컬럼에 없는 attrs 키가 포함돼 있습니다. 응답 시 해당 키가 비어있으면 fail-safe SHOW 됩니다.
+          컨택 컬럼에 없는 attrs 키가 포함돼 있습니다. 응답 시 해당 키가 비어있으면 fail-safe SHOW
+          됩니다.
         </div>
       )}
     </div>

@@ -24,13 +24,13 @@ import {
   Video,
   X,
 } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 
 import {
   createQuestion as createQuestionAction,
   updateQuestion as updateQuestionAction,
 } from '@/actions/question-actions';
 import { Button } from '@/components/ui/button';
-import { useEnsureSurveyInDb } from '@/hooks/use-ensure-survey-in-db';
 import {
   Dialog,
   DialogContent,
@@ -43,19 +43,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { useEnsureSurveyInDb } from '@/hooks/use-ensure-survey-in-db';
 import { isValidUUID } from '@/lib/utils';
-import {
-  INTERACTIVE_CELL_TYPES,
-  generateCellCode,
-  generateExportLabel,
-  inferSpssMeasure,
-  inferSpssVarType,
-} from '@/utils/table-cell-code-generator';
-import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { generateId } from '@/lib/utils';
-import { isPartialNumericInput, parseNumericInput } from '@/utils/numeric-input';
-import { getMaxSpssCode } from '@/utils/option-code-generator';
-import { hasExistingOtherRankingCell } from '@/utils/ranking-source';
+import { useSurveyBuilderStore } from '@/stores/survey-store';
 import {
   BranchRule,
   CheckboxOption,
@@ -64,15 +55,24 @@ import {
   RankingConfig,
   TableCell,
 } from '@/types/survey';
-import { useShallow } from 'zustand/react/shallow';
+import { isPartialNumericInput, parseNumericInput } from '@/utils/numeric-input';
+import { getMaxSpssCode } from '@/utils/option-code-generator';
+import { hasExistingOtherRankingCell } from '@/utils/ranking-source';
+import {
+  INTERACTIVE_CELL_TYPES,
+  generateCellCode,
+  generateExportLabel,
+  inferSpssMeasure,
+  inferSpssVarType,
+} from '@/utils/table-cell-code-generator';
 
 import { CellChoiceEditor } from './cell-choice-editor';
 import { CellImageEditor } from './cell-image-editor';
 import { CellContentLayout } from './cells/cell-content-layout';
+import { ChoiceOptCellTab } from './choice-opt-cell-tab';
 import { OptionsLayoutSelector } from './options-layout-selector';
 import { RankingCellTab } from './ranking-cell-tab';
 import { RankingOptCellTab } from './ranking-opt-cell-tab';
-import { ChoiceOptCellTab } from './choice-opt-cell-tab';
 import { VariableButton } from './variable-button';
 
 // textPosition 컨트롤을 표시할 셀 타입 — 텍스트 라벨과 입력/옵션 영역이 분리된 셀들만
@@ -135,8 +135,7 @@ export function CellContentModal({
     | 'ranking'
     | 'ranking_opt'
     | 'choice_opt';
-  const narrowCellType = (t: TableCell['type'] | undefined): ContentType =>
-    !t ? 'text' : t;
+  const narrowCellType = (t: TableCell['type'] | undefined): ContentType => (!t ? 'text' : t);
   const [contentType, setContentType] = useState<ContentType>(narrowCellType(cell.type));
   const [textContent, setTextContent] = useState(cell.content || '');
   const [imageUrl, setImageUrl] = useState(cell.imageUrl || '');
@@ -214,9 +213,13 @@ export function CellContentModal({
 
   // 셀 코드 및 엑셀 라벨
   const [cellCode, setCellCode] = useState(cell.cellCode || '');
-  const [isCustomCellCode, setIsCustomCellCode] = useState(cell.isCustomCellCode ?? !!cell.cellCode);
+  const [isCustomCellCode, setIsCustomCellCode] = useState(
+    cell.isCustomCellCode ?? !!cell.cellCode,
+  );
   const [exportLabel, setExportLabel] = useState(cell.exportLabel || '');
-  const [isCustomExportLabel, setIsCustomExportLabel] = useState(cell.isCustomExportLabel ?? !!cell.exportLabel);
+  const [isCustomExportLabel, setIsCustomExportLabel] = useState(
+    cell.isCustomExportLabel ?? !!cell.exportLabel,
+  );
 
   // SPSS 변수 타입 / 측정 수준 (셀 단위)
   const [spssVarType, setSpssVarType] = useState<TableCell['spssVarType']>(cell.spssVarType);
@@ -224,7 +227,11 @@ export function CellContentModal({
 
   // 자동생성 셀코드/라벨 계산
   const autoCellCode = generateCellCode(questionCode, rowCode, columnCode);
-  const autoExportLabel = generateExportLabel(questionCode, columnLabel, rowLabel);
+  const autoExportLabel = generateExportLabel(
+    questionCode,
+    columnLabel || columnCode,
+    rowLabel || rowCode,
+  );
 
   // 셀이 변경될 때 상태 동기화 (모달이 열릴 때마다 최신 셀 데이터 반영)
   useEffect(() => {
@@ -273,10 +280,10 @@ export function CellContentModal({
       setSpssMeasure(cell.spssMeasure);
       setMobileDisplay(cell.mobileDisplay ?? 'hidden');
     }
-  // deps 를 cell?.id 로 좁힘 — 모달 안에서 셀 저장 등으로 cell reference 가 바뀌어도
-  // 사용자가 편집 중인 20+ 로컬 state 가 store 의 옛 값으로 reset 되지 않도록 한다.
-  // (feedback_useeffect_reset_object_deps 참조)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // deps 를 cell?.id 로 좁힘 — 모달 안에서 셀 저장 등으로 cell reference 가 바뀌어도
+    // 사용자가 편집 중인 20+ 로컬 state 가 store 의 옛 값으로 reset 되지 않도록 한다.
+    // (feedback_useeffect_reset_object_deps 참조)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, cell?.id]);
 
   // YouTube URL을 임베드 URL로 변환
@@ -291,7 +298,9 @@ export function CellContentModal({
 
   const mountedRef = useRef(true);
   useEffect(() => {
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   const handleSave = async () => {
@@ -304,10 +313,10 @@ export function CellContentModal({
     // 단, "기타로 사용" 셀은 드롭다운 라벨이 자동 폴백(기타 (직접 입력))되므로 빈 상태도 허용.
     if (contentType === 'ranking_opt' && !isOtherRankingCell) {
       const hasContent = !!(
-        textContent.trim()
-        || rankingLabel.trim()
-        || imageUrl.trim()
-        || videoUrl.trim()
+        textContent.trim() ||
+        rankingLabel.trim() ||
+        imageUrl.trim() ||
+        videoUrl.trim()
       );
       if (!hasContent) {
         alert('순위 옵션 소스 셀은 텍스트/라벨/이미지/비디오 중 하나 이상을 설정해야 합니다.');
@@ -383,21 +392,19 @@ export function CellContentModal({
         // ranking_opt / choice_opt 전용 spssNumericCode (Case 2/A SPSS 재-export 안정성)
         // isOther 모드면 numeric 변수가 system-missing 이라 spssNumericCode 는 의미 없음 → 강제 undefined.
         spssNumericCode:
-          ((contentType === 'ranking_opt' && !isOtherRankingCell)
-            || contentType === 'choice_opt')
-            && typeof cellSpssNumericCode === 'number'
+          ((contentType === 'ranking_opt' && !isOtherRankingCell) ||
+            contentType === 'choice_opt') &&
+          typeof cellSpssNumericCode === 'number'
             ? cellSpssNumericCode
             : undefined,
         // ranking_opt 셀을 질문-레벨 "기타" 엔트리로 사용할지 (타입 전환 시 undefined 로 클리어).
-        isOtherRankingCell:
-          contentType === 'ranking_opt' && isOtherRankingCell ? true : undefined,
+        isOtherRankingCell: contentType === 'ranking_opt' && isOtherRankingCell ? true : undefined,
         // 보기 옵션 소스 셀 (Case A)
         choiceLabel:
           contentType === 'choice_opt' && choiceLabel.trim().length > 0
             ? choiceLabel.trim()
             : undefined,
-        allowTextInput:
-          contentType === 'choice_opt' && choiceAllowTextInput ? true : undefined,
+        allowTextInput: contentType === 'choice_opt' && choiceAllowTextInput ? true : undefined,
         // 보기 옵션 소스 셀의 조건부 분기 규칙 (Case A). value 는 셀 id(=resolveChoiceOptions
         // 가 부여하는 옵션 value)로 강제해 응답 매칭이 일치하도록 한다.
         branchRule:
@@ -425,7 +432,8 @@ export function CellContentModal({
         cellCode: cellCode || undefined,
         isCustomCellCode: isCustomCellCode === false ? false : isCustomCellCode || undefined,
         exportLabel: exportLabel || undefined,
-        isCustomExportLabel: isCustomExportLabel === false ? false : isCustomExportLabel || undefined,
+        isCustomExportLabel:
+          isCustomExportLabel === false ? false : isCustomExportLabel || undefined,
         // SPSS 변수 타입 / 측정 수준 (입력 셀만)
         spssVarType: INTERACTIVE_CELL_TYPES.has(contentType) ? spssVarType : undefined,
         spssMeasure: INTERACTIVE_CELL_TYPES.has(contentType) ? spssMeasure : undefined,
@@ -458,9 +466,7 @@ export function CellContentModal({
                 currentSurvey: {
                   ...state.currentSurvey,
                   questions: state.currentSurvey.questions.map((q) =>
-                    q.id === currentQuestionId
-                      ? { ...q, tableRowsData: updatedRowsData }
-                      : q,
+                    q.id === currentQuestionId ? { ...q, tableRowsData: updatedRowsData } : q,
                   ),
                 },
               }));
@@ -670,9 +676,12 @@ export function CellContentModal({
                 {autoCellCode && isCustomCellCode && (
                   <p className="text-[10px] text-gray-400">자동: {autoCellCode}</p>
                 )}
-                {!cellCode && (INTERACTIVE_CELL_TYPES.has(contentType) || contentType === 'ranking') && (
-                  <p className="text-[10px] text-amber-500">셀코드가 비어있으면 내보내기에서 제외됩니다.</p>
-                )}
+                {!cellCode &&
+                  (INTERACTIVE_CELL_TYPES.has(contentType) || contentType === 'ranking') && (
+                    <p className="text-[10px] text-amber-500">
+                      셀코드가 비어있으면 내보내기에서 제외됩니다.
+                    </p>
+                  )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="export-label">엑셀 라벨</Label>
@@ -714,14 +723,20 @@ export function CellContentModal({
             {INTERACTIVE_CELL_TYPES.has(contentType) && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label htmlFor="cell-spss-var-type" className="text-xs">변수 타입</Label>
+                  <Label htmlFor="cell-spss-var-type" className="text-xs">
+                    변수 타입
+                  </Label>
                   <select
                     id="cell-spss-var-type"
                     value={spssVarType || ''}
-                    onChange={(e) => setSpssVarType((e.target.value || undefined) as TableCell['spssVarType'])}
+                    onChange={(e) =>
+                      setSpssVarType((e.target.value || undefined) as TableCell['spssVarType'])
+                    }
                     className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
                   >
-                    <option value="" disabled>선택</option>
+                    <option value="" disabled>
+                      선택
+                    </option>
                     <option value="Numeric">Numeric</option>
                     <option value="String">String</option>
                     <option value="Date">Date</option>
@@ -729,14 +744,20 @@ export function CellContentModal({
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="cell-spss-measure" className="text-xs">측정 수준</Label>
+                  <Label htmlFor="cell-spss-measure" className="text-xs">
+                    측정 수준
+                  </Label>
                   <select
                     id="cell-spss-measure"
                     value={spssMeasure || ''}
-                    onChange={(e) => setSpssMeasure((e.target.value || undefined) as TableCell['spssMeasure'])}
+                    onChange={(e) =>
+                      setSpssMeasure((e.target.value || undefined) as TableCell['spssMeasure'])
+                    }
                     className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm"
                   >
-                    <option value="" disabled>선택</option>
+                    <option value="" disabled>
+                      선택
+                    </option>
                     <option value="Nominal">Nominal (명목)</option>
                     <option value="Ordinal">Ordinal (순서)</option>
                     <option value="Continuous">Continuous (척도)</option>
@@ -848,10 +869,7 @@ export function CellContentModal({
 
           {/* 이미지 탭 */}
           <TabsContent value="image" className="space-y-4">
-            <CellImageEditor
-              imageUrl={imageUrl}
-              onImageUrlChange={setImageUrl}
-            />
+            <CellImageEditor imageUrl={imageUrl} onImageUrlChange={setImageUrl} />
           </TabsContent>
 
           {/* 동영상 탭 */}
@@ -944,8 +962,8 @@ export function CellContentModal({
                   <label htmlFor="input-type-number" className="flex-1 cursor-pointer text-sm">
                     <span className="font-medium">숫자만 입력</span>
                     <p className="mt-0.5 text-xs text-gray-500">
-                      체크 시 응답자는 숫자만 입력할 수 있고, 분기 조건에서 비교 연산자 (=, ≠, ≥,
-                      ≤, &gt;, &lt;) 를 사용할 수 있습니다.
+                      체크 시 응답자는 숫자만 입력할 수 있고, 분기 조건에서 비교 연산자 (=, ≠, ≥, ≤,
+                      &gt;, &lt;) 를 사용할 수 있습니다.
                     </p>
                   </label>
                 </div>
@@ -995,8 +1013,7 @@ export function CellContentModal({
 
             <div className="space-y-2">
               <Label htmlFor="input-default-value-template" className="text-sm font-medium">
-                응답값 prefill{' '}
-                <span className="font-normal text-gray-500">(선택)</span>
+                응답값 prefill <span className="font-normal text-gray-500">(선택)</span>
               </Label>
               <div className="flex items-center gap-2">
                 <Input
@@ -1075,10 +1092,7 @@ export function CellContentModal({
 
           {/* 체크박스 탭 */}
           <TabsContent value="checkbox" className="space-y-4">
-            <OptionsLayoutSelector
-              value={cellOptionsColumns}
-              onChange={setCellOptionsColumns}
-            />
+            <OptionsLayoutSelector value={cellOptionsColumns} onChange={setCellOptionsColumns} />
             <CellChoiceEditor
               cellType="checkbox"
               textContent={textContent}
@@ -1101,10 +1115,7 @@ export function CellContentModal({
 
           {/* 라디오 버튼 탭 */}
           <TabsContent value="radio" className="space-y-4">
-            <OptionsLayoutSelector
-              value={cellOptionsColumns}
-              onChange={setCellOptionsColumns}
-            />
+            <OptionsLayoutSelector value={cellOptionsColumns} onChange={setCellOptionsColumns} />
             <CellChoiceEditor
               cellType="radio"
               textContent={textContent}
@@ -1149,10 +1160,7 @@ export function CellContentModal({
 
           {/* 순위형(ranking) 탭 — Case 3 */}
           <TabsContent value="ranking" className="space-y-4">
-            <OptionsLayoutSelector
-              value={cellOptionsColumns}
-              onChange={setCellOptionsColumns}
-            />
+            <OptionsLayoutSelector value={cellOptionsColumns} onChange={setCellOptionsColumns} />
             <RankingCellTab
               cellCode={cellCode}
               rankingOptions={rankingOptions}

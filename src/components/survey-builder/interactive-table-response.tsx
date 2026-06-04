@@ -713,6 +713,17 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
     ],
   );
 
+  // 모바일: 계층/매트릭스 감지 시 드릴다운, 평면 단순 표는 기존 스테퍼
+  const { useDrilldown } = useMemo(
+    () =>
+      decideDrilldown({
+        tableColumns: visibleColumns,
+        tableRowsData: displayRows,
+        tableHeaderGrid: visibleHeaderGrid,
+      }),
+    [visibleColumns, displayRows, visibleHeaderGrid],
+  );
+
   // ── 빈 테이블 ──
   if (columns.length === 0 || rows.length === 0) {
     return (
@@ -847,17 +858,6 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
         </div>
       </div>
     </div>
-  );
-
-  // 모바일: 계층/매트릭스 감지 시 드릴다운, 평면 단순 표는 기존 스테퍼
-  const { useDrilldown } = useMemo(
-    () =>
-      decideDrilldown({
-        tableColumns: visibleColumns,
-        tableRowsData: displayRows,
-        tableHeaderGrid: visibleHeaderGrid,
-      }),
-    [visibleColumns, displayRows, visibleHeaderGrid],
   );
 
   const mobileTableProps = {

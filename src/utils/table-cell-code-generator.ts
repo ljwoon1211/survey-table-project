@@ -4,7 +4,14 @@ import { generateAllOptionCodes } from './option-code-generator';
 import { sanitizeSpssVarName } from './spss-var-name';
 
 /** 입력 가능한 셀 타입 (SPSS 변수 생성 대상 — ranking_opt 는 Case 2 옵션 소스로 숫자코드/변수타입 설정 필요) */
-export const INTERACTIVE_CELL_TYPES = new Set(['checkbox', 'radio', 'select', 'input', 'ranking_opt', 'choice_opt']);
+export const INTERACTIVE_CELL_TYPES = new Set([
+  'checkbox',
+  'radio',
+  'select',
+  'input',
+  'ranking_opt',
+  'choice_opt',
+]);
 
 /**
  * ranking 셀(Case 3) + 질문 레벨 ranking(Case 1) 의 SPSS 변수 접미사 기본 템플릿.
@@ -129,9 +136,7 @@ export function generateExportLabel(
 // ── SPSS 변수 타입 / 측정 수준 자동 판단 ──
 
 /** 셀 타입 기반 SPSS 변수 타입 자동 판단 */
-export function inferSpssVarType(
-  cellType: TableCell['type'],
-): TableCell['spssVarType'] {
+export function inferSpssVarType(cellType: TableCell['type']): TableCell['spssVarType'] {
   switch (cellType) {
     case 'checkbox':
     case 'radio':
@@ -145,9 +150,7 @@ export function inferSpssVarType(
 }
 
 /** 셀 타입 기반 SPSS 측정 수준 자동 판단 */
-export function inferSpssMeasure(
-  cellType: TableCell['type'],
-): TableCell['spssMeasure'] {
+export function inferSpssMeasure(cellType: TableCell['type']): TableCell['spssMeasure'] {
   switch (cellType) {
     case 'checkbox':
     case 'radio':
@@ -188,7 +191,11 @@ function applyAutoCodeToCell(
   }
 
   if (!isEffectivelyCustomLabel(cell)) {
-    const newExportLabel = generateExportLabel(questionCode, columnLabel, rowLabel);
+    const newExportLabel = generateExportLabel(
+      questionCode,
+      columnLabel || columnCode,
+      rowLabel || rowCode,
+    );
     if (cell.exportLabel !== newExportLabel || cell.isCustomExportLabel !== false) {
       updates.exportLabel = newExportLabel;
       updates.isCustomExportLabel = false;
@@ -325,7 +332,7 @@ export function regenerateCellCodeForPaste(
     ...cell,
     cellCode: generateCellCode(questionCode, rowCode, columnCode),
     isCustomCellCode: false,
-    exportLabel: generateExportLabel(questionCode, columnLabel, rowLabel),
+    exportLabel: generateExportLabel(questionCode, columnLabel || columnCode, rowLabel || rowCode),
     isCustomExportLabel: false,
     // ranking 셀: 순위별 수동 변수명은 원본 셀 전용이므로 새 셀에서 제거 → 자동 생성 폴백
     rankVarNames: undefined,
