@@ -76,6 +76,16 @@ describe('bucketQuestions', () => {
     expect(out.map((x) => x.id)).toEqual(['T']);
     expect(out[0].tableRowsData!.map((r) => r.id)).toEqual(['r2']);
   });
+
+  it('멀티토큰 비테이블 질문은 각 버킷에 모두 복사된다', () => {
+    // M의 displayCondition이 opt1·opt2 두 값을 모두 requiredValues로 가짐
+    const M = q({ id: 'M', type: 'text', displayCondition: vm('Q2', ['opt1', 'opt2']) });
+    const questions = [basis, A, M];
+    const inOpt1 = bucketQuestions(questions, 'Q2', 'opt1');
+    const inOpt2 = bucketQuestions(questions, 'Q2', 'opt2');
+    expect(inOpt1.map((x) => x.id)).toContain('M');
+    expect(inOpt2.map((x) => x.id)).toContain('M');
+  });
 });
 
 describe('optionTokensForBasis', () => {
