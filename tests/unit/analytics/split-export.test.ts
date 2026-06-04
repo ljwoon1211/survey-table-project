@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { valueMatchSet, bucketQuestions, optionTokensForBasis } from '@/lib/analytics/split-export';
+import { valueMatchSet, bucketQuestions, optionTokensForBasis, planSplit } from '@/lib/analytics/split-export';
 import type { Question, QuestionConditionGroup } from '@/types/survey';
 
 const vm = (sourceQuestionId: string, requiredValues: string[]): QuestionConditionGroup => ({
@@ -38,6 +38,7 @@ describe('valueMatchSet', () => {
 
 const q = (over: Partial<Question>): Question => ({
   id: 'x', surveyId: 's', type: 'text', title: 't', required: false, order: 0,
+  questionCode: over.id ?? 'x',
   ...over,
 } as unknown as Question);
 
@@ -90,5 +91,34 @@ describe('optionTokensForBasis', () => {
     const C = q({ id: 'C', displayCondition: vm('Q2', ['opt1', 'other']) });
     const tokens = optionTokensForBasis([basis, B, C], basis);
     expect(tokens).toEqual(['opt1', 'opt2', 'other']);
+  });
+});
+
+describe('planSplit', () => {
+  const basis = q({
+    id: 'Q2', type: 'radio', questionCode: 'Q2', title: '품목',
+    options: [
+      { id: 'o1', value: 'opt1', label: '제재목' },
+      { id: 'o2', value: 'opt2', label: '합판' },
+    ],
+  } as Partial<Question>);
+  const common = q({ id: 'A', type: 'text', title: '공통질문' });
+  const only1 = q({ id: 'B', type: 'text', title: 'opt1전용', displayCondition: vm('Q2', ['opt1']) });
+  const all = [basis, common, only1];
+
+  it('공통/옵션 시트 변수 수와 메타를 계산한다', () => {
+    const plan = planSplit(all, 'Q2', { opt1: 12, opt2: 5 });
+    expect(plan.basisCode).toBe('Q2');
+    expect(plan.basisLabel).toBe('품목');
+    // 공통: basis(radio=1열) + 공통 text(1열) = 2
+    expect(plan.common).toBe(2);
+    // opt1 시트: only1 text 1열, opt2 시트: 변수 0 → 시트 제외
+    const opt1 = plan.sheets.find((s) => s.token === 'opt1')!;
+    expect(opt1.vars).toBe(1);
+    expect(opt1.name).toBe('제재목');
+    expect(opt1.resp).toBe(12);
+    expect(plan.sheets.find((s) => s.token === 'opt2')).toBeUndefined(); // 빈 버킷 제외
+    expect(plan.maxVars).toBe(2); // 공통이 최대
+    expect(plan.exceedsSoftLimit).toBe(false);
   });
 });

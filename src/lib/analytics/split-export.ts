@@ -1,4 +1,5 @@
 import type { Question, QuestionConditionGroup } from '@/types/survey';
+import { generateSPSSColumns } from './spss-excel-export';
 
 export const SPLIT_SOFT_LIMIT = 10000;
 export const SPLIT_EXCEL_LIMIT = 16384;
@@ -82,4 +83,55 @@ export function optionTokensForBasis(questions: Question[], basis: Question): st
   }
   for (const t of present) ordered.push(t); // 옵션 목록에 없는 토큰(other 등)
   return ordered;
+}
+
+export interface SplitSheetPlan {
+  token: string;
+  name: string;
+  vars: number;
+  resp: number;
+}
+
+export interface SplitPlan {
+  basisQuestionId: string;
+  basisCode: string;
+  basisLabel: string;
+  common: number;
+  sheets: SplitSheetPlan[];
+  maxVars: number;
+  exceedsSoftLimit: boolean;
+  exceedsExcelLimit: boolean;
+}
+
+export function planSplit(
+  questions: Question[],
+  basisQuestionId: string,
+  respCounts: Record<string, number> = {},
+): SplitPlan {
+  const basis = questions.find((q) => q.id === basisQuestionId);
+  if (!basis) throw new Error(`기준 문항을 찾을 수 없습니다: ${basisQuestionId}`);
+
+  const labelMap = new Map((basis.options ?? []).map((o) => [o.value, o.label]));
+  const tokens = optionTokensForBasis(questions, basis);
+
+  const common = generateSPSSColumns(bucketQuestions(questions, basisQuestionId, 'common')).length;
+
+  const sheets: SplitSheetPlan[] = [];
+  for (const t of tokens) {
+    const vars = generateSPSSColumns(bucketQuestions(questions, basisQuestionId, t)).length;
+    if (vars === 0) continue; // 빈 버킷 제외
+    sheets.push({ token: t, name: labelMap.get(t) ?? t, vars, resp: respCounts[t] ?? 0 });
+  }
+
+  const maxVars = Math.max(common, 0, ...sheets.map((s) => s.vars));
+  return {
+    basisQuestionId,
+    basisCode: basis.questionCode ?? '',
+    basisLabel: basis.title,
+    common,
+    sheets,
+    maxVars,
+    exceedsSoftLimit: maxVars > SPLIT_SOFT_LIMIT,
+    exceedsExcelLimit: maxVars > SPLIT_EXCEL_LIMIT,
+  };
 }
