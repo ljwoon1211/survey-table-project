@@ -79,6 +79,7 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
   // (scalar/list 섹션은 원래 목록 없이 바로 폼이라 leaf:null 그대로 둔다.)
   const enterSection = (si: number) => {
     const sec = sections[si];
+    if (!sec) return;
     const direct = sec.kind === 'matrix' && sec.leaves.length === 1;
     setNav({ sec: si, leaf: direct ? 0 : null });
   };
@@ -254,6 +255,8 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
   const s = sections[nav.sec];
   const backToRoot = () => setNav({ sec: null, leaf: null });
 
+  if (!s) return null;
+
   // ── scalar / list 섹션 ──
   if (s.kind === 'scalar' || s.kind === 'list') {
     return (
@@ -279,7 +282,7 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
                     </span>
                     {done && <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />}
                   </div>
-                  {renderCell(l.inputCellIds[0])}
+                  {l.inputCellIds[0] != null && renderCell(l.inputCellIds[0])}
                 </div>
               );
             })}
@@ -337,6 +340,7 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
 
   // matrix 리프 폼 (열 그룹별 입력)
   const leaf = s.leaves[nav.leaf];
+  if (!leaf) return null;
   // 리프 1개 섹션은 enterSection 이 목차→폼으로 직행시킨 경우라, '뒤로'도 리프 목록이 아닌
   // 목차로 보낸다. enterSection 의 직행 판정과 동일 기준(matrix·리프 1개)으로 맞춘다.
   // (이 경로는 scalar/list 가 위에서 early-return 되어 항상 matrix)
@@ -383,11 +387,12 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
               <div className="space-y-3">
                 {g.cols.map((c) => {
                   const cellId = leaf.inputCellIds[k++];
+                  if (cellId == null) return null;
                   const cell = cellById.get(cellId);
                   if (!cell) return null;
                   // 일반 테이블 카드(mobile-row-card)와 동일한 라벨 위계:
                   // 파란 점 불릿 + text-sm gray-900. 라벨이 주, 문항(cell.content)이 보조.
-                  const label = cell.exportLabel?.trim() || c.label;
+                  const label = cell.exportLabel?.trim() || c.label || '';
                   return (
                     <div key={c.col} className="space-y-1">
                       {label && (

@@ -151,7 +151,9 @@ describe('createUnifiedExtensions', () => {
       expect(initialWrapperStyle as string).toMatch(/float:\s*left/);
 
       // containerStyle attr 도 schema 에 등록되어 있는지
-      const imageSchemaSpec = editor.schema.nodes['imageResize'].spec as {
+      const imageResizeNode = editor.schema.nodes['imageResize'];
+      if (!imageResizeNode) throw new Error('imageResize node가 schema에 없음');
+      const imageSchemaSpec = imageResizeNode.spec as {
         attrs?: Record<string, unknown>;
       };
       expect(imageSchemaSpec.attrs).toHaveProperty('wrapperStyle');

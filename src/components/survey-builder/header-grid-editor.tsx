@@ -35,18 +35,21 @@ function buildOccupiedMap(
 
   for (let rowIdx = 0; rowIdx < grid.length; rowIdx++) {
     const row = grid[rowIdx];
+    if (!row) continue;
     let colPos = 0;
     for (let cellIdx = 0; cellIdx < row.length; cellIdx++) {
       // 이미 점유된 슬롯 건너뛰기 (위쪽 행의 rowspan)
-      while (colPos < columnCount && map[rowIdx][colPos] !== null) {
+      while (colPos < columnCount && map[rowIdx]?.[colPos] !== null) {
         colPos++;
       }
       const cell = row[cellIdx];
+      if (!cell) continue;
       const ref: OccupiedRef = { rowIdx, cellIdx, gridCol: colPos };
       for (let r = 0; r < cell.rowspan; r++) {
         for (let c = 0; c < cell.colspan; c++) {
           if (rowIdx + r < totalRows && colPos + c < columnCount) {
-            map[rowIdx + r][colPos + c] = ref;
+            const mapRow = map[rowIdx + r];
+            if (mapRow) mapRow[colPos + c] = ref;
           }
         }
       }
@@ -92,7 +95,7 @@ export function HeaderGridEditor({ headerGrid, columnCount, onChange }: HeaderGr
   const selectionBounds = useMemo(() => {
     if (selectedCells.size === 0) return null;
     const coords = Array.from(selectedCells).map((key) => {
-      const [r, c] = key.split('-').map(Number);
+      const [r = 0, c = 0] = key.split('-').map(Number);
       return { row: r, col: c };
     });
     return {
@@ -127,7 +130,7 @@ export function HeaderGridEditor({ headerGrid, columnCount, onChange }: HeaderGr
     }
 
     for (const refKey of involvedRefs) {
-      const [rIdx, cIdx] = refKey.split('-').map(Number);
+      const [rIdx = 0, cIdx = 0] = refKey.split('-').map(Number);
       const cell = headerGrid[rIdx]?.[cIdx];
       if (!cell) return false;
       const startCol = getCellGridCol(occupiedMap, rIdx, cIdx, columnCount);
@@ -146,7 +149,7 @@ export function HeaderGridEditor({ headerGrid, columnCount, onChange }: HeaderGr
   const canUnmerge = useMemo(() => {
     if (selectedCells.size === 0) return false;
     for (const key of selectedCells) {
-      const [r, c] = key.split('-').map(Number);
+      const [r = 0, c = 0] = key.split('-').map(Number);
       const ref = occupiedMap[r]?.[c];
       if (ref) {
         const cell = headerGrid[ref.rowIdx]?.[ref.cellIdx];
@@ -247,7 +250,7 @@ export function HeaderGridEditor({ headerGrid, columnCount, onChange }: HeaderGr
 
     // 첫 번째 셀의 라벨 사용
     const firstRef = occupiedMap[minRow]?.[minCol];
-    const mergedLabel = firstRef ? headerGrid[firstRef.rowIdx][firstRef.cellIdx].label : '';
+    const mergedLabel = firstRef ? (headerGrid[firstRef.rowIdx]?.[firstRef.cellIdx]?.label ?? '') : '';
 
     // 새 그리드 구성
     const newGrid: HeaderCell[][] = [];
@@ -256,6 +259,10 @@ export function HeaderGridEditor({ headerGrid, columnCount, onChange }: HeaderGr
     for (let rowIdx = 0; rowIdx < totalRows; rowIdx++) {
       const newRow: HeaderCell[] = [];
       const row = headerGrid[rowIdx];
+      if (!row) {
+        newGrid.push(newRow);
+        continue;
+      }
 
       for (let cellIdx = 0; cellIdx < row.length; cellIdx++) {
         const refKey = `${rowIdx}-${cellIdx}`;
@@ -274,7 +281,8 @@ export function HeaderGridEditor({ headerGrid, columnCount, onChange }: HeaderGr
           }
           // 나머지는 건너뜀
         } else {
-          newRow.push({ ...row[cellIdx] });
+          const sourceCell = row[cellIdx];
+          if (sourceCell) newRow.push({ ...sourceCell });
         }
       }
 
@@ -294,7 +302,7 @@ export function HeaderGridEditor({ headerGrid, columnCount, onChange }: HeaderGr
     const processedRefs = new Set<string>();
 
     for (const key of selectedCells) {
-      const [r, c] = key.split('-').map(Number);
+      const [r = 0, c = 0] = key.split('-').map(Number);
       const ref = occupiedMap[r]?.[c];
       if (!ref) continue;
       const refKey = `${ref.rowIdx}-${ref.cellIdx}`;
@@ -331,7 +339,8 @@ export function HeaderGridEditor({ headerGrid, columnCount, onChange }: HeaderGr
       for (let c = 1; c < origColspan; c++) {
         sameRowCells.push({ id: generateId(), label: '', colspan: 1, rowspan: 1 });
       }
-      currentGrid[rowIdx].splice(cellIdx + 1, 0, ...sameRowCells);
+      const currentRow = currentGrid[rowIdx];
+      if (currentRow) currentRow.splice(cellIdx + 1, 0, ...sameRowCells);
 
       // 3. 아래 행들에 빈 셀 추가
       for (let r = 1; r < origRowspan; r++) {
@@ -342,7 +351,9 @@ export function HeaderGridEditor({ headerGrid, columnCount, onChange }: HeaderGr
         const tempMap = buildOccupiedMap(currentGrid, currentGrid.length, columnCount);
         let insertPos = 0;
 
-        for (let ci = 0; ci < currentGrid[targetRowIdx].length; ci++) {
+        const targetRow = currentGrid[targetRowIdx];
+        if (!targetRow) continue;
+        for (let ci = 0; ci < targetRow.length; ci++) {
           const ciCol = getCellGridCol(tempMap, targetRowIdx, ci, columnCount);
           if (ciCol >= startCol) {
             insertPos = ci;
@@ -355,7 +366,7 @@ export function HeaderGridEditor({ headerGrid, columnCount, onChange }: HeaderGr
         for (let c = 0; c < origColspan; c++) {
           fillCells.push({ id: generateId(), label: '', colspan: 1, rowspan: 1 });
         }
-        currentGrid[targetRowIdx].splice(insertPos, 0, ...fillCells);
+        targetRow.splice(insertPos, 0, ...fillCells);
       }
     }
 
@@ -386,12 +397,15 @@ export function HeaderGridEditor({ headerGrid, columnCount, onChange }: HeaderGr
 
     for (let rowIdx = 0; rowIdx < headerGrid.length; rowIdx++) {
       const row = headerGrid[rowIdx];
+      if (!row) continue;
       for (let cellIdx = 0; cellIdx < row.length; cellIdx++) {
+        const cell = row[cellIdx];
+        if (!cell) continue;
         const gridCol = getCellGridCol(occupiedMap, rowIdx, cellIdx, columnCount);
         positions.push({
           rowIdx,
           cellIdx,
-          cell: row[cellIdx],
+          cell,
           gridCol,
         });
       }

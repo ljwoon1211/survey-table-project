@@ -332,10 +332,11 @@ export default function CreateSurveyPage() {
   const scrollToQuestion = (questionNumber: number) => {
     const questionIndex = questionNumber - 1;
     if (questionIndex >= 0 && questionIndex < currentSurvey.questions.length) {
+      const targetQuestion = currentSurvey.questions[questionIndex];
       const questionElement = document.querySelector(`[data-question-index="${questionIndex}"]`);
-      if (questionElement) {
+      if (questionElement && targetQuestion) {
         questionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        selectQuestion(currentSurvey.questions[questionIndex].id);
+        selectQuestion(targetQuestion.id);
       }
     }
   };

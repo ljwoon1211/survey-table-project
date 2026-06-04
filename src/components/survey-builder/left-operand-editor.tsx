@@ -108,7 +108,7 @@ export function LeftOperandEditor({ value, onChange, sourceQuestionId }: Props) 
       <Select
         value={composite}
         onValueChange={(v) => {
-          const [questionId, cellId] = v.split('::');
+          const [questionId = '', cellId = ''] = v.split('::');
           on({ kind: 'cell', questionId, cellId });
         }}
       >

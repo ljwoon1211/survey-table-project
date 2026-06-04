@@ -74,7 +74,11 @@ export function ProgressColumnEditor({ surveyId, initialScheme, contactScheme }:
     const j = i + delta;
     if (j < 0 || j >= columns.length) return;
     const next = [...columns];
-    [next[i], next[j]] = [next[j], next[i]];
+    const a = next[i];
+    const b = next[j];
+    if (!a || !b) return;
+    next[i] = b;
+    next[j] = a;
     setColumns(next.map((c, idx) => ({ ...c, order: idx })));
   };
 

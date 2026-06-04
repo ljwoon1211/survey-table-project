@@ -23,6 +23,7 @@ function detectRowGroups(rows: TableRow[]): RowGroup[] {
 
   while (i < rows.length) {
     const row = rows[i];
+    if (!row) break;
     const firstTextCell = row.cells.find(
       (c) => c.type === 'text' && !c.isHidden && (c.rowspan ?? 1) > 1,
     );
@@ -64,6 +65,7 @@ function buildColumnSectionMap(headerGrid: HeaderCell[][]): ColumnSectionMap | n
 
   // 마지막에서 2번째 행 = 섹션 레벨 (예: "자가 제재용 원목")
   const sectionRow = headerGrid[headerGrid.length - 2];
+  if (!sectionRow) return null;
   const map: ColumnSectionMap = new Map();
   let colIdx = 0;
 

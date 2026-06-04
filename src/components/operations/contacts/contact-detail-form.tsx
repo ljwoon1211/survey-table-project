@@ -394,6 +394,7 @@ function schemeEqual(a: ContactColumnScheme, b: ContactColumnScheme): boolean {
   for (let i = 0; i < a.columns.length; i++) {
     const ac = a.columns[i];
     const bc = b.columns[i];
+    if (!ac || !bc) return false;
     if (
       ac.key !== bc.key ||
       ac.source !== bc.source ||

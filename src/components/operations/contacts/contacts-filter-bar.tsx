@@ -115,7 +115,9 @@ export function ContactsFilterBar({
 
   const addClause = () => {
     if (columnCandidates.length === 0) return;
-    const firstCandidate = columnCandidates[0].source;
+    const firstItem = columnCandidates[0];
+    if (!firstItem) return;
+    const firstCandidate = firstItem.source;
     // system.web 은 boolean dropdown 의 기본값 'true' 로 초기화 (빈 value 면 silent drop 함정).
     const initialValue = firstCandidate === FILTER_SOURCE.WEB ? 'true' : '';
     const id = `new-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;

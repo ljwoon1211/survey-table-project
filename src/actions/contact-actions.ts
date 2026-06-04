@@ -118,7 +118,8 @@ export async function ingestContactUpload(
     );
   }
 
-  const headerKeys = allRows.length > 0 ? Object.keys(allRows[0]) : [];
+  const firstRow = allRows[0];
+  const headerKeys = firstRow !== undefined ? Object.keys(firstRow) : [];
   // 분류 기준은 선택사항 — 미지정 시 모든 행의 group_value = NULL
   const groupKey =
     mapping.systemFields.group != null ? (headerKeys[mapping.systemFields.group] ?? null) : null;

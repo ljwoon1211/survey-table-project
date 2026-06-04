@@ -52,7 +52,9 @@ export function useDynamicRowLayout({
           let placed = false;
           if (origIdx !== -1) {
             for (let i = origIdx; i >= 0; i--) {
-              const found = visibleRows.find((vr) => vr.id === rows[i].id);
+              const rowAtI = rows[i];
+              if (!rowAtI) continue;
+              const found = visibleRows.find((vr) => vr.id === rowAtI.id);
               if (found) {
                 anchors.set(groupId, found.id);
                 placed = true;
@@ -102,11 +104,12 @@ export function useDynamicRowLayout({
 
     for (let rowIdx = 0; rowIdx < visibleRows.length; rowIdx++) {
       const row = visibleRows[rowIdx];
+      if (!row) continue;
       for (let colIdx = 0; colIdx < row.cells.length; colIdx++) {
         const cell = row.cells[colIdx];
-        if (cell.isHidden || (cell.rowspan || 1) <= 1) continue;
+        if (!cell || cell.isHidden || (cell.rowspan ?? 1) <= 1) continue;
 
-        const span = cell.rowspan!;
+        const span = cell.rowspan ?? 1;
         const spanEnd = rowIdx + span;
 
         // 이 병합 범위와 겹치는 앵커 찾기
@@ -116,18 +119,22 @@ export function useDynamicRowLayout({
         if (intersecting.length === 0) continue;
 
         // 첫 번째 세그먼트: 원래 시작 ~ 첫 앵커까지
-        const seg1Span = intersecting[0] - rowIdx + 1;
+        const firstAnchor = intersecting[0];
+        if (firstAnchor === undefined) continue;
+        const seg1Span = firstAnchor - rowIdx + 1;
         setOvr(rowIdx, colIdx, {
           ...(seg1Span > 1 ? { rowspan: seg1Span } : {}),
         });
 
         // 후속 세그먼트들: 각 앵커 바로 다음 행에서 시작
         for (let i = 0; i < intersecting.length; i++) {
-          const nextStart = intersecting[i] + 1;
+          const anchorI = intersecting[i];
+          if (anchorI === undefined) break;
+          const nextStart = anchorI + 1;
           if (nextStart >= spanEnd) break;
 
-          const nextEnd =
-            i + 1 < intersecting.length ? intersecting[i + 1] + 1 : spanEnd;
+          const nextAnchor = intersecting[i + 1];
+          const nextEnd = nextAnchor !== undefined ? nextAnchor + 1 : spanEnd;
           const segSpan = nextEnd - nextStart;
           const isInteractive = ['checkbox', 'radio', 'select', 'input'].includes(cell.type);
 

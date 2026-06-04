@@ -129,10 +129,12 @@ async function sendInBatches(input: BulkSendInput): Promise<BulkSendResultItem[]
         // 모두 성공 — 순서대로 매핑
         for (let i = 0; i < c.length; i++) {
           const item = successItems[i];
+          const recipient = c[i];
+          if (!recipient) continue;
           if (item?.id) {
-            results.push({ recipientId: c[i].recipientId, resendMessageId: item.id });
+            results.push({ recipientId: recipient.recipientId, resendMessageId: item.id });
           } else {
-            results.push({ recipientId: c[i].recipientId, errorReason: 'Resend 응답 id 누락' });
+            results.push({ recipientId: recipient.recipientId, errorReason: 'Resend 응답 id 누락' });
           }
         }
       } else {

@@ -213,10 +213,14 @@ export function migrateSnapshotQuestions(snapshot: {
           if (!cellOtherIdMappings[question.id]) {
             cellOtherIdMappings[question.id] = {};
           }
-          if (!cellOtherIdMappings[question.id][cell.id]) {
-            cellOtherIdMappings[question.id][cell.id] = {};
+          const questionMap = cellOtherIdMappings[question.id];
+          if (questionMap && !questionMap[cell.id]) {
+            questionMap[cell.id] = {};
           }
-          cellOtherIdMappings[question.id][cell.id]['__other__'] = newOption.id;
+          const cellMap = questionMap?.[cell.id];
+          if (cellMap) {
+            cellMap['__other__'] = newOption.id;
+          }
 
           const { allowOtherOption: _cellAo, ...cellWithout } = cell;
           return {

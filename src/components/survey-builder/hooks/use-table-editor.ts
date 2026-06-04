@@ -44,10 +44,14 @@ interface UseTableEditorParams {
 function recalculateHiddenCells(tableRows: TableRow[]): TableRow[] {
   const hiddenCoords = new Set<string>();
   for (let r = 0; r < tableRows.length; r++) {
-    const cells = tableRows[r].cells;
+    const tableRow = tableRows[r];
+    if (!tableRow) continue;
+    const cells = tableRow.cells;
     for (let c = 0; c < cells.length; c++) {
-      const rowspan = cells[c].rowspan || 1;
-      const colspan = cells[c].colspan || 1;
+      const currentCell = cells[c];
+      if (!currentCell) continue;
+      const rowspan = currentCell.rowspan || 1;
+      const colspan = currentCell.colspan || 1;
       if (rowspan <= 1 && colspan <= 1) continue;
       for (let dr = 0; dr < rowspan; dr++) {
         for (let dc = 0; dc < colspan; dc++) {
@@ -73,6 +77,7 @@ function recalculateHiddenHeaders(cols: TableColumn[]): TableColumn[] {
     let shouldBeHidden = false;
     for (let j = 0; j < i; j++) {
       const checkCol = cols[j];
+      if (!checkCol) continue;
       const colspan = checkCol.colspan || 1;
       if (colspan > 1 && i >= j && i < j + colspan) {
         shouldBeHidden = true;
@@ -327,17 +332,19 @@ export function useTableEditor({
     (columnIndex: number) => {
       const cols = [...currentColumnsRef.current];
       const currentCol = cols[columnIndex];
+      if (!currentCol) return;
       const currentColspan = currentCol.colspan || 1;
       const nextVisibleIndex = columnIndex + currentColspan;
 
       if (nextVisibleIndex >= cols.length) return;
 
       const targetCol = cols[nextVisibleIndex];
+      if (!targetCol) return;
       const targetColspan = targetCol.colspan || 1;
 
-      cols[columnIndex] = { ...currentCol, colspan: currentColspan + targetColspan };
+      cols[columnIndex] = { ...currentCol, colspan: currentColspan + targetColspan } as TableColumn;
       const { colspan: _, ...targetColWithoutColspan } = targetCol;
-      cols[nextVisibleIndex] = targetColWithoutColspan;
+      cols[nextVisibleIndex] = targetColWithoutColspan as TableColumn;
 
       const updatedCols = recalculateHiddenHeaders(cols);
       commitColumns(updatedCols);
@@ -349,8 +356,10 @@ export function useTableEditor({
   const unmergeColumnHeader = useCallback(
     (columnIndex: number) => {
       const cols = [...currentColumnsRef.current];
-      const { colspan: _, ...colWithoutColspan } = cols[columnIndex];
-      cols[columnIndex] = colWithoutColspan;
+      const col = cols[columnIndex];
+      if (!col) return;
+      const { colspan: _, ...colWithoutColspan } = col;
+      cols[columnIndex] = colWithoutColspan as TableColumn;
 
       const updatedCols = recalculateHiddenHeaders(cols);
       commitColumns(updatedCols);
@@ -437,6 +446,7 @@ export function useTableEditor({
       let shouldBeHidden = false;
       for (let col = 0; col < row.cells.length; col++) {
         const cell = row.cells[col];
+        if (!cell) continue;
         const colspan = cell.colspan || 1;
         if (col < newColIndex && col + colspan > newColIndex) {
           shouldBeHidden = true;
@@ -518,17 +528,19 @@ export function useTableEditor({
       const targetIndex = direction === 'left' ? columnIndex - 1 : columnIndex + 1;
 
       const updatedColumns = [...columns];
-      [updatedColumns[columnIndex], updatedColumns[targetIndex]] = [
-        updatedColumns[targetIndex],
-        updatedColumns[columnIndex],
-      ];
+      const colA = updatedColumns[columnIndex];
+      const colB = updatedColumns[targetIndex];
+      if (!colA || !colB) return;
+      updatedColumns[columnIndex] = colB;
+      updatedColumns[targetIndex] = colA;
 
       const updatedRows = rows.map((row) => {
         const newCells = [...row.cells];
-        [newCells[columnIndex], newCells[targetIndex]] = [
-          newCells[targetIndex],
-          newCells[columnIndex],
-        ];
+        const cellA = newCells[columnIndex];
+        const cellB = newCells[targetIndex];
+        if (!cellA || !cellB) return { ...row, cells: newCells };
+        newCells[columnIndex] = cellB;
+        newCells[targetIndex] = cellA;
         return { ...row, cells: newCells };
       });
 
@@ -548,6 +560,7 @@ export function useTableEditor({
 
       const updatedRows = [...rows];
       const [removed] = updatedRows.splice(rowIndex, 1);
+      if (!removed) return;
       updatedRows.splice(targetIndex, 0, removed);
 
       const finalRows = recalculateHiddenCells(updatedRows);
@@ -578,7 +591,7 @@ export function useTableEditor({
     const existingNumbers = rows
       .map((row) => {
         const match = row.label.match(/행 (\d+)/);
-        return match ? parseInt(match[1], 10) : 0;
+        return match ? parseInt(match[1] ?? '0', 10) : 0;
       })
       .filter((n) => !isNaN(n));
 
@@ -591,14 +604,16 @@ export function useTableEditor({
       let shouldBeHidden = false;
 
       for (let r = 0; r < rows.length; r++) {
-        const cell = rows[r].cells[colIndex];
+        const rowItem = rows[r];
+        if (!rowItem) continue;
+        const cell = rowItem.cells[colIndex];
         if (!cell) continue;
 
         const rowspan = cell.rowspan || 1;
         const colspan = cell.colspan || 1;
 
         if (r + rowspan > rows.length) {
-          const cellColIndex = rows[r].cells.findIndex((c) => c.id === cell.id);
+          const cellColIndex = rowItem.cells.findIndex((c) => c.id === cell.id);
           if (colIndex >= cellColIndex && colIndex < cellColIndex + colspan) {
             shouldBeHidden = true;
             break;
@@ -721,11 +736,13 @@ export function useTableEditor({
       const updatedRows = rows.map((row) => {
         const newCells: TableCell[] = newColumns.map((col, i) => {
           const def = columnDefs[i];
+          const cellType = def?.cellType ?? 'text';
+          const cellTemplate = def?.cellTemplate;
           return {
             id: `cell-${row.id}-${col.id}`,
             content: '',
-            type: def.cellType ?? ('text' as const),
-            ...def.cellTemplate,
+            type: cellType as TableCell['type'],
+            ...cellTemplate,
           } as TableCell;
         });
         return {
@@ -1134,7 +1151,7 @@ export function useTableEditor({
       const rowIndex = rows.findIndex((row) => row.id === selected.rowId);
       const cellIndex = rows[rowIndex]?.cells.findIndex(
         (cell) => cell.id === selected.cellId,
-      );
+      ) ?? -1;
       if (rowIndex === -1 || cellIndex === -1) return false;
 
       return checkCanMerge(direction, rowIndex, cellIndex, rows, currentColumnsRef.current);
@@ -1153,7 +1170,7 @@ export function useTableEditor({
       const rowIndex = rows.findIndex((row) => row.id === selected.rowId);
       const cellIndex = rows[rowIndex]?.cells.findIndex(
         (cell) => cell.id === selected.cellId,
-      );
+      ) ?? -1;
       if (rowIndex === -1 || cellIndex === -1) return;
 
       if (!checkCanMerge(direction, rowIndex, cellIndex, rows, columns)) return;
@@ -1187,7 +1204,7 @@ export function useTableEditor({
     const rowIndex = rows.findIndex((row) => row.id === selected.rowId);
     const cellIndex = rows[rowIndex]?.cells.findIndex(
       (cell) => cell.id === selected.cellId,
-    );
+    ) ?? -1;
 
     if (rowIndex === -1 || cellIndex === -1) return;
 

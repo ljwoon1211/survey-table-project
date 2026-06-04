@@ -30,7 +30,9 @@ describe('recordVisibilitySegment — SQL 분기', () => {
     const { recordVisibilitySegment } = await import('@/actions/response-actions');
     await recordVisibilitySegment({ responseId: 'r1', action: 'hide' });
 
-    const setArg = setMock.mock.calls[0][0] as Record<string, unknown>;
+    const hideSetCall = setMock.mock.calls[0];
+    if (!hideSetCall) throw new Error('setMock 호출 없음');
+    const setArg = hideSetCall[0] as Record<string, unknown>;
     const pvSql = extractRawSql(setArg['pageVisits']);
     expect(pvSql).toContain('jsonb_set');
     expect(pvSql).toContain("'leftAt'");
@@ -41,7 +43,9 @@ describe('recordVisibilitySegment — SQL 분기', () => {
     const { recordVisibilitySegment } = await import('@/actions/response-actions');
     await recordVisibilitySegment({ responseId: 'r1', action: 'show' });
 
-    const setArg = setMock.mock.calls[0][0] as Record<string, unknown>;
+    const showSetCall = setMock.mock.calls[0];
+    if (!showSetCall) throw new Error('setMock 호출 없음');
+    const setArg = showSetCall[0] as Record<string, unknown>;
     const pvSql = extractRawSql(setArg['pageVisits']);
     expect(pvSql).toContain('jsonb_build_array');
     expect(pvSql).toContain('||');
@@ -52,7 +56,9 @@ describe('recordVisibilitySegment — SQL 분기', () => {
     const { recordVisibilitySegment } = await import('@/actions/response-actions');
     await recordVisibilitySegment({ responseId: 'r1', action: 'hide' });
     expect(whereMock).toHaveBeenCalledTimes(1); // 단일 UPDATE + WHERE 가드
-    const whereSql = extractRawSql(whereMock.mock.calls[0][0]);
+    const hideWhereCall = whereMock.mock.calls[0];
+    if (!hideWhereCall) throw new Error('whereMock 호출 없음');
+    const whereSql = extractRawSql(hideWhereCall[0]);
     expect(whereSql).toContain('leftAt');
   });
 
@@ -60,7 +66,9 @@ describe('recordVisibilitySegment — SQL 분기', () => {
     const { recordVisibilitySegment } = await import('@/actions/response-actions');
     await recordVisibilitySegment({ responseId: 'r1', action: 'show' });
     expect(whereMock).toHaveBeenCalledTimes(1);
-    const whereSql = extractRawSql(whereMock.mock.calls[0][0]);
+    const showWhereCall = whereMock.mock.calls[0];
+    if (!showWhereCall) throw new Error('whereMock 호출 없음');
+    const whereSql = extractRawSql(showWhereCall[0]);
     expect(whereSql).toContain('leftAt');
     expect(whereSql).toContain('IS NOT NULL');
   });

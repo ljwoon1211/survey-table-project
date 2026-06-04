@@ -112,7 +112,7 @@ export function autoFitColumnWidths(ws: ExcelJS.Worksheet): void {
     const row = ws.getRow(r);
     for (let c = 1; c <= colCount; c++) {
       if (!ws.getColumn(c).hidden) {
-        maxWidths[c - 1] = Math.max(maxWidths[c - 1], getTextWidth(row.getCell(c).value));
+        maxWidths[c - 1] = Math.max(maxWidths[c - 1] ?? 0, getTextWidth(row.getCell(c).value));
       }
     }
   }
@@ -122,7 +122,7 @@ export function autoFitColumnWidths(ws: ExcelJS.Worksheet): void {
     const row = ws.getRow(r);
     for (let c = 1; c <= colCount; c++) {
       if (!ws.getColumn(c).hidden) {
-        maxWidths[c - 1] = Math.max(maxWidths[c - 1], getTextWidth(row.getCell(c).value));
+        maxWidths[c - 1] = Math.max(maxWidths[c - 1] ?? 0, getTextWidth(row.getCell(c).value));
       }
     }
   }
@@ -131,7 +131,7 @@ export function autoFitColumnWidths(ws: ExcelJS.Worksheet): void {
     if (!ws.getColumn(c).hidden) {
       ws.getColumn(c).width = Math.min(
         AUTO_FIT_MAX_WIDTH,
-        Math.max(AUTO_FIT_MIN_WIDTH, maxWidths[c - 1] + AUTO_FIT_PADDING),
+        Math.max(AUTO_FIT_MIN_WIDTH, (maxWidths[c - 1] ?? 0) + AUTO_FIT_PADDING),
       );
     }
   }

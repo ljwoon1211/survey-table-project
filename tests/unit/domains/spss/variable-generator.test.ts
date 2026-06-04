@@ -29,8 +29,12 @@ describe('generateSpssVarNames', () => {
 
     const result = generateSpssVarNames(questions);
 
-    expect(result[0].questionCode).toBe('Q1');
-    expect(result[1].questionCode).toBe('Q2');
+    const r0 = result[0];
+    const r1 = result[1];
+    if (!r0) throw new Error('result[0] undefined');
+    if (!r1) throw new Error('result[1] undefined');
+    expect(r0.questionCode).toBe('Q1');
+    expect(r1.questionCode).toBe('Q2');
   });
 
   it('select 질문에 Q{순번} 변수명을 생성한다', () => {
@@ -39,7 +43,9 @@ describe('generateSpssVarNames', () => {
     ];
 
     const result = generateSpssVarNames(questions);
-    expect(result[0].questionCode).toBe('Q1');
+    const r0 = result[0];
+    if (!r0) throw new Error('result[0] undefined');
+    expect(r0.questionCode).toBe('Q1');
   });
 
   it('text/textarea 질문에 Q{순번} 변수명을 생성한다', () => {
@@ -49,8 +55,12 @@ describe('generateSpssVarNames', () => {
     ];
 
     const result = generateSpssVarNames(questions);
-    expect(result[0].questionCode).toBe('Q1');
-    expect(result[1].questionCode).toBe('Q2');
+    const r0 = result[0];
+    const r1 = result[1];
+    if (!r0) throw new Error('result[0] undefined');
+    if (!r1) throw new Error('result[1] undefined');
+    expect(r0.questionCode).toBe('Q1');
+    expect(r1.questionCode).toBe('Q2');
   });
 
   it('multiselect 질문에 Q{순번} 변수명을 생성한다', () => {
@@ -59,7 +69,9 @@ describe('generateSpssVarNames', () => {
     ];
 
     const result = generateSpssVarNames(questions);
-    expect(result[0].questionCode).toBe('Q1');
+    const r0 = result[0];
+    if (!r0) throw new Error('result[0] undefined');
+    expect(r0.questionCode).toBe('Q1');
   });
 
   it('notice 타입은 순번에서 제외한다', () => {
@@ -71,10 +83,16 @@ describe('generateSpssVarNames', () => {
 
     const result = generateSpssVarNames(questions);
 
+    const r0 = result[0];
+    const r1 = result[1];
+    const r2 = result[2];
+    if (!r0) throw new Error('result[0] undefined');
+    if (!r1) throw new Error('result[1] undefined');
+    if (!r2) throw new Error('result[2] undefined');
     // notice는 변수명 없음
-    expect(result[0].questionCode).toBe('Q1');
-    expect(result[1].questionCode).toBeUndefined();
-    expect(result[2].questionCode).toBe('Q2'); // notice 건너뛰고 Q2
+    expect(r0.questionCode).toBe('Q1');
+    expect(r1.questionCode).toBeUndefined();
+    expect(r2.questionCode).toBe('Q2'); // notice 건너뛰고 Q2
   });
 
   it('isCustomSpssVarName이 true인 질문은 기존 변수명을 보존한다', () => {
@@ -90,8 +108,12 @@ describe('generateSpssVarNames', () => {
 
     const result = generateSpssVarNames(questions);
 
-    expect(result[0].questionCode).toBe('Q1-4'); // 보존
-    expect(result[1].questionCode).toBe('Q1'); // 자동 (커스텀이 Q1-4이므로 Q1 사용 가능)
+    const r0 = result[0];
+    const r1 = result[1];
+    if (!r0) throw new Error('result[0] undefined');
+    if (!r1) throw new Error('result[1] undefined');
+    expect(r0.questionCode).toBe('Q1-4'); // 보존
+    expect(r1.questionCode).toBe('Q1'); // 자동 (커스텀이 Q1-4이므로 Q1 사용 가능)
   });
 
   it('대문자로 변수명을 생성한다', () => {
@@ -100,8 +122,10 @@ describe('generateSpssVarNames', () => {
     ];
 
     const result = generateSpssVarNames(questions);
-    expect(result[0].questionCode).toBe('Q1');
-    expect(result[0].questionCode).toMatch(/^[A-Z]/);
+    const r0 = result[0];
+    if (!r0) throw new Error('result[0] undefined');
+    expect(r0.questionCode).toBe('Q1');
+    expect(r0.questionCode).toMatch(/^[A-Z]/);
   });
 
   it('order 순서대로 정렬 후 순번을 부여한다', () => {
@@ -115,9 +139,15 @@ describe('generateSpssVarNames', () => {
 
     // order 1 → Q1, order 2 → Q2, order 3 → Q3
     const sorted = [...result].sort((a, b) => a.order - b.order);
-    expect(sorted[0].questionCode).toBe('Q1');
-    expect(sorted[1].questionCode).toBe('Q2');
-    expect(sorted[2].questionCode).toBe('Q3');
+    const s0 = sorted[0];
+    const s1 = sorted[1];
+    const s2 = sorted[2];
+    if (!s0) throw new Error('sorted[0] undefined');
+    if (!s1) throw new Error('sorted[1] undefined');
+    if (!s2) throw new Error('sorted[2] undefined');
+    expect(s0.questionCode).toBe('Q1');
+    expect(s1.questionCode).toBe('Q2');
+    expect(s2.questionCode).toBe('Q3');
   });
 });
 
@@ -129,19 +159,32 @@ describe('regenerateAfterReorder', () => {
       makeQuestion({ type: 'radio', order: 3, questionCode: 'Q3' }),
     ];
 
+    const q0 = questions[0];
+    const q1 = questions[1];
+    const q2 = questions[2];
+    if (!q0) throw new Error('questions[0] undefined');
+    if (!q1) throw new Error('questions[1] undefined');
+    if (!q2) throw new Error('questions[2] undefined');
+
     // Q3이 1번으로 이동
     const reordered: Question[] = [
-      { ...questions[2], order: 1 },
-      { ...questions[0], order: 2 },
-      { ...questions[1], order: 3 },
+      { ...q2, order: 1 },
+      { ...q0, order: 2 },
+      { ...q1, order: 3 },
     ];
 
     const result = regenerateAfterReorder(reordered);
     const sorted = [...result].sort((a, b) => a.order - b.order);
 
-    expect(sorted[0].questionCode).toBe('Q1');
-    expect(sorted[1].questionCode).toBe('Q2');
-    expect(sorted[2].questionCode).toBe('Q3');
+    const s0 = sorted[0];
+    const s1 = sorted[1];
+    const s2 = sorted[2];
+    if (!s0) throw new Error('sorted[0] undefined');
+    if (!s1) throw new Error('sorted[1] undefined');
+    if (!s2) throw new Error('sorted[2] undefined');
+    expect(s0.questionCode).toBe('Q1');
+    expect(s1.questionCode).toBe('Q2');
+    expect(s2.questionCode).toBe('Q3');
   });
 
   it('수동 편집 변수명은 재할당하지 않는다', () => {
@@ -159,10 +202,16 @@ describe('regenerateAfterReorder', () => {
     const result = regenerateAfterReorder(questions);
     const sorted = [...result].sort((a, b) => a.order - b.order);
 
-    expect(sorted[0].questionCode).toBe('SQ-GENDER'); // 보존
-    expect(sorted[0].isCustomSpssVarName).toBe(true);
-    expect(sorted[1].questionCode).toBe('Q1'); // 자동 재할당
-    expect(sorted[2].questionCode).toBe('Q2'); // 자동 재할당
+    const s0 = sorted[0];
+    const s1 = sorted[1];
+    const s2 = sorted[2];
+    if (!s0) throw new Error('sorted[0] undefined');
+    if (!s1) throw new Error('sorted[1] undefined');
+    if (!s2) throw new Error('sorted[2] undefined');
+    expect(s0.questionCode).toBe('SQ-GENDER'); // 보존
+    expect(s0.isCustomSpssVarName).toBe(true);
+    expect(s1.questionCode).toBe('Q1'); // 자동 재할당
+    expect(s2.questionCode).toBe('Q2'); // 자동 재할당
   });
 });
 
@@ -178,9 +227,15 @@ describe('regenerateAfterDelete', () => {
     const result = regenerateAfterDelete(questions);
     const sorted = [...result].sort((a, b) => a.order - b.order);
 
-    expect(sorted[0].questionCode).toBe('Q1');
-    expect(sorted[1].questionCode).toBe('Q2'); // Q3→Q2
-    expect(sorted[2].questionCode).toBe('Q3'); // Q4→Q3
+    const s0 = sorted[0];
+    const s1 = sorted[1];
+    const s2 = sorted[2];
+    if (!s0) throw new Error('sorted[0] undefined');
+    if (!s1) throw new Error('sorted[1] undefined');
+    if (!s2) throw new Error('sorted[2] undefined');
+    expect(s0.questionCode).toBe('Q1');
+    expect(s1.questionCode).toBe('Q2'); // Q3→Q2
+    expect(s2.questionCode).toBe('Q3'); // Q4→Q3
   });
 
   it('수동 편집 변수명은 삭제 후에도 보존한다', () => {
@@ -197,7 +252,11 @@ describe('regenerateAfterDelete', () => {
     const result = regenerateAfterDelete(questions);
     const sorted = [...result].sort((a, b) => a.order - b.order);
 
-    expect(sorted[0].questionCode).toBe('CUSTOM-1'); // 보존
-    expect(sorted[1].questionCode).toBe('Q1'); // 자동 재할당
+    const s0 = sorted[0];
+    const s1 = sorted[1];
+    if (!s0) throw new Error('sorted[0] undefined');
+    if (!s1) throw new Error('sorted[1] undefined');
+    expect(s0.questionCode).toBe('CUSTOM-1'); // 보존
+    expect(s1.questionCode).toBe('Q1'); // 자동 재할당
   });
 });

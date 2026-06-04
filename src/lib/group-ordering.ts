@@ -75,7 +75,10 @@ export function getInterleavedChildren(
   let qIdx = 0;
   for (let i = 0; i < totalSize; i++) {
     if (!result[i] && qIdx < directQuestions.length) {
-      result[i] = { kind: 'question', data: directQuestions[qIdx] };
+      const q = directQuestions[qIdx];
+      if (q) {
+        result[i] = { kind: 'question', data: q };
+      }
       qIdx++;
     }
   }

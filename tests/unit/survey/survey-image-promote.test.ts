@@ -278,7 +278,10 @@ describe('replaceUrlsInQuestion', () => {
       ],
     };
     const result = replaceUrlsInQuestion(q, mapping);
-    expect(result.tableRowsData![0].cells[0].imageUrl).toBe('https://cdn.test/survey/a.webp');
+    const row0 = result.tableRowsData?.[0];
+    const cell0 = row0?.cells[0];
+    if (!row0 || !cell0) throw new Error('tableRowsData[0].cells[0] is undefined');
+    expect(cell0.imageUrl).toBe('https://cdn.test/survey/a.webp');
   });
 
   it('mapping에 없는 URL은 그대로', () => {

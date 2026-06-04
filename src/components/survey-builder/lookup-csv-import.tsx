@@ -56,7 +56,7 @@ export function LookupCsvImport({ isOpen, onClose, onImport }: Props) {
         const text = await f.text();
         const lines = text.split(/\r?\n/).filter((l) => l.trim());
         parsed = {
-          headers: lines[0].split(',').map((s) => s.trim()),
+          headers: (lines[0] ?? '').split(',').map((s) => s.trim()),
           rows: lines.slice(1).map((l) => l.split(',').map((s) => s.trim())),
         };
       } else {
@@ -64,6 +64,7 @@ export function LookupCsvImport({ isOpen, onClose, onImport }: Props) {
         const wb = new ExcelJS.Workbook();
         await wb.xlsx.load(buf);
         const ws = wb.worksheets[0];
+        if (!ws) throw new Error('엑셀 파일에 시트가 없습니다.');
         const allRows: string[][] = [];
         ws.eachRow((row) => {
           allRows.push(

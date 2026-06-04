@@ -107,7 +107,9 @@ export const getProgressGroupLabel = cache(async (surveyId: string): Promise<str
     .limit(1);
 
   if (rows.length === 0) return '그룹';
-  const { attrs, groupValue } = rows[0];
+  const firstRow = rows[0];
+  if (!firstRow) return '그룹';
+  const { attrs, groupValue } = firstRow;
   if (!attrs || groupValue == null) return '그룹';
 
   const groupAttrsKey = Object.entries(attrs).find(([, v]) => v === groupValue)?.[0];

@@ -190,19 +190,22 @@ export function useDragCopy({
             const targetCell = draft[absRow]?.cells[absCol];
             if (!targetCell) continue;
 
-            const sourceCell = region.cells[rr][cc];
+            const sourceCellRow = region.cells[rr];
+            const sourceCell = sourceCellRow ? sourceCellRow[cc] : undefined;
 
-            if (sourceCell === null) {
-              // hidden 위치 → 내용 초기화 (recalculateHiddenCells가 isHidden 설정)
-              targetCell.type = 'text';
-              targetCell.content = '';
-              delete targetCell.rowspan;
-              delete targetCell.colspan;
-              // 타입별 잔여 속성 정리
-              clearStaleTypeProperties(
-                targetCell as unknown as Record<string, unknown>,
-                'text',
-              );
+            if (sourceCell === null || sourceCell === undefined) {
+              if (sourceCell === null) {
+                // hidden 위치 → 내용 초기화 (recalculateHiddenCells가 isHidden 설정)
+                targetCell.type = 'text';
+                targetCell.content = '';
+                delete targetCell.rowspan;
+                delete targetCell.colspan;
+                // 타입별 잔여 속성 정리
+                clearStaleTypeProperties(
+                  targetCell as unknown as Record<string, unknown>,
+                  'text',
+                );
+              }
               continue;
             }
 
@@ -224,6 +227,7 @@ export function useDragCopy({
 
             // cellCode/exportLabel 재생성
             const targetRowData = draft[absRow];
+            if (!targetRowData) continue;
             const targetColumn = columns[absCol];
             const newCellCode = generateCellCode(
               questionCodeRef.current,

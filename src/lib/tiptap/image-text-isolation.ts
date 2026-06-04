@@ -70,11 +70,12 @@ export const ImageTextIsolation = Extension.create({
                 groups.push([c]);
                 currentKind = kind;
               } else {
-                groups[groups.length - 1].push(c);
+                groups[groups.length - 1]?.push(c);
               }
             }
 
             const paragraphType = newState.schema.nodes['paragraph'];
+            if (!paragraphType) return;
             // paragraph attrs (text-align 등) 는 모든 split 결과에 그대로 전파
             const newParagraphs = groups.map((g) => paragraphType.create(node.attrs, g));
 
@@ -91,6 +92,7 @@ export const ImageTextIsolation = Extension.create({
           // 뒤에서부터 적용 — 앞 paragraph 의 split 으로 뒤쪽 pos 가 어긋나는 것 방지
           for (let i = targets.length - 1; i >= 0; i--) {
             const t = targets[i];
+            if (!t) continue;
             tr.replaceWith(t.from, t.to, t.paragraphs);
           }
           tr.setMeta(META_FLAG, true);

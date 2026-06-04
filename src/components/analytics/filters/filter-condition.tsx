@@ -116,48 +116,14 @@ export function FilterConditionRow({
 
       {/* 값 선택/입력 */}
       {needsValue && selectedQuestion && (
-        <>
-          {hasOptions ? (
-            useComboboxForValues ? (
-              // 옵션이 5개 이상이면 Combobox
-              <Combobox
-                options={valueComboboxOptions}
-                value={Array.isArray(condition.value) ? condition.value[0] : condition.value || ''}
-                onValueChange={(value) => onUpdate({ value })}
-                placeholder="값 선택"
-                searchPlaceholder="값 검색..."
-                emptyText="값을 찾을 수 없습니다"
-                triggerClassName="w-[180px] bg-white"
-                className="w-[220px]"
-              />
-            ) : (
-              // 옵션이 5개 미만이면 Select
-              <Select
-                value={Array.isArray(condition.value) ? condition.value[0] : condition.value || ''}
-                onValueChange={(value: string) => onUpdate({ value })}
-              >
-                <SelectTrigger className="w-[180px] bg-white">
-                  <SelectValue placeholder="값 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  {options.map((opt) => (
-                    <SelectItem key={opt.id} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )
-          ) : (
-            // 텍스트 입력
-            <Input
-              value={typeof condition.value === 'string' ? condition.value : ''}
-              onChange={(e) => onUpdate({ value: e.target.value })}
-              placeholder="값 입력"
-              className="w-[180px] bg-white"
-            />
-          )}
-        </>
+        <FilterValueInput
+          condition={condition}
+          options={options}
+          valueComboboxOptions={valueComboboxOptions}
+          hasOptions={hasOptions}
+          useComboboxForValues={useComboboxForValues}
+          onUpdate={onUpdate}
+        />
       )}
 
       {/* 삭제 버튼 */}
@@ -170,5 +136,68 @@ export function FilterConditionRow({
         <X className="h-4 w-4" />
       </Button>
     </div>
+  );
+}
+
+interface FilterValueInputProps {
+  condition: FilterCondition;
+  options: { id: string; value: string; label: string }[];
+  valueComboboxOptions: { value: string; label: string }[];
+  hasOptions: boolean;
+  useComboboxForValues: boolean;
+  onUpdate: (updates: Partial<FilterCondition>) => void;
+}
+
+function FilterValueInput({
+  condition,
+  options,
+  valueComboboxOptions,
+  hasOptions,
+  useComboboxForValues,
+  onUpdate,
+}: FilterValueInputProps) {
+  const singleValue: string = Array.isArray(condition.value)
+    ? (condition.value[0] ?? '')
+    : (condition.value ?? '');
+
+  if (!hasOptions) {
+    return (
+      <Input
+        value={typeof condition.value === 'string' ? condition.value : ''}
+        onChange={(e) => onUpdate({ value: e.target.value })}
+        placeholder="값 입력"
+        className="w-[180px] bg-white"
+      />
+    );
+  }
+
+  if (useComboboxForValues) {
+    return (
+      <Combobox
+        options={valueComboboxOptions}
+        value={singleValue}
+        onValueChange={(value) => onUpdate({ value })}
+        placeholder="값 선택"
+        searchPlaceholder="값 검색..."
+        emptyText="값을 찾을 수 없습니다"
+        triggerClassName="w-[180px] bg-white"
+        className="w-[220px]"
+      />
+    );
+  }
+
+  return (
+    <Select value={singleValue} onValueChange={(value: string) => onUpdate({ value })}>
+      <SelectTrigger className="w-[180px] bg-white">
+        <SelectValue placeholder="값 선택" />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((opt) => (
+          <SelectItem key={opt.id} value={opt.value}>
+            {opt.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

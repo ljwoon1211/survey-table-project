@@ -27,7 +27,9 @@ function getNumericCode(options: QuestionOption[] | undefined, optionId: string)
   if (!options) return null;
   const idx = options.findIndex((o) => o.id === optionId || o.value === optionId);
   if (idx === -1) return null;
-  return options[idx].spssNumericCode ?? idx + 1;
+  const found = options[idx];
+  if (!found) return null;
+  return found.spssNumericCode ?? idx + 1;
 }
 
 /**

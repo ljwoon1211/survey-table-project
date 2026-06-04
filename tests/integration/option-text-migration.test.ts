@@ -26,14 +26,18 @@ describe('migrateQuestionOptions', () => {
 
     expect(result.allowOtherOption).toBeUndefined();
     expect(result.options).toHaveLength(6);
-    expect(result.options![5]).toMatchObject({
+    const opts = result.options;
+    if (!opts) throw new Error('result.options 없음');
+    const opt5 = opts[5];
+    if (!opt5) throw new Error('result.options[5] 없음');
+    expect(opt5).toMatchObject({
       label: '기타',
       allowTextInput: true,
       optionCode: '6',
       spssNumericCode: 6,
     });
-    expect(result.options![5].id).toMatch(/^[a-zA-Z0-9_-]+$/);
-    expect(result.migratedOtherOptionId).toBe(result.options![5].id);
+    expect(opt5.id).toMatch(/^[a-zA-Z0-9_-]+$/);
+    expect(result.migratedOtherOptionId).toBe(opt5.id);
   });
 
   it('zero-pads optionCode when total options >= 10', () => {
@@ -52,8 +56,12 @@ describe('migrateQuestionOptions', () => {
     const result = migrateQuestionOptions(question);
 
     expect(result.options).toHaveLength(11);
-    expect(result.options![10].optionCode).toBe('11');
-    expect(result.options![10].spssNumericCode).toBe(11);
+    const opts = result.options;
+    if (!opts) throw new Error('result.options 없음');
+    const opt10 = opts[10];
+    if (!opt10) throw new Error('result.options[10] 없음');
+    expect(opt10.optionCode).toBe('11');
+    expect(opt10.spssNumericCode).toBe(11);
   });
 
   it('does not modify questions without allowOtherOption', () => {
@@ -82,7 +90,9 @@ describe('migrateQuestionOptions', () => {
     const { allowOtherOption: _ao1, ...firstWithoutOther1 } = first;
     const second = migrateQuestionOptions(firstWithoutOther1);
 
-    expect(second.options).toHaveLength(first.options!.length);
+    const firstOpts = first.options;
+    if (!firstOpts) throw new Error('first.options 없음');
+    expect(second.options).toHaveLength(firstOpts.length);
     expect(second.migratedOtherOptionId).toBeNull();
   });
 
@@ -96,13 +106,17 @@ describe('migrateQuestionOptions', () => {
     const result = migrateQuestionOptions(question);
 
     expect(result.options).toHaveLength(1);
-    expect(result.options![0]).toMatchObject({
+    const opts = result.options;
+    if (!opts) throw new Error('result.options 없음');
+    const emptyOpt0 = opts[0];
+    if (!emptyOpt0) throw new Error('result.options[0] 없음');
+    expect(emptyOpt0).toMatchObject({
       label: '기타',
       allowTextInput: true,
       optionCode: '1',
       spssNumericCode: 1,
     });
-    expect(result.migratedOtherOptionId).toBe(result.options![0].id);
+    expect(result.migratedOtherOptionId).toBe(emptyOpt0.id);
   });
 
   it('preserves ID stability when called twice — does not re-append', () => {
@@ -113,15 +127,23 @@ describe('migrateQuestionOptions', () => {
     };
 
     const first = migrateQuestionOptions(question);
-    const otherOptionId = first.options![1].id;
+    const firstOpts = first.options;
+    if (!firstOpts) throw new Error('first.options 없음');
+    const firstOpt1 = firstOpts[1];
+    if (!firstOpt1) throw new Error('first.options[1] 없음');
+    const otherOptionId = firstOpt1.id;
 
     // 두 번째 호출 -- 이미 마이그레이션된 결과 (allowOtherOption 없음) 를 그대로 줌
     const { allowOtherOption: _ao2, ...firstWithoutOther2 } = first;
     const second = migrateQuestionOptions(firstWithoutOther2);
 
     expect(second.options).toHaveLength(2);
-    expect(second.options![1].id).toBe(otherOptionId);
-    expect(second.options![1].allowTextInput).toBe(true);
+    const secondOpts = second.options;
+    if (!secondOpts) throw new Error('second.options 없음');
+    const secondOpt1 = secondOpts[1];
+    if (!secondOpt1) throw new Error('second.options[1] 없음');
+    expect(secondOpt1.id).toBe(otherOptionId);
+    expect(secondOpt1.allowTextInput).toBe(true);
   });
 });
 
@@ -217,9 +239,13 @@ describe('migrateSnapshotQuestions', () => {
 
     const result = migrateSnapshotQuestions(snapshot);
 
-    expect(result.questions[0].options).toHaveLength(2);
-    expect(result.questions[0].allowOtherOption).toBeUndefined();
-    expect(result.questions[1].options).toHaveLength(1);
+    const rq0 = result.questions[0];
+    const rq1 = result.questions[1];
+    if (!rq0) throw new Error('result.questions[0] 없음');
+    if (!rq1) throw new Error('result.questions[1] 없음');
+    expect(rq0.options).toHaveLength(2);
+    expect(rq0.allowOtherOption).toBeUndefined();
+    expect(rq1.options).toHaveLength(1);
     expect(result.otherIdMappings['q1']).toBeDefined();
     expect(result.otherIdMappings['q2']).toBeUndefined();
     expect(result.cellOtherIdMappings).toEqual({});
@@ -250,10 +276,21 @@ describe('migrateSnapshotQuestions', () => {
 
     const result = migrateSnapshotQuestions(snapshot);
 
-    const cell = result.questions[0].tableRowsData![0].cells[0];
+    const tableCellQ0 = result.questions[0];
+    if (!tableCellQ0) throw new Error('result.questions[0] 없음');
+    const rows = tableCellQ0.tableRowsData;
+    if (!rows) throw new Error('tableRowsData 없음');
+    const row0 = rows[0];
+    if (!row0) throw new Error('tableRowsData[0] 없음');
+    const cell = row0.cells[0];
+    if (!cell) throw new Error('tableRowsData[0].cells[0] 없음');
     expect(cell.radioOptions).toHaveLength(2);
     expect(cell.allowOtherOption).toBeUndefined();
-    expect(result.cellOtherIdMappings['q1']['c1']['__other__']).toBeDefined();
+    const q1Map = result.cellOtherIdMappings['q1'];
+    if (!q1Map) throw new Error('cellOtherIdMappings[q1] 없음');
+    const c1Map = q1Map['c1'];
+    if (!c1Map) throw new Error('cellOtherIdMappings[q1][c1] 없음');
+    expect(c1Map['__other__']).toBeDefined();
   });
 
   it('records cell-level mapping when table cell has allowOtherOption', () => {
@@ -281,16 +318,30 @@ describe('migrateSnapshotQuestions', () => {
 
     const result = migrateSnapshotQuestions(snapshot);
 
-    expect(result.cellOtherIdMappings['q1']).toBeDefined();
-    expect(result.cellOtherIdMappings['q1']['c1']).toBeDefined();
-    expect(result.cellOtherIdMappings['q1']['c1']['__other__']).toBeDefined();
+    const q1Map = result.cellOtherIdMappings['q1'];
+    expect(q1Map).toBeDefined();
+    if (!q1Map) throw new Error('cellOtherIdMappings[q1] 없음');
+    const c1Map = q1Map['c1'];
+    expect(c1Map).toBeDefined();
+    if (!c1Map) throw new Error('cellOtherIdMappings[q1][c1] 없음');
+    expect(c1Map['__other__']).toBeDefined();
     // 새로 생성된 기타 옵션 ID 와 mapping 의 ID 가 일치
-    const newOtherId = result.cellOtherIdMappings['q1']['c1']['__other__'];
-    const cell = result.questions[0].tableRowsData![0].cells[0];
-    const addedOption = cell.radioOptions!.find(o => o.id === newOtherId);
+    const newOtherId = c1Map['__other__'];
+    const mappingQ0 = result.questions[0];
+    if (!mappingQ0) throw new Error('result.questions[0] 없음');
+    const rows = mappingQ0.tableRowsData;
+    if (!rows) throw new Error('tableRowsData 없음');
+    const row0 = rows[0];
+    if (!row0) throw new Error('tableRowsData[0] 없음');
+    const cell = row0.cells[0];
+    if (!cell) throw new Error('tableRowsData[0].cells[0] 없음');
+    const radioOptions = cell.radioOptions;
+    if (!radioOptions) throw new Error('cell.radioOptions 없음');
+    const addedOption = radioOptions.find(o => o.id === newOtherId);
     expect(addedOption).toBeDefined();
-    expect(addedOption!.label).toBe('기타');
-    expect(addedOption!.allowTextInput).toBe(true);
+    if (!addedOption) throw new Error('addedOption 없음');
+    expect(addedOption.label).toBe('기타');
+    expect(addedOption.allowTextInput).toBe(true);
   });
 
   it('migrates checkbox and select cell types correctly', () => {
@@ -324,11 +375,23 @@ describe('migrateSnapshotQuestions', () => {
 
     const result = migrateSnapshotQuestions(snapshot);
 
-    const cells = result.questions[0].tableRowsData![0].cells;
-    expect(cells[0].checkboxOptions).toHaveLength(2);
-    expect(cells[1].selectOptions).toHaveLength(2);
-    expect(result.cellOtherIdMappings['q1']['cb1']).toBeDefined();
-    expect(result.cellOtherIdMappings['q1']['sel1']).toBeDefined();
+    const cbQ0 = result.questions[0];
+    if (!cbQ0) throw new Error('result.questions[0] 없음');
+    const rows = cbQ0.tableRowsData;
+    if (!rows) throw new Error('tableRowsData 없음');
+    const row0 = rows[0];
+    if (!row0) throw new Error('tableRowsData[0] 없음');
+    const cells = row0.cells;
+    const cellCb1 = cells[0];
+    const cellSel1 = cells[1];
+    if (!cellCb1) throw new Error('cells[0] 없음');
+    if (!cellSel1) throw new Error('cells[1] 없음');
+    expect(cellCb1.checkboxOptions).toHaveLength(2);
+    expect(cellSel1.selectOptions).toHaveLength(2);
+    const q1Map = result.cellOtherIdMappings['q1'];
+    if (!q1Map) throw new Error('cellOtherIdMappings[q1] 없음');
+    expect(q1Map['cb1']).toBeDefined();
+    expect(q1Map['sel1']).toBeDefined();
   });
 
   it('skips non-option cell types with allowOtherOption=true (defensive)', () => {
@@ -356,7 +419,14 @@ describe('migrateSnapshotQuestions', () => {
     const result = migrateSnapshotQuestions(snapshot);
 
     // text 셀은 옵션이 없으므로 추가도 안 되고 mapping 도 없음
-    const cell = result.questions[0].tableRowsData![0].cells[0];
+    const skipQ0 = result.questions[0];
+    if (!skipQ0) throw new Error('result.questions[0] 없음');
+    const rows = skipQ0.tableRowsData;
+    if (!rows) throw new Error('tableRowsData 없음');
+    const row0 = rows[0];
+    if (!row0) throw new Error('tableRowsData[0] 없음');
+    const cell = row0.cells[0];
+    if (!cell) throw new Error('tableRowsData[0].cells[0] 없음');
     expect(cell.allowOtherOption).toBe(true);  // 그대로 유지 (skip)
     expect(result.cellOtherIdMappings['q1']?.['txt1']).toBeUndefined();
   });

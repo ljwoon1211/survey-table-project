@@ -53,7 +53,9 @@ describe('ChoiceTableResponse (mobile)', () => {
     expect(screen.getByText('② 음성 처리')).toBeInTheDocument();
     // 표시 셀 정의는 "자세히" 안에 있어 처음엔 안 보임
     expect(screen.queryByText('이미지 정보 추출')).not.toBeInTheDocument();
-    fireEvent.click(screen.getAllByLabelText(/① 컴퓨터 비전|선택/)[0]);
+    const labelEl = screen.getAllByLabelText(/① 컴퓨터 비전|선택/)[0];
+    if (!labelEl) throw new Error('매칭 라벨 엘리먼트가 없음');
+    fireEvent.click(labelEl);
     expect(onChange).toHaveBeenCalledWith(['r1c2']);
   });
 

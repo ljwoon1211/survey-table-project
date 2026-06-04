@@ -227,6 +227,7 @@ export function formatExpandedCellValue(
         const actualOpts = actualCell.checkboxOptions ?? [];
         if (optIdx >= actualOpts.length) return null;
         const actualOpt = actualOpts[optIdx];
+        if (!actualOpt) return null;
         const { selectedIds } = parseCheckboxRawValue(rawValue);
         const isSelected = selectedIds.some((sid) => sid === actualOpt.value);
         return isSelected ? (actualOpt.spssNumericCode ?? (optIdx + 1)) : 0;
@@ -307,18 +308,18 @@ export function classifyTableCells(
   rows: TableRow[],
   columns: TableColumn[],
 ): ClassifiedCells {
-  if (!rows.length || !rows[0].cells.length) {
+  const firstRow = rows[0];
+  if (!firstRow || !firstRow.cells.length) {
     return { identifiers: [], measurements: [] };
   }
 
-  const firstRow = rows[0];
   const identifiers: ClassifiedCells['identifiers'] = [];
   const measurements: ClassifiedCells['measurements'] = [];
   let passedIdentifiers = false;
 
   for (let i = 0; i < firstRow.cells.length; i++) {
     const cell = firstRow.cells[i];
-    if (cell.isHidden || cell._isContinuation) continue;
+    if (!cell || cell.isHidden || cell._isContinuation) continue;
 
     // radio/select는 input/checkbox 앞에 오면 식별자(depth-2+)로 분류
     const isDataInputCell = cell.type === 'input' || cell.type === 'checkbox';
@@ -368,7 +369,9 @@ export function hasVaryingCheckboxOptions(
       const opts = cell.checkboxOptions ?? [];
       if (opts.length !== firstValues.length) return true;
       for (let oi = 0; oi < opts.length; oi++) {
-        if (opts[oi].value !== firstValues[oi]) return true;
+        const opt = opts[oi];
+        const fv = firstValues[oi];
+        if (!opt || opt.value !== fv) return true;
       }
     }
   }
@@ -580,6 +583,7 @@ function extractIdentifierValues(
   rowspanTracker: Map<number, { value: string; remaining: number }>,
 ): string[] {
   const row = rows[rowIndex];
+  if (!row) return identifierColIndices.map(() => '');
   const values: string[] = [];
 
   for (const colIdx of identifierColIndices) {
@@ -685,8 +689,8 @@ export function buildSemiLongRows(
       }
     }
     const unexposedExpandedIndices = new Set<number>();
-    for (let ei = 0; ei < expandedColumns.length; ei++) {
-      if (unexposedOrigColIndices.has(expandedColumns[ei].colIndex)) {
+    for (const [ei, ec] of expandedColumns.entries()) {
+      if (unexposedOrigColIndices.has(ec.colIndex)) {
         unexposedExpandedIndices.add(ei);
       }
     }
@@ -713,8 +717,7 @@ export function buildSemiLongRows(
     let seqNum = 0;
     let prevDepth1 = '';
 
-    for (let origRi = 0; origRi < allRows.length; origRi++) {
-      const row = allRows[origRi];
+    for (const [origRi, row] of allRows.entries()) {
       const identifierValues = hasVirtual
         ? []
         : extractIdentifierValues(allRows, origRi, identifierColIndices, rowspanTracker);
@@ -753,8 +756,7 @@ export function buildSemiLongRows(
       const cellIds: string[] = [];
       const computedLabels = new Map<number, string>();
 
-      for (let ei = 0; ei < expandedColumns.length; ei++) {
-        const ec = expandedColumns[ei];
+      for (const [ei, ec] of expandedColumns.entries()) {
         const actualCell = row.cells[ec.colIndex];
         cellIds.push(buildCellIdKey(ec, actualCell?.id ?? ''));
 

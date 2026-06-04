@@ -393,7 +393,7 @@ export function generateRawDataWorkbook(
   ws2.addRow(['', ...columns.map((c) => row2Label(c))]);
   ws2.addRow(['', ...columns.map((c) => c.spssVarName)]);
   rows.forEach((row, i) => {
-    ws2.addRow([idValue(row, i), ...dataMatrix[i]]);
+    ws2.addRow([idValue(row, i), ...(dataMatrix[i] ?? [])]);
   });
 
   // 1~3행 헤더 스타일
@@ -404,7 +404,7 @@ export function generateRawDataWorkbook(
   let start = 0;
   while (start < columns.length) {
     let end = start;
-    while (end + 1 < columns.length && columns[end + 1].questionId === columns[start].questionId) {
+    while (end + 1 < columns.length && columns[end + 1]?.questionId === columns[start]?.questionId) {
       end++;
     }
     if (end > start) ws2.mergeCells(1, start + 2, 1, end + 2);

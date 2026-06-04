@@ -46,7 +46,7 @@ export async function publishSurvey(surveyId: string, changeNote?: string) {
     });
     const nextVersionNumber = (latestVersion?.versionNumber ?? 0) + 1;
 
-    const [newVersion] = await tx
+    const versionRows = await tx
       .insert(surveyVersions)
       .values({
         surveyId,
@@ -58,6 +58,8 @@ export async function publishSurvey(surveyId: string, changeNote?: string) {
         changeNote: changeNote || null,
       })
       .returning();
+    const newVersion = versionRows[0];
+    if (!newVersion) throw new Error('publishSurvey: 버전 생성 실패');
 
     await tx
       .update(surveys)

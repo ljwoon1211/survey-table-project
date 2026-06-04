@@ -45,7 +45,9 @@ describe('sortGroupRows', () => {
   });
   it('groupLabel asc 는 한글 자모 순 (localeCompare ko)', () => {
     const sorted = sortGroupRows(fixture, 'groupLabel', 'asc');
-    expect(sorted[0].groupLabel).toBe('(미분류)'); // '(' 가 한글 앞
+    const first = sorted[0];
+    if (!first) throw new Error('expected sorted[0]');
+    expect(first.groupLabel).toBe('(미분류)'); // '(' 가 한글 앞
   });
   it('listCount desc', () => {
     const sorted = sortGroupRows(fixture, 'listCount', 'desc');

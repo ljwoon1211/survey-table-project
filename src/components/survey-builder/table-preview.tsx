@@ -115,7 +115,7 @@ export const TablePreview = React.memo(function TablePreview({
           if (rs > 1) {
             for (let r = rowIdx + 1; r < rowIdx + rs && r < totalRows; r++) {
               for (let c = startCol; c < startCol + cs; c++) {
-                occupied[r].set(c, true);
+                occupied[r]?.set(c, true);
               }
             }
           }

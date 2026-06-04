@@ -48,8 +48,10 @@ export function FilterPanel({ questions, responses, filter, onFilterChange }: Fi
   // 새 조건 추가
   const handleAddCondition = () => {
     if (filterableQuestions.length === 0) return;
+    const firstFilterable = filterableQuestions[0];
+    if (!firstFilterable) return;
 
-    const newCondition = createFilterCondition(filterableQuestions[0].id);
+    const newCondition = createFilterCondition(firstFilterable.id);
     const updatedFilter = addConditionToFilter(filter, newCondition);
     onFilterChange(updatedFilter);
   };

@@ -83,11 +83,15 @@ export function buildClauseSql(cond: FilterCondition): SQL {
  */
 export function buildContactsFilterSql(clauses: FilterClause[]): SQL {
   if (clauses.length === 0) return sql`TRUE`;
+  const first = clauses[0];
+  if (!first) return sql`TRUE`;
   // 첫 절도 괄호로 감싸 buildClauseSql 의 결과가 내부 OR 체인이어도 외부 AND 와 안전하게 결합.
-  let expr: SQL = sql`(${buildClauseSql(clauses[0].condition)})`;
+  let expr: SQL = sql`(${buildClauseSql(first.condition)})`;
   for (let i = 1; i < clauses.length; i++) {
-    const next = buildClauseSql(clauses[i].condition);
-    const op = clauses[i].op === 'OR' ? sql.raw('OR') : sql.raw('AND');
+    const clause = clauses[i];
+    if (!clause) continue;
+    const next = buildClauseSql(clause.condition);
+    const op = clause.op === 'OR' ? sql.raw('OR') : sql.raw('AND');
     expr = sql`${expr} ${op} (${next})`;
   }
   return expr;

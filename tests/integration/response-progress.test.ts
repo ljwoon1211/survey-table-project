@@ -76,7 +76,9 @@ describe('updateQuestionResponse — progress_pct SET', () => {
     await updateQuestionResponse('r1', 'q3', 'value');
 
     expect(updateSetMock).toHaveBeenCalledTimes(1);
-    const setArg = updateSetMock.mock.calls[0][0] as Record<string, unknown>;
+    const rawCall0 = updateSetMock.mock.calls[0];
+    if (!rawCall0) throw new Error('updateSetMock 호출 없음');
+    const setArg = rawCall0[0] as Record<string, unknown>;
     expect(setArg).toHaveProperty('progressPct');
     // drizzle sql template tag 객체 (queryChunks 보유) — 정확한 SQL 비교 대신 SET 키 존재만 검증
     expect(setArg).toHaveProperty('questionResponses');
@@ -111,7 +113,9 @@ describe('saveAdminEdit — progress_pct 재계산', () => {
     const { saveAdminEdit } = await import('@/actions/response-edit-actions');
     await saveAdminEdit('s1', 'r1', { questionResponses: { q1: 'v' } });
 
-    const setArg = updateSetMock.mock.calls[0][0] as Record<string, unknown>;
+    const completedCall = updateSetMock.mock.calls[0];
+    if (!completedCall) throw new Error('updateSetMock 호출 없음');
+    const setArg = completedCall[0] as Record<string, unknown>;
     expect(setArg['progressPct']).toBe(100);
   });
 
@@ -127,7 +131,9 @@ describe('saveAdminEdit — progress_pct 재계산', () => {
     const { saveAdminEdit } = await import('@/actions/response-edit-actions');
     await saveAdminEdit('s1', 'r1', { questionResponses: {} });
 
-    const setArg = updateSetMock.mock.calls[0][0] as Record<string, unknown>;
+    const dropEmptyCall = updateSetMock.mock.calls[0];
+    if (!dropEmptyCall) throw new Error('updateSetMock 호출 없음');
+    const setArg = dropEmptyCall[0] as Record<string, unknown>;
     expect(setArg['progressPct']).toBeNull();
   });
 
@@ -150,7 +156,9 @@ describe('saveAdminEdit — progress_pct 재계산', () => {
       questionResponses: { q1: 'a', q3: 'b' },
     });
 
-    const setArg = updateSetMock.mock.calls[0][0] as Record<string, unknown>;
+    const dropAnsweredCall = updateSetMock.mock.calls[0];
+    if (!dropAnsweredCall) throw new Error('updateSetMock 호출 없음');
+    const setArg = dropAnsweredCall[0] as Record<string, unknown>;
     // max position q3 = 3, total = 4, → 75
     expect(setArg['progressPct']).toBe(75);
   });
@@ -167,7 +175,9 @@ describe('saveAdminEdit — progress_pct 재계산', () => {
       questionResponses: { q1: 'a' },
     });
 
-    const setArg = updateSetMock.mock.calls[0][0] as Record<string, unknown>;
+    const nullVersionCall = updateSetMock.mock.calls[0];
+    if (!nullVersionCall) throw new Error('updateSetMock 호출 없음');
+    const setArg = nullVersionCall[0] as Record<string, unknown>;
     expect(setArg['progressPct']).toBeNull();
   });
 });

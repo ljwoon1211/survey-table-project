@@ -108,7 +108,9 @@ describe('normalizeToAnswers', () => {
     );
 
     expect(answers).toHaveLength(1);
-    expect(answers[0].questionId).toBe('q-checkbox');
+    const answer0 = answers[0];
+    if (!answer0) throw new Error('answers[0] is undefined');
+    expect(answer0.questionId).toBe('q-checkbox');
   });
 
   it('질문 목록에 없는 questionId는 건너뜀', () => {
@@ -120,7 +122,9 @@ describe('normalizeToAnswers', () => {
     const answers = normalizeToAnswers(RESPONSE_ID, responses, mockQuestions);
 
     expect(answers).toHaveLength(1);
-    expect(answers[0].questionId).toBe('q-text');
+    const answer0 = answers[0];
+    if (!answer0) throw new Error('answers[0] is undefined');
+    expect(answer0.questionId).toBe('q-text');
   });
 
   it('빈 응답 객체는 빈 배열 반환', () => {

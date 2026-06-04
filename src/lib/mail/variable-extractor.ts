@@ -9,7 +9,8 @@ export function extractVariableKeys(...sources: string[]): string[] {
     let m: RegExpExecArray | null;
     re.lastIndex = 0;
     while ((m = re.exec(s)) !== null) {
-      set.add(m[1].trim());
+      const key = m[1];
+      if (key !== undefined) set.add(key.trim());
     }
   }
   return Array.from(set);

@@ -333,8 +333,11 @@ describe('shapePageDwell', () => {
       'group:G1',
     ]);
     expect(out.pages.map((p) => p.position)).toEqual([1, 2, 3]);
-    expect(out.pages[0].label).toBe('메인');
-    expect(out.pages[2].label).toBe('메인');
+    const page0 = out.pages[0];
+    const page2 = out.pages[2];
+    if (!page0 || !page2) throw new Error('expected pages[0] and pages[2]');
+    expect(page0.label).toBe('메인');
+    expect(page2.label).toBe('메인');
   });
 
   it('page 필드: group step은 order+1, table step은 그룹 order+1, ungrouped는 null', () => {

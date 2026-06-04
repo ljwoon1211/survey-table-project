@@ -93,8 +93,9 @@ export function LazyMount({
     const el = ref.current;
     if (!el) return;
     const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting) {
           setMounted(true);
           io.disconnect();
         }

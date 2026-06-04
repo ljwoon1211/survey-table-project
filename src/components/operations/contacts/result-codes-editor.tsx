@@ -78,7 +78,11 @@ export function ResultCodesEditor({ surveyId, initialCodes }: ResultCodesEditorP
     const newCodes = [...codes];
     const target = index + dir;
     if (target < 0 || target >= newCodes.length) return;
-    [newCodes[index], newCodes[target]] = [newCodes[target], newCodes[index]];
+    const a = newCodes[index];
+    const b = newCodes[target];
+    if (!a || !b) return;
+    newCodes[index] = b;
+    newCodes[target] = a;
     newCodes.forEach((c, i) => {
       c.order = i + 1;
     });
@@ -91,6 +95,7 @@ export function ResultCodesEditor({ surveyId, initialCodes }: ResultCodesEditorP
       return;
     }
     const target = codes[index];
+    if (!target) return;
     if (resolveCodeStatus(target) === 'positive') {
       const otherPositiveExists = codes.some(
         (c, i) => i !== index && resolveCodeStatus(c) === 'positive',

@@ -20,7 +20,9 @@ interface RankingOptionsEditorProps {
 export function RankingOptionsEditor({ options, onChange }: RankingOptionsEditorProps) {
   const updateAt = (index: number, patch: Partial<QuestionOption>) => {
     const next = [...options];
-    next[index] = { ...next[index], ...patch };
+    const current = next[index];
+    if (!current) return;
+    next[index] = { ...current, ...patch };
     onChange(next);
   };
 

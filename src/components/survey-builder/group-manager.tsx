@@ -192,7 +192,7 @@ export function GroupManager({ className }: GroupManagerProps) {
             ...(groupDescription.trim() ? { description: groupDescription.trim() } : {}),
             ...(parentGroupIdForNew ? { parentGroupId: parentGroupIdForNew } : {}),
           });
-          createdGroupId = createdGroup.id;
+          if (createdGroup) createdGroupId = createdGroup.id;
         } catch (error) {
           console.error('그룹 생성 실패:', error);
           alert('그룹 생성에 실패했습니다. 다시 시도해주세요.');

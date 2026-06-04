@@ -101,7 +101,8 @@ async function insertResponseWithContactReuse(params: {
     throw e;
   }
 
-  if (inserted.length > 0) return inserted[0];
+  const firstInserted = inserted[0];
+  if (firstInserted !== undefined) return firstInserted;
 
   const [existing] = await db
     .select({ id: surveyResponses.id, contactTargetId: surveyResponses.contactTargetId })
@@ -699,9 +700,10 @@ export async function completeResponse(
       .where(eq(surveyResponses.id, responseId))
       .limit(1);
 
-    const contactTargetId = responseRow[0]?.contactTargetId;
+    const firstResponseRow = responseRow[0];
+    const contactTargetId = firstResponseRow?.contactTargetId;
 
-    if (contactTargetId) {
+    if (contactTargetId && firstResponseRow) {
       const [target] = await db
         .select({ attrs: contactTargets.attrs })
         .from(contactTargets)
@@ -714,7 +716,7 @@ export async function completeResponse(
         .from(questions)
         .where(
           and(
-            eq(questions.surveyId, responseRow[0].surveyId),
+            eq(questions.surveyId, firstResponseRow.surveyId),
             isNotNull(questions.defaultValueTemplate),
           ),
         );
@@ -771,6 +773,10 @@ export async function completeResponse(
       })
       .where(eq(surveyResponses.id, responseId))
       .returning();
+
+    if (!updated) {
+      throw new Error(`completeResponse: 응답 행 없음 (responseId=${responseId})`);
+    }
 
     // totalSeconds 정정: pageVisits 활성시간 합으로 덮어쓴다.
     // (UPDATE 1의 벽시계 EXTRACT는 활성 segment가 없을 때의 폴백으로 남는다.)

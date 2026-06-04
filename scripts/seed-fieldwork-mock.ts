@@ -81,7 +81,9 @@ function pickPlatform(idx: number): PlatformKey {
 }
 
 function pickRandom<T>(arr: readonly T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
+  const item = arr[Math.floor(Math.random() * arr.length)];
+  if (item === undefined) throw new Error('pickRandom: empty array');
+  return item;
 }
 
 interface RenderStep {
@@ -135,12 +137,14 @@ function buildPageVisits(
   let cursor = new Date(startedAt);
 
   for (let i = 0; i < stopIdx; i++) {
+    const step = steps[i];
+    if (!step) continue;
     const dwellSeconds = Math.max(5, Math.round(gaussian(60, 20)));
     const enteredAt = new Date(cursor);
     cursor = new Date(cursor.getTime() + dwellSeconds * 1000);
 
     visits.push({
-      stepId: `${steps[i].kind}:${steps[i].id}`,
+      stepId: `${step.kind}:${step.id}`,
       enteredAt: enteredAt.toISOString(),
       leftAt: new Date(cursor).toISOString(),
     });
@@ -305,8 +309,10 @@ async function main() {
   let normalizedRows = 0;
   for (let i = 0; i < records.length; i++) {
     const rec = records[i];
+    const ins = inserted[i];
+    if (!rec || !ins) continue;
     const normalized = normalizeToAnswers(
-      inserted[i].id,
+      ins.id,
       rec.questionResponses,
       surveyQuestions,
     );

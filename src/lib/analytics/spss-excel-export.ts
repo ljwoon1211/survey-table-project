@@ -110,6 +110,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
       const opts = resolveChoiceOptions(q);
       for (let i = 0; i < opts.length; i++) {
         const opt = opts[i];
+        if (!opt) continue;
         columns.push({
           spssVarName: buildCheckboxItemVarName(q.questionCode, opt.optionCode, i),
           questionText: q.title,
@@ -160,6 +161,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
       // allowTextInput 옵션마다 STRING 사이드카 텍스트 변수 생성
       for (let i = 0; i < opts.length; i++) {
         const opt = opts[i];
+        if (!opt) continue;
         if (opt.allowTextInput) {
           const varNumber = opt.optionCode ?? String(i + 1);
           columns.push({
@@ -239,13 +241,13 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
           // exportLabel 미저장 셀은 questionCode_열라벨_행라벨 자동 라벨로 폴백.
           // (빌더는 placeholder로 같은 자동값을 표시하므로 export도 동일하게 맞춘다.)
           const autoExportLabel = cell.exportLabel
-            || generateExportLabel(q.questionCode, q.tableColumns[colIdx].label, tRow.label);
+            || generateExportLabel(q.questionCode, q.tableColumns[colIdx]?.label ?? '', tRow.label);
 
           // ranking 셀 (Case 3): positions 만큼 {baseVarName}{접미사} 변수 생성.
           // 접미사는 셀의 rankSuffixPattern (기본 '_rk{k}') 으로 결정. rankVarNames 오버라이드 우선.
           if (cell.type === 'ranking') {
             const rowLabel = tRow.label;
-            const colLabel = q.tableColumns[colIdx].label;
+            const colLabel = q.tableColumns[colIdx]?.label ?? '';
             const cellOptions = cell.rankingOptions ?? [];
             const positions = Math.max(1, cell.rankingConfig?.positions ?? 3);
             for (let k = 1; k <= positions; k++) {
@@ -292,6 +294,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
           if (cell.type === 'checkbox' && cell.checkboxOptions && cell.checkboxOptions.length > 0) {
             for (let optIdx = 0; optIdx < cell.checkboxOptions.length; optIdx++) {
               const opt = cell.checkboxOptions[optIdx];
+              if (!opt) continue;
               columns.push({
                 spssVarName: `${varName}_${opt.optionCode ?? String(optIdx + 1)}`,
                 questionText: q.title,
@@ -332,7 +335,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
             columns.push({
               spssVarName: varName,
               questionText: q.title,
-              optionLabel: optionLabel || `${tRow.label} - ${q.tableColumns[colIdx].label}`,
+              optionLabel: optionLabel || `${tRow.label} - ${q.tableColumns[colIdx]?.label ?? ''}`,
               questionId: q.id,
               type: 'table-cell',
               tableCellId: cell.id,
@@ -349,6 +352,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
             if (cell.type === 'radio' && cell.radioOptions) {
               for (let optIdx = 0; optIdx < cell.radioOptions.length; optIdx++) {
                 const opt = cell.radioOptions[optIdx];
+                if (!opt) continue;
                 if (opt.allowTextInput) {
                   const varNumber = opt.optionCode ?? String(optIdx + 1);
                   columns.push({
@@ -366,6 +370,7 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
             } else if (cell.type === 'select' && cell.selectOptions) {
               for (let optIdx = 0; optIdx < cell.selectOptions.length; optIdx++) {
                 const opt = cell.selectOptions[optIdx];
+                if (!opt) continue;
                 if (opt.allowTextInput) {
                   const varNumber = opt.optionCode ?? String(optIdx + 1);
                   columns.push({
@@ -421,6 +426,7 @@ function collectAndEmitRadioGroupColumns(
 
   for (let rowIdx = 0; rowIdx < q.tableRowsData.length; rowIdx++) {
     const tRow = q.tableRowsData[rowIdx];
+    if (!tRow) continue;
     for (let colIdx = 0; colIdx < q.tableColumns.length; colIdx++) {
       const cell = tRow.cells[colIdx];
       if (!cell) continue;
@@ -451,32 +457,38 @@ function collectAndEmitRadioGroupColumns(
     let groupVarName: string;
     let groupLabel: string;
 
+    const firstMember = members[0];
+    // members.length >= 2 가드 후이므로 firstMember는 항상 존재하지만
+    // noUncheckedIndexedAccess를 위해 명시적 가드 추가
+    if (!firstMember) continue;
+
     if (orientation === 'row') {
       // 같은 행 → 열 단위 응답: rowCode 기반 변수명, 옵션 라벨(폴백: 열 라벨)을 값 라벨로
-      const { row, rowIdx } = members[0];
+      const { row, rowIdx } = firstMember;
       const rowCode = row.rowCode || `r${rowIdx + 1}`;
       groupVarName = `${q.questionCode}_${rowCode}`;
       groupLabel = row.label || groupName;
 
       members.forEach((m, idx) => {
-        const opt = m.cell.radioOptions![0];
-        const value = opt.spssNumericCode ?? (idx + 1);
+        const opt = m.cell.radioOptions?.[0];
+        const value = opt?.spssNumericCode ?? (idx + 1);
         cellValueMap[m.cell.id] = value;
-        valueLabels[value] = opt.label || q.tableColumns![m.colIdx].label;
+        valueLabels[value] = opt?.label || q.tableColumns?.[m.colIdx]?.label || '';
       });
     } else if (orientation === 'column') {
       // 같은 열 → 행 단위 응답: columnCode 기반 변수명, 옵션 라벨(폴백: 행 라벨)을 값 라벨로
-      const { colIdx } = members[0];
+      const { colIdx } = firstMember;
       const col = q.tableColumns[colIdx];
+      if (!col) continue;
       const colCode = col.columnCode || `c${colIdx + 1}`;
       groupVarName = `${q.questionCode}_${colCode}`;
       groupLabel = col.label || groupName;
 
       members.forEach((m, idx) => {
-        const opt = m.cell.radioOptions![0];
-        const value = opt.spssNumericCode ?? (idx + 1);
+        const opt = m.cell.radioOptions?.[0];
+        const value = opt?.spssNumericCode ?? (idx + 1);
         cellValueMap[m.cell.id] = value;
-        valueLabels[value] = opt.label || m.row.label;
+        valueLabels[value] = opt?.label || m.row.label;
       });
     } else {
       // mixed (드뭄, 비정형 그룹): 그룹명 기반 변수명, 셀별 라벨 폴백
@@ -485,10 +497,10 @@ function collectAndEmitRadioGroupColumns(
       groupLabel = groupName;
 
       members.forEach((m, idx) => {
-        const opt = m.cell.radioOptions![0];
-        const value = opt.spssNumericCode ?? (idx + 1);
+        const opt = m.cell.radioOptions?.[0];
+        const value = opt?.spssNumericCode ?? (idx + 1);
         cellValueMap[m.cell.id] = value;
-        valueLabels[value] = opt.label || `${m.row.label} - ${q.tableColumns![m.colIdx].label}`;
+        valueLabels[value] = opt?.label || `${m.row.label} - ${q.tableColumns?.[m.colIdx]?.label ?? ''}`;
       });
     }
 
@@ -504,9 +516,9 @@ function collectAndEmitRadioGroupColumns(
       // 그룹 멤버들의 셀 단위 SPSS 오버라이드를 그룹 컬럼에 전파.
       // 사용자가 5점 척도 셀에 spssMeasure='Continuous'를 명시한 경우 등을 보존.
       // 멤버들이 서로 다른 값을 가질 가능성은 낮으므로 첫 멤버의 값을 채택.
-      ...(members[0].cell.spssVarType !== undefined ? { cellSpssVarType: members[0].cell.spssVarType } : {}),
-      ...(members[0].cell.spssMeasure !== undefined ? { cellSpssMeasure: members[0].cell.spssMeasure } : {}),
-      ...(members[0].cell.exportLabel !== undefined ? { cellExportLabel: members[0].cell.exportLabel } : {}),
+      ...(firstMember.cell.spssVarType !== undefined ? { cellSpssVarType: firstMember.cell.spssVarType } : {}),
+      ...(firstMember.cell.spssMeasure !== undefined ? { cellSpssMeasure: firstMember.cell.spssMeasure } : {}),
+      ...(firstMember.cell.exportLabel !== undefined ? { cellExportLabel: firstMember.cell.exportLabel } : {}),
     });
 
     members.forEach((m) => groupedCellIds.add(m.cell.id));

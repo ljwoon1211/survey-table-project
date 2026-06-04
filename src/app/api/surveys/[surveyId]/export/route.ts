@@ -67,10 +67,11 @@ export async function GET(
     let responses: typeof surveyResponses.$inferSelect[] = [];
 
     if (type !== 'map' && type !== 'raw') {
-      const [{ total }] = await db
+      const totalRows = await db
         .select({ total: count() })
         .from(surveyResponses)
         .where(and(eq(surveyResponses.surveyId, surveyId), notDeletedResponse));
+      const total = totalRows[0]?.total ?? 0;
 
       if (total > MAX_EXPORT_RESPONSES) {
         return NextResponse.json(

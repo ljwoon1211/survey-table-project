@@ -122,7 +122,7 @@ export function getRowMergeInfo(
           return {
             isMerged: true,
             mergedRowIds,
-            mergeStartRowId: tableRowsData[r].id,
+            mergeStartRowId: tableRowsData[r]?.id ?? null,
           };
         }
       }
@@ -159,7 +159,7 @@ export function getRowMergeInfo(
           return {
             isMerged: true,
             mergedRowIds,
-            mergeStartRowId: tableRowsData[r].id,
+            mergeStartRowId: tableRowsData[r]?.id ?? null,
           };
         }
       }
@@ -187,7 +187,7 @@ export function recalculateRowspansForVisibleRows(
 
   if (visibleRows.length === 0) return visibleRows;
 
-  const colCount = visibleRows[0].cells.length;
+  const colCount = visibleRows[0]?.cells.length ?? 0;
 
   // 변경이 필요한 셀만 추적: Map<visibleRowIndex, Map<colIdx, cellOverrides>>
   const modifications = new Map<number, Map<number, Partial<TableRow['cells'][0]>>>();
@@ -212,7 +212,9 @@ export function recalculateRowspansForVisibleRows(
     const mergeGroups: MergeGroup[] = [];
 
     for (let r = 0; r < originalRows.length; r++) {
-      const cell = originalRows[r].cells[colIdx];
+      const origRow = originalRows[r];
+      if (!origRow) continue;
+      const cell = origRow.cells[colIdx];
       if (cell && cell.rowspan && cell.rowspan > 1 && !cell.isHidden) {
         mergeGroups.push({
           startOrigIdx: r,
@@ -226,12 +228,14 @@ export function recalculateRowspansForVisibleRows(
     for (const group of mergeGroups) {
       const groupOrigRowIds = new Set<string>();
       for (let r = group.startOrigIdx; r < group.endOrigIdx && r < originalRows.length; r++) {
-        groupOrigRowIds.add(originalRows[r].id);
+        const origRow = originalRows[r];
+        if (origRow) groupOrigRowIds.add(origRow.id);
       }
 
       const visibleInGroup: number[] = [];
       for (let v = 0; v < visibleRows.length; v++) {
-        if (groupOrigRowIds.has(visibleRows[v].id)) {
+        const vRow = visibleRows[v];
+        if (vRow && groupOrigRowIds.has(vRow.id)) {
           visibleInGroup.push(v);
         }
       }
@@ -239,7 +243,9 @@ export function recalculateRowspansForVisibleRows(
       if (visibleInGroup.length === 0) continue;
 
       // 첫 번째 가시 행에 병합 시작 셀 배치
-      setMod(visibleInGroup[0], colIdx, {
+      const firstIdx = visibleInGroup[0];
+      if (firstIdx === undefined) continue;
+      setMod(firstIdx, colIdx, {
         isHidden: false,
         content: group.cellContent.content,
         type: group.cellContent.type,
@@ -248,9 +254,11 @@ export function recalculateRowspansForVisibleRows(
 
       // 나머지 가시 행의 해당 열 셀은 isHidden
       for (let i = 1; i < visibleInGroup.length; i++) {
+        const nextIdx = visibleInGroup[i];
+        if (nextIdx === undefined) continue;
         const mod: Partial<TableRow['cells'][0]> = { isHidden: true };
         delete mod.rowspan;
-        setMod(visibleInGroup[i], colIdx, mod);
+        setMod(nextIdx, colIdx, mod);
       }
     }
   }
@@ -296,7 +304,9 @@ export function recalculateColspansForVisibleColumns(
   const filteredColumns: TableColumn[] = [];
   for (let i = 0; i < originalColumns.length; i++) {
     if (!visibleColIndices.has(i)) continue;
-    const col = { ...originalColumns[i] };
+    const origCol = originalColumns[i];
+    if (!origCol) continue;
+    const col = { ...origCol } as TableColumn;
 
     // 이 열이 헤더 병합 시작이면 colspan 재계산
     if (col.colspan && col.colspan > 1) {
@@ -311,11 +321,13 @@ export function recalculateColspansForVisibleColumns(
   }
 
   // 행의 cells 필터링 + colspan 재계산
-  const filteredRows = originalRows.map((row) => {
-    const newCells = [];
+  const filteredRows: TableRow[] = originalRows.map((row) => {
+    const newCells: TableRow['cells'] = [];
     for (let i = 0; i < row.cells.length; i++) {
       if (!visibleColIndices.has(i)) continue;
-      const cell = { ...row.cells[i] };
+      const origCell = row.cells[i];
+      if (!origCell) continue;
+      const cell = { ...origCell };
 
       // colspan 재계산
       if (cell.colspan && cell.colspan > 1) {
@@ -365,7 +377,7 @@ export function recalculateColspansForVisibleColumns(
         if (cellRowspan > 1) {
           for (let r = rowIdx + 1; r < rowIdx + cellRowspan && r < totalHeaderRows; r++) {
             for (let c = origColIdx; c < origColIdx + cellColspan; c++) {
-              occupied[r].add(c);
+              occupied[r]?.add(c);
             }
           }
         }
@@ -426,11 +438,14 @@ export function validateHeaderGrid(grid: HeaderCell[][], columnCount: number): b
 
   for (let rowIdx = 0; rowIdx < totalRows; rowIdx++) {
     const row = grid[rowIdx];
+    if (!row) return false;
+    const occupiedRow = occupied[rowIdx];
+    if (!occupiedRow) return false;
     let colPos = 0;
 
     for (const cell of row) {
       // 이미 rowspan으로 점유된 슬롯 건너뛰기
-      while (colPos < columnCount && occupied[rowIdx][colPos]) {
+      while (colPos < columnCount && occupiedRow[colPos]) {
         colPos++;
       }
 
@@ -444,10 +459,12 @@ export function validateHeaderGrid(grid: HeaderCell[][], columnCount: number): b
 
       // 슬롯 점유 마킹
       for (let r = 0; r < rs; r++) {
+        const occupiedMergeRow = occupied[rowIdx + r];
+        if (!occupiedMergeRow) return false;
         for (let c = 0; c < cs; c++) {
           if (colPos + c >= columnCount) return false; // colspan 넘침
-          if (occupied[rowIdx + r][colPos + c]) return false; // 겹침
-          occupied[rowIdx + r][colPos + c] = true;
+          if (occupiedMergeRow[colPos + c]) return false; // 겹침
+          occupiedMergeRow[colPos + c] = true;
         }
       }
 
@@ -457,8 +474,9 @@ export function validateHeaderGrid(grid: HeaderCell[][], columnCount: number): b
 
   // 모든 슬롯이 정확히 점유되었는지 확인
   for (let r = 0; r < totalRows; r++) {
+    const occupiedCheckRow = occupied[r];
     for (let c = 0; c < columnCount; c++) {
-      if (!occupied[r][c]) return false;
+      if (!occupiedCheckRow?.[c]) return false;
     }
   }
 
@@ -473,5 +491,5 @@ export function getHeaderGridColumnCount(grid: HeaderCell[][]): number {
   if (!grid || grid.length === 0) return 0;
 
   // 첫 번째 행의 colspan 합이 총 컬럼 수
-  return grid[0].reduce((sum, cell) => sum + cell.colspan, 0);
+  return grid[0]?.reduce((sum, cell) => sum + cell.colspan, 0) ?? 0;
 }

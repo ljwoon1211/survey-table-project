@@ -53,7 +53,7 @@ export function ExportDataModal({ surveyId, surveyTitle, onExportCleaningExcel }
         let filename = buildSafeFilename(surveyTitle, 'Export', ext);
         if (contentDisposition) {
           const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
-          if (filenameMatch) filename = decodeURIComponent(filenameMatch[1]);
+          if (filenameMatch?.[1]) filename = decodeURIComponent(filenameMatch[1]);
         }
         downloadBlob(blob, filename);
       }

@@ -144,10 +144,16 @@ describe('classifyTable — GPU (LIST)', () => {
     const secs = classifyTable(gpu());
     expect(secs.map((s) => s.label)).toEqual(['NVIDIA', 'AMD']);
     expect(secs.map((s) => s.kind)).toEqual(['list', 'list']);
-    expect(secs[0].leaves.map((l) => l.label)).toEqual(['H100', 'A100', 'L4']);
-    expect(secs[0].leaves[0].inputCellIds).toEqual(['gpu-h100']);
-    expect(secs[0].totalInputs).toBe(3);
-    expect(secs[1].leaves.map((l) => l.label)).toEqual(['MI300X', 'MI250X']);
+    const sec0 = secs[0];
+    const sec1 = secs[1];
+    if (!sec0) throw new Error('secs[0] undefined');
+    if (!sec1) throw new Error('secs[1] undefined');
+    expect(sec0.leaves.map((l) => l.label)).toEqual(['H100', 'A100', 'L4']);
+    const leaf0 = sec0.leaves[0];
+    if (!leaf0) throw new Error('sec0.leaves[0] undefined');
+    expect(leaf0.inputCellIds).toEqual(['gpu-h100']);
+    expect(sec0.totalInputs).toBe(3);
+    expect(sec1.leaves.map((l) => l.label)).toEqual(['MI300X', 'MI250X']);
   });
 });
 
@@ -156,14 +162,20 @@ describe('classifyTable — 종사자 (MATRIX)', () => {
     const secs = classifyTable(workers());
     expect(secs.map((s) => s.label)).toEqual(['① 제재목', '② 합판']);
     expect(secs.every((s) => s.kind === 'matrix')).toBe(true);
+    const sec0 = secs[0];
+    if (!sec0) throw new Error('secs[0] undefined');
     // 열 그룹: 사무직(남/여) · 생산직(남/여)
-    expect(secs[0].colGroups.map((g) => g.label)).toEqual(['사무직', '생산직']);
-    expect(secs[0].colGroups[0].cols.map((c) => c.label)).toEqual(['남', '여']);
+    expect(sec0.colGroups.map((g) => g.label)).toEqual(['사무직', '생산직']);
+    const colGroup0 = sec0.colGroups[0];
+    if (!colGroup0) throw new Error('sec0.colGroups[0] undefined');
+    expect(colGroup0.cols.map((c) => c.label)).toEqual(['남', '여']);
     // 리프 = 연령행, 각 4개 입력
-    expect(secs[0].leaves).toHaveLength(3);
-    expect(secs[0].leaves[0].label).toBe('29세 이하');
-    expect(secs[0].leaves[0].inputCellIds).toHaveLength(4);
-    expect(secs[0].totalInputs).toBe(12);
+    expect(sec0.leaves).toHaveLength(3);
+    const leaf0 = sec0.leaves[0];
+    if (!leaf0) throw new Error('sec0.leaves[0] undefined');
+    expect(leaf0.label).toBe('29세 이하');
+    expect(leaf0.inputCellIds).toHaveLength(4);
+    expect(sec0.totalInputs).toBe(12);
   });
 });
 
@@ -176,16 +188,30 @@ describe('classifyTable — 숯 혼합 (MATRIX + SCALAR + SCALAR)', () => {
       '3) 월평균 가동일 수',
     ]);
     expect(secs.map((s) => s.kind)).toEqual(['matrix', 'scalar', 'scalar']);
+    const sec0 = secs[0];
+    const sec1 = secs[1];
+    const sec2 = secs[2];
+    if (!sec0) throw new Error('secs[0] undefined');
+    if (!sec1) throw new Error('secs[1] undefined');
+    if (!sec2) throw new Error('secs[2] undefined');
     // matrix 섹션: 비대칭 하위 그룹(방식) + 종류 리프
-    expect(secs[0].leaves.map((l) => l.label)).toEqual(['흑탄', '백탄', '톱밥숯', '칩', '대나무']);
-    expect(secs[0].leaves[0].subGroup).toBe('전통식 가마');
-    expect(secs[0].leaves[3].subGroup).toBe('기계식 탄화로');
-    expect(secs[0].colGroups.map((g) => g.label)).toEqual(['시설 1', '시설 2']);
-    expect(secs[0].leaves[0].inputCellIds).toEqual(['s1-heuk-1c', 's1-heuk-1q', 's1-heuk-2c', 's1-heuk-2q']);
+    expect(sec0.leaves.map((l) => l.label)).toEqual(['흑탄', '백탄', '톱밥숯', '칩', '대나무']);
+    const leaf0 = sec0.leaves[0];
+    const leaf3 = sec0.leaves[3];
+    if (!leaf0) throw new Error('sec0.leaves[0] undefined');
+    if (!leaf3) throw new Error('sec0.leaves[3] undefined');
+    expect(leaf0.subGroup).toBe('전통식 가마');
+    expect(leaf3.subGroup).toBe('기계식 탄화로');
+    expect(sec0.colGroups.map((g) => g.label)).toEqual(['시설 1', '시설 2']);
+    expect(leaf0.inputCellIds).toEqual(['s1-heuk-1c', 's1-heuk-1q', 's1-heuk-2c', 's1-heuk-2q']);
     // scalar 섹션: 입력 1칸이 값 열 전체 colspan
-    expect(secs[1].leaves.map((l) => l.label)).toEqual(['숯', '목초액 (죽초액)']);
-    expect(secs[1].leaves[0].inputCellIds).toEqual(['s2-charcoal']);
-    expect(secs[2].leaves[0].inputCellIds).toEqual(['s3-days']);
+    expect(sec1.leaves.map((l) => l.label)).toEqual(['숯', '목초액 (죽초액)']);
+    const sec1leaf0 = sec1.leaves[0];
+    const sec2leaf0 = sec2.leaves[0];
+    if (!sec1leaf0) throw new Error('sec1.leaves[0] undefined');
+    if (!sec2leaf0) throw new Error('sec2.leaves[0] undefined');
+    expect(sec1leaf0.inputCellIds).toEqual(['s2-charcoal']);
+    expect(sec2leaf0.inputCellIds).toEqual(['s3-days']);
   });
 });
 
@@ -202,9 +228,11 @@ describe('classifyTable — 수출 국가 (라벨 rowspan 병합)', () => {
   it('rowspan 병합 라벨 셀의 첫 행도 row.label 기반으로 일관되게 매겨진다', () => {
     const secs = classifyTable(exportCountry(3));
     expect(secs).toHaveLength(1);
-    expect(secs[0].kind).toBe('matrix');
+    const sec0 = secs[0];
+    if (!sec0) throw new Error('secs[0] undefined');
+    expect(sec0.kind).toBe('matrix');
     // 첫 리프가 병합 셀의 풀 텍스트가 아니라 row.label "_1" 이어야 한다.
-    expect(secs[0].leaves.map((l) => l.label)).toEqual([
+    expect(sec0.leaves.map((l) => l.label)).toEqual([
       '수출 국가 및 비중(%)_1',
       '수출 국가 및 비중(%)_2',
       '수출 국가 및 비중(%)_3',

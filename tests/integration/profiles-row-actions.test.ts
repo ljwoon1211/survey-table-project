@@ -663,7 +663,9 @@ describe('profiles-row-actions', () => {
       );
       // 옛 행은 사라지고 새 행 한 건이 남는다
       expect(remaining).toHaveLength(1);
-      expect(remaining[0].questionId).toBe(newQid);
+      const remaining0 = remaining[0];
+      if (!remaining0) throw new Error('remaining[0] 없음');
+      expect(remaining0.questionId).toBe(newQid);
     });
 
     it('존재하지 않는 응답은 Response not found throw', async () => {

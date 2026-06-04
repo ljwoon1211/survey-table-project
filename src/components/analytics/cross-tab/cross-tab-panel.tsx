@@ -61,8 +61,12 @@ export function CrossTabPanel({ questions, responses }: CrossTabPanelProps) {
   // 자동 선택 (첫 렌더링 시)
   useState(() => {
     if (crossTabableQuestions.length >= 2) {
-      setRowQuestionId(crossTabableQuestions[0].id);
-      setColQuestionId(crossTabableQuestions[1].id);
+      const first = crossTabableQuestions[0];
+      const second = crossTabableQuestions[1];
+      if (first && second) {
+        setRowQuestionId(first.id);
+        setColQuestionId(second.id);
+      }
     }
   });
 

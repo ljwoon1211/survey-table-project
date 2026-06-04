@@ -133,8 +133,10 @@ export function applyEmptyRowGrouping(
 
   for (let i = 0; i < dataRows.length; i++) {
     const row = dataRows[i];
+    if (!row) continue;
     const isEmptyRow = isEmpty(row);
-    const isResponseBoundary = i > 0 && dataRows[i].responseId !== dataRows[i - 1].responseId;
+    const prevRow = dataRows[i - 1];
+    const isResponseBoundary = i > 0 && row.responseId !== prevRow?.responseId;
 
     if (isResponseBoundary && spanStart !== -1) {
       // 응답 경계 → 이전 구간 종결
@@ -196,6 +198,7 @@ export function applyCheckboxFormulas(
 
   for (let i = 0; i < expandedColumns.length; i++) {
     const ec = expandedColumns[i];
+    if (!ec) continue;
     const excelCol = startCol + i;
 
     if (ec.columnKind === 'label') {
@@ -221,6 +224,7 @@ export function applyCheckboxFormulas(
 
   for (let ri = 0; ri < dataRows.length; ri++) {
     const meta = dataRows[ri];
+    if (!meta) continue;
     if (meta.isUnexposed) continue;
     if (isNonDataDepth1(meta.depth1Value)) continue;
 
@@ -239,7 +243,7 @@ export function applyCheckboxFormulas(
 
       const ifParts = group.binaryExcelCols.map((col, idx) => {
         const colLetter = getExcelColumnLetter(col);
-        const label = group.binaryLabels[idx].replace(/"/g, '""');
+        const label = (group.binaryLabels[idx] ?? '').replace(/"/g, '""');
         return `IF(IFERROR(${colLetter}${excelRowNum}>0,FALSE),", ${label}","")`;
       });
 
@@ -270,6 +274,7 @@ export function applyHiddenAndValidation(
 ) {
   for (let i = 0; i < expandedColumns.length; i++) {
     const ec = expandedColumns[i];
+    if (!ec) continue;
     const excelCol = startCol + i;
 
     if (!ec.visible) {
@@ -302,10 +307,10 @@ export function mergeExpandedH1Headers(
 
   const h1Row = 1 + rowOffset;
   let mergeStart = startCol;
-  let prevCellId: string | null = expandedColumns[0].cellId;
+  let prevCellId: string | null = expandedColumns[0]?.cellId ?? null;
 
   for (let i = 1; i <= expandedColumns.length; i++) {
-    const currentCellId = i < expandedColumns.length ? expandedColumns[i].cellId : null;
+    const currentCellId = i < expandedColumns.length ? (expandedColumns[i]?.cellId ?? null) : null;
     if (currentCellId !== prevCellId) {
       const mergeEnd = startCol + i - 1;
       if (mergeEnd > mergeStart) {

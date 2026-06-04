@@ -110,11 +110,11 @@ export default async function ReportProgressPage({ params, searchParams }: PageP
     contactScheme?.columns.find((c) => c.source === FILTER_SOURCE.RESID)?.label?.trim() || '번호';
 
   // 조사 대상 0건 빠른 검출 — getProgressTotals 보다 훨씬 가벼움.
-  const [{ ct }] = await db
+  const countRows = await db
     .select({ ct: sql<number>`count(*)::int` })
     .from(contactTargets)
     .where(sql`${contactTargets.surveyId} = ${surveyId}`);
-  const isEmpty = Number(ct) === 0;
+  const isEmpty = Number(countRows[0]?.ct ?? 0) === 0;
 
   const { rows, totals } = isEmpty
     ? { rows: [], totals: { groupCount: 0, listTotal: 0, completedTotal: 0, excludedTotal: 0 } }

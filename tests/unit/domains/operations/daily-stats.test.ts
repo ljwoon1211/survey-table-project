@@ -66,10 +66,12 @@ describe('shapeDailyStats', () => {
       { date: '2026-04-27', total: 0, completed: 0, drop: 0 },
     ]);
     expect(result).toHaveLength(1);
-    expect(result[0].completionRate).toBeNull();
+    const row0 = result[0];
+    if (!row0) throw new Error('expected result[0]');
+    expect(row0.completionRate).toBeNull();
     // overallTotal 도 0 → columnPct null
-    expect(result[0].columnPct).toBeNull();
-    expect(result[0].drop).toBe(0);
+    expect(row0.columnPct).toBeNull();
+    expect(row0.drop).toBe(0);
   });
 
   it('한국어 요일 라벨이 달력과 일치 — 2026-04-27 = 월', () => {
@@ -98,8 +100,10 @@ describe('shapeDailyStats', () => {
     const result = shapeDailyStats([
       { date: '2026-04-27', total: 5, completed: 5, drop: 0 },
     ]);
-    expect(result[0].drop).toBe(0);
-    expect(typeof result[0].drop).toBe('number');
+    const dropRow = result[0];
+    if (!dropRow) throw new Error('expected result[0]');
+    expect(dropRow.drop).toBe(0);
+    expect(typeof dropRow.drop).toBe('number');
   });
 
   it('월/년 경계를 가로지르는 입력에서도 내림차순 정렬', () => {

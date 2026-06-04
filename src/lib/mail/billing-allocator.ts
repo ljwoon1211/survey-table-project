@@ -103,7 +103,11 @@ export function allocateCycleCosts(args: {
   if (preliminary.length > 0) {
     const sumPreliminary = preliminary.reduce((a, b) => a + b, 0);
     const drift = cycleOverageKrw - sumPreliminary;
-    preliminary[preliminary.length - 1] += drift;
+    const lastIdx = preliminary.length - 1;
+    const last = preliminary[lastIdx];
+    if (last !== undefined) {
+      preliminary[lastIdx] = last + drift;
+    }
   }
 
   const allocated: AllocatedCampaign[] = breakdown.map((b, i) => {

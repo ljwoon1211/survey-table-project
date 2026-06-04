@@ -27,7 +27,7 @@ function buildWrapperStyle(widthPct: number | null): string {
 function readWidthPct(wrapperStyle: string, containerStyle: string): number | null {
   const tryMatch = (s: string) => {
     const m = s.match(/width:\s*([0-9.]+)%/);
-    return m ? parseFloat(m[1]) : null;
+    return m?.[1] != null ? parseFloat(m[1]) : null;
   };
   return tryMatch(wrapperStyle) ?? tryMatch(containerStyle);
 }

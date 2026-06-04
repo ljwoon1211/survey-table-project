@@ -134,7 +134,9 @@ describe('createBlankResponse', () => {
     expect(result).toEqual({ kind: 'created', id: 'response-1', contactTargetId: 'contact-1' });
 
     expect(insertValuesArg).toHaveBeenCalledOnce();
-    const values = insertValuesArg.mock.calls[0][0] as {
+    const rawCall = insertValuesArg.mock.calls[0];
+    if (!rawCall) throw new Error('insertValuesArg 호출 없음');
+    const values = rawCall[0] as {
       questionResponses: Record<string, unknown>;
       isCompleted: boolean;
       status: string;
@@ -147,7 +149,9 @@ describe('createBlankResponse', () => {
     expect(values.status).toBe('in_progress');
     expect(values.contactTargetId).toBe('contact-1');
     expect(values.pageVisits).toHaveLength(1);
-    expect(values.pageVisits[0].stepId).toBe('step-1');
+    const firstVisit = values.pageVisits[0];
+    if (!firstVisit) throw new Error('pageVisits[0] 없음');
+    expect(firstVisit.stepId).toBe('step-1');
     // ipHash 는 null 이 아님 (IP 가 있으므로 sha256 결과)
     expect(values.ipHash).not.toBeNull();
   });

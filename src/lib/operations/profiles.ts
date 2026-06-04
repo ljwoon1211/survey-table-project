@@ -132,7 +132,7 @@ const Q_NUMBER_RE = /^(Q\d+(?:-\d+)?)\b/
 export function parseQuestionNumberFromTitle(title: string | null | undefined): string | null {
   if (!title) return null
   const m = Q_NUMBER_RE.exec(title)
-  return m ? m[1] : null
+  return m ? (m[1] ?? null) : null
 }
 
 export type StatusTone = 'green' | 'blue' | 'gray' | 'amber' | 'red'

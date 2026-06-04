@@ -324,7 +324,10 @@ export async function upsertSurveyLookupAction(
     .where(eq(surveys.id, surveyId));
 
   revalidatePath(`/admin/surveys/${surveyId}`);
-  return next[idx >= 0 ? idx : next.length - 1];
+  const resultIndex = idx >= 0 ? idx : next.length - 1;
+  const result = next[resultIndex];
+  if (!result) throw new Error('upsertSurveyLookupAction: 저장 결과 조회 실패');
+  return result;
 }
 
 // 설문 LUT 삭제

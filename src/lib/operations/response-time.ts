@@ -89,8 +89,8 @@ function buildStats(
   const sum = values.reduce((acc, v) => acc + v, 0);
   const avg = sum / n;
   const avgTrimmed = trimmedMean(values, DEFAULT_TRIM);
-  let min = values[0];
-  let max = values[0];
+  let min = Infinity;
+  let max = -Infinity;
   for (const v of values) {
     if (v < min) min = v;
     if (v > max) max = v;

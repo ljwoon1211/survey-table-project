@@ -68,28 +68,39 @@ const sampleQuestions: Question[] = [
   }),
 ];
 
+const sq0 = sampleQuestions[0];
+const sq1 = sampleQuestions[1];
+const sq2 = sampleQuestions[2];
+if (!sq0 || !sq1 || !sq2) throw new Error('sampleQuestions 픽스처 누락');
+
 describe('generateSPSSColumns', () => {
   it('단일선택 질문은 열 1개를 생성한다', () => {
-    const columns = generateSPSSColumns([sampleQuestions[0]]);
+    const columns = generateSPSSColumns([sq0]);
     expect(columns).toHaveLength(1);
-    expect(columns[0].spssVarName).toBe('Q1');
-    expect(columns[0].type).toBe('single');
+    const col0 = columns[0];
+    if (!col0) throw new Error('columns[0] 없음');
+    expect(col0.spssVarName).toBe('Q1');
+    expect(col0.type).toBe('single');
   });
 
   it('복수선택 질문은 옵션 수만큼 열을 생성한다', () => {
-    const columns = generateSPSSColumns([sampleQuestions[1]]);
+    const columns = generateSPSSColumns([sq1]);
     expect(columns).toHaveLength(3);
-    expect(columns[0].spssVarName).toBe('Q2_1');
-    expect(columns[1].spssVarName).toBe('Q2_2');
-    expect(columns[2].spssVarName).toBe('Q2_3');
-    expect(columns[0].type).toBe('checkbox-item');
+    const [cb0, cb1, cb2] = columns;
+    if (!cb0 || !cb1 || !cb2) throw new Error('columns 없음');
+    expect(cb0.spssVarName).toBe('Q2_1');
+    expect(cb1.spssVarName).toBe('Q2_2');
+    expect(cb2.spssVarName).toBe('Q2_3');
+    expect(cb0.type).toBe('checkbox-item');
   });
 
   it('텍스트 질문은 열 1개를 생성한다', () => {
-    const columns = generateSPSSColumns([sampleQuestions[2]]);
+    const columns = generateSPSSColumns([sq2]);
     expect(columns).toHaveLength(1);
-    expect(columns[0].spssVarName).toBe('Q3');
-    expect(columns[0].type).toBe('text');
+    const txtCol0 = columns[0];
+    if (!txtCol0) throw new Error('columns[0] 없음');
+    expect(txtCol0.spssVarName).toBe('Q3');
+    expect(txtCol0.type).toBe('text');
   });
 
   it('notice 질문은 제외한다', () => {
@@ -109,11 +120,13 @@ describe('generateSPSSColumns', () => {
 
   it('옵션 라벨을 포함한다', () => {
     const columns = generateSPSSColumns(sampleQuestions);
+    const [lblCol0, lblCol1, lblCol2] = columns;
+    if (!lblCol0 || !lblCol1 || !lblCol2) throw new Error('columns 없음');
     // radio는 모든 옵션을 "1. 남성 / 2. 여성" 형태로
-    expect(columns[0].optionLabel).toContain('남성');
+    expect(lblCol0.optionLabel).toContain('남성');
     // checkbox는 개별 옵션 라벨
-    expect(columns[1].optionLabel).toContain('제제목');
-    expect(columns[2].optionLabel).toContain('합판');
+    expect(lblCol1.optionLabel).toContain('제제목');
+    expect(lblCol2.optionLabel).toContain('합판');
   });
 
   it('isHidden 테이블 셀은 변수 열에서 제외한다', () => {
@@ -140,7 +153,9 @@ describe('generateSPSSColumns', () => {
     const cols = generateSPSSColumns([q]);
     const tableCols = cols.filter((c) => c.type === 'table-cell');
     expect(tableCols).toHaveLength(1);
-    expect(tableCols[0].spssVarName).toBe('Q1_r1_c2');
+    const tableCol0 = tableCols[0];
+    if (!tableCol0) throw new Error('tableCols[0] 없음');
+    expect(tableCol0.spssVarName).toBe('Q1_r1_c2');
   });
 
   it('테이블 셀 컬럼에 cellExportLabel을 실어 준다', () => {
@@ -188,45 +203,56 @@ describe('generateSPSSColumns', () => {
 
 describe('buildDataRows', () => {
   it('단일선택 응답을 숫자코드로 변환한다', () => {
-    const columns = generateSPSSColumns([sampleQuestions[0]]);
+    const columns = generateSPSSColumns([sq0]);
     const submissions = [makeSubmission({ 'q-gender': 'o-male' })];
-    const rows = buildDataRows(columns, [sampleQuestions[0]], submissions);
-    expect(rows[0][0]).toBe(1);
+    const rows = buildDataRows(columns, [sq0], submissions);
+    const row0 = rows[0];
+    if (!row0) throw new Error('rows[0] 없음');
+    expect(row0[0]).toBe(1);
   });
 
   it('복수선택 응답을 옵션별 분리한다', () => {
-    const columns = generateSPSSColumns([sampleQuestions[1]]);
+    const columns = generateSPSSColumns([sq1]);
     const submissions = [
       makeSubmission({ 'q-products': ['o-wood', 'o-fiber'] }),
     ];
-    const rows = buildDataRows(columns, [sampleQuestions[1]], submissions);
-    expect(rows[0]).toEqual([1, null, 3]); // 제제목=1, 합판=null, 섬유판=3
+    const rows = buildDataRows(columns, [sq1], submissions);
+    const cbRow0 = rows[0];
+    if (!cbRow0) throw new Error('rows[0] 없음');
+    expect(cbRow0).toEqual([1, null, 3]); // 제제목=1, 합판=null, 섬유판=3
   });
 
   it('텍스트 응답을 그대로 유지한다', () => {
-    const columns = generateSPSSColumns([sampleQuestions[2]]);
+    const columns = generateSPSSColumns([sq2]);
     const submissions = [makeSubmission({ 'q-opinion': '좋았습니다' })];
-    const rows = buildDataRows(columns, [sampleQuestions[2]], submissions);
-    expect(rows[0][0]).toBe('좋았습니다');
+    const rows = buildDataRows(columns, [sq2], submissions);
+    const txtRow0 = rows[0];
+    if (!txtRow0) throw new Error('rows[0] 없음');
+    expect(txtRow0[0]).toBe('좋았습니다');
   });
 
   it('미응답은 null로 처리한다', () => {
-    const columns = generateSPSSColumns([sampleQuestions[0]]);
+    const columns = generateSPSSColumns([sq0]);
     const submissions = [makeSubmission({})];
-    const rows = buildDataRows(columns, [sampleQuestions[0]], submissions);
-    expect(rows[0][0]).toBeNull();
+    const rows = buildDataRows(columns, [sq0], submissions);
+    const nullRow0 = rows[0];
+    if (!nullRow0) throw new Error('rows[0] 없음');
+    expect(nullRow0[0]).toBeNull();
   });
 
   it('여러 응답자의 데이터를 행으로 반환한다', () => {
-    const columns = generateSPSSColumns([sampleQuestions[0]]);
+    const columns = generateSPSSColumns([sq0]);
     const submissions = [
       makeSubmission({ 'q-gender': 'o-male' }),
       makeSubmission({ 'q-gender': 'o-female' }, { id: 'sub-2' }),
     ];
-    const rows = buildDataRows(columns, [sampleQuestions[0]], submissions);
+    const rows = buildDataRows(columns, [sq0], submissions);
     expect(rows).toHaveLength(2);
-    expect(rows[0][0]).toBe(1);
-    expect(rows[1][0]).toBe(2);
+    const multiRow0 = rows[0];
+    const multiRow1 = rows[1];
+    if (!multiRow0 || !multiRow1) throw new Error('rows 없음');
+    expect(multiRow0[0]).toBe(1);
+    expect(multiRow1[0]).toBe(2);
   });
 
   it('테이블 radio 셀 응답을 옵션 spssNumericCode로 변환한다', () => {
@@ -253,8 +279,11 @@ describe('buildDataRows', () => {
 
     const rows = buildDataRows(cols, [q], submissions);
     const colIdx = cols.findIndex((c) => c.spssVarName === 'Q1_r1_c2');
-    expect(rows[0][colIdx]).toBe(2);
-    expect(rows[1][colIdx]).toBe(1);
+    const tableRow0 = rows[0];
+    const tableRow1 = rows[1];
+    if (!tableRow0 || !tableRow1) throw new Error('rows 없음');
+    expect(tableRow0[colIdx]).toBe(2);
+    expect(tableRow1[colIdx]).toBe(1);
   });
 });
 

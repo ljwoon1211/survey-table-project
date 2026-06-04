@@ -55,8 +55,10 @@ function valueColumns(q: ClassifyInput): number[] {
 function groupByColumn(rows: TableRow[], col: number) {
   const groups: { label: string; rows: TableRow[] }[] = [];
   for (let i = 0; i < rows.length; ) {
-    const c = rows[i].cells[col];
-    const span = c && !c.isHidden && (c.rowspan ?? 1) > 1 ? c.rowspan! : 1;
+    const row = rows[i];
+    if (!row) break;
+    const c = row.cells[col];
+    const span = c && !c.isHidden && (c.rowspan ?? 1) > 1 ? c.rowspan ?? 1 : 1;
     groups.push({ label: (c?.content ?? '').trim(), rows: rows.slice(i, i + span) });
     i += span;
   }
@@ -68,13 +70,18 @@ function columnPaths(grid: HeaderCell[][], n: number): string[][] {
   const paths: string[][] = Array.from({ length: n }, () => []);
   const occ = Array.from({ length: grid.length }, () => new Set<number>());
   grid.forEach((cells, r) => {
+    const occRow = occ[r];
+    if (!occRow) return;
     let col = 0;
     for (const cell of cells) {
-      while (occ[r].has(col)) col++;
+      while (occRow.has(col)) col++;
       const cs = cell.colspan || 1;
       const rs = cell.rowspan || 1;
       for (let rr = r; rr < r + rs; rr++) for (let cc = col; cc < col + cs; cc++) occ[rr]?.add(cc);
-      for (let cc = col; cc < col + cs; cc++) paths[cc][r] = cell.label;
+      for (let cc = col; cc < col + cs; cc++) {
+        const path = paths[cc];
+        if (path) path[r] = cell.label;
+      }
       col += cs;
     }
   });
@@ -84,13 +91,13 @@ function columnPaths(grid: HeaderCell[][], n: number): string[][] {
 function buildColGroups(q: ClassifyInput, vcols: number[]): ColGroup[] {
   const grid = q.tableHeaderGrid;
   if (!grid || grid.length < 2)
-    return [{ label: '', cols: vcols.map((j) => ({ col: j, label: q.tableColumns[j].label })) }];
+    return [{ label: '', cols: vcols.map((j) => ({ col: j, label: q.tableColumns[j]?.label ?? '' })) }];
   const paths = columnPaths(grid, q.tableColumns.length);
   const groups: ColGroup[] = [];
   for (const j of vcols) {
     const p = paths[j] ?? [];
-    const leaf = p[p.length - 1] ?? q.tableColumns[j].label ?? '';
-    const parent = p.length >= 2 ? p[p.length - 2] : '';
+    const leaf = p[p.length - 1] ?? q.tableColumns[j]?.label ?? '';
+    const parent = p.length >= 2 ? p[p.length - 2] ?? '' : '';
     let g = groups[groups.length - 1];
     if (!g || g.label !== parent) groups.push((g = { label: parent, cols: [] }));
     g.cols.push({ col: j, label: leaf });
@@ -100,10 +107,12 @@ function buildColGroups(q: ClassifyInput, vcols: number[]): ColGroup[] {
 
 const rightmostLabel = (row: TableRow, labelCols: number[]) => {
   for (let k = labelCols.length - 1; k >= 0; k--) {
-    const c = row.cells[labelCols[k]];
+    const colIdx = labelCols[k];
+    if (colIdx === undefined) continue;
+    const c = row.cells[colIdx];
     // rowspan 으로 병합된 라벨 셀의 첫 행 content 는 그룹 전체를 대표하는 라벨이라
     // 개별 행(리프)을 구분하지 못한다. 이런 셀은 건너뛰고 row.label 로 떨어진다.
-    if (isLabel(c) && c!.content.trim() && (c!.rowspan ?? 1) <= 1) return c!.content.trim();
+    if (isLabel(c) && c?.content.trim() && (c?.rowspan ?? 1) <= 1) return c.content.trim();
   }
   return row.label || '';
 };

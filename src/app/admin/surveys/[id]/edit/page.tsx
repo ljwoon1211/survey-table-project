@@ -361,10 +361,11 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
     const questions = useSurveyBuilderStore.getState().currentSurvey.questions;
     const questionIndex = questionNumber - 1;
     if (questionIndex >= 0 && questionIndex < questions.length) {
+      const targetQuestion = questions[questionIndex];
       const questionElement = document.querySelector(`[data-question-index="${questionIndex}"]`);
-      if (questionElement) {
+      if (questionElement && targetQuestion) {
         questionElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        selectQuestion(questions[questionIndex].id);
+        selectQuestion(targetQuestion.id);
       }
     }
   };

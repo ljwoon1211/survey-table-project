@@ -39,7 +39,9 @@ describe('publish 통합 — survey 이미지 + notice 첨부 동시 처리', ()
     const promoted = await promoteNoticeAttachments(
       await promoteSurveyImages(draftQuestions),
     );
-    const html = promoted[0].noticeContent ?? '';
+    const promoted0 = promoted[0];
+    if (!promoted0) throw new Error('promoted[0] 없음');
+    const html = promoted0.noticeContent ?? '';
     expect(html).toContain('https://cdn.test/survey/img1.webp');
     expect(html).toContain('https://cdn.test/notice-attachment/x.pdf');
     expect(html).not.toContain('tmp/survey/');

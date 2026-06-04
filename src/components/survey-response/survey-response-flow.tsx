@@ -831,7 +831,9 @@ export function SurveyResponseFlow({
         setHighlightQuestionIds(highlight);
 
         // 첫 번째 미응답 필수 질문이 속한 step으로 이동
-        const firstId = unansweredRequired[0].id;
+        const firstRequired = unansweredRequired[0];
+        if (!firstRequired) return;
+        const firstId = firstRequired.id;
         const targetIdx = steps.findIndex((s) => {
           if (s.kind === 'table') return s.question.id === firstId;
           return s.items.some((it) => it.question.id === firstId);

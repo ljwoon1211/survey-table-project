@@ -52,7 +52,10 @@ export function parseClausesFromUrl(
   if (len === 0) return [];
   const clauses: FilterClause[] = [];
   for (let i = 0; i < len; i++) {
-    const clause = buildClause(colsArr[i], qsArr[i], opsArr[i] ?? '', candidates, resultCodes);
+    const col = colsArr[i];
+    const q = qsArr[i];
+    if (col === undefined || q === undefined) continue;
+    const clause = buildClause(col, q, opsArr[i] ?? '', candidates, resultCodes);
     if (!clause) continue;
     // 출력 첫 절은 항상 op=null (URL 첫 절이 drop 되어도 invariant 보장).
     clauses.push({
