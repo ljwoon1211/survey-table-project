@@ -30,6 +30,9 @@ export interface ClassifiedLeaf {
   label: string;
   subGroup: string;
   inputCellIds: string[];
+  // 실제 열 인덱스 → 입력 셀 id. matrix 폼은 colGroups 의 col(실제 열 인덱스)로 셀을 찾는다.
+  // inputCellIds 는 행마다 길이가 다를 수 있어(비대칭 matrix) 위치로 끼워맞추면 밀린다.
+  cellByCol: Record<number, string>;
 }
 export interface ClassifiedSection {
   label: string;
@@ -152,12 +155,19 @@ export function classifyTable(q: ClassifyInput): ClassifiedSection[] {
     const subGroups = subCol != null ? groupByColumn(sec.rows, subCol) : [{ label: '', rows: sec.rows }];
     const subOf = (row: TableRow) => subGroups.find((g) => g.rows.includes(row))?.label ?? '';
 
-    const leaves: ClassifiedLeaf[] = inputRows.map((row) => ({
-      rowId: row.id,
-      label: rightmostLabel(row, labelCols),
-      subGroup: subOf(row),
-      inputCellIds: row.cells.filter(isInput).map((c) => c.id),
-    }));
+    const leaves: ClassifiedLeaf[] = inputRows.map((row) => {
+      const cellByCol: Record<number, string> = {};
+      row.cells.forEach((c, j) => {
+        if (isInput(c)) cellByCol[j] = c.id;
+      });
+      return {
+        rowId: row.id,
+        label: rightmostLabel(row, labelCols),
+        subGroup: subOf(row),
+        inputCellIds: row.cells.filter(isInput).map((c) => c.id),
+        cellByCol,
+      };
+    });
 
     return {
       label: sec.label,

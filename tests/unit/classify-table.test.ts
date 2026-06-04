@@ -135,6 +135,27 @@ function exportCountry(n = 3): ClassifyInput {
   return { tableColumns: cols, tableRowsData: rows };
 }
 
+// ── 표 7: 비대칭 matrix (값 열 2개, 행마다 채우는 열이 다름) ──
+// 품목 ▸ 연령(남/여). 일부 연령행은 남만, 일부는 여만 입력 가능(반대편은 빈 라벨 셀).
+// 드릴다운 matrix 폼은 colGroups(열 합집합) 순서에 inputCellIds 를 위치로 끼워 맞추는데,
+// 행마다 입력 칸 수가 다르면 그 가정이 깨진다 → 셀이 엉뚱한 열에 붙거나 누락된다.
+function asymMatrix(): ClassifyInput {
+  const cols = [C('품목'), C('연령'), C('남'), C('여')];
+  const grid: HeaderCell[][] = [
+    [HC('구분', 2, 2), HC('직군', 2)],
+    [HC('남'), HC('여')],
+  ];
+  const rows: TableRow[] = [
+    // 전체: 남+여 둘 다
+    { id: 'a', label: '', cells: [T('제재목', { rs: 3 }), T('전체'), I('a-m'), I('a-f')] },
+    // 남자전용: 남만 입력, 여 자리는 빈 라벨(text)
+    { id: 'b', label: '', cells: [H(), T('남자전용'), I('b-m'), T('')] },
+    // 여자전용: 여만 입력, 남 자리는 빈 라벨(text) → inputCellIds=["c-f"] 한 개
+    { id: 'c', label: '', cells: [H(), T('여자전용'), T(''), I('c-f')] },
+  ];
+  return { tableColumns: cols, tableRowsData: rows, tableHeaderGrid: grid };
+}
+
 beforeEach(() => {
   _id = 0;
 });
@@ -212,6 +233,34 @@ describe('classifyTable — 숯 혼합 (MATRIX + SCALAR + SCALAR)', () => {
     if (!sec2leaf0) throw new Error('sec2.leaves[0] undefined');
     expect(sec1leaf0.inputCellIds).toEqual(['s2-charcoal']);
     expect(sec2leaf0.inputCellIds).toEqual(['s3-days']);
+  });
+});
+
+describe('classifyTable — 비대칭 matrix (행마다 입력 열 다름)', () => {
+  it('각 입력 셀은 실제 열 인덱스(cellByCol)로 매핑돼 위치 밀림이 없다', () => {
+    const secs = classifyTable(asymMatrix());
+    const sec0 = secs[0];
+    if (!sec0) throw new Error('secs[0] undefined');
+    expect(sec0.kind).toBe('matrix');
+    // 값 열은 col 2(남) · col 3(여)
+    const cols = sec0.colGroups.flatMap((g) => g.cols.map((c) => c.col));
+    expect(cols).toEqual([2, 3]);
+
+    const [whole, maleOnly, femaleOnly] = sec0.leaves;
+    if (!whole || !maleOnly || !femaleOnly) throw new Error('leaves missing');
+
+    // 전체 행: 남 셀 col2 = a-m, 여 셀 col3 = a-f
+    expect(whole.cellByCol[2]).toBe('a-m');
+    expect(whole.cellByCol[3]).toBe('a-f');
+
+    // 남자전용: 남(col2)만 채움. 여(col3) 자리는 비어 있어야 한다(undefined).
+    expect(maleOnly.cellByCol[2]).toBe('b-m');
+    expect(maleOnly.cellByCol[3]).toBeUndefined();
+
+    // 여자전용: 여(col3)만 채움. 남(col2) 자리는 비어 있어야 한다.
+    // 위치 끼워맞춤이면 c-f 가 col2(남)에 잘못 붙는 버그가 여기서 잡힌다.
+    expect(femaleOnly.cellByCol[2]).toBeUndefined();
+    expect(femaleOnly.cellByCol[3]).toBe('c-f');
   });
 });
 

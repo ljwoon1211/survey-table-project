@@ -346,7 +346,6 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
   // (이 경로는 scalar/list 가 위에서 early-return 되어 항상 matrix)
   const isSingleLeaf = s.leaves.length === 1;
   const backToLeaves = () => (isSingleLeaf ? backToRoot() : setNav({ sec: nav.sec, leaf: null }));
-  let k = 0; // colGroups flat 순서 = leaf.inputCellIds 순서
   // 하단 네비: disabled 로 죽이지 않고 위치별로 라벨·이동을 바꿔 항상 빠져나갈 길을 둔다.
   const leafIdx = nav.leaf;
   const secIdx = nav.sec;
@@ -386,7 +385,9 @@ export const MobileTableDrilldown = React.memo(function MobileTableDrilldown({
               )}
               <div className="space-y-3">
                 {g.cols.map((c) => {
-                  const cellId = leaf.inputCellIds[k++];
+                  // 실제 열 인덱스(c.col)로 이 리프의 입력 셀을 찾는다. 비대칭 matrix 에서
+                  // 행마다 채운 열이 달라도 셀이 올바른 열 라벨 아래 렌더된다.
+                  const cellId = leaf.cellByCol[c.col];
                   if (cellId == null) return null;
                   const cell = cellById.get(cellId);
                   if (!cell) return null;
