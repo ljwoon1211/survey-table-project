@@ -8,6 +8,7 @@ import { contactTargets, surveyResponses, surveys } from '@/db/schema';
 import { notDeletedResponse } from '@/data/response-filters';
 import { requireAuth } from '@/lib/auth';
 import {
+  buildSplitWorkbook,
   generateRawDataWorkbook,
   generateSummaryWorkbook,
   generateVariableMapWorkbook,
@@ -20,7 +21,7 @@ import { generateAllCellCodes } from '@/utils/table-cell-code-generator';
 // Vercel serverless 최대 실행시간 30초 (기본 10초)
 export const maxDuration = 30;
 
-const ALLOWED_EXPORT_TYPES = ['summary', 'map', 'sav', 'raw'] as const;
+const ALLOWED_EXPORT_TYPES = ['summary', 'map', 'sav', 'raw', 'raw-split'] as const;
 type ExportType = (typeof ALLOWED_EXPORT_TYPES)[number];
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -66,7 +67,7 @@ export async function GET(
     // raw는 자체 모수(in_progress 제외)와 가드를 별도로 가지므로 이 공용 블록을 건너뛴다.
     let responses: typeof surveyResponses.$inferSelect[] = [];
 
-    if (type !== 'map' && type !== 'raw') {
+    if (type !== 'map' && type !== 'raw' && type !== 'raw-split') {
       const [{ total }] = await db
         .select({ total: count() })
         .from(surveyResponses)
@@ -149,6 +150,76 @@ export async function GET(
       return new NextResponse(buffer as ArrayBuffer, {
         headers: {
           'Content-Disposition': `attachment; filename="${filename}"`,
+          'Content-Type': XLSX_MIME,
+        },
+      });
+    }
+
+    // 3-b. Raw Split Data xlsx
+    if (type === 'raw-split') {
+      const basis = request.nextUrl.searchParams.get('basis');
+      if (!basis) {
+        return NextResponse.json({ error: '분할 기준 문항이 필요합니다.' }, { status: 400 });
+      }
+
+      const rawResponses = await db.query.surveyResponses.findMany({
+        where: and(
+          eq(surveyResponses.surveyId, surveyId),
+          isNull(surveyResponses.deletedAt),
+          ne(surveyResponses.status, 'in_progress'),
+        ),
+        orderBy: (r, { asc }) => [asc(r.startedAt)],
+      });
+
+      if (rawResponses.length > MAX_EXPORT_RESPONSES) {
+        return NextResponse.json(
+          { error: `응답이 ${MAX_EXPORT_RESPONSES.toLocaleString()}건을 초과하여 내보내기할 수 없습니다.` },
+          { status: 413 },
+        );
+      }
+
+      const contactIds = rawResponses
+        .map((r) => r.contactTargetId)
+        .filter((v): v is string => !!v);
+      const contactMap = new Map<string, { resid: number; groupValue: string | null }>();
+      if (contactIds.length > 0) {
+        const targets = await db
+          .select({ id: contactTargets.id, resid: contactTargets.resid, groupValue: contactTargets.groupValue })
+          .from(contactTargets)
+          .where(inArray(contactTargets.id, contactIds));
+        for (const t of targets) contactMap.set(t.id, { resid: t.resid, groupValue: t.groupValue });
+      }
+
+      const identifierMode = surveyData.requireInviteToken ? 'systemId' : 'sequence';
+
+      const rows: RawExportResponseRow[] = rawResponses.map((r) => {
+        const c = r.contactTargetId ? contactMap.get(r.contactTargetId) : undefined;
+        return {
+          id: r.id,
+          questionResponses: (r.questionResponses ?? {}) as Record<string, unknown>,
+          groupValue: c?.groupValue ?? null,
+          resid: c?.resid ?? null,
+          platform: r.platform,
+          browser: r.browser,
+          status: r.status,
+          startedAt: r.startedAt,
+          completedAt: r.completedAt,
+          totalSeconds: r.totalSeconds,
+        };
+      });
+
+      const workbook = buildSplitWorkbook(
+        surveyData.questions as unknown as Question[],
+        rows,
+        basis,
+        identifierMode,
+      );
+      const buffer = await workbook.xlsx.writeBuffer();
+      const basisCode = (surveyData.questions as unknown as Question[]).find((q) => q.id === basis)?.questionCode ?? 'split';
+      const filename = `${safeTitle}_분할_${basisCode}_${dateSlice}.xlsx`;
+      return new NextResponse(buffer as ArrayBuffer, {
+        headers: {
+          'Content-Disposition': `attachment; filename="${encodeURIComponent(filename)}"`,
           'Content-Type': XLSX_MIME,
         },
       });
