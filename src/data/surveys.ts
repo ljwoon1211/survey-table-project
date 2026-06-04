@@ -1,6 +1,6 @@
 import { cache } from 'react';
 
-import { and, desc, eq, gte, ilike, lte } from 'drizzle-orm';
+import { and, count, desc, eq, gte, ilike, lte } from 'drizzle-orm';
 
 import { db } from '@/db';
 import { questionGroups, questions, surveys, surveyVersions } from '@/db/schema';
@@ -290,27 +290,25 @@ export async function getSurveyForResponse(
 export async function getSurveyListWithCounts() {
   const surveyList = await getSurveys();
 
-  // 각 설문의 질문 수 조회
-  const surveysWithCounts = await Promise.all(
-    surveyList.map(async (survey) => {
-      const questionList = await db.query.questions.findMany({
-        where: eq(questions.surveyId, survey.id),
-      });
-
-      return {
-        id: survey.id,
-        title: survey.title,
-        description: survey.description,
-        slug: survey.slug,
-        privateToken: survey.privateToken,
-        questionCount: questionList.length,
-        responseCount: 0,
-        createdAt: survey.createdAt,
-        updatedAt: survey.updatedAt,
-        isPublic: survey.isPublic,
-      };
-    }),
+  // 모든 설문의 질문 수를 단일 GROUP BY 로 집계 (설문별 findMany N+1 제거)
+  const questionCounts = await db
+    .select({ surveyId: questions.surveyId, count: count() })
+    .from(questions)
+    .groupBy(questions.surveyId);
+  const questionCountMap = new Map(
+    questionCounts.map((q) => [q.surveyId, Number(q.count)]),
   );
 
-  return surveysWithCounts;
+  return surveyList.map((survey) => ({
+    id: survey.id,
+    title: survey.title,
+    description: survey.description,
+    slug: survey.slug,
+    privateToken: survey.privateToken,
+    questionCount: questionCountMap.get(survey.id) ?? 0,
+    responseCount: 0,
+    createdAt: survey.createdAt,
+    updatedAt: survey.updatedAt,
+    isPublic: survey.isPublic,
+  }));
 }

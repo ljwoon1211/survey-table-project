@@ -1,4 +1,4 @@
-import { and, count, desc, eq, isNull } from 'drizzle-orm';
+import { and, count, desc, eq, isNull, sql } from 'drizzle-orm';
 
 import { db } from '@/db';
 import { responseAnswers, surveyResponses, surveyVersions } from '@/db/schema';
@@ -67,6 +67,27 @@ export async function getCompletedResponseCountBySurvey(surveyId: string) {
     );
 
   return result[0]?.count || 0;
+}
+
+// 전체 설문의 응답 수를 한 번의 GROUP BY 로 집계 (설문별 fan-out N+1 제거).
+// 설문 목록 대시보드처럼 여러 설문의 총/완료 응답 수가 동시에 필요할 때 사용.
+// 반환: surveyId -> { total, completed } Map. 응답이 0건인 설문은 키 없음.
+export async function getResponseCountsGroupedBySurvey() {
+  const rows = await db
+    .select({
+      surveyId: surveyResponses.surveyId,
+      total: count(),
+      completed: sql<number>`count(*) filter (where ${surveyResponses.isCompleted} = true)`,
+    })
+    .from(surveyResponses)
+    .where(notDeletedResponse)
+    .groupBy(surveyResponses.surveyId);
+
+  const map = new Map<string, { total: number; completed: number }>();
+  for (const r of rows) {
+    map.set(r.surveyId, { total: Number(r.total), completed: Number(r.completed) });
+  }
+  return map;
 }
 
 // 버전별 완료된 응답 조회 (response_answers JOIN + 어댑터 변환)

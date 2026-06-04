@@ -5,7 +5,7 @@ import { ArrowRight, BarChart3, Calendar, FileText, Plus, Users } from 'lucide-r
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { LocalDateTime } from '@/components/ui/local-date-time';
-import { getCompletedResponseCountBySurvey, getResponseCountBySurvey } from '@/data/responses';
+import { getResponseCountsGroupedBySurvey } from '@/data/responses';
 import { getSurveys } from '@/data/surveys';
 
 // 라이브 응답 수를 보여주는 대시보드. 빌드 타임 prerender(static) 대상이 되면
@@ -16,20 +16,16 @@ export const dynamic = 'force-dynamic';
 export default async function AnalyticsListPage() {
   const surveys = await getSurveys();
 
-  // 각 설문의 응답 수 조회
-  const surveysWithResponses = await Promise.all(
-    surveys.map(async (survey) => {
-      const [totalResponses, completedResponses] = await Promise.all([
-        getResponseCountBySurvey(survey.id),
-        getCompletedResponseCountBySurvey(survey.id),
-      ]);
-      return {
-        ...survey,
-        totalResponses,
-        completedResponses,
-      };
-    }),
-  );
+  // 모든 설문의 응답 수를 단일 GROUP BY 로 집계 (설문별 count fan-out 제거)
+  const countsMap = await getResponseCountsGroupedBySurvey();
+  const surveysWithResponses = surveys.map((survey) => {
+    const counts = countsMap.get(survey.id) ?? { total: 0, completed: 0 };
+    return {
+      ...survey,
+      totalResponses: counts.total,
+      completedResponses: counts.completed,
+    };
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
