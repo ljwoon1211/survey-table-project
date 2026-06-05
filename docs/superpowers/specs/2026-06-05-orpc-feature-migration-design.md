@@ -200,15 +200,25 @@ phase('cleanup')→ 1 agent 순차
 
 빌더·응답·운영·컨택·메일 5개 feature를 가로지름. analytics/library/auth/media는 procedure unit이 커버.
 
-### test DB — 로컬 supabase CLI
-`supabase start`로 로컬 스택. 무료·CI 재현·dev 오염 없음.
-> **prerequisite (인프라 PR에서 확인·셋업)**: 로컬 supabase CLI/docker 설치 여부, 마이그레이션을 로컬 스택에 적용하는 시드 스크립트.
+### test DB — 로컬 supabase CLI (절차 검증 완료 2026-06-05)
+로컬 supabase 스택. 무료·CI 재현·dev 오염 없음. **단, `supabase start` + `db:migrate`만으로는 스키마가 불완전하다** — drizzle journal(`_journal.json`)에 20개(idx 0~19)만 등록돼 있고 sql 파일은 34개라, `0020_mail_campaigns` 이후 14개가 silent skip되어 mail/billing/contact_attrs 등 6개 테이블이 누락된다(prod는 Supabase MCP `apply_migration`으로 적용해 정상).
+
+**검증된 셋업 절차 (인프라 PR에 포함):**
+1. `supabase/config.toml` → `[db.migrations] enabled = false` (supabase CLI가 prefix 중복 `0003/0009/0019`에서 `schema_migrations` PK 충돌하므로 마이그레이션 러너 비활성화)
+2. `supabase start` (로컬 Postgres 스택, 포트 54322)
+3. `supabase db reset` (빈 public 스키마 확보)
+4. `DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres" pnpm db:push`
+   — drizzle-kit push로 schema SoT(`src/db/schema`)를 직접 반영 → 19개 테이블 전체 재현.
+   - **주의**: `drizzle.config.ts`의 `strict: true`는 push 시 TTY confirm을 요구한다. 비대화(CI) 실행은 strict를 일시 false로 두거나 TTY를 부여해야 함.
+   - **주의**: `DATABASE_URL`을 반드시 로컬로 명시 오버라이드. `.env`의 prod URL로 push/migrate 시 prod 파괴.
+
+> CI에서는 위 절차를 스크립트화(`scripts/setup-test-db.sh` 등)하고 strict 우회를 자동화.
 
 ---
 
 ## 미해결·주의사항
 
-- **로컬 supabase 셋업 존재 여부 미확인** — 인프라 PR 착수 전 확인 필요. 없으면 셋업이 인프라 PR 첫 작업.
+- **로컬 supabase 셋업 — 검증 완료(2026-06-05)** — 위 §6 절차로 19개 테이블 재현 확인. `supabase/config.toml`(현재 untracked)의 `enabled = false`를 인프라 PR에서 커밋할지 결정 필요. drizzle journal과 sql 파일의 미동기화(20 vs 34)는 본 리팩토링과 별개의 기존 부채 — 정리는 선택사항.
 - **빌더 god-file 분해** — PR7 진입 시 store/컴포넌트 추가 분해 가능성. 사전 인벤토리 필요.
 - **`survey-save-actions.ts` explicit field set** — 마이그레이션 시 spread 미사용 패턴 유지, 신규 컬럼 누락 주의(tsc 미검출).
 - **drizzle 함정 계승** — timestamptz optimistic lock(version int), `ANY(${arr})` 금지(inArray) 등 기존 함정을 procedure/service에서도 유지.
