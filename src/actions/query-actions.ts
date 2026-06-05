@@ -151,8 +151,3 @@ export async function getAllTags() {
   return libraryData.getAllTags();
 }
 
-export async function getAllCategories() {
-  await requireAuth();
-  return libraryData.getAllCategories();
-}
-

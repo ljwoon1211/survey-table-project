@@ -29,7 +29,6 @@ export {
 // Library 조회 함수
 export {
   getAllTags,
-  getAllCategories,
 } from './library';
 
 // regions는 기존 파일 유지
