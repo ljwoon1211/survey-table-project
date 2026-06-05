@@ -1,16 +1,18 @@
 import * as z from 'zod';
 
 import type { QuestionData } from '@/db/schema/schema-types';
-import type { SavedQuestion } from '@/db/schema/surveys';
-import type { Question } from '@/types/survey';
+import type { SavedQuestion as DbSavedQuestion } from '@/db/schema/surveys';
+import type { Question, SavedQuestion } from '@/types/survey';
 
-export type { SavedQuestion };
+export type { DbSavedQuestion };
 export type { QuestionData };
+export type { SavedQuestion };
 
 /** 복잡 JSONB는 z.custom으로 타입만 보장(런타임 통과). */
 export const QuestionDataSchema = z.custom<QuestionData>();
 // service 함수는 Question(빌더 타입)을 받으므로 별도 스키마 정의
 export const QuestionSchema = z.custom<Question>();
+// procedure output 타입은 컴포넌트가 기대하는 types/survey.ts 의 SavedQuestion으로 통일
 export const SavedQuestionSchema = z.custom<SavedQuestion>();
 
 // 컴포넌트가 useSaveQuestion().mutateAsync({ question, metadata })로 호출하므로 nested로 정의.

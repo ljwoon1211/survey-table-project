@@ -3,12 +3,12 @@ import 'server-only';
 import { desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 
 import { db } from '@/db';
-import { NewSavedQuestion, savedQuestions, type SavedQuestion } from '@/db/schema/surveys';
+import { NewSavedQuestion, savedQuestions } from '@/db/schema/surveys';
 import { extractImageUrlsFromQuestion } from '@/lib/image-extractor';
 import { deleteImagesFromR2Server } from '@/lib/image-utils-server';
 import { promoteSurveyImages } from '@/lib/survey/survey-image-promote';
 import { generateId } from '@/lib/utils';
-import type { Question } from '@/types/survey';
+import type { Question, SavedQuestion } from '@/types/survey';
 
 import type {
   CreateSavedQuestionInput,
@@ -95,7 +95,7 @@ export async function createSavedQuestion(input: CreateSavedQuestionInput): Prom
 
   const [saved] = await db.insert(savedQuestions).values(newSavedQuestion).returning();
   if (!saved) throw new Error('질문 저장에 실패했습니다.');
-  return saved;
+  return saved as unknown as SavedQuestion;
 }
 
 /** 저장된 질문 업데이트 — question 포함 시 이미지 promote */
@@ -120,7 +120,7 @@ export async function updateSavedQuestion(
     .returning();
 
   if (!updated) throw new Error('질문 수정에 실패했습니다.');
-  return updated;
+  return updated as unknown as SavedQuestion;
 }
 
 /** 저장된 질문 삭제 — 연결 이미지 R2에서도 삭제 시도 */
