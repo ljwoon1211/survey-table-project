@@ -3,7 +3,8 @@
  *
  * 현재 소비자:
  *  - `@/lib/spss/sav-builder` — .sav 네이티브 내보내기
- *  - `@/lib/excel-transformer` — 서버 엑셀 워크북 (Summary/Map 등)
+ *  - `@/lib/analytics/raw-workbook` — Raw Data 엑셀 워크북
+ *  - `@/lib/analytics/split-workbook` — 분할 내보내기 워크북
  *
  * 과거 엑셀 Blob/워크북/코딩북 헬퍼는 UI에서 제거됨에 따라 함께 삭제되었다.
  */

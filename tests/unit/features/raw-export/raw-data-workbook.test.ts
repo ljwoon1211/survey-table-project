@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { type RawExportResponseRow, generateRawDataWorkbook } from '@/lib/excel-transformer';
+import { type RawExportResponseRow, generateRawDataWorkbook } from '@/lib/analytics/raw-workbook';
 import type { Question } from '@/types/survey';
 
 const radioQ = {

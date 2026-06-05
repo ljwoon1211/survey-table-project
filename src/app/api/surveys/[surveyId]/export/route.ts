@@ -1,28 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { and, count, eq, inArray, isNull, ne } from 'drizzle-orm';
-import * as XLSX from 'xlsx';
 
 import { db } from '@/db';
 import { contactTargets, surveyResponses, surveys } from '@/db/schema';
 import { notDeletedResponse } from '@/data/response-filters';
 import { requireAuth } from '@/lib/auth';
-import {
-  buildSplitWorkbook,
-  generateRawDataWorkbook,
-  generateSummaryWorkbook,
-  generateVariableMapWorkbook,
-  type RawExportResponseRow,
-} from '@/lib/excel-transformer';
+import { generateRawDataWorkbook, type RawExportResponseRow } from '@/lib/analytics/raw-workbook';
+import { buildSplitWorkbook } from '@/lib/analytics/split-workbook';
 import { planSplit } from '@/lib/analytics/split-export';
-import { Question, Survey, SurveySubmission } from '@/types/survey';
+import { Question, SurveySubmission } from '@/types/survey';
 import { generateAllOptionCodes } from '@/utils/option-code-generator';
 import { generateAllCellCodes } from '@/utils/table-cell-code-generator';
 
 // Vercel serverless 최대 실행시간 30초 (기본 10초)
 export const maxDuration = 30;
 
-const ALLOWED_EXPORT_TYPES = ['summary', 'map', 'sav', 'raw', 'raw-split'] as const;
+const ALLOWED_EXPORT_TYPES = ['sav', 'raw', 'raw-split'] as const;
 type ExportType = (typeof ALLOWED_EXPORT_TYPES)[number];
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -64,11 +58,11 @@ export async function GET(
       }
     }
 
-    // 2. 응답 데이터 조회 (Variable Map은 응답 불필요 → 스킵)
-    // raw는 자체 모수(in_progress 제외)와 가드를 별도로 가지므로 이 공용 블록을 건너뛴다.
+    // 2. 응답 데이터 조회 (sav 전용 공용 블록)
+    // raw/raw-split는 자체 모수(in_progress 제외)와 가드를 별도로 가지므로 이 블록을 건너뛴다.
     let responses: typeof surveyResponses.$inferSelect[] = [];
 
-    if (type !== 'map' && type !== 'raw' && type !== 'raw-split') {
+    if (type !== 'raw' && type !== 'raw-split') {
       const totalRows = await db
         .select({ total: count() })
         .from(surveyResponses)
@@ -257,31 +251,8 @@ export async function GET(
       });
     }
 
-    // 5. xlsx 계열 분기
-    let workbook: XLSX.WorkBook;
-    let filenamePrefix: string;
-
-    if (type === 'summary') {
-      workbook = generateSummaryWorkbook(
-        surveyData as unknown as Survey,
-        responses as unknown as SurveySubmission[],
-      );
-      filenamePrefix = 'Summary';
-    } else {
-      // type === 'map'
-      workbook = generateVariableMapWorkbook(surveyData as unknown as Survey);
-      filenamePrefix = 'VariableMap';
-    }
-
-    const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer' });
-    const filename = `${safeTitle}_${filenamePrefix}_${dateSlice}.xlsx`;
-
-    return new NextResponse(buffer, {
-      headers: {
-        'Content-Disposition': `attachment; filename="${filename}"`,
-        'Content-Type': XLSX_MIME,
-      },
-    });
+    // 도달 불가: ALLOWED_EXPORT_TYPES(sav/raw/raw-split)는 위에서 모두 처리됨
+    return NextResponse.json({ error: '지원하지 않는 내보내기 형식입니다.' }, { status: 400 });
   } catch (error) {
     if (error instanceof Error && error.message === '인증이 필요합니다.') {
       return NextResponse.json({ error: '권한 없음' }, { status: 401 });

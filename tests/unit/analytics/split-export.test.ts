@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 
 import { valueMatchSet, bucketQuestions, optionTokensForBasis, planSplit, detectSplitCandidates, assignSplitSheetNames, SPLIT_RESERVED_SHEET_NAMES, splitPlanExceedsExcelLimit, SPLIT_EXCEL_LIMIT } from '@/lib/analytics/split-export';
-import { buildSplitWorkbook } from '@/lib/excel-transformer';
-import type { RawExportResponseRow } from '@/lib/excel-transformer';
+import { buildSplitWorkbook } from '@/lib/analytics/split-workbook';
+import type { RawExportResponseRow } from '@/lib/analytics/raw-workbook';
 import type { Question, QuestionConditionGroup } from '@/types/survey';
 
 const vm = (sourceQuestionId: string, requiredValues: string[]): QuestionConditionGroup => ({

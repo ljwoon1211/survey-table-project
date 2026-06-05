@@ -23,18 +23,20 @@ vi.mock('@/db/schema', () => ({
   contactTargets: { id: 'contact_targets.id', resid: 'resid', groupValue: 'group_value' },
 }));
 
-vi.mock('@/lib/excel-transformer', () => ({
-  generateSummaryWorkbook: vi.fn(),
-  generateVariableMapWorkbook: vi.fn(),
+vi.mock('@/lib/analytics/raw-workbook', () => ({
   generateRawDataWorkbook: vi.fn(),
+}));
+
+vi.mock('@/lib/analytics/split-workbook', () => ({
+  buildSplitWorkbook: vi.fn(),
 }));
 
 import { GET } from '@/app/api/surveys/[surveyId]/export/route';
 
 describe('GET /api/surveys/[surveyId]/export requires authentication', () => {
-  it('returns 401 without auth (summary type)', async () => {
+  it('returns 401 without auth (raw-split type)', async () => {
     const request = new NextRequest(
-      'http://localhost/api/surveys/test-id/export?type=summary',
+      'http://localhost/api/surveys/test-id/export?type=raw-split',
     );
 
     const response = await GET(request, {
@@ -47,18 +49,6 @@ describe('GET /api/surveys/[surveyId]/export requires authentication', () => {
   it('returns 401 without auth (sav type)', async () => {
     const request = new NextRequest(
       'http://localhost/api/surveys/test-id/export?type=sav',
-    );
-
-    const response = await GET(request, {
-      params: Promise.resolve({ surveyId: 'test-id' }),
-    });
-
-    expect(response.status).toBe(401);
-  });
-
-  it('returns 401 without auth (map type)', async () => {
-    const request = new NextRequest(
-      'http://localhost/api/surveys/test-id/export?type=map',
     );
 
     const response = await GET(request, {
