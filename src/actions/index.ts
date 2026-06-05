@@ -39,10 +39,6 @@ export {
 export {
   exportLibrary,
   importLibrary,
-  createCategory,
-  updateCategory,
-  deleteCategory,
-  initializeDefaultCategories,
   initializePresetQuestions,
 } from './library-actions';
 
@@ -72,5 +68,4 @@ export {
   exportResponsesAsJson,
   exportResponsesAsCsv,
   getAllTags,
-  getAllCategories,
 } from './query-actions';

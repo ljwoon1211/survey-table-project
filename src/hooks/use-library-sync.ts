@@ -3,15 +3,11 @@
 import { useCallback, useTransition } from 'react';
 
 import {
-  createCategory as createCategoryAction,
-  deleteCategory as deleteCategoryAction,
   exportLibrary as exportLibraryAction,
   importLibrary as importLibraryAction,
-  initializeDefaultCategories,
   initializePresetQuestions,
-  updateCategory as updateCategoryAction,
 } from '@/actions/library-actions';
-import { getAllCategories, getAllTags } from '@/actions/query-actions';
+import { getAllTags } from '@/actions/query-actions';
 import { client } from '@/shared/lib/rpc';
 
 /**
@@ -214,7 +210,7 @@ export function useCategorySync() {
   // 모든 카테고리 불러오기
   const loadCategories = useCallback(async () => {
     try {
-      const categories = await getAllCategories();
+      const categories = await client.library.questionCategories.list({});
       return categories;
     } catch (error) {
       console.error('카테고리 불러오기 실패:', error);
@@ -225,7 +221,7 @@ export function useCategorySync() {
   // 카테고리 생성
   const createCategory = useCallback(async (name: string, color?: string) => {
     try {
-      const category = await createCategoryAction(name, color);
+      const category = await client.library.questionCategories.create({ name, color });
       return category;
     } catch (error) {
       console.error('카테고리 생성 실패:', error);
@@ -245,7 +241,7 @@ export function useCategorySync() {
       }>,
     ) => {
       try {
-        const updated = await updateCategoryAction(id, updates);
+        const updated = await client.library.questionCategories.update({ id, updates });
         return updated;
       } catch (error) {
         console.error('카테고리 업데이트 실패:', error);
@@ -258,7 +254,7 @@ export function useCategorySync() {
   // 카테고리 삭제
   const deleteCategory = useCallback(async (id: string) => {
     try {
-      await deleteCategoryAction(id);
+      await client.library.questionCategories.remove({ id });
     } catch (error) {
       console.error('카테고리 삭제 실패:', error);
       throw error;
@@ -268,7 +264,7 @@ export function useCategorySync() {
   // 기본 카테고리 초기화
   const initializeCategories = useCallback(async () => {
     try {
-      const categories = await initializeDefaultCategories();
+      const categories = await client.library.questionCategories.initializeDefaults({});
       return categories;
     } catch (error) {
       console.error('카테고리 초기화 실패:', error);

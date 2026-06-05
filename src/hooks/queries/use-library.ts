@@ -3,15 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
-  createCategory as createCategoryAction,
-  deleteCategory as deleteCategoryAction,
   exportLibrary as exportLibraryAction,
   importLibrary as importLibraryAction,
-  initializeDefaultCategories,
   initializePresetQuestions,
-  updateCategory as updateCategoryAction,
 } from '@/actions/library-actions';
-import { getAllCategories, getAllTags } from '@/actions/query-actions';
+import { getAllTags } from '@/actions/query-actions';
 import { orpc } from '@/shared/lib/rpc';
 
 // ========================
@@ -105,10 +101,7 @@ export function useAllTags() {
  * 모든 카테고리 조회
  */
 export function useCategories() {
-  return useQuery({
-    queryKey: libraryKeys.categories(),
-    queryFn: () => getAllCategories(),
-  });
+  return useQuery(orpc.library.questionCategories.list.queryOptions());
 }
 
 // ========================
@@ -195,54 +188,47 @@ export function useApplyMultipleQuestions() {
 
 /**
  * 카테고리 생성
+ * 컴포넌트 시그니처 유지: mutateAsync({ name, color })
  */
 export function useCreateCategory() {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: ({ name, color }: { name: string; color?: string }) =>
-      createCategoryAction(name, color),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: libraryKeys.categories() });
-    },
-  });
+  return useMutation(
+    orpc.library.questionCategories.create.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: orpc.library.questionCategories.key() });
+      },
+    }),
+  );
 }
 
 /**
  * 카테고리 업데이트
+ * 컴포넌트 시그니처 유지: mutate({ id, updates })
  */
 export function useUpdateCategory() {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: ({
-      id,
-      updates,
-    }: {
-      id: string;
-      updates: Partial<{
-        name: string;
-        color: string;
-        icon: string;
-        order: number;
-      }>;
-    }) => updateCategoryAction(id, updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: libraryKeys.categories() });
-    },
-  });
+  return useMutation(
+    orpc.library.questionCategories.update.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: orpc.library.questionCategories.key() });
+      },
+    }),
+  );
 }
 
 /**
  * 카테고리 삭제
+ * 컴포넌트 시그니처 유지: mutate(id: string)
  */
 export function useDeleteCategory() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => deleteCategoryAction(id),
+    mutationFn: (id: string) => orpc.library.questionCategories.remove.call({ id }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: libraryKeys.categories() });
+      queryClient.invalidateQueries({ queryKey: orpc.library.questionCategories.key() });
       queryClient.invalidateQueries({ queryKey: libraryKeys.questions() });
     },
   });
@@ -278,9 +264,9 @@ export function useInitializeCategories() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: () => initializeDefaultCategories(),
+    mutationFn: () => orpc.library.questionCategories.initializeDefaults.call({}),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: libraryKeys.categories() });
+      queryClient.invalidateQueries({ queryKey: orpc.library.questionCategories.key() });
     },
   });
 }
