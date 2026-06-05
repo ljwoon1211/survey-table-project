@@ -22,8 +22,7 @@ const link = new RPCLink({
  * - 브라우저: RPCLink로 /api/rpc 호출
  */
 export const client: RouterClient<typeof router> =
-  (globalThis.$client as RouterClient<typeof router> | undefined) ??
-  createORPCClient(link);
+  globalThis.$client ?? createORPCClient(link);
 
 /** TanStack Query 통합: orpc.health.check.queryOptions() 등 */
 export const orpc = createTanstackQueryUtils(client);

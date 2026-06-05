@@ -1,6 +1,6 @@
 import { ORPCError, os } from '@orpc/server';
 
-import type { AuthUser, ORPCContext } from './context';
+import type { ORPCContext } from './context';
 
 /** 모든 procedure의 뿌리. 컨텍스트 타입만 박는다. */
 export const base = os.$context<ORPCContext>();
@@ -16,5 +16,5 @@ export const authed = base.use(({ context, next }) => {
   if (!context.user) {
     throw new ORPCError('UNAUTHORIZED', { message: '인증이 필요합니다.' });
   }
-  return next({ context: { user: context.user satisfies AuthUser } });
+  return next({ context: { user: context.user } });
 });
