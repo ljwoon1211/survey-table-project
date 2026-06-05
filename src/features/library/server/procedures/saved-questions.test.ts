@@ -21,7 +21,7 @@ describe('savedQuestions procedures', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('list는 service.listSavedQuestions 결과를 반환한다', async () => {
-    svc.listSavedQuestions.mockResolvedValue([{ id: 'q1', name: '질문1' }]);
+    vi.mocked(svc.listSavedQuestions).mockResolvedValue([{ id: 'q1', name: '질문1' }] as never);
     const client = createRouterClient({ savedQuestions }, { context: authedContext() });
     const res = await client.savedQuestions.list();
     expect(svc.listSavedQuestions).toHaveBeenCalledOnce();
@@ -29,7 +29,7 @@ describe('savedQuestions procedures', () => {
   });
 
   it('create는 입력을 service.createSavedQuestion에 위임한다', async () => {
-    svc.createSavedQuestion.mockResolvedValue({ id: 'new', name: '새질문' });
+    vi.mocked(svc.createSavedQuestion).mockResolvedValue({ id: 'new', name: '새질문' } as never);
     const client = createRouterClient({ savedQuestions }, { context: authedContext() });
     const input = { question: { id: 'x', type: 'text', title: 't', required: false, order: 0 }, metadata: { name: '새질문', category: '기본' } };
     const res = await client.savedQuestions.create(input as never);

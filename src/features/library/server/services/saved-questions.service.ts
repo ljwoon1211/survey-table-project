@@ -3,12 +3,17 @@ import 'server-only';
 import { desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 
 import { db } from '@/db';
-import { NewSavedQuestion, savedQuestions } from '@/db/schema/surveys';
+import { NewSavedQuestion, savedQuestions, type SavedQuestion } from '@/db/schema/surveys';
 import { extractImageUrlsFromQuestion } from '@/lib/image-extractor';
 import { deleteImagesFromR2Server } from '@/lib/image-utils-server';
 import { promoteSurveyImages } from '@/lib/survey/survey-image-promote';
 import { generateId } from '@/lib/utils';
-import type { Question, SavedQuestion } from '@/types/survey';
+import type { Question } from '@/types/survey';
+
+import type {
+  CreateSavedQuestionInput,
+  UpdateSavedQuestionInput,
+} from '../../domain/saved-question';
 
 // ========================
 // 쿼리
@@ -75,15 +80,7 @@ export async function getSavedQuestionsByTag(tag: string): Promise<SavedQuestion
 // ========================
 
 /** 질문 저장 — tmp/survey/ 이미지를 영구 prefix로 promote 후 insert */
-export async function createSavedQuestion(input: {
-  question: Question;
-  metadata: {
-    name: string;
-    description?: string;
-    category: string;
-    tags?: string[];
-  };
-}) {
+export async function createSavedQuestion(input: CreateSavedQuestionInput): Promise<SavedQuestion> {
   const [promotedQuestion] = await promoteSurveyImages([input.question]);
 
   const newSavedQuestion: NewSavedQuestion = {
@@ -97,20 +94,15 @@ export async function createSavedQuestion(input: {
   };
 
   const [saved] = await db.insert(savedQuestions).values(newSavedQuestion).returning();
+  if (!saved) throw new Error('질문 저장에 실패했습니다.');
   return saved;
 }
 
 /** 저장된 질문 업데이트 — question 포함 시 이미지 promote */
 export async function updateSavedQuestion(
   id: string,
-  updates: Partial<{
-    name: string;
-    description: string;
-    category: string;
-    tags: string[];
-    question: Question;
-  }>,
-) {
+  updates: UpdateSavedQuestionInput['updates'],
+): Promise<SavedQuestion> {
   let promotedQuestion = updates.question;
   if (updates.question) {
     const [promoted] = await promoteSurveyImages([updates.question]);
@@ -127,6 +119,7 @@ export async function updateSavedQuestion(
     .where(eq(savedQuestions.id, id))
     .returning();
 
+  if (!updated) throw new Error('질문 수정에 실패했습니다.');
   return updated;
 }
 
