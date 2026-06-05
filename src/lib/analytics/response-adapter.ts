@@ -2,7 +2,7 @@
  * 응답 어댑터
  *
  * response_answers 정규화 데이터 → 기존 questionResponses 형식 변환
- * 기존 분석 코드(analyzer, cross-tab, filter, excel-transformer)를 변경 없이 사용 가능
+ * 기존 분석 코드(analyzer, cross-tab, filter)를 변경 없이 사용 가능
  */
 
 interface AnswerRow {
