@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
-import { getExistingContactsCount } from '@/actions/contact-actions';
 import { UploadWizard } from '@/components/operations/contacts/upload-wizard';
+import { getExistingContactsCount } from '@/features/contacts/server/services/contact-columns.service';
 
 export const metadata: Metadata = {
   title: '현황 - 엑셀 업로드',

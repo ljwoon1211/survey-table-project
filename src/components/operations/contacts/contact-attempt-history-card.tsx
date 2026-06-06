@@ -3,13 +3,13 @@
 import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';
 
-import { deleteContactAttempt } from '@/actions/contact-actions';
 import { Button } from '@/components/ui/button';
 import type { ContactResultCode } from '@/db/schema/schema-types';
 import { useAutoFadeMessage } from '@/hooks/use-auto-fade-message';
 import { formatLocalMonthDayTime } from '@/lib/date-formatters';
 import { resultCodeToneClass } from '@/lib/operations/contacts-shared';
 import type { ContactAttemptRow } from '@/lib/operations/contacts.server';
+import { client } from '@/shared/lib/rpc';
 
 interface ContactAttemptHistoryCardProps {
   contactTargetId: string;
@@ -34,7 +34,7 @@ export function ContactAttemptHistoryCard({
     if (!window.confirm('이 회차 기록을 삭제하시겠습니까?')) return;
     startTransition(async () => {
       try {
-        await deleteContactAttempt(surveyId, contactTargetId, id);
+        await client.contacts.attempts.remove({ surveyId, contactTargetId, id });
         router.refresh();
         setSuccessMessage('회차 삭제 완료');
       } catch (e) {
