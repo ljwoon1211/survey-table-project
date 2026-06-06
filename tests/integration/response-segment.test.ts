@@ -27,7 +27,7 @@ describe('recordVisibilitySegment — SQL 분기', () => {
   });
 
   it('hide: pageVisits set에 jsonb_set + leftAt 백필, lastActivityAt 미갱신', async () => {
-    const { recordVisibilitySegment } = await import('@/actions/response-actions');
+    const { recordVisibilitySegment } = await import('@/features/survey-response/server/services/lifecycle.service');
     await recordVisibilitySegment({ responseId: 'r1', action: 'hide' });
 
     const hideSetCall = setMock.mock.calls[0];
@@ -40,7 +40,7 @@ describe('recordVisibilitySegment — SQL 분기', () => {
   });
 
   it('show: pageVisits set에 append(||), lastActivityAt 갱신', async () => {
-    const { recordVisibilitySegment } = await import('@/actions/response-actions');
+    const { recordVisibilitySegment } = await import('@/features/survey-response/server/services/lifecycle.service');
     await recordVisibilitySegment({ responseId: 'r1', action: 'show' });
 
     const showSetCall = setMock.mock.calls[0];
@@ -53,7 +53,7 @@ describe('recordVisibilitySegment — SQL 분기', () => {
   });
 
   it('hide: where 가드에 status in_progress + leftAt NULL 조건이 포함된다', async () => {
-    const { recordVisibilitySegment } = await import('@/actions/response-actions');
+    const { recordVisibilitySegment } = await import('@/features/survey-response/server/services/lifecycle.service');
     await recordVisibilitySegment({ responseId: 'r1', action: 'hide' });
     expect(whereMock).toHaveBeenCalledTimes(1); // 단일 UPDATE + WHERE 가드
     const hideWhereCall = whereMock.mock.calls[0];
@@ -63,7 +63,7 @@ describe('recordVisibilitySegment — SQL 분기', () => {
   });
 
   it('show: where 가드에 멱등 조건(leftAt IS NOT NULL)이 포함된다', async () => {
-    const { recordVisibilitySegment } = await import('@/actions/response-actions');
+    const { recordVisibilitySegment } = await import('@/features/survey-response/server/services/lifecycle.service');
     await recordVisibilitySegment({ responseId: 'r1', action: 'show' });
     expect(whereMock).toHaveBeenCalledTimes(1);
     const showWhereCall = whereMock.mock.calls[0];

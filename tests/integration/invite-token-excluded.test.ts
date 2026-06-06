@@ -93,7 +93,7 @@ vi.mock('@/lib/operations/result-code-statuses.server', async () => {
   };
 });
 
-import { findContactByInviteToken } from '@/actions/response-actions';
+import { findContactByInviteToken } from '@/lib/duplicate-detection/invite-lookup';
 import { randomUUID } from 'crypto';
 
 const SURVEY_ID = '00000000-0000-4000-8000-000000000020';

@@ -4,12 +4,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // 테스트
 // ========================
 
+import { createRouterClient } from '@orpc/server';
+
 import {
   hardResetResponse,
   restoreResponse,
   softDeleteResponse,
-} from '@/actions/profiles-row-actions';
-import { saveAdminEdit } from '@/actions/response-edit-actions';
+} from '@/features/survey-response/server/services/response-manage.service';
+import { saveAdminEdit } from '@/features/survey-response/server/services/response-edit.service';
+import { manage } from '@/features/survey-response/server/procedures/manage';
+import type { ORPCContext } from '@/server/context';
 import type { StatusCounts } from '@/lib/operations/aggregate-status';
 import * as aggregateStatusServer from '@/lib/operations/aggregate-status.server';
 import * as profilesServer from '@/lib/operations/profiles.server';
@@ -19,18 +23,21 @@ import type { ListProfilesResult } from '@/lib/operations/profiles.server';
 // 모듈 모킹
 // ========================
 //
-// profiles-row-actions 는 다음에 의존한다:
-//   - @/db  : drizzle client (update, delete, transaction)
-//   - @/db/schema : surveyResponses, contactTargets
-//   - @/lib/auth/require-survey-ownership : requireSurveyOwnership (requireAuth 내부 포함)
-//   - next/cache : revalidatePath
+// response-manage.service / response-edit.service 는 다음에 의존한다:
+//   - @/db  : drizzle client (query, update, delete, insert, transaction)
+//   - @/db/schema : surveyResponses, contactTargets, surveys, responseAnswers, questions
+//   - next/cache : revalidatePath (소비처에서만 호출 — service 는 미사용이나 안전망 mock)
+//
+// service 는 인증을 더 이상 내부에서 하지 않는다(authed 미들웨어가 담당). 소유권 검증
+// (surveys row 존재 → SurveyOwnershipError) 만 service 안에 보존되므로
+// db.query.surveys.findFirst 로 검증한다.
 //
 // vi.mock 는 hoist 되므로 mock 안에서 참조하는 state 는 vi.hoisted 로 끌어올린다.
 // in-memory map 으로 CRUD 흐름을 통합 검증한다.
 //
 // IDOR 케이스: 현 시스템은 단일 어드민 구조(surveys.userId 없음).
 // 따라서 'attacker vs victim' 시나리오는 의미 없음.
-// 대신 (b) 미인증 상태에서 requireAuth 가 throw 하는 것을 검증.
+// 대신 (b) 미인증 차단은 procedure(authed 미들웨어) 레벨에서 검증한다.
 
 type SurveyResponseRow = {
   id: string;
@@ -78,24 +85,21 @@ const h = vi.hoisted(() => {
   const answerStore = new Map<string, ResponseAnswerRow>();
   const surveyStore = new Map<string, SurveyRow>();
   const questionStore = new Map<string, QuestionRow>();
-  const authed = true;
 
-  return { responseStore, contactStore, answerStore, surveyStore, questionStore, authed };
+  return { responseStore, contactStore, answerStore, surveyStore, questionStore };
 });
 
 vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
 }));
 
+// manage procedure import 가 @/server/context → @/lib/supabase/server 를 끌어오므로
+// 모듈 resolve 안전망으로 stub. service 직접 호출 경로는 인증을 쓰지 않고,
+// procedure 인증 가드는 context.user(null) 로만 판정하므로 getUser 응답값은 무의미.
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => ({
     auth: {
-      getUser: vi.fn(async () => {
-        if (h.authed) {
-          return { data: { user: { id: 'admin-user' } }, error: null };
-        }
-        return { data: { user: null }, error: null };
-      }),
+      getUser: vi.fn(async () => ({ data: { user: null }, error: null })),
     },
   })),
 }));
@@ -348,7 +352,6 @@ describe('profiles-row-actions', () => {
     h.answerStore.clear();
     h.surveyStore.clear();
     h.questionStore.clear();
-    h.authed = true;
     idCounter = 0;
     vi.clearAllMocks();
   });
@@ -362,7 +365,7 @@ describe('profiles-row-actions', () => {
       const surveyId = createTestSurvey();
       const responseId = createTestResponse(surveyId);
 
-      const result = await softDeleteResponse(surveyId, responseId);
+      const result = await softDeleteResponse({ surveyId, responseId });
 
       expect(result).toEqual({ ok: true });
 
@@ -375,8 +378,8 @@ describe('profiles-row-actions', () => {
       const surveyId = createTestSurvey();
       const responseId = createTestResponse(surveyId);
 
-      await softDeleteResponse(surveyId, responseId);
-      await expect(softDeleteResponse(surveyId, responseId)).resolves.toEqual({ ok: true });
+      await softDeleteResponse({ surveyId, responseId });
+      await expect(softDeleteResponse({ surveyId, responseId })).resolves.toEqual({ ok: true });
 
       const row = h.responseStore.get(responseId);
       expect(row?.deletedAt).not.toBeNull();
@@ -392,10 +395,10 @@ describe('profiles-row-actions', () => {
       const surveyId = createTestSurvey();
       const responseId = createTestResponse(surveyId);
 
-      await softDeleteResponse(surveyId, responseId);
+      await softDeleteResponse({ surveyId, responseId });
       expect(h.responseStore.get(responseId)?.deletedAt).not.toBeNull();
 
-      const result = await restoreResponse(surveyId, responseId);
+      const result = await restoreResponse({ surveyId, responseId });
       expect(result).toEqual({ ok: true });
 
       const row = h.responseStore.get(responseId);
@@ -418,7 +421,7 @@ describe('profiles-row-actions', () => {
       );
       expect(answersBefore).toHaveLength(1);
 
-      const result = await hardResetResponse(surveyId, responseId);
+      const result = await hardResetResponse({ surveyId, responseId });
       expect(result).toEqual({ ok: true });
 
       // 응답 행 삭제 확인
@@ -440,7 +443,7 @@ describe('profiles-row-actions', () => {
       expect(contactBefore?.responseId).toBe(responseId);
       expect(contactBefore?.respondedAt).not.toBeNull();
 
-      await hardResetResponse(surveyId, responseId);
+      await hardResetResponse({ surveyId, responseId });
 
       const contactAfter = h.contactStore.get(contactId);
       expect(contactAfter?.responseId).toBeNull();
@@ -533,7 +536,7 @@ describe('profiles-row-actions', () => {
       const before = await profilesServer.listResponsesForProfiles(normalizedArgs);
       expect(before.total).toBe(1);
 
-      await softDeleteResponse(surveyId, responseId);
+      await softDeleteResponse({ surveyId, responseId });
 
       const afterActive = await profilesServer.listResponsesForProfiles({
         ...normalizedArgs,
@@ -558,7 +561,7 @@ describe('profiles-row-actions', () => {
       const before = await aggregateStatusServer.aggregateStatus(surveyId);
       expect(before.completed).toBeGreaterThanOrEqual(1);
 
-      await softDeleteResponse(surveyId, responseId);
+      await softDeleteResponse({ surveyId, responseId });
 
       const after = await aggregateStatusServer.aggregateStatus(surveyId);
       expect(after.completed).toBe(before.completed - 1);
@@ -587,7 +590,7 @@ describe('profiles-row-actions', () => {
       };
 
       // 1단계: softDelete
-      await softDeleteResponse(surveyId, responseId);
+      await softDeleteResponse({ surveyId, responseId });
 
       const midActive = await profilesServer.listResponsesForProfiles({
         ...normalizedArgs,
@@ -603,7 +606,7 @@ describe('profiles-row-actions', () => {
       expect(midCounts.completed).toBe(0);
 
       // 2단계: restore
-      await restoreResponse(surveyId, responseId);
+      await restoreResponse({ surveyId, responseId });
 
       const afterActive = await profilesServer.listResponsesForProfiles({
         ...normalizedArgs,
@@ -636,7 +639,9 @@ describe('profiles-row-actions', () => {
       const before = h.responseStore.get(responseId);
       const beforeCompletedAt = before?.completedAt?.getTime();
 
-      await saveAdminEdit(surveyId, responseId, {
+      await saveAdminEdit({
+        surveyId,
+        responseId,
         questionResponses: { [qid]: 'new' },
       });
 
@@ -653,11 +658,11 @@ describe('profiles-row-actions', () => {
     it('삭제된 응답은 수정 거부 — Cannot edit deleted response throw', async () => {
       const surveyId = createTestSurvey();
       const responseId = createTestResponse(surveyId);
-      await softDeleteResponse(surveyId, responseId);
+      await softDeleteResponse({ surveyId, responseId });
 
-      await expect(saveAdminEdit(surveyId, responseId, { questionResponses: {} })).rejects.toThrow(
-        'Cannot edit deleted response',
-      );
+      await expect(
+        saveAdminEdit({ surveyId, responseId, questionResponses: {} }),
+      ).rejects.toThrow('Cannot edit deleted response');
     });
 
     it('response_answers 를 새 응답으로 재기록한다 (옛 답 제거 + 새 답 INSERT)', async () => {
@@ -678,7 +683,9 @@ describe('profiles-row-actions', () => {
         Array.from(h.answerStore.values()).filter((a) => a.responseId === responseId),
       ).toHaveLength(1);
 
-      await saveAdminEdit(surveyId, responseId, {
+      await saveAdminEdit({
+        surveyId,
+        responseId,
         questionResponses: { [newQid]: 'NEW_ANS' },
       });
 
@@ -695,26 +702,39 @@ describe('profiles-row-actions', () => {
     it('존재하지 않는 응답은 Response not found throw', async () => {
       const surveyId = createTestSurvey();
       await expect(
-        saveAdminEdit(surveyId, 'nonexistent-id', { questionResponses: {} }),
+        saveAdminEdit({ surveyId, responseId: 'nonexistent-id', questionResponses: {} }),
       ).rejects.toThrow('Response not found');
     });
   });
 
   // ─────────────────────────────────────────────────────────────
-  // 인증 가드 (옵션 b: 단일 어드민 구조라 IDOR 없음, 미인증 throw 검증)
+  // 인증 가드 (옵션 b: 단일 어드민 구조라 IDOR 없음, 미인증 차단 검증)
   //
   // 현재 시스템은 surveys.userId 컬럼이 없는 단일 어드민 구조이므로
   // 다중 사용자 IDOR(attacker vs victim) 시나리오는 의미 없음.
-  // 대신 인증 없을 때 requireAuth 가 에러 throw 하는 것을 검증한다.
+  //
+  // oRPC 마이그레이션으로 인증은 service 가 아니라 authed 미들웨어(procedure 레벨)가
+  // 담당한다. 미인증 차단 검증은 procedure 레벨로 이동 — context.user 가 null 이면
+  // service/db 호출 전에 UNAUTHORIZED 로 막힌다. service 의 소유권 검증
+  // (SurveyOwnershipError) 은 인증과 별개이므로 service 직접 호출로 그대로 검증한다.
+  // (procedure UNAUTHORIZED 매핑은 src/features/.../procedures/manage.test.ts 와 중복 커버.)
   // ─────────────────────────────────────────────────────────────
 
   describe('인증 가드', () => {
-    it('미인증 상태에서 softDeleteResponse 는 에러를 throw 한다', async () => {
-      h.authed = false;
+    it('미인증(context.user=null) 상태에서 manage.softDelete 는 UNAUTHORIZED 로 막힌다', async () => {
       const surveyId = createTestSurvey();
       const responseId = createTestResponse(surveyId);
 
-      await expect(softDeleteResponse(surveyId, responseId)).rejects.toThrow();
+      const noUserContext: ORPCContext = {
+        db: {} as never,
+        supabase: {} as never,
+        user: null,
+      };
+      const client = createRouterClient({ manage }, { context: noUserContext });
+
+      await expect(
+        client.manage.softDelete({ surveyId, responseId }),
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     });
 
     it('존재하지 않는 surveyId 로 호출하면 SurveyOwnershipError 를 throw 한다', async () => {
@@ -722,7 +742,9 @@ describe('profiles-row-actions', () => {
       const nonExistentSurveyId = 'does-not-exist';
       const responseId = createTestResponse('some-survey');
 
-      await expect(softDeleteResponse(nonExistentSurveyId, responseId)).rejects.toThrow();
+      await expect(
+        softDeleteResponse({ surveyId: nonExistentSurveyId, responseId }),
+      ).rejects.toThrow();
     });
   });
 });

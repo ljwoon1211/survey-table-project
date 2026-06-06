@@ -29,6 +29,10 @@ type DbOrTx =
  * 호출자는 트랜잭션 안에서 호출하여 partial write 를 방지한다.
  *
  * completeResponse(첫 제출) 와 saveAdminEdit(어드민 수정) 둘 다 사용.
+ *
+ * 원본 src/actions/response-answers-replace.ts 의 로직을 그대로 보존한다.
+ * features → actions 역방향 의존을 피하기 위해 feature 내부 service 로 복제했다.
+ * (response_answers 정규화 불변식: DELETE+INSERT 단일 치환, byte 보존)
  */
 export async function replaceResponseAnswers(
   tx: DbOrTx,

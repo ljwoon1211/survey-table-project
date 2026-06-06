@@ -31,7 +31,7 @@ vi.mock('@/db', () => {
   return { db: chainable };
 });
 
-vi.mock('@/actions/response-answers-replace', () => ({
+vi.mock('@/features/survey-response/server/services/response-answers.service', () => ({
   replaceResponseAnswers: vi.fn(async () => undefined),
 }));
 
@@ -53,10 +53,10 @@ describe('completeResponse — 대상 행 없음 (빈 returning)', () => {
     // 트랜잭션 내부 UPDATE 가 0행 매칭 → returning() = []
     updateReturningMock.mockResolvedValue([]);
 
-    const { completeResponse } = await import('@/actions/response-actions');
+    const { completeResponse } = await import('@/features/survey-response/server/services/response.service');
 
     // data 없이 호출 → prefill SELECT 분기 skip, 곧장 트랜잭션 UPDATE 로 진입
-    await expect(completeResponse('does-not-exist')).rejects.toThrow(
+    await expect(completeResponse({ responseId: 'does-not-exist' })).rejects.toThrow(
       /응답 행 없음/,
     );
   });
@@ -66,8 +66,8 @@ describe('completeResponse — 대상 행 없음 (빈 returning)', () => {
       { id: 'r1', surveyId: 's1', contactTargetId: null, pageVisits: null },
     ]);
 
-    const { completeResponse } = await import('@/actions/response-actions');
-    const result = await completeResponse('r1');
+    const { completeResponse } = await import('@/features/survey-response/server/services/response.service');
+    const result = await completeResponse({ responseId: 'r1' });
 
     expect(result).toMatchObject({ id: 'r1', surveyId: 's1' });
   });

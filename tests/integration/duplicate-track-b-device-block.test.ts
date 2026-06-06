@@ -23,13 +23,13 @@ vi.mock('next/headers', () => ({
   headers: mockHeaders,
 }));
 
-// Track A 경로 내부에서 사용하는 response-actions 를 stub — Track B 에서는 호출되지 않지만
+// Track A 경로 내부에서 사용하는 invite-lookup 을 stub — Track B 에서는 호출되지 않지만
 // check.ts 가 import 하므로 resolve 오류 방지를 위해 모킹.
-vi.mock('@/actions/response-actions', () => ({
+vi.mock('@/lib/duplicate-detection/invite-lookup', () => ({
   findContactByInviteToken: vi.fn(async () => ({ kind: 'invalid' as const })),
 }));
 
-import { checkDuplicateOnEntry } from '@/actions/duplicate-detection-actions';
+import { checkDuplicateOnEntry } from '@/features/survey-response/server/services/duplicate.service';
 
 const SURVEY_ID = 'aaaaaaaa-0002-0002-0002-000000000002';
 

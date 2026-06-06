@@ -1,20 +1,19 @@
-'use server';
-
 import 'server-only';
 
-import { revalidatePath } from 'next/cache';
 import { and, eq } from 'drizzle-orm';
 
 import { db } from '@/db';
-import { surveyResponses } from '@/db/schema';
-import { requireSurveyOwnership } from '@/lib/auth/require-survey-ownership';
-import { replaceResponseAnswers } from '@/actions/response-answers-replace';
+import { surveyResponses, surveys } from '@/db/schema';
+import { replaceResponseAnswers } from './response-answers.service';
 import { calculateProgressPct } from '@/lib/operations/response-progress';
 import { getProgressSnapshot } from '@/lib/operations/response-progress.server';
+import { SurveyOwnershipError } from '@/lib/auth/require-survey-ownership';
 
-function revalidate(surveyId: string) {
-  revalidatePath(`/admin/surveys/${surveyId}/operations/profiles`);
-}
+import type { SaveAdminEditInput } from '../../domain/response-edit';
+
+// 'Response not found' / 'Cannot edit deleted response' throw 메시지는 그대로 두고
+// procedure 가 ORPCError 로 매핑한다.
+export { SurveyOwnershipError };
 
 /**
  * 어드민 응답 수정 저장.
@@ -29,17 +28,22 @@ function revalidate(surveyId: string) {
  *   구버전 기준이 될 수 있음. 다음 답변/완료 시 재계산되므로 데이터 손실은 없음.
  *
  * spread 사용 금지 — 명시적 set 만.
+ *
+ * 인증은 authed 미들웨어가 담당. 단 소유권 검증(surveys row 존재 확인)은 인증과
+ * 별개이므로 service 안에 보존한다 — 없는 설문이면 SurveyOwnershipError('not_found').
+ * 캐시 갱신(revalidatePath)은 소비처 router.push 로 대체한다.
  */
-export interface SaveAdminEditPayload {
-  questionResponses: Record<string, unknown>;
-}
-
 export async function saveAdminEdit(
-  surveyId: string,
-  responseId: string,
-  payload: SaveAdminEditPayload,
-) {
-  await requireSurveyOwnership(surveyId);
+  input: SaveAdminEditInput,
+): Promise<{ ok: true }> {
+  const { surveyId, responseId, questionResponses } = input;
+
+  // 소유권 검증 — surveys row 존재 확인 (require-survey-ownership.ts 패턴 인라인 복제)
+  const ownerRow = await db.query.surveys.findFirst({
+    where: eq(surveys.id, surveyId),
+    columns: { id: true },
+  });
+  if (!ownerRow) throw new SurveyOwnershipError('not_found');
 
   const existing = await db.query.surveyResponses.findFirst({
     where: and(
@@ -63,7 +67,7 @@ export async function saveAdminEdit(
   } else {
     const { positionMap, totalQuestions } = await getProgressSnapshot(existing.versionId);
     nextProgressPct = calculateProgressPct(
-      Object.keys(payload.questionResponses),
+      Object.keys(questionResponses),
       positionMap,
       totalQuestions,
     );
@@ -73,7 +77,7 @@ export async function saveAdminEdit(
     await tx
       .update(surveyResponses)
       .set({
-        questionResponses: payload.questionResponses,
+        questionResponses: questionResponses,
         lastEditedAt: now,
         lastActivityAt: now,
         currentStepId: null,
@@ -90,10 +94,9 @@ export async function saveAdminEdit(
       tx,
       responseId,
       surveyId,
-      payload.questionResponses,
+      questionResponses,
     );
   });
 
-  revalidate(surveyId);
   return { ok: true as const };
 }

@@ -1,6 +1,5 @@
-'use server';
+import 'server-only';
 
-import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 
 import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm';
@@ -15,15 +14,20 @@ import {
 import type { PageVisit } from '@/db/schema/schema-types';
 import { checkTrackA, checkTrackB } from '@/lib/duplicate-detection/check';
 import { computeSignals } from '@/lib/duplicate-detection/signals';
-import type { BlockReason, ClientSignals } from '@/lib/duplicate-detection/types';
 import { sumActiveSeconds } from '@/lib/operations/active-seconds';
 import { parseBrowser, parsePlatform } from '@/lib/operations/parse-ua';
-import {
-  buildNegativeCodeExists,
-  getResultCodeStatuses,
-} from '@/lib/operations/result-code-statuses.server';
-import { replaceResponseAnswers } from '@/actions/response-answers-replace';
 import { substituteTokens } from '@/lib/survey/substitute-tokens';
+
+import type {
+  CompleteResponseInput,
+  CreateBlankResponseInput,
+  CreateResponseWithFirstAnswerInput,
+  FirstAnswerResult,
+  StartResponseInput,
+  SurveyResponse,
+  UpdateQuestionResponseInput,
+} from '../../domain/response';
+import { replaceResponseAnswers } from './response-answers.service';
 
 // ========================
 // 컨택 매칭 helper
@@ -122,74 +126,21 @@ async function insertResponseWithContactReuse(params: {
   return existing;
 }
 
-/**
- * inviteToken 으로 컨택 lookup. 반환 케이스 3가지:
- * - valid: 정상 ct, contactTargetId 매칭됨 (+ respondedAt 동봉 — token_already_used 판정용)
- * - excluded: 부정 결과코드 OR unsubscribed_at IS NOT NULL [응답 차단]
- * - invalid: 토큰 자체가 무효 [익명 폴백]
- *
- * 액션은 mutation 흐름이라 dedupe 가 의미 없어 cache 적용 안 함.
- *
- * SECURITY DEFINER PG 함수 사용 — connection role 이 anon/authenticated 라도
- * RLS 우회해서 contact_target_id 만 안전하게 조회 가능. 다른 attrs/PII 는 노출 안 됨.
- *
- * SECURITY: 차단 사유는 호출자에게 구분 노출하지 않음 [UI 는 동일 카피 — PII].
- */
-export type InviteTokenLookupResult =
-  | { kind: 'valid'; contactTargetId: string; respondedAt: Date | null }
-  | { kind: 'excluded' }
-  | { kind: 'invalid' };
-
-export async function findContactByInviteToken(
-  surveyId: string,
-  inviteToken: string,
-): Promise<InviteTokenLookupResult> {
-  const lookup = (await db.execute(
-    sql`SELECT public.lookup_contact_by_invite_token(${surveyId}::uuid, ${inviteToken}::uuid) AS id`,
-  )) as unknown as Array<{ id: string | null }>;
-  const contactTargetId = lookup[0]?.id ?? null;
-  if (!contactTargetId) return { kind: 'invalid' };
-
-  const { negative: negativeCodes } = await getResultCodeStatuses(surveyId);
-  const excludedRows = (await db.execute(sql`
-    SELECT 1
-    FROM contact_targets ct
-    WHERE ct.id = ${contactTargetId}::uuid
-      AND (
-        ct.unsubscribed_at IS NOT NULL
-        ${negativeCodes.length > 0
-          ? sql`OR ${buildNegativeCodeExists(negativeCodes, sql`ct.id`)}`
-          : sql``}
-      )
-    LIMIT 1
-  `)) as unknown as unknown[];
-  if (excludedRows.length > 0) {
-    return { kind: 'excluded' };
-  }
-
-  const row = await db.query.contactTargets.findFirst({
-    where: eq(contactTargets.id, contactTargetId),
-    columns: { respondedAt: true },
-  });
-
-  return { kind: 'valid', contactTargetId, respondedAt: row?.respondedAt ?? null };
-}
-
 // ========================
-// 응답 변경 액션 (Mutations)
+// 응답 변경 service (Mutations)
 // ========================
 
-// 아래 3개 함수는 설문 응답자용이므로 인증 체크하지 않음
+// 아래 함수들은 설문 응답자용이므로 인증 체크하지 않음(pub 미들웨어):
 // - startResponse
 // - updateQuestionResponse
+// - createResponseWithFirstAnswer
+// - createBlankResponse
 // - completeResponse
 
 // 응답 시작
-export async function startResponse(
-  surveyId: string,
-  sessionId?: string,
-  versionId?: string,
-) {
+export async function startResponse(input: StartResponseInput): Promise<SurveyResponse> {
+  const { surveyId, sessionId, versionId } = input;
+
   const newResponse: NewSurveyResponse = {
     surveyId,
     questionResponses: {},
@@ -199,15 +150,18 @@ export async function startResponse(
   };
 
   const [response] = await db.insert(surveyResponses).values(newResponse).returning();
+  if (!response) {
+    throw new Error('startResponse: 응답 행 INSERT 실패');
+  }
   return response;
 }
 
 // 질문 응답 업데이트 (원자적 업데이트로 Race Condition 방지)
 export async function updateQuestionResponse(
-  responseId: string,
-  questionId: string,
-  value: unknown,
-) {
+  input: UpdateQuestionResponseInput,
+): Promise<SurveyResponse> {
+  const { responseId, questionId, value } = input;
+
   // jsonb_set 으로 답변 저장 + progress_pct 동기 갱신.
   // progress_pct 는 versionId 의 snapshot 에서 questionId 의 1-based position 을 찾아
   // (position / totalQuestions) × 100 으로 계산. GREATEST 로 단조 증가 보장 (앞 질문 수정
@@ -262,15 +216,6 @@ export async function updateQuestionResponse(
 // ========================
 
 /**
- * createResponseWithFirstAnswer / createBlankResponse 의 반환 타입.
- * - created: 응답 행 생성 성공
- * - blocked: 중복 감지로 차단
- */
-export type FirstAnswerResult =
-  | { kind: 'created'; id: string; contactTargetId: string | null }
-  | { kind: 'blocked'; reason: BlockReason };
-
-/**
  * 첫 답변과 함께 survey_responses 행을 INSERT.
  *
  * - UA를 서버 헤더에서 읽어 platform/browser를 파싱
@@ -281,18 +226,9 @@ export type FirstAnswerResult =
  *
  * @returns created (생성/기존 행 id) 또는 blocked (중복 감지)
  */
-export async function createResponseWithFirstAnswer(input: {
-  surveyId: string;
-  sessionId: string;
-  versionId: string | null;
-  questionId: string;
-  value: unknown;
-  currentStepId: string;
-  inviteToken?: string;
-  // null 이면 신호 기반 검사 skip — 클라이언트 신호 수집 실패(LocalStorage 차단 등) 시
-  // placeholder 신호로 hash 충돌 발생을 방지하기 위해 null 그대로 받는다
-  clientSignals: ClientSignals | null;
-}): Promise<FirstAnswerResult> {
+export async function createResponseWithFirstAnswer(
+  input: CreateResponseWithFirstAnswerInput,
+): Promise<FirstAnswerResult> {
   const { surveyId, sessionId, versionId, questionId, value, currentStepId, inviteToken, clientSignals } = input;
 
   // UA + IP (Next 15+ 비동기 headers API)
@@ -349,7 +285,7 @@ export async function createResponseWithFirstAnswer(input: {
   // 신규 INSERT 든 reuse 든 모두 updateQuestionResponse 로 첫 답변 머지 + progress_pct
   // 갱신을 단일화. jsonb_set 은 동일 값 덮어쓰기라 멱등이라 신규 INSERT path 의 중복 set
   // 도 안전. onReuse 콜백을 사용하지 않는 이유: progress_pct 가 신규 INSERT 에서도 필요.
-  await updateQuestionResponse(result.id, questionId, value);
+  await updateQuestionResponse({ responseId: result.id, questionId, value });
   return { kind: 'created', id: result.id, contactTargetId: result.contactTargetId };
 }
 
@@ -369,15 +305,9 @@ export async function createResponseWithFirstAnswer(input: {
  *
  * 충돌(=이미 답변이 있는 row 존재) 시 기존 row 의 id 를 그대로 반환.
  */
-export async function createBlankResponse(input: {
-  surveyId: string;
-  sessionId: string;
-  versionId: string | null;
-  currentStepId: string;
-  inviteToken?: string;
-  // null 이면 신호 기반 검사 skip (createResponseWithFirstAnswer 와 동일 정책)
-  clientSignals: ClientSignals | null;
-}): Promise<FirstAnswerResult> {
+export async function createBlankResponse(
+  input: CreateBlankResponseInput,
+): Promise<FirstAnswerResult> {
   const { surveyId, sessionId, versionId, currentStepId, inviteToken, clientSignals } = input;
 
   const headerStore = await headers();
@@ -432,263 +362,14 @@ export async function createBlankResponse(input: {
   return { kind: 'created', id: result.id, contactTargetId: result.contactTargetId };
 }
 
-/**
- * 페이지 이동(스텝 전환) 기록.
- *
- * - 동일 stepId면 no-op (React 더블 이펙트, 네비게이션 레이스 방어)
- * - 그 외 단일 UPDATE로 원자적 처리:
- *   - 이전 마지막 pageVisits 항목의 leftAt을 now()로 (NULL일 때만 — 뒤로갔다 앞으로 시 기존 leftAt 보존)
- *   - 새 항목을 pageVisits 끝에 append
- *   - currentStepId, lastActivityAt 갱신
- *
- * @throws 행이 없으면 에러 — 호출자(T5)는 catch & log하되 사용자 흐름은 막지 않는다
- */
-export async function recordStepVisit(input: {
-  responseId: string;
-  nextStepId: string;
-}): Promise<void> {
-  const { responseId, nextStepId } = input;
-
-  // 단일 UPDATE: WHERE 절에서 currentStepId !== nextStepId 조건으로 멱등성 보장
-  // jsonb_set은 마지막 항목의 leftAt이 NULL일 때만 갱신, 그 후 || 로 새 항목 append.
-  const result = await db
-    .update(surveyResponses)
-    .set({
-      currentStepId: nextStepId,
-      lastActivityAt: new Date(),
-      pageVisits: sql`(
-        CASE
-          WHEN jsonb_array_length(COALESCE(${surveyResponses.pageVisits}, '[]'::jsonb)) > 0
-           AND (COALESCE(${surveyResponses.pageVisits}, '[]'::jsonb) -> -1 ->> 'leftAt') IS NULL
-          THEN jsonb_set(
-                 COALESCE(${surveyResponses.pageVisits}, '[]'::jsonb),
-                 ARRAY[(jsonb_array_length(COALESCE(${surveyResponses.pageVisits}, '[]'::jsonb)) - 1)::text, 'leftAt'],
-                 to_jsonb(now())
-               )
-          ELSE COALESCE(${surveyResponses.pageVisits}, '[]'::jsonb)
-        END
-      ) || jsonb_build_array(
-        jsonb_build_object(
-          'stepId', ${nextStepId}::text,
-          'enteredAt', to_jsonb(now())
-        )
-      )`,
-    })
-    .where(
-      and(
-        eq(surveyResponses.id, responseId),
-        // 동일 스텝이면 UPDATE 자체를 건너뛴다 (no-op idempotency)
-        sql`COALESCE(${surveyResponses.currentStepId}, '') <> ${nextStepId}`,
-      ),
-    )
-    .returning({ id: surveyResponses.id });
-
-  if (result.length === 0) {
-    // 행이 없거나 이미 같은 스텝인 경우. 같은 스텝은 no-op이므로 통과해야 함.
-    // → 행 존재 여부를 확인해 행이 없을 때만 throw.
-    const exists = await db
-      .select({ id: surveyResponses.id })
-      .from(surveyResponses)
-      .where(eq(surveyResponses.id, responseId))
-      .limit(1);
-
-    if (exists.length === 0) {
-      throw new Error('응답을 찾을 수 없습니다.');
-    }
-    // 같은 스텝이면 그냥 통과 (no-op)
-  }
-}
-
-/**
- * Page Visibility 세그먼트 기록 (sendBeacon 대상).
- *
- * - hide: 마지막 visit의 leftAt이 NULL이면 now()로 닫는다. lastActivityAt은 건드리지 않는다
- *   (떠난 시점 기준으로 3h sweep 타이머가 돌도록).
- * - show: 마지막 visit이 닫혀 있으면(또는 빈 배열) currentStepId로 새 visit을 append.
- *   lastActivityAt을 갱신한다(복귀 = 활동).
- * - 둘 다 단일 UPDATE문 — 동시 hide/show 경합 시 PG 행 잠금으로 직렬화(lost update 방지).
- * - status='in_progress' 가드 — 공개 엔드포인트 IDOR 영향 제한 + 완료 후 늦은 beacon no-op.
- */
-export async function recordVisibilitySegment(input: {
-  responseId: string;
-  action: 'hide' | 'show';
-}): Promise<void> {
-  const { responseId, action } = input;
-
-  if (action === 'hide') {
-    await db
-      .update(surveyResponses)
-      .set({
-        pageVisits: sql`jsonb_set(
-          COALESCE(${surveyResponses.pageVisits}, '[]'::jsonb),
-          ARRAY[(jsonb_array_length(COALESCE(${surveyResponses.pageVisits}, '[]'::jsonb)) - 1)::text, 'leftAt'],
-          to_jsonb(now())
-        )`,
-      })
-      .where(
-        and(
-          eq(surveyResponses.id, responseId),
-          eq(surveyResponses.status, 'in_progress'),
-          sql`jsonb_array_length(COALESCE(${surveyResponses.pageVisits}, '[]'::jsonb)) > 0`,
-          sql`(${surveyResponses.pageVisits} -> -1 ->> 'leftAt') IS NULL`,
-        ),
-      );
-    return;
-  }
-
-  // action === 'show'
-  await db
-    .update(surveyResponses)
-    .set({
-      lastActivityAt: new Date(),
-      pageVisits: sql`COALESCE(${surveyResponses.pageVisits}, '[]'::jsonb) || jsonb_build_array(
-        jsonb_build_object('stepId', ${surveyResponses.currentStepId}, 'enteredAt', to_jsonb(now()))
-      )`,
-    })
-    .where(
-      and(
-        eq(surveyResponses.id, responseId),
-        eq(surveyResponses.status, 'in_progress'),
-        sql`${surveyResponses.currentStepId} IS NOT NULL`,
-        sql`(
-          jsonb_array_length(COALESCE(${surveyResponses.pageVisits}, '[]'::jsonb)) = 0
-          OR (${surveyResponses.pageVisits} -> -1 ->> 'leftAt') IS NOT NULL
-        )`,
-      ),
-    );
-}
-
-/**
- * 같은 (surveyId, sessionId) 조합으로 기존 응답이 있으면 회복, 없으면 null 반환.
- *
- * - drop 상태면 in_progress 로 UPDATE + lastActivityAt 갱신
- * - in_progress 면 그대로 (lastActivityAt만 갱신해 stale 방지)
- * - completed/screened_out/quotaful_out/bad 면 그대로 반환 — 호출자가 "이미 끝남" UX 처리
- *
- * 반환 null 이면 첫 진입 — 호출자는 평소대로 createResponseWithFirstAnswer 흐름.
- */
-export async function resumeOrCreateResponse(input: {
-  surveyId: string;
-  sessionId: string;
-  inviteToken?: string;
-}): Promise<{
-  id: string;
-  status: 'in_progress' | 'completed' | 'screened_out' | 'quotaful_out' | 'bad' | 'drop';
-  resumed: boolean;
-} | null> {
-  const { surveyId, sessionId, inviteToken } = input;
-
-  // 컨택 매칭 우선순위: 유효한 inviteToken 이 있으면 같은 컨택의 in_progress 응답 우선 resume.
-  // - 유효 토큰 + in_progress 행 존재 → 그 행 resume (sessionId 무시)
-  // - 유효 토큰 + in_progress 행 없음 → null (호출자가 새 응답 생성)
-  // - 무효 토큰 → silent fallback, 일반 sessionId 흐름 진행
-  if (inviteToken) {
-    const lookup = await findContactByInviteToken(surveyId, inviteToken);
-    // excluded 도 valid 외 = null 로 fallback (anonymous sessionId 흐름으로 자연 처리).
-    // excluded race 차단은 saveResponse 시점의 checkTrackA 가 별도로 책임.
-    const target = lookup.kind === 'valid'
-      ? { id: lookup.contactTargetId }
-      : null;
-    if (target) {
-      const [existingByContact] = await db
-        .select({
-          id: surveyResponses.id,
-          status: surveyResponses.status,
-        })
-        .from(surveyResponses)
-        .where(
-          and(
-            eq(surveyResponses.contactTargetId, target.id),
-            eq(surveyResponses.isCompleted, false),
-          ),
-        )
-        .limit(1);
-
-      if (existingByContact) {
-        const now = new Date();
-        if (existingByContact.status === 'drop') {
-          await db
-            .update(surveyResponses)
-            .set({ status: 'in_progress', lastActivityAt: now })
-            .where(eq(surveyResponses.id, existingByContact.id));
-          return { id: existingByContact.id, status: 'in_progress', resumed: true };
-        }
-        if (existingByContact.status === 'in_progress') {
-          await db
-            .update(surveyResponses)
-            .set({ lastActivityAt: now })
-            .where(eq(surveyResponses.id, existingByContact.id));
-          return { id: existingByContact.id, status: 'in_progress', resumed: false };
-        }
-        // isCompleted=false 인데 in_progress/drop 도 아닌 알 수 없는 status → fallback
-      }
-      // 유효 토큰이지만 매칭되는 in_progress 응답 없음 → 새 응답 흐름
-      return null;
-    }
-    // 토큰 무효 → 일반 sessionId 흐름 fallback
-  }
-
-  const [existing] = await db
-    .select({
-      id: surveyResponses.id,
-      status: surveyResponses.status,
-    })
-    .from(surveyResponses)
-    .where(
-      and(eq(surveyResponses.surveyId, surveyId), eq(surveyResponses.sessionId, sessionId)),
-    )
-    .limit(1);
-
-  if (!existing) return null;
-
-  const now = new Date();
-
-  if (existing.status === 'drop') {
-    // 회복 — drop → in_progress, lastActivityAt 새로 박는다
-    await db
-      .update(surveyResponses)
-      .set({ status: 'in_progress', lastActivityAt: now })
-      .where(eq(surveyResponses.id, existing.id));
-    return { id: existing.id, status: 'in_progress', resumed: true };
-  }
-
-  if (existing.status === 'in_progress') {
-    // stale 방지용 lastActivityAt 터치
-    await db
-      .update(surveyResponses)
-      .set({ lastActivityAt: now })
-      .where(eq(surveyResponses.id, existing.id));
-    return { id: existing.id, status: 'in_progress', resumed: false };
-  }
-
-  // 종결 상태 — 알려진 값만 통과시키고 알 수 없으면 null 로 fallback
-  const concludedStatuses = ['completed', 'screened_out', 'quotaful_out', 'bad'] as const;
-  type ConcludedStatus = (typeof concludedStatuses)[number];
-  if ((concludedStatuses as readonly string[]).includes(existing.status)) {
-    return {
-      id: existing.id,
-      status: existing.status as ConcludedStatus,
-      resumed: false,
-    };
-  }
-  // 알 수 없는 status — 호출자가 새 응답 흐름으로 가도록 null 반환
-  console.warn(
-    `[resumeOrCreateResponse] 알 수 없는 status 발견: ${existing.status} (id=${existing.id})`,
-  );
-  return null;
-}
-
 // 응답 완료 (JSONB + response_answers 이중 쓰기)
 // 읽기: response_answers 우선 (getResponsesWithAnswers), JSONB fallback
 // JSONB 쓰기는 마이그레이션 완료 + 모든 읽기 경로 전환 후 제거 예정
 export async function completeResponse(
-  responseId: string,
-  data?: {
-    questionResponses?: Record<string, unknown>;
-    exposedQuestionIds?: string[];
-    exposedRowIds?: string[];
-  },
-) {
+  input: CompleteResponseInput,
+): Promise<SurveyResponse> {
+  const { responseId, data } = input;
+
   // prefill 재검증: defaultValueTemplate 이 있는 질문의 응답값은
   // contact_targets.attrs 로 치환한 expected 와 일치해야 함.
   // 클라이언트가 disabled 입력을 우회 조작해도 서버에서 expected 값으로 강제 복원.
@@ -823,8 +504,7 @@ export async function completeResponse(
     }
   }
 
-  revalidatePath('/analytics');
+  // revalidatePath('/analytics') 는 백엔드에서 제거 — 공개 응답이 admin /analytics
+  // 캐시를 cross 무효화하던 부분으로, 소비처 통합 단계에서 query invalidation 등으로 보강.
   return result;
 }
-
-
