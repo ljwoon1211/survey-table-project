@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 
-import { updateContactResultCodes } from '@/actions/contact-actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -19,6 +18,7 @@ import {
   type ResultCodeStatus,
 } from '@/db/schema/schema-types';
 import { resolveCodeStatus } from '@/lib/operations/result-code-statuses';
+import { client } from '@/shared/lib/rpc';
 
 interface ResultCodesEditorProps {
   surveyId: string;
@@ -157,7 +157,10 @@ export function ResultCodesEditor({ surveyId, initialCodes }: ResultCodesEditorP
     setError(null);
     startTransition(async () => {
       try {
-        await updateContactResultCodes(surveyId, mode === 'use-default' ? null : codes);
+        await client.contacts.resultCodes.update({
+          surveyId,
+          codes: mode === 'use-default' ? null : codes,
+        });
         router.refresh();
       } catch (e) {
         setError((e as Error).message);

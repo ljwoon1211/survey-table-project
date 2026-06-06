@@ -3,10 +3,10 @@
 import { useRouter } from 'next/navigation';
 import { forwardRef, useImperativeHandle, useState, useTransition } from 'react';
 
-import { addContactAttempt } from '@/actions/contact-actions';
 import { Button } from '@/components/ui/button';
 import type { ContactResultCode } from '@/db/schema/schema-types';
 import { useAutoFadeMessage } from '@/hooks/use-auto-fade-message';
+import { client } from '@/shared/lib/rpc';
 
 interface ContactAttemptAddCardProps {
   contactTargetId: string;
@@ -43,7 +43,7 @@ export const ContactAttemptAddCard = forwardRef<
     if (!resultCode) return; // imperative 호출 시 라디오 없으면 silent no-op
     setError(null);
     try {
-      await addContactAttempt({
+      await client.contacts.attempts.add({
         contactTargetId,
         surveyId,
         resultCode,
