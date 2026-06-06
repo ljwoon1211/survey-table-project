@@ -1,0 +1,54 @@
+import { createRouterClient } from '@orpc/server';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { ORPCContext } from '@/server/context';
+
+vi.mock('../services/contact-attrs.service', () => ({
+  lookupContactAttrs: vi.fn(),
+}));
+
+import * as svc from '../services/contact-attrs.service';
+import { attrs } from './attrs';
+
+function anonContext(): ORPCContext {
+  return {
+    db: {} as never,
+    supabase: { tag: 'anon-supabase' } as never,
+    user: null,
+  };
+}
+
+const VALID_TOKEN = '11111111-2222-3333-4444-555555555555';
+
+describe('contacts.attrs procedures', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('lookup(pub)은 익명 컨텍스트에서 attrs 를 반환한다', async () => {
+    vi.mocked(svc.lookupContactAttrs).mockResolvedValue({ name: '홍길동' } as never);
+    const client = createRouterClient({ attrs }, { context: anonContext() });
+    const res = await client.attrs.lookup({ surveyId: 's-1', inviteToken: VALID_TOKEN });
+    expect(svc.lookupContactAttrs).toHaveBeenCalledWith({
+      surveyId: 's-1',
+      inviteToken: VALID_TOKEN,
+    });
+    expect(res).toEqual({ name: '홍길동' });
+  });
+
+  it('lookup 은 매칭 실패 시 service 가 반환한 null 을 그대로 통과시킨다', async () => {
+    vi.mocked(svc.lookupContactAttrs).mockResolvedValue(null as never);
+    const client = createRouterClient({ attrs }, { context: anonContext() });
+    const res = await client.attrs.lookup({ surveyId: 's-1', inviteToken: VALID_TOKEN });
+    expect(res).toBeNull();
+  });
+
+  it('lookup 은 무효(비-UUID) 토큰도 input 검증을 통과시켜 service 에 위임한다', async () => {
+    vi.mocked(svc.lookupContactAttrs).mockResolvedValue(null as never);
+    const client = createRouterClient({ attrs }, { context: anonContext() });
+    const res = await client.attrs.lookup({ surveyId: 's-1', inviteToken: 'not-a-uuid' });
+    expect(svc.lookupContactAttrs).toHaveBeenCalledWith({
+      surveyId: 's-1',
+      inviteToken: 'not-a-uuid',
+    });
+    expect(res).toBeNull();
+  });
+});

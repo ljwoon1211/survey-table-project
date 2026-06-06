@@ -18,8 +18,8 @@ import {
   recordStepVisit,
   resumeOrCreateResponse,
 } from '@/actions/response-actions';
-import { lookupContactAttrs } from '@/actions/contact-attrs-actions';
 import { checkDuplicateOnEntry } from '@/actions/duplicate-detection-actions';
+import { client } from '@/shared/lib/rpc';
 import { AlreadyRespondedView } from '@/components/survey/already-responded-view';
 import { InviteRequiredScreen } from '@/components/survey-response/invite-required-screen';
 import { MobileBottomNav } from '@/components/survey-response/mobile-bottom-nav';
@@ -389,7 +389,7 @@ export function SurveyResponseFlow({
           if (result.survey.settings.requireInviteToken && !inviteToken) {
             setShowInviteRequired(true);
           } else if (inviteToken) {
-            const attrs = await lookupContactAttrs(surveyId, inviteToken);
+            const attrs = await client.contacts.attrs.lookup({ surveyId, inviteToken });
             if (attrs) {
               setContactAttrs(attrs);
             } else if (result.survey.settings.requireInviteToken) {
