@@ -39,10 +39,6 @@ vi.mock('next/headers', () => ({
   headers: mockHeaders,
 }));
 
-vi.mock('@/lib/auth', () => ({
-  requireAuth: vi.fn(),
-}));
-
 vi.mock('@/lib/operations/parse-ua', () => ({
   parseBrowser: vi.fn().mockReturnValue('chrome'),
   parsePlatform: vi.fn().mockReturnValue('desktop'),
@@ -76,7 +72,7 @@ describe('createBlankResponse bypass defense', () => {
   it('checkDuplicateOnEntry 우회 → createBlankResponse 에서 차단', async () => {
     mockFindFirst.mockResolvedValue({ id: 'prev-blank-response' });
 
-    const { createBlankResponse } = await import('@/actions/response-actions');
+    const { createBlankResponse } = await import('@/features/survey-response/server/services/response.service');
     const result = await createBlankResponse({
       surveyId: SURVEY_ID,
       sessionId: 'fresh-session-blank-bypass',
@@ -104,7 +100,7 @@ describe('clientSignals null 시 신호 기반 검사 skip', () => {
       }),
     });
 
-    const { createResponseWithFirstAnswer } = await import('@/actions/response-actions');
+    const { createResponseWithFirstAnswer } = await import('@/features/survey-response/server/services/response.service');
     const result = await createResponseWithFirstAnswer({
       surveyId: SURVEY_ID,
       sessionId: 'session-null-signals',
@@ -132,7 +128,7 @@ describe('clientSignals null 시 신호 기반 검사 skip', () => {
       }),
     });
 
-    const { createBlankResponse } = await import('@/actions/response-actions');
+    const { createBlankResponse } = await import('@/features/survey-response/server/services/response.service');
     const result = await createBlankResponse({
       surveyId: SURVEY_ID,
       sessionId: 'session-blank-null-signals',
@@ -149,7 +145,7 @@ describe('clientSignals null 시 신호 기반 검사 skip', () => {
   it('checkDuplicateOnEntry: clientSignals null → blocked false 즉시 반환', async () => {
     mockFindFirst.mockResolvedValue(undefined);
 
-    const { checkDuplicateOnEntry } = await import('@/actions/duplicate-detection-actions');
+    const { checkDuplicateOnEntry } = await import('@/features/survey-response/server/services/duplicate.service');
     const result = await checkDuplicateOnEntry({
       surveyId: SURVEY_ID,
       clientSignals: null,

@@ -44,15 +44,15 @@ vi.mock('@/db', () => {
     surveyResponses: {
       findFirst: (...args: unknown[]) => findFirstMock(...args),
     },
+    // saveAdminEdit service 의 소유권 검증(db.query.surveys.findFirst) — 항상 존재로 통과
+    surveys: {
+      findFirst: vi.fn(async () => ({ id: 's1' })),
+    },
   };
   return { db: chainable };
 });
 
-vi.mock('@/lib/auth/require-survey-ownership', () => ({
-  requireSurveyOwnership: vi.fn(async () => undefined),
-}));
-
-vi.mock('@/actions/response-answers-replace', () => ({
+vi.mock('@/features/survey-response/server/services/response-answers.service', () => ({
   replaceResponseAnswers: vi.fn(async () => undefined),
 }));
 
@@ -72,8 +72,8 @@ describe('updateQuestionResponse — progress_pct SET', () => {
   });
 
   it('set() 인자에 progressPct SQL 이 포함된다', async () => {
-    const { updateQuestionResponse } = await import('@/actions/response-actions');
-    await updateQuestionResponse('r1', 'q3', 'value');
+    const { updateQuestionResponse } = await import('@/features/survey-response/server/services/response.service');
+    await updateQuestionResponse({ responseId: 'r1', questionId: 'q3', value: 'value' });
 
     expect(updateSetMock).toHaveBeenCalledTimes(1);
     const rawCall0 = updateSetMock.mock.calls[0];
@@ -86,10 +86,10 @@ describe('updateQuestionResponse — progress_pct SET', () => {
 
   it('응답 없음 → throw', async () => {
     updateReturningMock.mockResolvedValue([]);
-    const { updateQuestionResponse } = await import('@/actions/response-actions');
-    await expect(updateQuestionResponse('missing', 'q1', 'v')).rejects.toThrow(
-      '응답을 찾을 수 없습니다.',
-    );
+    const { updateQuestionResponse } = await import('@/features/survey-response/server/services/response.service');
+    await expect(
+      updateQuestionResponse({ responseId: 'missing', questionId: 'q1', value: 'v' }),
+    ).rejects.toThrow('응답을 찾을 수 없습니다.');
   });
 });
 
@@ -110,8 +110,8 @@ describe('saveAdminEdit — progress_pct 재계산', () => {
       versionId: 'v1',
       deletedAt: null,
     });
-    const { saveAdminEdit } = await import('@/actions/response-edit-actions');
-    await saveAdminEdit('s1', 'r1', { questionResponses: { q1: 'v' } });
+    const { saveAdminEdit } = await import('@/features/survey-response/server/services/response-edit.service');
+    await saveAdminEdit({ surveyId: 's1', responseId: 'r1', questionResponses: { q1: 'v' } });
 
     const completedCall = updateSetMock.mock.calls[0];
     if (!completedCall) throw new Error('updateSetMock 호출 없음');
@@ -128,8 +128,8 @@ describe('saveAdminEdit — progress_pct 재계산', () => {
     });
     // snapshot 로더가 호출되면 빈 questions 배열 반환
     selectLimitMock.mockResolvedValue([{ snapshot: { questions: [] } }]);
-    const { saveAdminEdit } = await import('@/actions/response-edit-actions');
-    await saveAdminEdit('s1', 'r1', { questionResponses: {} });
+    const { saveAdminEdit } = await import('@/features/survey-response/server/services/response-edit.service');
+    await saveAdminEdit({ surveyId: 's1', responseId: 'r1', questionResponses: {} });
 
     const dropEmptyCall = updateSetMock.mock.calls[0];
     if (!dropEmptyCall) throw new Error('updateSetMock 호출 없음');
@@ -151,8 +151,10 @@ describe('saveAdminEdit — progress_pct 재계산', () => {
         },
       },
     ]);
-    const { saveAdminEdit } = await import('@/actions/response-edit-actions');
-    await saveAdminEdit('s1', 'r1', {
+    const { saveAdminEdit } = await import('@/features/survey-response/server/services/response-edit.service');
+    await saveAdminEdit({
+      surveyId: 's1',
+      responseId: 'r1',
       questionResponses: { q1: 'a', q3: 'b' },
     });
 
@@ -170,8 +172,10 @@ describe('saveAdminEdit — progress_pct 재계산', () => {
       versionId: null,
       deletedAt: null,
     });
-    const { saveAdminEdit } = await import('@/actions/response-edit-actions');
-    await saveAdminEdit('s1', 'r1', {
+    const { saveAdminEdit } = await import('@/features/survey-response/server/services/response-edit.service');
+    await saveAdminEdit({
+      surveyId: 's1',
+      responseId: 'r1',
       questionResponses: { q1: 'a' },
     });
 

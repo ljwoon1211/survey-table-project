@@ -10,7 +10,7 @@ vi.mock('@/db', () => ({
   db: { query: { surveyResponses: { findFirst: mockFindFirst } } },
 }));
 
-vi.mock('@/actions/response-actions', () => ({
+vi.mock('@/lib/duplicate-detection/invite-lookup', () => ({
   findContactByInviteToken: mockFindContact,
 }));
 

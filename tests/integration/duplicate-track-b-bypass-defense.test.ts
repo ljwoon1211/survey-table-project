@@ -32,10 +32,6 @@ vi.mock('next/headers', () => ({
   headers: mockHeaders,
 }));
 
-vi.mock('@/lib/auth', () => ({
-  requireAuth: vi.fn(),
-}));
-
 vi.mock('@/lib/operations/parse-ua', () => ({
   parseBrowser: vi.fn().mockReturnValue('chrome'),
   parsePlatform: vi.fn().mockReturnValue('desktop'),
@@ -66,11 +62,11 @@ beforeEach(() => {
 });
 
 describe('Track B bypass defense', () => {
-  it('checkDuplicateOnEntry 우회 → 첫 답변 server action에서 차단', async () => {
+  it('checkDuplicateOnEntry 우회 → 첫 답변 service에서 차단', async () => {
     // 매칭되는 완료 응답이 이미 존재하는 상황 시뮬레이션
     mockFindFirst.mockResolvedValue({ id: 'prev-response' });
 
-    const { createResponseWithFirstAnswer } = await import('@/actions/response-actions');
+    const { createResponseWithFirstAnswer } = await import('@/features/survey-response/server/services/response.service');
     const result = await createResponseWithFirstAnswer({
       surveyId: SURVEY_ID,
       sessionId: 'fresh-session-bypass',

@@ -22,7 +22,7 @@ const h = vi.hoisted(() => {
   return { findContactMock };
 });
 
-vi.mock('@/actions/response-actions', () => ({
+vi.mock('@/lib/duplicate-detection/invite-lookup', () => ({
   findContactByInviteToken: h.findContactMock,
 }));
 
@@ -48,7 +48,7 @@ vi.mock('@/lib/duplicate-detection/signals', () => ({
   computeSignals: vi.fn(() => ({ ipHash: null, fpHash: null, deviceId: null })),
 }));
 
-import { checkDuplicateOnEntry } from '@/actions/duplicate-detection-actions';
+import { checkDuplicateOnEntry } from '@/features/survey-response/server/services/duplicate.service';
 
 const TEST_SURVEY_ID = 'aaaaaaaa-0001-0001-0001-000000000001';
 

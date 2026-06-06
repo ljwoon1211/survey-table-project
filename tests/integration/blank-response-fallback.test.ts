@@ -7,7 +7,7 @@ process.env['DUPLICATE_DETECTION_SALT'] = 'test-salt-blank-response';
 // 모듈 모킹
 // ========================
 //
-// createBlankResponse 는 server action 이며 다음에 의존한다:
+// createBlankResponse 는 feature service 이며 다음에 의존한다:
 // - next/headers 의 headers() (UA / x-forwarded-for / x-real-ip)
 // - @/db 의 drizzle client (db.insert, db.select, db.execute, db.query)
 // - @/lib/operations/parse-ua (순수 함수이므로 모킹 안 함, 실제 호출)
@@ -77,10 +77,6 @@ vi.mock('@/db', () => ({
   },
 }));
 
-vi.mock('@/lib/auth', () => ({
-  requireAuth: vi.fn(async () => ({ id: 'user-test' })),
-}));
-
 // findContactByInviteToken 내부에서 negative codes 조회
 vi.mock('@/lib/operations/result-code-statuses.server', async () => {
   const { mockBuildNegativeCodeExists } = await import('./_helpers/result-code-mock');
@@ -90,7 +86,7 @@ vi.mock('@/lib/operations/result-code-statuses.server', async () => {
   };
 });
 
-import { createBlankResponse } from '@/actions/response-actions';
+import { createBlankResponse } from '@/features/survey-response/server/services/response.service';
 import type { ClientSignals } from '@/lib/duplicate-detection/types';
 
 const PLACEHOLDER_SIGNALS: ClientSignals = {
