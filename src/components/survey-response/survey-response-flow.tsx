@@ -1069,7 +1069,7 @@ export function SurveyResponseFlow({
   // 로딩 중
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-dvh items-center justify-center bg-gray-50">
         <Card className="mx-auto max-w-md">
           <CardContent className="p-8 text-center">
             <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin text-blue-500" />
@@ -1086,7 +1086,7 @@ export function SurveyResponseFlow({
     const isPrivateError = loadError?.includes('비공개');
 
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-dvh items-center justify-center bg-gray-50">
         <Card className="mx-auto max-w-md">
           <CardContent className="p-8 text-center">
             {isPrivateError ? (
@@ -1112,7 +1112,7 @@ export function SurveyResponseFlow({
 
   if (questions.length === 0 || steps.length === 0 || !currentStep) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-dvh items-center justify-center bg-gray-50">
         <Card className="mx-auto max-w-md">
           <CardContent className="p-8 text-center">
             <AlertCircle className="mx-auto mb-4 h-12 w-12 text-yellow-500" />
@@ -1131,7 +1131,7 @@ export function SurveyResponseFlow({
   // 완료 화면
   if (isCompleted) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-dvh items-center justify-center bg-gray-50">
         <Card className="mx-auto max-w-md">
           <CardContent className="p-8 text-center">
             <CheckCircle className="mx-auto mb-4 h-16 w-16 text-green-500" />
@@ -1155,7 +1155,7 @@ export function SurveyResponseFlow({
 
   return (
     <ContactAttrsProvider attrs={contactAttrs}>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-dvh bg-gray-50">
       {/* 헤더 */}
       <div className="border-b border-gray-200 bg-white">
         <div className={`${containerMaxWidth} mx-auto px-4 py-4 transition-all duration-300 md:px-6`}>
@@ -1202,8 +1202,8 @@ export function SurveyResponseFlow({
 
       {/* 메인 콘텐츠 */}
       <div
-        className={`${containerMaxWidth} mx-auto px-4 py-6 transition-all duration-300 md:px-6 md:py-8 ${
-          isMobile ? 'pb-28' : ''
+        className={`${containerMaxWidth} mx-auto px-4 pt-6 transition-all duration-300 md:px-6 md:pt-8 ${
+          isMobile ? 'pb-28' : 'pb-16 md:pb-24'
         }`}
       >
         {resumeMessage && (

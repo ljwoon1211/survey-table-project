@@ -187,14 +187,16 @@ export const TablePreview = React.memo(function TablePreview({
             aria-rowcount={headerRowCount + rows.length}
             aria-colcount={columns.length}
           >
-            {/* 헤더: 페이지 스크롤 기준 sticky + 별도 가로 스크롤 컨테이너 */}
-            {!hideColumnLabels && (
-              <div className="sticky top-0 z-30 bg-white print:static print:z-auto">
-                <TableScrollControls
-                  scrollRef={tableContainerRef}
-                  canScrollLeft={canScrollLeft}
-                  canScrollRight={canScrollRight}
-                />
+            {/* 가로 스크롤 컨트롤 + (선택적) 헤더 라벨. 페이지 스크롤 기준 sticky.
+                컨트롤은 hideColumnLabels 여부와 무관하게 렌더한다 — 헤더 라벨을 숨긴
+                넓은 표도 가로 스크롤 수단이 필요하기 때문. */}
+            <div className="sticky top-0 z-30 bg-white print:static print:z-auto">
+              <TableScrollControls
+                scrollRef={tableContainerRef}
+                canScrollLeft={canScrollLeft}
+                canScrollRight={canScrollRight}
+              />
+              {!hideColumnLabels && (
                 <div className="relative">
                   <div ref={headerScrollRef} className={HEADER_SCROLL_CLASS}>
                     <div
@@ -219,8 +221,8 @@ export const TablePreview = React.memo(function TablePreview({
                     />
                   )}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* 바디: 가로 스크롤 + 우측/좌측 페이드. relative 래퍼로 페이드를 우측에
                 고정한다(스크롤 컨테이너 안에 두면 콘텐츠와 함께 밀려 힌트 효과가 사라진다).

@@ -751,15 +751,18 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
         aria-rowcount={headerRowCount + displayRows.length}
         aria-colcount={visibleColumns.length}
       >
-        {/* 헤더: 페이지 스크롤 기준 sticky 래퍼 + 별도 가로 스크롤 컨테이너 */}
-        {!hideColumnLabels && (
-          <div className="sticky top-0 z-30 -mx-4 bg-white md:mx-0 print:static print:z-auto">
-            {/* 가로 스크롤 컨트롤 (버튼 + 진행도) — sticky 영역이라 항상 조작 가능 */}
-            <TableScrollControls
-              scrollRef={tableContainerRef}
-              canScrollLeft={canScrollLeft}
-              canScrollRight={canScrollRight}
-            />
+        {/* 가로 스크롤 컨트롤 + (선택적) 헤더 라벨. 페이지 스크롤 기준 sticky 래퍼.
+            컨트롤은 hideColumnLabels 여부와 무관하게 렌더한다 — 헤더 라벨을 숨긴
+            테이블도 넓으면 가로 스크롤 수단이 필요한데, 과거엔 이 컨트롤이 헤더
+            블록 안에 갇혀 hideColumnLabels=true 시 함께 사라지는 버그가 있었다. */}
+        <div className="sticky top-0 z-30 -mx-4 bg-white md:mx-0 print:static print:z-auto">
+          {/* 가로 스크롤 컨트롤 (버튼 + 진행도) — sticky 영역이라 항상 조작 가능 */}
+          <TableScrollControls
+            scrollRef={tableContainerRef}
+            canScrollLeft={canScrollLeft}
+            canScrollRight={canScrollRight}
+          />
+          {!hideColumnLabels && (
             <div className="relative">
               <div ref={headerScrollRef} className={HEADER_SCROLL_CLASS}>
                 <div
@@ -784,8 +787,8 @@ export const InteractiveTableResponse = React.memo(function InteractiveTableResp
                 />
               )}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* 바디: 가로 스크롤 + 우측/좌측 페이드. relative 래퍼로 페이드를 우측에
             고정한다(스크롤 컨테이너 안에 두면 콘텐츠와 함께 밀려 힌트 효과가 사라진다).
