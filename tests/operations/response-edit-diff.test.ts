@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildChangedQuestions,
   diffQuestionResponses,
+  mergeChangeLabels,
 } from '@/lib/operations/response-edit-diff';
 import type { SurveyVersionSnapshot } from '@/db/schema/schema-types';
 
@@ -57,6 +58,39 @@ describe('buildChangedQuestions', () => {
     ]);
     expect(buildChangedQuestions(['q1'], null)).toEqual([
       { questionId: 'q1', code: null, title: 'q1' },
+    ]);
+  });
+});
+
+describe('mergeChangeLabels', () => {
+  it('labelMap 에 있으면 live code/title 로 덮어쓴다 (questionId 폴백 복구)', () => {
+    const changes = [{ questionId: 'q1', code: null, title: 'q1' }];
+    const map = new Map([['q1', { code: 'Q1', title: '회사 기본사항' }]]);
+    expect(mergeChangeLabels(changes, map)).toEqual([
+      { questionId: 'q1', code: 'Q1', title: '회사 기본사항' },
+    ]);
+  });
+
+  it('labelMap 에 없으면 (삭제된 질문) 저장된 스냅샷 값을 유지한다', () => {
+    const changes = [{ questionId: 'deleted', code: 'OLD', title: '삭제된 질문' }];
+    const map = new Map<string, { code: string | null; title: string }>();
+    expect(mergeChangeLabels(changes, map)).toEqual([
+      { questionId: 'deleted', code: 'OLD', title: '삭제된 질문' },
+    ]);
+  });
+
+  it('여러 항목을 각각 매핑한다', () => {
+    const changes = [
+      { questionId: 'q1', code: null, title: 'q1' },
+      { questionId: 'q5', code: null, title: 'q5' },
+    ];
+    const map = new Map([
+      ['q1', { code: 'Q1', title: '회사' }],
+      ['q5', { code: 'Q5', title: '성과' }],
+    ]);
+    expect(mergeChangeLabels(changes, map)).toEqual([
+      { questionId: 'q1', code: 'Q1', title: '회사' },
+      { questionId: 'q5', code: 'Q5', title: '성과' },
     ]);
   });
 });

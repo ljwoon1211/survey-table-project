@@ -47,3 +47,21 @@ export function buildChangedQuestions(
     return { questionId: id, code: meta?.code ?? null, title: meta?.title ?? id };
   });
 }
+
+/**
+ * 저장된 changedQuestions 라벨을 현재 questions 기준으로 보강.
+ * labelMap(questionId → { code, title })에 있으면 live 값으로 덮어쓰고,
+ * 없으면(삭제된 질문 등) 저장된 스냅샷 값을 유지한다.
+ *
+ * 기록 시점에 version_id 가 없어 라벨이 questionId 로 폴백된 경우를 표시 시점에 복구한다.
+ */
+export function mergeChangeLabels(
+  changes: ResponseEditChange[],
+  labelMap: Map<string, { code: string | null; title: string }>,
+): ResponseEditChange[] {
+  return changes.map((c) => {
+    const live = labelMap.get(c.questionId);
+    if (!live) return c;
+    return { questionId: c.questionId, code: live.code, title: live.title };
+  });
+}
