@@ -1,12 +1,24 @@
 import 'server-only';
 import { cache } from 'react';
 
-import { and, asc, desc, eq, sql, type AnyColumn, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql, type AnyColumn, type SQL } from 'drizzle-orm';
 
 import { db } from '@/db';
-import { contactTargets, contactUploads, surveys } from '@/db/schema';
-import type { ContactColumnScheme } from '@/db/schema/schema-types';
+import {
+  contactTargets,
+  contactUploads,
+  surveys,
+  questions,
+  mailRecipients,
+  mailCampaigns,
+  responseEditLogs,
+} from '@/db/schema';
+import type {
+  ContactColumnScheme,
+  ResponseEditChange,
+} from '@/db/schema/schema-types';
 import type { MailRecipientStatus } from '@/db/schema/mail';
+import { mergeChangeLabels } from '@/lib/operations/response-edit-diff';
 import {
   decryptForTarget,
   getMaskHintsForTargets,
@@ -354,5 +366,97 @@ export const getContactResultCodes = cache(
     return codes ?? DEFAULT_RESULT_CODES;
   },
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 단건 편집 — 이메일 발송 현황 / 수정·편집 현황 카드용 조회
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface MailHistoryRow {
+  /** mail_recipients.id — React key 용 */
+  id: string;
+  campaignTitle: string;
+  runNumber: number;
+  status: MailRecipientStatus;
+  sentAt: Date | null;
+  deliveredAt: Date | null;
+  openedAt: Date | null;
+  bouncedAt: Date | null;
+  errorReason: string | null;
+  createdAt: Date;
+}
+
+/** 조사 대상에게 발송된 메일 수신 이력 (최근순). 캠페인 제목/회차 조인. */
+export async function getMailRecipientsForTarget(
+  contactTargetId: string,
+): Promise<MailHistoryRow[]> {
+  return db
+    .select({
+      id: mailRecipients.id,
+      campaignTitle: mailCampaigns.title,
+      runNumber: mailCampaigns.runNumber,
+      status: mailRecipients.status,
+      sentAt: mailRecipients.sentAt,
+      deliveredAt: mailRecipients.deliveredAt,
+      openedAt: mailRecipients.openedAt,
+      bouncedAt: mailRecipients.bouncedAt,
+      errorReason: mailRecipients.errorReason,
+      createdAt: mailRecipients.createdAt,
+    })
+    .from(mailRecipients)
+    .innerJoin(mailCampaigns, eq(mailRecipients.campaignId, mailCampaigns.id))
+    .where(eq(mailRecipients.contactTargetId, contactTargetId))
+    .orderBy(desc(mailRecipients.createdAt));
+}
+
+export interface ResponseEditLogRow {
+  id: string;
+  editorEmail: string | null;
+  changedQuestions: ResponseEditChange[];
+  changedCount: number;
+  createdAt: Date;
+}
+
+/** 응답 편집 audit 이력 (최근순). responseId 없으면 빈 배열. */
+export async function getResponseEditLogs(
+  responseId: string | null,
+): Promise<ResponseEditLogRow[]> {
+  if (!responseId) return [];
+  const rows = await db
+    .select({
+      id: responseEditLogs.id,
+      surveyId: responseEditLogs.surveyId,
+      editorEmail: responseEditLogs.editorEmail,
+      changedQuestions: responseEditLogs.changedQuestions,
+      changedCount: responseEditLogs.changedCount,
+      createdAt: responseEditLogs.createdAt,
+    })
+    .from(responseEditLogs)
+    .where(eq(responseEditLogs.responseId, responseId))
+    .orderBy(desc(responseEditLogs.createdAt));
+  if (rows.length === 0) return [];
+
+  // 라벨 보강: 기록 시점에 version_id 부재로 questionId 로 폴백된 라벨을
+  // 현재 questions 테이블의 code/title 로 복구. 삭제된 질문은 저장값 유지.
+  const surveyId = rows[0]!.surveyId;
+  const questionIds = [
+    ...new Set(rows.flatMap((r) => r.changedQuestions.map((c) => c.questionId))),
+  ];
+  const labelMap = new Map<string, { code: string | null; title: string }>();
+  if (questionIds.length > 0) {
+    const qs = await db
+      .select({ id: questions.id, code: questions.questionCode, title: questions.title })
+      .from(questions)
+      .where(and(eq(questions.surveyId, surveyId), inArray(questions.id, questionIds)));
+    for (const q of qs) labelMap.set(q.id, { code: q.code, title: q.title });
+  }
+
+  return rows.map((r) => ({
+    id: r.id,
+    editorEmail: r.editorEmail,
+    changedQuestions: mergeChangeLabels(r.changedQuestions, labelMap),
+    changedCount: r.changedCount,
+    createdAt: r.createdAt,
+  }));
+}
 
 export { CONTACT_METHOD_LABEL };
