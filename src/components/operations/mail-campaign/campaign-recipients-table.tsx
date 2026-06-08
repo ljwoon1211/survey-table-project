@@ -3,8 +3,9 @@ import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { LocalDateTime } from '@/components/ui/local-date-time';
 import type { MailRecipientStatus } from '@/db/schema/mail';
-import { RecipientStatusBadge } from './recipient-status-badge';
 import type { CampaignRecipientRow } from '@/lib/operations/campaigns.server';
+
+import { RecipientStatusBadge } from './recipient-status-badge';
 
 interface Props {
   surveyId: string;

@@ -2,16 +2,16 @@
 
 import { useMemo } from 'react';
 
+import {
+  RecipientStatusBadge,
+  recipientStatusMeta,
+} from '@/components/operations/mail-campaign/recipient-status-badge';
 import { SortIndicator, TablePagerFooter } from '@/components/operations/table-primitives';
 import type { ContactColumnDef, ContactColumnScheme } from '@/db/schema/schema-types';
 import { useSearchParamsMutator } from '@/hooks/use-search-params-mutator';
 import { formatLocalMonthDayTime } from '@/lib/date-formatters';
 import { attrsKeyOf, piiKeyOf, type ContactsSortDir, type ContactsSortKey } from '@/lib/operations/contacts';
 import type { ContactsRow } from '@/lib/operations/contacts.server';
-import {
-  RecipientStatusBadge,
-  STATUS_LABEL,
-} from '@/components/operations/mail-campaign/recipient-status-badge';
 
 interface ContactsTableProps {
   rows: ContactsRow[];
@@ -90,7 +90,7 @@ function computeCell(col: ContactColumnDef, row: ContactsRow): {
       return row.latestMailStatus
         ? {
             display: <RecipientStatusBadge status={row.latestMailStatus} />,
-            plain: STATUS_LABEL[row.latestMailStatus].label,
+            plain: recipientStatusMeta(row.latestMailStatus).label,
           }
         : { display: '—', plain: undefined };
     case 'system.web': {
