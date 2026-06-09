@@ -4,6 +4,12 @@ import { immer } from 'zustand/middleware/immer';
 
 import { buildFlatOrderedQuestions } from '@/lib/group-ordering';
 import { regenerateAfterDelete, regenerateAfterReorder } from '@/lib/spss/variable-generator';
+import {
+  computeSpssChangedQuestions,
+  emptyChangeset,
+  mergeChangesets,
+  type QuestionChangeset,
+} from '@/lib/survey-builder/changeset';
 
 // ── 헬퍼 함수 ──
 
@@ -51,20 +57,9 @@ import {
 } from '@/types/survey';
 import type { VariableDef } from '@/components/operations/mail-template/variable-catalog';
 
-// 질문 변경 추적을 위한 changeset
-export interface QuestionChangeset {
-  updated: Record<string, boolean>;  // 수정된 질문 ID
-  added: Record<string, boolean>;    // 새로 추가된 질문 ID
-  deleted: Record<string, boolean>;  // 삭제된 질문 ID
-  reordered: boolean;                // 순서 변경 여부
-}
-
-const emptyChangeset = (): QuestionChangeset => ({
-  updated: {},
-  added: {},
-  deleted: {},
-  reordered: false,
-});
+// 질문 변경 추적용 changeset 타입/헬퍼는 @/lib/survey-builder/changeset 로 추출됨.
+// 기존 import 호환을 위해 타입은 store 에서도 re-export 한다.
+export type { QuestionChangeset };
 
 export interface SurveyBuilderState {
   // 현재 편집 중인 설문 (메모리에만 유지, TanStack Query로 서버와 동기화)
@@ -665,35 +660,9 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
       // 저장 실패 시 스냅샷을 현재 changeset에 merge back
       mergeChangesBack: (snapshot: { questionChanges: QuestionChangeset; isMetadataDirty: boolean }) => {
         set((state) => {
-          const pending = snapshot.questionChanges;
-          const current = state.questionChanges;
+          // 머지/상쇄 로직은 순수 함수에 위임하고, 결과만 대입한다.
+          state.questionChanges = mergeChangesets(state.questionChanges, snapshot);
 
-          // pending.added → current에 merge (단, current에서 삭제된 건 제외)
-          for (const id in pending.added) {
-            if (!current.deleted[id]) {
-              current.added[id] = true;
-            }
-          }
-          // pending.updated → current에 merge (삭제/추가 대상 제외)
-          for (const id in pending.updated) {
-            if (!current.deleted[id] && !current.added[id]) {
-              current.updated[id] = true;
-            }
-          }
-          // pending.deleted → current에 merge
-          for (const id in pending.deleted) {
-            if (current.added[id]) {
-              // 저장 중 다시 추가된 경우 → 상쇄
-              delete current.added[id];
-            } else {
-              current.deleted[id] = true;
-            }
-            delete current.updated[id];
-          }
-
-          if (pending.reordered) {
-            current.reordered = true;
-          }
           if (snapshot.isMetadataDirty) {
             state.isMetadataDirty = true;
           }
@@ -731,16 +700,19 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
 /**
  * SPSS 코드 재생성 후 코드가 바뀐 기존 질문들을 updated changeset에 추가.
  * added 상태인 질문은 이미 전체 전송 대상이므로 제외.
+ * 변경 판정은 순수 함수 computeSpssChangedQuestions 에 위임하고, 결과만 draft 에 반영한다.
  */
 function markSpssChangedQuestions(
   state: SurveyBuilderState,
   oldCodes: Map<string, string | undefined>,
 ) {
-  for (const q of state.currentSurvey.questions) {
-    if (state.questionChanges.added[q.id]) continue;
-    if (oldCodes.get(q.id) !== q.questionCode) {
-      state.questionChanges.updated[q.id] = true;
-    }
+  const changedIds = computeSpssChangedQuestions(
+    state.currentSurvey.questions,
+    oldCodes,
+    state.questionChanges.added,
+  );
+  for (const id of changedIds) {
+    state.questionChanges.updated[id] = true;
   }
 }
 
