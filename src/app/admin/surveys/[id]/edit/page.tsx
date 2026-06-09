@@ -119,7 +119,7 @@ interface EditSurveyPageProps {
 export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   const { id } = use(params);
   // 액션 (안정적 참조)
-  const { updateSurveyTitle, addQuestion, addPreparedQuestion, updateSurveySlug, markPublished, setVariableCatalog } =
+  const { updateSurveyTitle, addQuestion, addPreparedQuestion, updateSurveySlug, markPublished } =
     useSurveyBuilderStore(
       useShallow((s) => ({
         updateSurveyTitle: s.updateSurveyTitle,
@@ -127,7 +127,6 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
         addPreparedQuestion: s.addPreparedQuestion,
         updateSurveySlug: s.updateSurveySlug,
         markPublished: s.markPublished,
-        setVariableCatalog: s.setVariableCatalog,
       })),
     );
 
@@ -145,12 +144,13 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
   const groupCount = useSurveyBuilderStore((s) => (s.currentSurvey.groups || []).length);
   const isDirty = useSurveyBuilderStore((s) => s.isDirty);
 
-  const { selectedQuestionId, isTestMode, selectQuestion, toggleTestMode } = useSurveyUIStore(
+  const { selectedQuestionId, isTestMode, selectQuestion, toggleTestMode, setVariableCatalog } = useSurveyUIStore(
     useShallow((s) => ({
       selectedQuestionId: s.selectedQuestionId,
       isTestMode: s.isTestMode,
       selectQuestion: s.selectQuestion,
       toggleTestMode: s.toggleTestMode,
+      setVariableCatalog: s.setVariableCatalog,
     })),
   );
   // TanStack Query 훅 사용

@@ -35,6 +35,7 @@ import { Switch } from '@/components/ui/switch';
 import { generateId } from '@/lib/utils';
 import { generateOptionCode } from '@/utils/option-code-generator';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
+import { useSurveyUIStore } from '@/stores/ui-store';
 import { Question, QuestionOption, SelectLevel } from '@/types/survey';
 
 import { OptionPlaceholderEditor } from './option-placeholder-editor';
@@ -119,7 +120,7 @@ export function QuestionBasicTab({
   removeLevelOption,
 }: QuestionBasicTabProps) {
   // 변수 카탈로그 (prefill 토큰용)
-  const variableCatalog = useSurveyBuilderStore((s) => s.variableCatalog);
+  const variableCatalog = useSurveyUIStore((s) => s.variableCatalog);
   const defaultTemplateRef = useRef<HTMLInputElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   // 공지사항 RichTextEditor ref — unmount 시 미사용 첨부·이미지 정리에 사용

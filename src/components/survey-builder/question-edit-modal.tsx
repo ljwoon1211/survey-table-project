@@ -25,6 +25,7 @@ import { extractImageUrlsFromQuestion } from '@/lib/image-extractor';
 import { deleteImagesFromR2 } from '@/lib/image-utils';
 import { isValidUUID } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
+import { useSurveyUIStore } from '@/stores/ui-store';
 import { Question } from '@/types/survey';
 import { collectChoiceOptCells, resolveChoiceOptions } from '@/utils/choice-source';
 import { collectRankingOptCells } from '@/utils/ranking-source';
@@ -53,12 +54,8 @@ interface QuestionEditModalProps {
 }
 
 export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditModalProps) {
-  const { updateQuestion, setEditingQuestionId } = useSurveyBuilderStore(
-    useShallow((s) => ({
-      updateQuestion: s.updateQuestion,
-      setEditingQuestionId: s.setEditingQuestionId,
-    })),
-  );
+  const updateQuestion = useSurveyBuilderStore((s) => s.updateQuestion);
+  const setEditingQuestionId = useSurveyUIStore((s) => s.setEditingQuestionId);
   const questions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
   const question = questions.find((q) => q.id === questionId);
   const ensureSurvey = useEnsureSurveyInDb();
@@ -112,7 +109,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
         if (!didSaveRef.current) {
           useSurveyBuilderStore.getState().silentUpdateQuestion(questionId, { hideColumnLabels: originalHidden });
         }
-        useSurveyBuilderStore.getState().setEditingQuestionId(null);
+        useSurveyUIStore.getState().setEditingQuestionId(null);
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps

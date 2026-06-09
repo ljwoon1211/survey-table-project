@@ -8,6 +8,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { GroupManager } from '@/components/survey-builder/group-manager';
 import { TokenWarningPanel } from '@/components/survey-builder/token-warning-panel';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
+import { useSurveyUIStore } from '@/stores/ui-store';
 
 interface SurveySettingsPanelProps {
   slugInput: string;
@@ -33,7 +34,7 @@ export const SurveySettingsPanel = React.memo(function SurveySettingsPanel({
     useShallow((s) => s.currentSurvey.contactEmail),
   );
   const questions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
-  const variableCatalog = useSurveyBuilderStore((s) => s.variableCatalog);
+  const variableCatalog = useSurveyUIStore((s) => s.variableCatalog);
 
   return (
     <div

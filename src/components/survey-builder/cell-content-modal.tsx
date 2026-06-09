@@ -44,6 +44,7 @@ import { useEnsureSurveyInDb } from '@/hooks/use-ensure-survey-in-db';
 import { isValidUUID } from '@/lib/utils';
 import { generateId } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
+import { useSurveyUIStore } from '@/stores/ui-store';
 import { TableCell } from '@/types/survey';
 import { isPartialNumericInput } from '@/utils/numeric-input';
 import { getMaxSpssCode } from '@/utils/option-code-generator';
@@ -111,7 +112,7 @@ export function CellContentModal({
   columnLabel,
 }: CellContentModalProps) {
   const questions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
-  const variableCatalog = useSurveyBuilderStore((s) => s.variableCatalog);
+  const variableCatalog = useSurveyUIStore((s) => s.variableCatalog);
   const ensureSurvey = useEnsureSurveyInDb();
   const [isSaving, setIsSaving] = useState(false);
   const inputTemplateRef = useRef<HTMLInputElement>(null);
