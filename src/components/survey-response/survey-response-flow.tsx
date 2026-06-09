@@ -29,7 +29,11 @@ import {
   StepItem,
   stepIdOf,
 } from '@/lib/group-ordering';
-import { parsesurveyIdentifier } from '@/lib/survey-url';
+import { isQuestionAnswered as isQuestionAnsweredPure } from '@/lib/survey/answer-validation';
+import { sessionStorageKey } from '@/components/survey-response/hooks/session-helpers';
+import { useResponseTelemetry } from '@/components/survey-response/hooks/use-response-telemetry';
+import { useSessionRecovery } from '@/components/survey-response/hooks/use-session-recovery';
+import { useSurveyLoader } from '@/components/survey-response/hooks/use-survey-loader';
 import { cn, isEmptyHtml } from '@/lib/utils';
 import { sanitizeRichHtml } from '@/lib/sanitize';
 import {
@@ -40,7 +44,7 @@ import {
 import { useSurveyResponseStore } from '@/stores/survey-response-store';
 import { useShallow } from 'zustand/react/shallow';
 import type { SurveyVersionSnapshot } from '@/db/schema';
-import { Question, QuestionGroup, Survey } from '@/types/survey';
+import { Question, QuestionGroup } from '@/types/survey';
 import {
   getBranchRuleForResponse,
   shouldDisplayDynamicGroup,
@@ -67,39 +71,6 @@ export interface SurveyResponseFlowProps {
     initialContactAttrs: Record<string, string>;
     onSubmit: (payload: SaveAdminEditPayload) => Promise<void>;
   };
-}
-
-/**
- * localStorage 키 — 회복용 sessionId 보관.
- * 첫 답변 INSERT 성공 후 SET, completeResponse 성공 후 DELETE.
- */
-function sessionStorageKey(surveyId: string): string {
-  return `survey-session:${surveyId}`;
-}
-
-/**
- * Page Visibility 세그먼트 신호를 /api/response/segment로 전송한다(fire-and-forget).
- * 탭 닫힘에도 살아남아야 하는 hide는 sendBeacon, 그 외는 keepalive fetch를 쓴다.
- */
-function sendVisibilitySegment(
-  responseId: string,
-  action: 'hide' | 'show',
-  useBeacon = false,
-): void {
-  const payload = JSON.stringify({ responseId, action });
-  if (useBeacon && typeof navigator !== 'undefined' && navigator.sendBeacon) {
-    navigator.sendBeacon(
-      '/api/response/segment',
-      new Blob([payload], { type: 'application/json' }),
-    );
-  } else {
-    fetch('/api/response/segment', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload,
-      keepalive: true,
-    }).catch(() => {});
-  }
 }
 
 // step 내에서 표시 가능한 질문만 추린 뒤 step-like 객체로 반환
@@ -208,21 +179,31 @@ export function SurveyResponseFlow({
     );
   const currentResponseId = useSurveyResponseStore((s) => s.currentResponseId);
 
-  // 설문 로딩 상태
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadedSurvey, setLoadedSurvey] = useState<Survey | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  // attrs 토큰 prefill — invite 매칭 시 contact_targets.attrs 로드
-  const [contactAttrs, setContactAttrs] = useState<Record<string, string>>({});
-  // requireInviteToken=true 설문에 invite 없이 접근 시 차단
-  const [showInviteRequired, setShowInviteRequired] = useState(false);
+  // responses 는 loader prefill(admin-edit) + handleResponse/handleSubmit 가 공유하므로
+  // 컴포넌트가 소유한다. loader 가 setResponses 를 인자로 받기 위해 loader 호출보다 먼저 선언.
+  const [responses, setResponses] = useState<ResponsesMap>({});
+
+  // 설문 로딩 상태 — loadedSurvey/loadError/isLoading/contactAttrs/showInviteRequired/versionId
+  // 와 설문 로딩 effect 를 useSurveyLoader 로 추출 (세터가 loader effect 전용이라 훅이 소유).
+  const {
+    isLoading,
+    loadedSurvey,
+    loadError,
+    contactAttrs,
+    showInviteRequired,
+    versionId,
+  } = useSurveyLoader({
+    identifier,
+    isAdminEdit,
+    adminContext,
+    inviteToken,
+    setResponses,
+  });
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [responses, setResponses] = useState<ResponsesMap>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [stepHistory, setStepHistory] = useState<number[]>([]);
-  const [versionId, setVersionId] = useState<string | null>(null);
 
   // 페이지 진입 시 1회 생성된 세션 식별자. 컴포넌트 수명 동안 안정적.
   // - createResponseWithFirstAnswer의 멱등성 키 (surveyId, sessionId)
@@ -232,9 +213,6 @@ export function SurveyResponseFlow({
   // INSERT 진행 중인지 추적 (첫 답변 동시 발사 시 중복 INSERT 방어).
   // ref가 아닌 state라도 OK — `handleResponse` 클로저에서 캡처되는 시점이 한 번이면 충분.
   const [isCreatingResponse, setIsCreatingResponse] = useState(false);
-  // recovery effect 가 resumeOrCreateResponse 를 await 하는 동안 true.
-  // handleResponse 의 INSERT 가드에서 참조해 recovery 완료 전 신규 INSERT 발사를 차단한다 (I-1).
-  const [isRecovering, setIsRecovering] = useState(false);
   // 제출 시도 후 하이라이트할 질문 ID 집합
   const [highlightQuestionIds, setHighlightQuestionIds] = useState<Set<string>>(
     () => new Set(),
@@ -254,140 +232,6 @@ export function SurveyResponseFlow({
   const [duplicateStatus, setDuplicateStatus] = useState<DuplicateStatus>(() =>
     isAdminEdit ? { kind: 'ok' } : { kind: 'checking' },
   );
-
-  // URL 식별자로 설문 조회
-  useEffect(() => {
-    const loadSurvey = async () => {
-      setIsLoading(true);
-      setLoadError(null);
-
-      try {
-        // admin-edit 분기 (1/8) — survey 로드: versionSnapshot 우선, fallback DB 조회.
-        // invite/requireInviteToken/attrs lookup 도 모두 건너뜀.
-        if (isAdminEdit && adminContext) {
-          const snapshot = adminContext.versionSnapshot;
-          if (snapshot) {
-            // snapshot 으로 직접 Survey 구성. lookups 는 T17 이후 snapshot 에 포함되므로 복원한다.
-            // T17 이전 publish 본은 snapshot.lookups 가 undefined → 빈 배열 (해당 시점 lookups 복원 불가, known limitation).
-            const builtSurvey: Survey = {
-              id: adminContext.surveyId,
-              title: snapshot.title,
-              ...(snapshot.description !== undefined
-                ? { description: snapshot.description }
-                : {}),
-              groups: snapshot.groups as QuestionGroup[],
-              questions: snapshot.questions as unknown as Question[],
-              settings: {
-                isPublic: snapshot.settings.isPublic,
-                allowMultipleResponses: snapshot.settings.allowMultipleResponses,
-                showProgressBar: snapshot.settings.showProgressBar,
-                shuffleQuestions: snapshot.settings.shuffleQuestions,
-                requireLogin: snapshot.settings.requireLogin,
-                ...(snapshot.settings.endDate
-                  ? { endDate: new Date(snapshot.settings.endDate) }
-                  : {}),
-                ...(snapshot.settings.maxResponses !== undefined ? { maxResponses: snapshot.settings.maxResponses } : {}),
-                thankYouMessage: snapshot.settings.thankYouMessage,
-                ...(snapshot.settings.requireInviteToken !== undefined ? { requireInviteToken: snapshot.settings.requireInviteToken } : {}),
-              },
-              lookups: (snapshot as { lookups?: Survey['lookups'] }).lookups ?? [],
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            };
-            setLoadedSurvey(builtSurvey);
-            setVersionId(null);
-          } else {
-            // snapshot 미존재 (published 이전 응답) → 현재 surveys 행 직접 사용.
-            const result = await client.surveyBuilder.publicRead.forResponse({
-              surveyId: adminContext.surveyId,
-            });
-            if (!result) {
-              setLoadError('요청하신 설문을 찾을 수 없습니다.');
-              setLoadedSurvey(null);
-            } else {
-              setLoadedSurvey(result.survey);
-              setVersionId(result.versionId);
-            }
-          }
-          // 초기 응답값 prefill — DB INSERT 없이 state 만 세팅.
-          setResponses(adminContext.initialResponses);
-          // 응답 당시 contact attrs 복원 — 조건/토큰 표시 평가에 사용.
-          setContactAttrs(adminContext.initialContactAttrs ?? {});
-          return;
-        }
-
-        const { type, value } = parsesurveyIdentifier(identifier);
-
-        let surveyId: string | null = null;
-
-        switch (type) {
-          case 'slug': {
-            const dbSurvey = await client.surveyBuilder.publicRead.bySlug({ slug: value });
-            if (dbSurvey) surveyId = dbSurvey.id;
-            break;
-          }
-          case 'privateToken': {
-            const dbSurvey = await client.surveyBuilder.publicRead.byPrivateToken({ token: value });
-            if (dbSurvey) {
-              surveyId = dbSurvey.id;
-            } else {
-              // UUID 형태지만 private_token 매칭 실패 — surveys.id 로 직접 시도.
-              // 단체 메일/컨택 응답 링크가 surveys.id 직접 URL을 사용하므로 호환 필요.
-              surveyId = value;
-            }
-            break;
-          }
-          case 'id':
-            surveyId = value;
-            break;
-        }
-
-        if (!surveyId) {
-          setLoadError('요청하신 설문을 찾을 수 없습니다.');
-          setLoadedSurvey(null);
-          return;
-        }
-
-        const result = await client.surveyBuilder.publicRead.forResponse({ surveyId });
-
-        if (!result) {
-          setLoadError('요청하신 설문을 찾을 수 없습니다.');
-          setLoadedSurvey(null);
-        } else if (!result.survey.settings.isPublic && type === 'slug') {
-          setLoadError('이 설문은 비공개 설문입니다. 올바른 링크로 접근해주세요.');
-          setLoadedSurvey(null);
-        } else {
-          setLoadedSurvey(result.survey);
-          setVersionId(result.versionId);
-
-          // requireInviteToken 체크 + attrs 로드
-          if (result.survey.settings.requireInviteToken && !inviteToken) {
-            setShowInviteRequired(true);
-          } else if (inviteToken) {
-            const attrs = await client.contacts.attrs.lookup({ surveyId, inviteToken });
-            if (attrs) {
-              setContactAttrs(attrs);
-            } else if (result.survey.settings.requireInviteToken) {
-              // 토큰 무효 + requireInviteToken → 차단
-              setShowInviteRequired(true);
-            }
-            // 토큰 무효 + requireInviteToken=false → 기존 amber alert (inviteIsInvalid)
-            // 만 노출. attrs 는 빈 Record 유지.
-          }
-        }
-      } catch (error) {
-        console.error('설문 로딩 오류:', error);
-        setLoadError('설문을 불러오는 중 오류가 발생했습니다.');
-        setLoadedSurvey(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadSurvey();
-    // adminContext 는 페이지 수명 동안 안정적 (부모에서 한 번만 생성) — deps 미포함
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identifier, isAdminEdit]);
 
   // 진입 시 중복 검사 — 설문 로드 + 신호 수집 완료 후 1회 실행
   // signals 가 null 인 동안 effect skip → state 채워지면 자동 재실행
@@ -534,155 +378,37 @@ export function SurveyResponseFlow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadedSurvey, currentStepIndex, currentStepQuestions.length]);
 
-  // 운영 현황 콘솔(T5): 스텝 전환 추적.
-  // - currentResponseId가 set된 이후(첫 답변 후)에만 동작
-  // - 동일 stepId면 서버에서 no-op (멱등)
-  // - 실패는 사용자 흐름을 막지 않고 콘솔에만 남긴다 (best-effort)
-  // admin-edit 분기 (3/8) — 어드민 수정은 lastActivityAt 의미가 없고
-  // saveAdminEdit 이 currentStepId 를 null 로 재설정하므로 step 추적 자체를 끈다.
-  useEffect(() => {
-    if (isAdminEdit) return;
-    if (currentResponseId === null) return;
-    if (!currentStep) return;
-    const nextStepId = stepIdOf(currentStep);
-    client.surveyResponse.lifecycle
-      .stepVisit({
-        responseId: currentResponseId,
-        nextStepId,
-        visibleStepIndex: visibleProgressRef.current.index,
-        visibleStepTotal: visibleProgressRef.current.total,
-      })
-      .catch((err) => {
-        console.error('recordStepVisit 실패:', err);
-      });
-  }, [isAdminEdit, currentResponseId, currentStep]);
+  // 운영 현황 콘솔(T5/세그먼트): 스텝 전환 추적 + Page Visibility 세그먼트.
+  // 두 effect 를 useResponseTelemetry 로 추출 (등록 순서·deps 동일, 상태 미소유).
+  useResponseTelemetry({
+    isAdminEdit,
+    currentResponseId,
+    currentStep,
+    isCompleted,
+    visibleProgressRef,
+  });
 
-  // 운영 현황 콘솔: Page Visibility 세그먼트.
-  // - 탭이 숨겨질 때(hidden/pagehide) 현재 visit을 닫고, 다시 보일 때(visible) 새 visit을 연다.
-  // - within-page idle(탭 닫고 떠난 시간)을 pageVisits에서 분리 → 소요시간/체류시간 정확화.
-  // - hide는 sendBeacon(탭 닫힘에도 전송), show는 fetch(keepalive).
-  useEffect(() => {
-    if (isAdminEdit) return;
-    if (currentResponseId === null) return;
-    if (isCompleted) return;
-    const rid = currentResponseId;
-
-    const onVisibility = () => {
-      if (document.visibilityState === 'hidden') sendVisibilitySegment(rid, 'hide', true);
-      else sendVisibilitySegment(rid, 'show');
-    };
-    const onPageHide = () => sendVisibilitySegment(rid, 'hide', true);
-
-    document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('pagehide', onPageHide);
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('pagehide', onPageHide);
-    };
-  }, [isAdminEdit, currentResponseId, isCompleted]);
-
-  // 운영 현황 콘솔(T6): localStorage 기반 응답 회복.
-  // - 진입 시 1회 실행 (loadedSurvey 로드 완료 + currentResponseId 가 아직 null 일 때)
-  // - localStorage에 saved sessionId 가 있으면 resumeOrCreateResponse 호출
-  // - drop → in_progress 회복 시 sessionId/currentResponseId 갱신 + 토스트
-  // - 종결 상태이거나 orphan(DB row 없음)이면 키 정리
-  // - dep array에 sessionId 자체는 넣지 않는다 (saved 값을 effect 내부에서 직접 set → 무한 루프 방지)
-  const [resumeMessage, setResumeMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    // admin-edit 분기 (4/8) — localStorage 회복은 응답자 세션 전용이므로 건너뜀.
-    if (isAdminEdit) return;
-    if (!loadedSurvey || currentResponseId !== null) return;
-
-    const key = sessionStorageKey(loadedSurvey.id);
-    const savedSessionId = window.localStorage.getItem(key);
-    if (!savedSessionId) return;
-
-    setIsRecovering(true);
-    client.surveyResponse.lifecycle.resume({
-      surveyId: loadedSurvey.id,
-      sessionId: savedSessionId,
-      ...(inviteToken != null ? { inviteToken } : {}),
-    })
-      .then((result) => {
-        if (!result) {
-          // localStorage 키는 있는데 DB에 row 없음 — orphan, 정리
-          window.localStorage.removeItem(key);
-          return;
-        }
-        // 종결 상태(completed/screened/quotaful/bad)면 회복 안 시키고 새 응답 흐름 둔다
-        if (result.status !== 'in_progress') {
-          window.localStorage.removeItem(key);
-          return;
-        }
-        // 응답 row 사용 — sessionId 를 saved 값으로 갱신해 DB row 와 일치시킨다
-        setSessionId(savedSessionId);
-        setCurrentResponseId(result.id);
-        // 회복 직후 새 visit 열기 — recordStepVisit은 동일 step 재진입 시 no-op이라 의존 불가.
-        sendVisibilitySegment(result.id, 'show');
-        // 회복된 경우(drop → in_progress)만 토스트
-        if (result.resumed) {
-          setResumeMessage('이전 응답을 이어서 진행합니다');
-        }
-      })
-      .catch((err) => {
-        console.error('응답 회복 실패:', err);
-      })
-      .finally(() => {
-        setIsRecovering(false);
-      });
-  }, [isAdminEdit, loadedSurvey, currentResponseId, setCurrentResponseId, inviteToken]);
-
-  // 회복 토스트 자동 dismiss (4초)
-  useEffect(() => {
-    if (!resumeMessage) return;
-    const timer = setTimeout(() => setResumeMessage(null), 4000);
-    return () => clearTimeout(timer);
-  }, [resumeMessage]);
+  // 운영 현황 콘솔(T6): localStorage 기반 응답 회복 + 회복 토스트 자동 dismiss.
+  // 회복 effect + dismiss effect 와 isRecovering/resumeMessage state 를
+  // useSessionRecovery 로 추출 (두 effect 등록 순서·deps 동일, 세터 전용이라 훅이 소유).
+  // isRecovering 은 handleResponse 의 INSERT 가드(I-1)에서 참조한다.
+  const { isRecovering, resumeMessage } = useSessionRecovery({
+    isAdminEdit,
+    loadedSurvey,
+    currentResponseId,
+    inviteToken,
+    setSessionId,
+    setCurrentResponseId,
+  });
 
   const hasPreviousDisplayable = stepHistory.length > 0;
 
   const isQuestionRequired = (question: Question) => question.required;
 
+  // 타입별 응답 충족 판정은 순수 함수(isQuestionAnswered)로 추출.
+  // 원본 useCallback 의 [responses] deps 를 유지해 참조 안정성(answeredCount/requiredRemaining/handleSubmit) 보존.
   const isQuestionAnswered = useCallback(
-    (question: Question) => {
-      const response = responses[question.id];
-      if (response === undefined || response === null) return false;
-
-      switch (question.type) {
-        case 'notice':
-          if (!question.requiresAcknowledgment) return true;
-          if (
-            response &&
-            typeof response === 'object' &&
-            'agreed' in (response as Record<string, unknown>)
-          )
-            return (response as { agreed: boolean }).agreed;
-          return response === true;
-        case 'text':
-        case 'textarea':
-          return typeof response === 'string' && response.trim().length > 0;
-        case 'radio':
-        case 'select':
-          return response !== null && response !== undefined && response !== '';
-        case 'checkbox':
-          if (!Array.isArray(response) || response.length === 0) return false;
-          if (question.minSelections !== undefined && question.minSelections > 0) {
-            return response.length >= question.minSelections;
-          }
-          return true;
-        case 'multiselect':
-          return Array.isArray(response) && response.length > 0;
-        case 'table':
-          return (
-            typeof response === 'object' &&
-            response !== null &&
-            Object.keys(response as Record<string, unknown>).length > 0
-          );
-        default:
-          return true;
-      }
-    },
+    (question: Question) => isQuestionAnsweredPure(question, responses[question.id]),
     [responses],
   );
 
