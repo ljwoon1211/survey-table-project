@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 
 import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle, Loader2, Lock } from 'lucide-react';
 
-import { client } from '@/shared/lib/rpc';
 import { AlreadyRespondedView } from '@/components/survey/already-responded-view';
 import { InviteRequiredScreen } from '@/components/survey-response/invite-required-screen';
 import { MobileBottomNav } from '@/components/survey-response/mobile-bottom-nav';
@@ -28,10 +27,8 @@ import {
   StepItem,
 } from '@/lib/group-ordering';
 import { isQuestionAnswered as isQuestionAnsweredPure } from '@/lib/survey/answer-validation';
-import {
-  useResponseLifecycle,
-  type DuplicateStatus,
-} from '@/components/survey-response/hooks/use-response-lifecycle';
+import { useDuplicateGuard } from '@/components/survey-response/hooks/use-duplicate-guard';
+import { useResponseLifecycle } from '@/components/survey-response/hooks/use-response-lifecycle';
 import { useResponseTelemetry } from '@/components/survey-response/hooks/use-response-telemetry';
 import { useSessionRecovery } from '@/components/survey-response/hooks/use-session-recovery';
 import { useSurveyLoader } from '@/components/survey-response/hooks/use-survey-loader';
@@ -222,44 +219,16 @@ export function SurveyResponseFlow({
   // null 이면 아직 수집 전. 수집 완료 후 듀얼 effect (duplicate check, callsite) 재트리거
   const signals = useClientSignals();
 
-  // DuplicateStatus 타입은 useResponseLifecycle 과 공유한다(handleResponse/handleSubmit 가 blocked 로 set).
-  // admin-edit 분기 (8/8) — 어드민 수정은 중복검사 대상이 아니므로 초기값부터 ok.
-  const [duplicateStatus, setDuplicateStatus] = useState<DuplicateStatus>(() =>
-    isAdminEdit ? { kind: 'ok' } : { kind: 'checking' },
-  );
-
-  // 진입 시 중복 검사 — 설문 로드 + 신호 수집 완료 후 1회 실행
-  // signals 가 null 인 동안 effect skip → state 채워지면 자동 재실행
-  // admin-edit 분기 (2/8) — 어드민 수정 모드에서는 검사 자체를 건너뜀 (초기값이 이미 ok)
-  useEffect(() => {
-    if (isAdminEdit) return;
-    if (!loadedSurvey?.id || !signals) return;
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const r = await client.surveyResponse.duplicate.checkOnEntry({
-          surveyId: loadedSurvey.id,
-          ...(inviteToken != null ? { inviteToken } : {}),
-          clientSignals: signals,
-        });
-        if (cancelled) return;
-        if (r.blocked) {
-          setDuplicateStatus({ kind: 'blocked', reason: r.reason });
-        } else {
-          setDuplicateStatus({ kind: 'ok' });
-        }
-      } catch (err) {
-        // 검사 실패 시 통과 가정 (best-effort) — 첫 답변에서 다시 검사됨
-        console.error('checkDuplicateOnEntry 실패', err);
-        if (!cancelled) setDuplicateStatus({ kind: 'ok' });
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isAdminEdit, loadedSurvey?.id, inviteToken, signals]);
+  // 진입 시 중복 감지 가드 — duplicateStatus state 초기화 + checkOnEntry effect 를
+  // useDuplicateGuard 로 추출 (초기값 admin-edit 분기·effect 가드/페이로드/cleanup·deps 동일).
+  // signals 는 컴포넌트가 소유(useResponseLifecycle 도 사용)하고 양쪽 훅에 인자로 전달한다.
+  // 반환 setDuplicateStatus 는 useResponseLifecycle 에도 그대로 넘겨 INSERT blocked 결과를 set 한다.
+  const { duplicateStatus, setDuplicateStatus } = useDuplicateGuard({
+    isAdminEdit,
+    loadedSurvey,
+    inviteToken,
+    signals,
+  });
 
   // 운영 현황 콘솔(T5): 페이지 진입 시 DB INSERT를 더 이상 하지 않는다.
   // 첫 답변 시점에 createResponseWithFirstAnswer로 행을 생성한다 (handleResponse 참고).

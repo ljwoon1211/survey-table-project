@@ -10,17 +10,13 @@ import { shouldDisplayDynamicGroup, shouldDisplayQuestion, shouldDisplayRow } fr
 import type { SaveAdminEditPayload } from '@/features/survey-response/domain/response-edit';
 
 import { sessionStorageKey } from './session-helpers';
+import type { DuplicateStatus } from './use-duplicate-guard';
 
 type ResponsesMap = Record<string, unknown>;
 
-/**
- * 응답 흐름의 중복 차단 상태. 컴포넌트가 소유(렌더 분기)하지만
- * handleResponse/handleSubmit 가 blocked 로 set 하므로 타입을 공유한다.
- */
-export type DuplicateStatus =
-  | { kind: 'checking' }
-  | { kind: 'blocked'; reason: import('@/lib/duplicate-detection/types').BlockReason }
-  | { kind: 'ok' };
+// DuplicateStatus 타입은 use-duplicate-guard 가 소유한다(진입 시 중복검사의 주 소유자).
+// handleResponse/handleSubmit 가 blocked 로 set 하므로 여기서 re-export 해 기존 import 경로를 유지한다.
+export type { DuplicateStatus };
 
 /**
  * survey-response-flow.tsx 의 admin-edit 전용 컨텍스트. handleSubmit 의 admin-edit 분기에서 소비.
