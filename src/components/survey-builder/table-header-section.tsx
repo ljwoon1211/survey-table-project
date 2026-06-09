@@ -15,6 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
+import { useSurveyUIStore } from '@/stores/ui-store';
 import { TableColumn } from '@/types/survey';
 import { getGridSpanStyle } from '@/utils/table-grid-utils';
 
@@ -269,8 +270,9 @@ export const TableHeaderSection = React.memo(function TableHeaderSection({
   onColumnWidthChange,
   onOpenColumnConditionModal,
 }: TableHeaderSectionProps) {
+  const editingQuestionId = useSurveyUIStore((s) => s.editingQuestionId);
   const hideColumnLabels = useSurveyBuilderStore(
-    (s) => s.currentSurvey.questions.find((q) => q.id === s.editingQuestionId)?.hideColumnLabels ?? false,
+    (s) => s.currentSurvey.questions.find((q) => q.id === editingQuestionId)?.hideColumnLabels ?? false,
   );
 
   return (
