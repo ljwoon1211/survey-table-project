@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { generateId } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
+import { useSurveyUIStore } from '@/stores/ui-store';
 import { DynamicRowGroupConfig, HeaderCell, QuestionConditionGroup, TableCell, TableColumn, TableRow } from '@/types/survey';
 
 import { BulkGeneratorModal, BulkColumnDef } from './bulk-generator';
@@ -50,9 +51,9 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
   // 기존 단일 객체 → 배열 마이그레이션 호환
   const dynamicRowConfigs = Array.isArray(rawConfigs) ? rawConfigs : [];
   const hasQuestions = useSurveyBuilderStore((s) => s.currentSurvey.questions.length > 0);
-  const editingQuestionId = useSurveyBuilderStore((s) => s.editingQuestionId);
+  const editingQuestionId = useSurveyUIStore((s) => s.editingQuestionId);
   const hideColumnLabels = useSurveyBuilderStore(
-    (s) => s.currentSurvey.questions.find((q) => q.id === s.editingQuestionId)?.hideColumnLabels ?? false,
+    (s) => s.currentSurvey.questions.find((q) => q.id === editingQuestionId)?.hideColumnLabels ?? false,
   );
   const silentUpdateQuestion = useSurveyBuilderStore((s) => s.silentUpdateQuestion);
   const { state, actions } = useTableEditor(props);
@@ -167,7 +168,7 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
   // ── 그룹 조건 모달 상태 ──
   const [editingGroupCondition, setEditingGroupCondition] = useState<DynamicRowGroupConfig | null>(null);
   const currentQuestion = useSurveyBuilderStore(
-    (s) => s.currentSurvey.questions.find((q) => q.id === s.editingQuestionId),
+    (s) => s.currentSurvey.questions.find((q) => q.id === editingQuestionId),
   );
 
   const handleUpdateGroupCondition = useCallback(
