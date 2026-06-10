@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { SPSSExportColumn } from '@/lib/analytics/spss-excel-export';
 import { generateSavBuffer } from '@/lib/spss/sav-builder';
-import { assertValidSpssVarNames, SpssVarNameError } from '@/lib/spss/variable-name-guard';
+import { assertValidSpssVarNames, isSpssVarNameError, SpssVarNameError } from '@/lib/spss/variable-name-guard';
 import { validateSpssVarName } from '@/lib/spss/variable-validator';
 import type { Question } from '@/types/survey';
 import { sanitizeSpssVarName } from '@/utils/spss-var-name';
@@ -87,5 +87,32 @@ describe('generateSavBuffer 가드 연결', () => {
     } as unknown as Question;
 
     await expect(generateSavBuffer([question], [])).rejects.toThrow(SpssVarNameError);
+  });
+});
+
+describe('isSpssVarNameError - 구조 판별', () => {
+  it('자기 모듈 인스턴스를 판별한다', () => {
+    try {
+      assertValidSpssVarNames([makeCol('Q-1')]);
+      expect.unreachable('던져야 한다');
+    } catch (e) {
+      expect(isSpssVarNameError(e)).toBe(true);
+    }
+  });
+
+  it('다른 모듈 그래프에서 생성된 동형 에러도 판별한다 - dev HMR instanceof 어긋남 대응', () => {
+    const foreign = Object.assign(new Error('SPSS 변수명 오류 1건'), {
+      name: 'SpssVarNameError',
+      issues: [{ varName: 'Q-1', questionText: '질문', reason: '허용되지 않는 문자' }],
+    });
+    expect(foreign instanceof SpssVarNameError).toBe(false);
+    expect(isSpssVarNameError(foreign)).toBe(true);
+  });
+
+  it('일반 에러와 비에러 값은 거부한다', () => {
+    expect(isSpssVarNameError(new Error('boom'))).toBe(false);
+    expect(isSpssVarNameError(Object.assign(new Error('x'), { name: 'SpssVarNameError' }))).toBe(false);
+    expect(isSpssVarNameError(null)).toBe(false);
+    expect(isSpssVarNameError('SpssVarNameError')).toBe(false);
   });
 });

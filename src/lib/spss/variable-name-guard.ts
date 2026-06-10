@@ -25,6 +25,20 @@ export class SpssVarNameError extends Error {
 }
 
 /**
+ * SpssVarNameError 구조 판별. instanceof는 Next.js dev의 HMR 재평가나
+ * 정적/동적 import 그래프 이중 인스턴스화로 클래스 identity가 어긋나
+ * 실패할 수 있으므로(route는 정적, sav-builder는 동적 import), name과
+ * issues 형태로 판별한다.
+ */
+export function isSpssVarNameError(error: unknown): error is SpssVarNameError {
+  return (
+    error instanceof Error
+    && error.name === 'SpssVarNameError'
+    && Array.isArray((error as SpssVarNameError).issues)
+  );
+}
+
+/**
  * .sav 생성 전 전체 변수명을 검증한다. 침묵 치환 대신 명시적 에러.
  * - SPSS 규격 위반(validateSpssVarName: 영문 시작, 영문/숫자/밑줄, 64자, 예약어)
  * - 대소문자 무시 중복
