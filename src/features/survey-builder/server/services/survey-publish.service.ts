@@ -5,6 +5,9 @@ import { and, desc, eq } from 'drizzle-orm';
 import { getSurveyWithDetails } from '@/data/surveys';
 import { db } from '@/db';
 import { surveys, surveyVersions, type SurveyVersionSnapshot } from '@/db/schema';
+import { generateSPSSColumns } from '@/lib/analytics/spss-excel-export';
+import { hydrateQuestionsForSpss } from '@/lib/spss/hydrate-questions';
+import { assertValidSpssVarNames } from '@/lib/spss/variable-name-guard';
 import { buildSurveySnapshot } from '@/lib/versioning/snapshot-builder';
 
 import type {
@@ -33,6 +36,14 @@ export async function publishSurvey(
   if (!surveyData.questions || surveyData.questions.length === 0) {
     throw new Error('질문이 없는 설문은 배포할 수 없습니다.');
   }
+
+  // 변수명 게이트: 깨진 이름은 배포 단계에서 차단 (export 400보다 앞선 방어선)
+  // 주의: export route(raw db.query)와 질문 fetch 경로가 다르지만 검증 체인
+  // (hydrateQuestionsForSpss -> generateSPSSColumns -> assert)은 동일해야 한다.
+  // 어느 한쪽 fetch가 질문을 필터링/변형하게 바뀌면 두 게이트가 silent하게 어긋난다.
+  assertValidSpssVarNames(
+    generateSPSSColumns(hydrateQuestionsForSpss(surveyData.questions)),
+  );
 
   const snapshot = buildSurveySnapshot(surveyData);
 

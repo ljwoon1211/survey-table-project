@@ -5,6 +5,7 @@ export { useTestResponseStore } from './test-response-store';
 export { useSurveyListStore } from './survey-list-store';
 export { useSurveyResponseStore } from './survey-response-store';
 export { useQuestionLibraryStore } from './question-library-store';
+export { useErrorDialogStore } from './error-dialog-store';
 
 // 타입 export
 export type { SurveyListItem } from './survey-list-store';
