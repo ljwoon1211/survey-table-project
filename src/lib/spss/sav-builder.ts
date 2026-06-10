@@ -75,9 +75,10 @@ function buildValueLabels(
     case 'table-cell': {
       if (col.tableCellType === 'input') return undefined;
 
-      // checkbox 옵션별 분리: 해당 옵션의 코드만
+      // checkbox 옵션별 분리: 해당 옵션의 코드만 (컬럼 메타 우선, 폴백 역참조)
       if (col.tableCellType === 'checkbox' && col.optionIndex != null) {
-        const cellOpts = findTableCellOptions(question, col.tableCellId, 'checkbox');
+        const cellOpts = col.cellOptions
+          ?? findTableCellOptions(question, col.tableCellId, 'checkbox');
         const code = cellOpts?.[col.optionIndex]?.spssNumericCode ?? col.optionIndex + 1;
         return [{ value: code, label: '선택' }];
       }
