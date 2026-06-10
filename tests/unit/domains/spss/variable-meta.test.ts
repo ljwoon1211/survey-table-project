@@ -49,7 +49,7 @@ describe('resolveVarType 폴백 체인', () => {
 
 describe('resolveMeasure 폴백 체인', () => {
   // radio-group은 sav-builder 구현상 Ordinal이므로 이 묶음에서 제외한다.
-  // (Likert 등 매트릭스 단일선택 변수는 순서척도로 취급 — 119행 참조)
+  // radio-group (Likert 등 매트릭스 단일선택)은 순서척도가 분석 기본값
   it('categorical 컬럼 기본은 Nominal이다 — Scale로 새면 CTABLES가 카테고리를 안 그린다', () => {
     for (const type of ['single', 'checkbox-item', 'table-cell'] as const) {
       expect(resolveMeasure(makeCol({ type }), makeQuestion({}))).toBe(VariableMeasure.Nominal);
@@ -68,6 +68,16 @@ describe('resolveMeasure 폴백 체인', () => {
   it('셀 spssMeasure 오버라이드가 최우선이다', () => {
     const col = makeCol({ type: 'table-cell', cellSpssMeasure: 'Ordinal' });
     expect(resolveMeasure(col, makeQuestion({}))).toBe(VariableMeasure.Ordinal);
+  });
+
+  it('질문 spssMeasure 오버라이드가 2순위다', () => {
+    const col = makeCol({ type: 'single' });
+    expect(resolveMeasure(col, makeQuestion({ spssMeasure: 'Continuous' }))).toBe(VariableMeasure.Continuous);
+  });
+
+  it('numericText text 컬럼은 Continuous이다', () => {
+    const col = makeCol({ type: 'text', numericText: true });
+    expect(resolveMeasure(col, makeQuestion({ type: 'text' }))).toBe(VariableMeasure.Continuous);
   });
 });
 
