@@ -14,8 +14,7 @@ import {
 } from '@/lib/analytics/split-export';
 import { generateSPSSColumns } from '@/lib/analytics/spss-excel-export';
 import type { Question } from '@/types/survey';
-import { generateAllOptionCodes } from '@/utils/option-code-generator';
-import { generateAllCellCodes } from '@/utils/table-cell-code-generator';
+import { hydrateQuestionsForSpss } from '@/lib/spss/hydrate-questions';
 
 export const maxDuration = 30;
 
@@ -34,19 +33,10 @@ export async function GET(
     });
     if (!surveyData) return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
 
-    // 셀/옵션 코드 hydrate (export/route.ts와 동일 패턴)
-    for (const q of surveyData.questions) {
-      if (q.type === 'table' && q.tableRowsData && q.tableColumns) {
-        (q as any).tableRowsData = generateAllCellCodes(
-          q.questionCode ?? undefined, q.title, q.tableColumns as any, q.tableRowsData as any,
-        );
-      }
-      if ((q as any).options && ['radio', 'checkbox', 'select', 'multiselect'].includes(q.type)) {
-        (q as any).options = generateAllOptionCodes((q as any).options);
-      }
-    }
-
-    const questions = surveyData.questions as unknown as Question[];
+    // 셀/옵션 코드 hydrate (export/route.ts와 공용 헬퍼)
+    const questions = hydrateQuestionsForSpss(
+      surveyData.questions as unknown as Question[],
+    );
 
     if (!basis) {
       const totalVars = generateSPSSColumns([...questions].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))).length;

@@ -46,4 +46,19 @@ describe('hydrateQuestionsForSpss', () => {
     const out = hydrateQuestionsForSpss(input);
     expect(out).not.toBe(input);
   });
+
+  it('multiselect 질문의 optionCode도 복원한다', () => {
+    const question = {
+      id: 'q4',
+      type: 'multiselect',
+      title: '질문',
+      required: false,
+      order: 1,
+      questionCode: 'Q4',
+      options: [{ id: 'o1', label: '보기1', value: 'o1' }],
+    } as unknown as Question;
+
+    const [hydrated] = hydrateQuestionsForSpss([question]);
+    expect(hydrated!.options?.[0]?.optionCode).toBeTruthy();
+  });
 });
