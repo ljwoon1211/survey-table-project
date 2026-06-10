@@ -9,7 +9,7 @@ import { requireAuth } from '@/lib/auth';
 import { generateRawDataWorkbook, type RawExportResponseRow } from '@/lib/analytics/raw-workbook';
 import { buildSplitWorkbook } from '@/lib/analytics/split-workbook';
 import { planSplit } from '@/lib/analytics/split-export';
-import { SpssVarNameError } from '@/lib/spss/variable-name-guard';
+import { isSpssVarNameError } from '@/lib/spss/variable-name-guard';
 import { Question, SurveySubmission } from '@/types/survey';
 import { generateAllOptionCodes } from '@/utils/option-code-generator';
 import { generateAllCellCodes } from '@/utils/table-cell-code-generator';
@@ -258,7 +258,9 @@ export async function GET(
     if (error instanceof Error && error.message === '인증이 필요합니다.') {
       return NextResponse.json({ error: '권한 없음' }, { status: 401 });
     }
-    if (error instanceof SpssVarNameError) {
+    // instanceof 금지: sav-builder가 동적 import라 dev HMR/이중 그래프에서
+    // 클래스 identity가 어긋나 분기를 놓치고 500으로 빠진다. 구조 판별 사용.
+    if (isSpssVarNameError(error)) {
       return NextResponse.json(
         { error: error.message, issues: error.issues },
         { status: 400 },
