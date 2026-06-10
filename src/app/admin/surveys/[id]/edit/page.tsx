@@ -26,9 +26,12 @@ import {
   Table,
   Type,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useShallow } from 'zustand/react/shallow';
 
 import { client } from '@/shared/lib/rpc';
+import type { VarNameIssue } from '@/lib/spss/variable-name-guard';
+import { useErrorDialogStore } from '@/stores/error-dialog-store';
 import { ImportExportLibraryModal } from '@/components/survey-builder/import-export-library-modal';
 import { QuestionLibraryPanel } from '@/components/survey-builder/question-library-panel';
 import { SaveQuestionModal } from '@/components/survey-builder/save-question-modal';
@@ -325,7 +328,7 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
       if (message.includes('이미 사용 중인 URL') || message.includes('slug_unique') || message.includes('23505')) {
         setSlugError('이미 사용 중인 URL입니다. 다른 URL을 입력해주세요.');
       } else {
-        alert('설문 저장에 실패했습니다. 다시 시도해주세요.');
+        toast.error('설문 저장에 실패했습니다. 다시 시도해주세요.');
       }
     }
   };
@@ -346,9 +349,18 @@ export default function EditSurveyPage({ params }: EditSurveyPageProps) {
 
       const version = await client.surveyBuilder.publish.publish({ surveyId });
       markPublished();
-      alert(`설문이 배포되었습니다. (버전 ${version.versionNumber})`);
+      toast.success(`설문이 배포되었습니다. 버전 ${version.versionNumber}`);
     } catch (error) {
-      alert(`배포 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+      const issues = (error as { data?: { issues?: VarNameIssue[] } })?.data?.issues;
+      if (issues && issues.length > 0) {
+        useErrorDialogStore.getState().show({
+          title: 'SPSS 변수명 오류로 배포가 중단되었습니다',
+          description: '빌더에서 해당 변수명을 수정한 뒤 다시 배포하세요.',
+          issues,
+        });
+      } else {
+        toast.error(`배포 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+      }
     } finally {
       setIsPublishing(false);
     }
