@@ -9,6 +9,7 @@ import { requireAuth } from '@/lib/auth';
 import { generateRawDataWorkbook, type RawExportResponseRow } from '@/lib/analytics/raw-workbook';
 import { buildSplitWorkbook } from '@/lib/analytics/split-workbook';
 import { planSplit } from '@/lib/analytics/split-export';
+import { SpssVarNameError } from '@/lib/spss/variable-name-guard';
 import { Question, SurveySubmission } from '@/types/survey';
 import { generateAllOptionCodes } from '@/utils/option-code-generator';
 import { generateAllCellCodes } from '@/utils/table-cell-code-generator';
@@ -256,6 +257,12 @@ export async function GET(
   } catch (error) {
     if (error instanceof Error && error.message === '인증이 필요합니다.') {
       return NextResponse.json({ error: '권한 없음' }, { status: 401 });
+    }
+    if (error instanceof SpssVarNameError) {
+      return NextResponse.json(
+        { error: error.message, issues: error.issues },
+        { status: 400 },
+      );
     }
     console.error('Export Error:', error);
     return NextResponse.json(

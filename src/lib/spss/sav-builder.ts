@@ -14,6 +14,7 @@ import type { Question, QuestionOption, SurveySubmission } from '@/types/survey'
 
 import { buildDataRows, generateSPSSColumns, SPSSExportColumn } from '@/lib/analytics/spss-excel-export';
 import { buildLabel, resolveMeasure, resolveVarType } from '@/lib/spss/variable-meta';
+import { assertValidSpssVarNames } from '@/lib/spss/variable-name-guard';
 import { resolveChoiceOptions } from '@/utils/choice-source';
 import { toSpssValueLabelPairs } from '@/utils/ranking-source';
 import { sanitizeSpssVarName } from '@/utils/spss-var-name';
@@ -249,6 +250,8 @@ export async function generateSavBuffer(
   submissions: SurveySubmission[],
 ): Promise<Buffer> {
   const columns = generateSPSSColumns(questions);
+  // 변수명 가드: invalid/중복이면 명시적 에러 (silent 치환 금지 — C1 차단)
+  assertValidSpssVarNames(columns);
   const dataRows = buildDataRows(columns, questions, submissions);
 
   const questionMap = new Map(questions.map((q) => [q.id, q]));
