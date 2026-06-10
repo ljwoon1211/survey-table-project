@@ -38,6 +38,9 @@ export async function publishSurvey(
   }
 
   // 변수명 게이트: 깨진 이름은 배포 단계에서 차단 (export 400보다 앞선 방어선)
+  // 주의: export route(raw db.query)와 질문 fetch 경로가 다르지만 검증 체인
+  // (hydrateQuestionsForSpss -> generateSPSSColumns -> assert)은 동일해야 한다.
+  // 어느 한쪽 fetch가 질문을 필터링/변형하게 바뀌면 두 게이트가 silent하게 어긋난다.
   assertValidSpssVarNames(
     generateSPSSColumns(hydrateQuestionsForSpss(surveyData.questions)),
   );
