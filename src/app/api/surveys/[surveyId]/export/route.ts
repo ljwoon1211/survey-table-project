@@ -17,7 +17,7 @@ import { generateAllCellCodes } from '@/utils/table-cell-code-generator';
 // Vercel serverless 최대 실행시간 30초 (기본 10초)
 export const maxDuration = 30;
 
-const ALLOWED_EXPORT_TYPES = ['sav', 'raw', 'raw-split'] as const;
+const ALLOWED_EXPORT_TYPES = ['sav', 'raw', 'raw-split', 'sps'] as const;
 type ExportType = (typeof ALLOWED_EXPORT_TYPES)[number];
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -63,7 +63,7 @@ export async function GET(
     // raw/raw-split는 자체 모수와 가드를 별도로 가지므로 이 블록을 건너뛴다.
     let responses: typeof surveyResponses.$inferSelect[] = [];
 
-    if (type !== 'raw' && type !== 'raw-split') {
+    if (type !== 'raw' && type !== 'raw-split' && type !== 'sps') {
       const totalRows = await db
         .select({ total: count() })
         .from(surveyResponses)
@@ -85,6 +85,26 @@ export async function GET(
 
     const dateSlice = new Date().toISOString().slice(0, 10);
     const safeTitle = encodeURIComponent(surveyData.title);
+
+    // 3-0. MRSETS .sps 문법 파일 (복수응답 세트 등록 - .sav 보조 파일)
+    if (type === 'sps') {
+      const { generateSPSSColumns } = await import('@/lib/analytics/spss-excel-export');
+      const { generateMrsetsSyntax } = await import('@/lib/spss/mrsets-syntax');
+      const questions = surveyData.questions as unknown as Question[];
+      const syntax = generateMrsetsSyntax(generateSPSSColumns(questions), questions);
+      if (syntax === null) {
+        return NextResponse.json(
+          { error: '복수응답(checkbox) 변수가 없어 MRSETS 문법을 생성할 항목이 없습니다.' },
+          { status: 400 },
+        );
+      }
+      return new NextResponse(syntax, {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${safeTitle}_MRSETS_${dateSlice}.sps"`,
+        },
+      });
+    }
 
     // 3. Raw Data xlsx
     if (type === 'raw') {
@@ -252,7 +272,7 @@ export async function GET(
       });
     }
 
-    // 도달 불가: ALLOWED_EXPORT_TYPES(sav/raw/raw-split)는 위에서 모두 처리됨
+    // 도달 불가: ALLOWED_EXPORT_TYPES(sav/raw/raw-split/sps)는 위에서 모두 처리됨
     return NextResponse.json({ error: '지원하지 않는 내보내기 형식입니다.' }, { status: 400 });
   } catch (error) {
     if (error instanceof Error && error.message === '인증이 필요합니다.') {
