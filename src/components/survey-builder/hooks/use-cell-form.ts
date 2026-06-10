@@ -65,6 +65,7 @@ export interface CellFormSetters {
   setChoiceLabel: (v: string) => void;
   setChoiceAllowTextInput: (v: boolean) => void;
   setChoiceBranchRule: (v: CellFormState['choiceBranchRule']) => void;
+  setChoiceGroupId: (v: string) => void;
   setHorizontalAlign: (v: 'left' | 'center' | 'right') => void;
   setMobileDisplay: (v: CellFormState['mobileDisplay']) => void;
   setVerticalAlign: (v: 'top' | 'middle' | 'bottom') => void;
@@ -139,6 +140,7 @@ export function useCellForm(cell: TableCell, isOpen: boolean): UseCellFormResult
       setChoiceLabel: set('choiceLabel'),
       setChoiceAllowTextInput: set('choiceAllowTextInput'),
       setChoiceBranchRule: set('choiceBranchRule'),
+      setChoiceGroupId: set('choiceGroupId'),
       setHorizontalAlign: set('horizontalAlign'),
       setMobileDisplay: set('mobileDisplay'),
       setVerticalAlign: set('verticalAlign'),

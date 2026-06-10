@@ -47,7 +47,8 @@ import { isValidUUID } from '@/lib/utils';
 import { generateId } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { useSurveyUIStore } from '@/stores/ui-store';
-import { TableCell } from '@/types/survey';
+import { ChoiceGroup, TableCell } from '@/types/survey';
+import { collectChoiceOptCells } from '@/utils/choice-source';
 import { isPartialNumericInput } from '@/utils/numeric-input';
 import { getMaxSpssCode } from '@/utils/option-code-generator';
 import { hasExistingOtherRankingCell } from '@/utils/ranking-source';
@@ -99,6 +100,10 @@ interface CellContentModalProps {
   rowLabel?: string | undefined;
   columnCode?: string | undefined;
   columnLabel?: string | undefined;
+  /** choice_opt 탭용: 질문 레벨 옵션 그룹 목록 (표시/편집용). 없으면 그룹 기능 비활성. */
+  choiceGroups?: ChoiceGroup[] | undefined;
+  /** choice_opt 그룹 변경 시 부모에게 통보 (prune 후 저장은 부모 책임) */
+  onChoiceGroupsChange?: ((groups: ChoiceGroup[]) => void) | undefined;
 }
 
 export function CellContentModal({
@@ -112,6 +117,8 @@ export function CellContentModal({
   rowLabel,
   columnCode,
   columnLabel,
+  choiceGroups: choiceGroupsProp,
+  onChoiceGroupsChange,
 }: CellContentModalProps) {
   const questions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
   const variableCatalog = useSurveyUIStore((s) => s.variableCatalog);
@@ -153,6 +160,7 @@ export function CellContentModal({
     choiceLabel,
     choiceAllowTextInput,
     choiceBranchRule,
+    choiceGroupId,
     horizontalAlign,
     mobileDisplay,
     verticalAlign,
@@ -196,6 +204,7 @@ export function CellContentModal({
     setChoiceLabel,
     setChoiceAllowTextInput,
     setChoiceBranchRule,
+    setChoiceGroupId,
     setHorizontalAlign,
     setMobileDisplay,
     setVerticalAlign,
@@ -210,6 +219,37 @@ export function CellContentModal({
     setSpssVarType,
     setSpssMeasure,
   } = setters;
+
+  // choice_opt 탭용 로컬 그룹 편집 상태.
+  // 부모에서 choiceGroupsProp 를 전달받으면 그 값으로, 아니면 스토어 질문의 choiceGroups 를 사용한다.
+  // 모달이 열릴 때(isOpen + cell.id 변경) 재동기화하기 위해 useState 초기값은 lazy initializer 로 설정하지 않고
+  // useEffect 로 동기화한다. (isOpen 이 꺼지면 닫는 시점이므로 재설정이 무해하다.)
+  const [editChoiceGroups, setEditChoiceGroups] = useState<ChoiceGroup[]>(
+    () => choiceGroupsProp ?? [],
+  );
+  useEffect(() => {
+    if (isOpen) {
+      const storeQuestion = useSurveyBuilderStore
+        .getState()
+        .currentSurvey.questions.find((q) => q.id === currentQuestionId);
+      setEditChoiceGroups(choiceGroupsProp ?? storeQuestion?.choiceGroups ?? []);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, cell?.id]);
+
+  // 현재 질문 tableRowsData 기반으로 그룹별 멤버 셀 수를 계산한다 (표시용).
+  // 아직 저장되지 않은 이번 편집 셀은 카운트에 반영되지 않아도 무방하다.
+  const groupMemberCounts = (() => {
+    const storeQuestion = questions.find((q) => q.id === currentQuestionId);
+    const allCells = collectChoiceOptCells(storeQuestion?.tableRowsData);
+    const counts: Record<string, number> = {};
+    for (const c of allCells) {
+      if (c.choiceGroupId) {
+        counts[c.choiceGroupId] = (counts[c.choiceGroupId] ?? 0) + 1;
+      }
+    }
+    return counts;
+  })();
 
   // 자동생성 셀코드/라벨 계산
   const autoCellCode = generateCellCode(questionCode, rowCode, columnCode);
@@ -262,6 +302,14 @@ export function CellContentModal({
       // 폼 상태를 저장될 TableCell 로 직렬화 (조건부 spread 로 optional 필드 처리).
       const updatedCell: TableCell = buildUpdatedCell(form, cell);
 
+      // choice_opt 탭에서 그룹 변경이 있었으면 정리 후 부모에게 통보.
+      // prune 은 updatedCell(이 셀 반영 후)의 rowsData 기준으로 계산해야 하지만,
+      // prune 함수가 question 전체를 인자로 받으므로 여기서는 editChoiceGroups 를 직접 전달한다.
+      // 실질적인 prune(빈 그룹 제거)은 dynamic-table-editor 의 onChoiceGroupsChange 핸들러에서 수행한다.
+      if (contentType === 'choice_opt') {
+        onChoiceGroupsChange?.(editChoiceGroups);
+      }
+
       // 로컬 스토어 업데이트 (셀 저장)
       onSave(updatedCell);
 
@@ -275,6 +323,19 @@ export function CellContentModal({
             cells: row.cells.map((c) => (c.id === cell.id ? updatedCell : c)),
           }));
 
+          // choice_opt 저장 시 choiceGroups 도 함께 저장한다.
+          // prune 은 updatedRowsData 기준으로 계산해 빈 그룹이 DB 에 남지 않도록 한다.
+          const prunedChoiceGroups = (() => {
+            if (contentType !== 'choice_opt' || editChoiceGroups.length === 0) return undefined;
+            const memberIds = new Set(
+              collectChoiceOptCells(updatedRowsData)
+                .map((c) => c.choiceGroupId)
+                .filter((id): id is string => !!id),
+            );
+            const pruned = editChoiceGroups.filter((g) => memberIds.has(g.id));
+            return pruned.length > 0 ? pruned : undefined;
+          })();
+
           try {
             await ensureSurvey();
 
@@ -282,7 +343,10 @@ export function CellContentModal({
               // 이미 DB에 저장된 질문: 업데이트
               await client.surveyBuilder.questions.update({
                 questionId: currentQuestionId,
-                data: { tableRowsData: updatedRowsData },
+                data: {
+                  tableRowsData: updatedRowsData,
+                  ...(prunedChoiceGroups !== undefined ? { choiceGroups: prunedChoiceGroups } : {}),
+                },
               });
               // store 도 동일 데이터로 동기화. 표시 조건/장기 계산식 picker 가
               // store 를 직접 구독하므로 누락 시 셀 라벨 변경이 stale 로 표시됨.
@@ -290,7 +354,13 @@ export function CellContentModal({
                 currentSurvey: {
                   ...state.currentSurvey,
                   questions: state.currentSurvey.questions.map((q) =>
-                    q.id === currentQuestionId ? { ...q, tableRowsData: updatedRowsData } : q,
+                    q.id === currentQuestionId
+                      ? {
+                          ...q,
+                          tableRowsData: updatedRowsData,
+                          ...(prunedChoiceGroups !== undefined ? { choiceGroups: prunedChoiceGroups } : {}),
+                        }
+                      : q,
                   ),
                 },
               }));
@@ -986,6 +1056,11 @@ export function CellContentModal({
               onBranchRuleChange={setChoiceBranchRule}
               allQuestions={questions}
               currentQuestionId={currentQuestionId}
+              choiceGroups={editChoiceGroups}
+              groupMemberCounts={groupMemberCounts}
+              choiceGroupId={choiceGroupId}
+              onChoiceGroupIdChange={setChoiceGroupId}
+              onChoiceGroupsChange={setEditChoiceGroups}
             />
           </TabsContent>
         </Tabs>

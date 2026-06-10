@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import { generateId } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { useSurveyUIStore } from '@/stores/ui-store';
-import { DynamicRowGroupConfig, HeaderCell, QuestionConditionGroup, TableCell, TableColumn, TableRow } from '@/types/survey';
+import { ChoiceGroup, DynamicRowGroupConfig, HeaderCell, QuestionConditionGroup, TableCell, TableColumn, TableRow } from '@/types/survey';
+import { pruneChoiceGroups } from '@/utils/choice-group-helpers';
 
 import { BulkGeneratorModal, BulkColumnDef } from './bulk-generator';
 import { CellContentModal } from './cell-content-modal';
@@ -753,6 +754,21 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
           columnCode={selectedCellContext.columnCode}
           columnLabel={selectedCellContext.columnLabel}
           cell={selectedCellContext.cell}
+          choiceGroups={currentQuestion?.choiceGroups}
+          onChoiceGroupsChange={(groups: ChoiceGroup[]) => {
+            if (!currentQuestionId) return;
+            // 셀 저장 이후 호출되므로 currentRows 는 이미 최신 상태.
+            // prune 은 최신 행 데이터 기준으로 계산한다.
+            const qAfter = {
+              ...currentQuestion!,
+              tableRowsData: currentRowsRef.current,
+              choiceGroups: groups,
+            };
+            const pruned = pruneChoiceGroups(qAfter);
+            silentUpdateQuestion(currentQuestionId, {
+              ...(pruned !== undefined ? { choiceGroups: pruned } : { choiceGroups: [] }),
+            });
+          }}
           onSave={(cell) => {
             if (selectedCellContext.rowIndex !== -1 && selectedCellContext.cellIndex !== -1) {
               updateCell(selectedCellContext.rowIndex, selectedCellContext.cellIndex, cell);

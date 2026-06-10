@@ -257,6 +257,20 @@ describe('buildUpdatedCell — 셀타입별 characterization', () => {
     expect(out.branchRule).toEqual({ ...branch, value: 'c1' });
   });
 
+  it('choice_opt: choiceGroupId 설정 시 저장되고 해제(빈 문자열) 시 키가 제거된다', () => {
+    const cellWithGroup: TableCell = { id: 'c1', type: 'choice_opt', content: '', choiceGroupId: 'g1' };
+
+    // 그룹 설정: choiceGroupId='g1'
+    const formSet: CellFormState = { ...baseForm('choice_opt'), choiceGroupId: 'g1' };
+    const outSet = buildUpdatedCell(formSet, baseCell);
+    expect(outSet.choiceGroupId).toBe('g1');
+
+    // 그룹 해제: choiceGroupId='' — 기존 셀에 choiceGroupId 가 있어도 키가 제거되어야 한다
+    const formRelease: CellFormState = { ...baseForm('choice_opt'), choiceGroupId: '' };
+    const outRelease = buildUpdatedCell(formRelease, cellWithGroup);
+    expect(outRelease).not.toHaveProperty('choiceGroupId');
+  });
+
   it('병합/정렬/textPosition/코드/라벨: 기본값은 키 제거, 비기본값만 저장', () => {
     const form: CellFormState = {
       ...baseForm('input'),
