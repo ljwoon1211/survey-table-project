@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Geist_Mono } from 'next/font/google';
 import { Toaster } from 'sonner';
 
+import { GlobalErrorDialog } from '@/components/ui/global-error-dialog';
 import { QueryProvider } from '@/components/providers/query-provider';
 
 import './globals.css';
@@ -53,6 +54,7 @@ export default function RootLayout({
       <body className={`${geistMono.variable} antialiased`} suppressHydrationWarning={true}>
         <QueryProvider>
           {children}
+          <GlobalErrorDialog />
           <Toaster
             position="top-right"
             gap={8}
