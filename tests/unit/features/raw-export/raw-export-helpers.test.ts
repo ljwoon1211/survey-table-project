@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { formatExcelDateTime, buildCodebookValueLabel } from '@/lib/analytics/raw-export-helpers';
+import { generateSPSSColumns } from '@/lib/analytics/spss-excel-export';
 import type { SPSSExportColumn } from '@/lib/analytics/spss-excel-export';
 import type { Question } from '@/types/survey';
 
@@ -44,5 +45,46 @@ describe('buildCodebookValueLabel', () => {
   it('텍스트는 빈 문자열', () => {
     const col = { type: 'text', questionId: 'q1', spssVarName: 'Q1' } as SPSSExportColumn;
     expect(buildCodebookValueLabel(col, qMap)).toBe('');
+  });
+});
+
+describe('테이블 checkbox 셀 코딩북 값 라벨 - spssNumericCode 반영', () => {
+  it('checkboxOptions의 spssNumericCode가 코딩북에 그대로 쓰인다', () => {
+    const question = {
+      id: 'tq1',
+      type: 'table',
+      title: '테이블 질문',
+      required: false,
+      order: 1,
+      questionCode: 'T1',
+      tableColumns: [{ id: 'c1', label: '열1' }],
+      tableRowsData: [
+        {
+          id: 'r1',
+          label: '행1',
+          cells: [
+            {
+              id: 'cell1',
+              content: '',
+              type: 'checkbox',
+              cellCode: 'T1_r1_c1',
+              checkboxOptions: [
+                { id: 'o1', label: '보기A', value: 'o1', spssNumericCode: 7 },
+              ],
+            },
+          ],
+        },
+      ],
+    } as unknown as Question;
+
+    const columns = generateSPSSColumns([question]);
+    const checkboxCol = columns.find(
+      (c) => c.tableCellType === 'checkbox' && c.optionIndex === 0,
+    );
+    expect(checkboxCol).toBeDefined();
+
+    const questionMap = new Map([[question.id, question]]);
+    // 수정 전 버그: cellOptions 미세팅이라 optionIndex+1=1로 오기재된다
+    expect(buildCodebookValueLabel(checkboxCol!, questionMap)).toBe('빈값=비선택, 7=선택');
   });
 });

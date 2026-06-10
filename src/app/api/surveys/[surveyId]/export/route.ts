@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { and, count, eq, inArray, isNull, ne } from 'drizzle-orm';
+import { and, count, eq, inArray } from 'drizzle-orm';
 
 import { db } from '@/db';
 import { contactTargets, surveyResponses, surveys } from '@/db/schema';
-import { notDeletedResponse } from '@/data/response-filters';
+import { completedResponse, notDeletedResponse } from '@/data/response-filters';
 import { requireAuth } from '@/lib/auth';
 import { generateRawDataWorkbook, type RawExportResponseRow } from '@/lib/analytics/raw-workbook';
 import { buildSplitWorkbook } from '@/lib/analytics/split-workbook';
 import { planSplit } from '@/lib/analytics/split-export';
+import { SpssVarNameError } from '@/lib/spss/variable-name-guard';
 import { Question, SurveySubmission } from '@/types/survey';
 import { generateAllOptionCodes } from '@/utils/option-code-generator';
 import { generateAllCellCodes } from '@/utils/table-cell-code-generator';
@@ -59,14 +60,14 @@ export async function GET(
     }
 
     // 2. 응답 데이터 조회 (sav 전용 공용 블록)
-    // raw/raw-split는 자체 모수(in_progress 제외)와 가드를 별도로 가지므로 이 블록을 건너뛴다.
+    // raw/raw-split는 자체 모수와 가드를 별도로 가지므로 이 블록을 건너뛴다.
     let responses: typeof surveyResponses.$inferSelect[] = [];
 
     if (type !== 'raw' && type !== 'raw-split') {
       const totalRows = await db
         .select({ total: count() })
         .from(surveyResponses)
-        .where(and(eq(surveyResponses.surveyId, surveyId), notDeletedResponse));
+        .where(and(eq(surveyResponses.surveyId, surveyId), notDeletedResponse, completedResponse));
       const total = totalRows[0]?.total ?? 0;
 
       if (total > MAX_EXPORT_RESPONSES) {
@@ -77,7 +78,7 @@ export async function GET(
       }
 
       responses = await db.query.surveyResponses.findMany({
-        where: and(eq(surveyResponses.surveyId, surveyId), notDeletedResponse),
+        where: and(eq(surveyResponses.surveyId, surveyId), notDeletedResponse, completedResponse),
         orderBy: (responses, { desc }) => [desc(responses.createdAt)],
       });
     }
@@ -87,12 +88,12 @@ export async function GET(
 
     // 3. Raw Data xlsx
     if (type === 'raw') {
-      // raw 전용 모수: deleted 제외 + in_progress 제외, started_at ASC
+      // raw 전용 모수: deleted 제외 + completed만 (행 포함 정책 통일)
       const rawResponses = await db.query.surveyResponses.findMany({
         where: and(
           eq(surveyResponses.surveyId, surveyId),
-          isNull(surveyResponses.deletedAt),
-          ne(surveyResponses.status, 'in_progress'),
+          notDeletedResponse,
+          completedResponse,
         ),
         orderBy: (r, { asc }) => [asc(r.startedAt)],
       });
@@ -166,8 +167,8 @@ export async function GET(
       const rawResponses = await db.query.surveyResponses.findMany({
         where: and(
           eq(surveyResponses.surveyId, surveyId),
-          isNull(surveyResponses.deletedAt),
-          ne(surveyResponses.status, 'in_progress'),
+          notDeletedResponse,
+          completedResponse,
         ),
         orderBy: (r, { asc }) => [asc(r.startedAt)],
       });
@@ -256,6 +257,12 @@ export async function GET(
   } catch (error) {
     if (error instanceof Error && error.message === '인증이 필요합니다.') {
       return NextResponse.json({ error: '권한 없음' }, { status: 401 });
+    }
+    if (error instanceof SpssVarNameError) {
+      return NextResponse.json(
+        { error: error.message, issues: error.issues },
+        { status: 400 },
+      );
     }
     console.error('Export Error:', error);
     return NextResponse.json(

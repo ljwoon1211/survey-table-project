@@ -315,6 +315,9 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
                 tableCellType: 'checkbox',
                 optionIndex: optIdx,
                 optionValue: opt.value,
+                // 코딩북/value labels가 실제 spssNumericCode를 쓰도록 셀 옵션 전달
+                // (CheckboxOption은 QuestionOption과 구조 호환 — radio/select 셀과 동일 처리)
+                cellOptions: cell.checkboxOptions,
                 ...(cell.spssVarType !== undefined ? { cellSpssVarType: cell.spssVarType } : {}),
                 ...(cell.spssMeasure !== undefined ? { cellSpssMeasure: cell.spssMeasure } : {}),
                 ...(autoExportLabel !== undefined ? { cellExportLabel: autoExportLabel } : {}),
@@ -691,8 +694,8 @@ export function buildDataRow(
         ) {
           const selectedValues = Array.isArray(cellVal) ? cellVal : [cellVal];
           const isSelected = selectedValues.some((v: unknown) => v === col.optionValue);
-          // 셀의 checkboxOptions에서 spssNumericCode 조회
-          const cellOptions = findTableCellCheckboxOptions(question, cellId);
+          // 셀의 checkboxOptions에서 spssNumericCode 조회 (컬럼 메타 우선, 폴백 역참조)
+          const cellOptions = col.cellOptions ?? findTableCellCheckboxOptions(question, cellId);
           const code = cellOptions?.[col.optionIndex]?.spssNumericCode ?? col.optionIndex + 1;
           return isSelected ? code : null;
         }
