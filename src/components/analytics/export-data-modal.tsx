@@ -127,7 +127,7 @@ export function ExportDataModal({ surveyId, surveyTitle }: Props) {
 
       const blob = await response.blob();
       const contentDisposition = response.headers.get('Content-Disposition');
-      const ext = type === 'sav' ? 'sav' : 'xlsx';
+      const ext = type === 'sav' ? 'sav' : type === 'sps' ? 'sps' : 'xlsx';
       let filename = buildSafeFilename(surveyTitle, 'Export', ext);
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
@@ -200,6 +200,15 @@ export function ExportDataModal({ surveyId, surveyTitle }: Props) {
               isLoading={exportingType === 'sav'}
               disabled={!!exportingType}
               onClick={() => handleExport('sav')}
+            />
+
+            <ExportCard
+              title="SPSS 복수응답 세트 (.sps)"
+              description="복수응답(checkbox) 변수들을 MRSETS로 등록하는 문법 파일입니다. .sav를 연 뒤 실행하세요."
+              icon={<FileDown className="h-5 w-5 text-slate-600" />}
+              isLoading={exportingType === 'sps'}
+              disabled={!!exportingType}
+              onClick={() => handleExport('sps')}
             />
 
             {overLimit && summary.data && (
