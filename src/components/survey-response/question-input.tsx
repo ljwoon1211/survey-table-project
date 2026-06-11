@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { useContactAttrs } from '@/lib/survey/contact-attrs-context';
 import { substituteTokens } from '@/lib/survey/substitute-tokens';
 import { isPartialNumericInput } from '@/utils/numeric-input';
-import { Question, QuestionOption, RankingAnswer } from '@/types/survey';
+import { Question, QuestionOption } from '@/types/survey';
 import {
   applyMobileOptionsGridOverride,
   computeMobileOptionsColumnsByLabels,
@@ -72,7 +72,7 @@ export function QuestionInput({
       <ChoiceTableResponse
         question={question}
         value={value}
-        onChange={onChange as (v: string | string[] | null) => void}
+        onChange={onChange as (v: unknown) => void}
       />
     );
   }
@@ -153,7 +153,7 @@ export function QuestionInput({
         <RankingQuestion
           question={question}
           value={value}
-          onChange={(v: RankingAnswer[]) => onChange(v)}
+          onChange={(v) => onChange(v)}
         />
       );
 

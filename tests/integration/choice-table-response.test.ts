@@ -100,6 +100,144 @@ describe('choice table-source checkbox 집계', () => {
   });
 });
 
+/**
+ * 그룹별 선택 radio: getBranchRuleForResponse 가 grouped 응답 맵을 처리한다.
+ * 맵의 값들(선택 cell.id 목록) 중 branchRule 이 있는 첫 번째 옵션을 반환.
+ */
+function groupedBranchQ(): Question {
+  return {
+    id: 'qg',
+    type: 'radio',
+    title: '그룹 분기 라디오',
+    required: false,
+    order: 0,
+    tableColumns: [{ id: 'c1', label: '열' }],
+    tableRowsData: [
+      {
+        id: 'row1',
+        label: '',
+        cells: [
+          {
+            id: 'cellA',
+            type: 'choice_opt',
+            content: '',
+            choiceGroupId: 'grp1',
+            branchRule: { id: 'b1', value: 'cellA', action: 'end' },
+          },
+          {
+            id: 'cellB',
+            type: 'choice_opt',
+            content: '',
+            choiceGroupId: 'grp1',
+          },
+          {
+            id: 'cellC',
+            type: 'choice_opt',
+            content: '',
+            choiceGroupId: 'grp2',
+          },
+        ],
+      },
+    ],
+    choiceGroups: [
+      { id: 'grp1', type: 'radio', groupKey: 'rad1', label: '그룹1' },
+      { id: 'grp2', type: 'radio', groupKey: 'rad2', label: '그룹2' },
+    ],
+  } as unknown as Question;
+}
+
+describe('그룹별 선택 radio 분기 로직', () => {
+  it('grouped 응답 맵에서 branchRule 있는 선택 셀의 규칙을 반환한다', () => {
+    const q = groupedBranchQ();
+    const rule = getBranchRuleForResponse(q, { rad1: 'cellA', rad2: 'cellC' });
+    expect(rule?.action).toBe('end');
+  });
+
+  it('branchRule 없는 셀만 선택된 경우 null 반환', () => {
+    const q = groupedBranchQ();
+    const rule = getBranchRuleForResponse(q, { rad1: 'cellB', rad2: 'cellC' });
+    expect(rule).toBeNull();
+  });
+
+  it('빈 맵({})이면 null 반환', () => {
+    const q = groupedBranchQ();
+    const rule = getBranchRuleForResponse(q, {});
+    expect(rule).toBeNull();
+  });
+});
+
+/**
+ * checkbox 그룹이 포함된 grouped 응답 맵에서 branchRule 탐색.
+ * { cb1: ['cellE'] } 에서 cellE 의 branchRule 반환.
+ */
+function groupedCheckboxBranchQ(): Question {
+  return {
+    id: 'qgcb',
+    type: 'radio',
+    title: '혼합 분기 질문',
+    required: false,
+    order: 0,
+    tableColumns: [{ id: 'c1', label: '열' }],
+    tableRowsData: [
+      {
+        id: 'row1',
+        label: '',
+        cells: [
+          {
+            id: 'cellA',
+            type: 'choice_opt',
+            content: '',
+            choiceGroupId: 'grp1',
+          },
+          {
+            id: 'cellE',
+            type: 'choice_opt',
+            content: '',
+            choiceGroupId: 'grpCb',
+            branchRule: { id: 'bE', value: 'cellE', action: 'end' },
+          },
+          {
+            id: 'cellF',
+            type: 'choice_opt',
+            content: '',
+            choiceGroupId: 'grpCb',
+          },
+        ],
+      },
+    ],
+    choiceGroups: [
+      { id: 'grp1', type: 'radio', groupKey: 'rad1', label: 'Radio그룹' },
+      { id: 'grpCb', type: 'checkbox', groupKey: 'cb1', label: 'CB그룹' },
+    ],
+  } as unknown as Question;
+}
+
+describe('checkbox 그룹 분기 로직', () => {
+  it('{ cb1: [cellE] } 에서 cellE branchRule 반환', () => {
+    const q = groupedCheckboxBranchQ();
+    const rule = getBranchRuleForResponse(q, { rad1: 'cellA', cb1: ['cellE'] });
+    expect(rule?.action).toBe('end');
+  });
+
+  it('branchRule 없는 셀만 선택된 경우 null', () => {
+    const q = groupedCheckboxBranchQ();
+    const rule = getBranchRuleForResponse(q, { rad1: 'cellA', cb1: ['cellF'] });
+    expect(rule).toBeNull();
+  });
+
+  it('{ cb1: [cellE, cellF] } — cellE branchRule 반환(첫 번째 매칭)', () => {
+    const q = groupedCheckboxBranchQ();
+    const rule = getBranchRuleForResponse(q, { cb1: ['cellE', 'cellF'] });
+    expect(rule?.action).toBe('end');
+  });
+
+  it('빈 맵({})이면 null', () => {
+    const q = groupedCheckboxBranchQ();
+    const rule = getBranchRuleForResponse(q, {});
+    expect(rule).toBeNull();
+  });
+});
+
 describe('choice table-source SPSS 단일/복수 변수 계약', () => {
   function radioTableQ(): Question {
     return {

@@ -45,6 +45,8 @@ export interface CellFormState {
   choiceLabel: string;
   choiceAllowTextInput: boolean;
   choiceBranchRule: BranchRule | undefined;
+  /** 이 보기 옵션 셀이 속한 ChoiceGroup.id. 빈 문자열 = 미소속. */
+  choiceGroupId: string;
   horizontalAlign: 'left' | 'center' | 'right';
   mobileDisplay: NonNullable<TableCell['mobileDisplay']>;
   verticalAlign: 'top' | 'middle' | 'bottom';
@@ -83,6 +85,9 @@ export const TEXT_POSITION_CELL_TYPES = new Set<ContentType>([
 ]);
 export const MOBILE_DISPLAY_CELL_TYPES = new Set<TableCell['type']>(['text', 'image', 'video']);
 
+/** 옵션 그룹 귀속이 가능한 셀 타입 */
+export const GROUPABLE_CELL_TYPES = new Set<TableCell['type']>(['choice_opt', 'ranking_opt']);
+
 /** cell.type → 모달 ContentType (undefined 면 'text' 로 폴백) */
 export function narrowCellType(t: TableCell['type'] | undefined): ContentType {
   return !t ? 'text' : t;
@@ -119,6 +124,7 @@ export function cellToFormState(cell: TableCell): CellFormState {
     choiceLabel: cell.choiceLabel || '',
     choiceAllowTextInput: cell.allowTextInput === true,
     choiceBranchRule: cell.branchRule,
+    choiceGroupId: cell.choiceGroupId ?? '',
     horizontalAlign: cell.horizontalAlign || 'left',
     mobileDisplay: cell.mobileDisplay ?? 'hidden',
     verticalAlign: cell.verticalAlign || 'top',
@@ -213,6 +219,8 @@ export function buildUpdatedCell(form: CellFormState, cell: TableCell): TableCel
     ...(contentType === 'ranking_opt' && form.rankingLabel.trim().length > 0
       ? { rankingLabel: form.rankingLabel.trim() }
       : {}),
+    // ranking_opt 그룹 귀속. 빈 문자열이면 기존 셀의 choiceGroupId 를 후처리 delete 로 제거.
+    ...(contentType === 'ranking_opt' && form.choiceGroupId ? { choiceGroupId: form.choiceGroupId } : {}),
     // ranking_opt / choice_opt 전용 spssNumericCode (Case 2/A SPSS 재-export 안정성)
     // isOther 모드면 numeric 변수가 system-missing 이라 spssNumericCode 는 의미 없음 → 강제 undefined.
     ...(((contentType === 'ranking_opt' && !form.isOtherRankingCell) ||
@@ -234,6 +242,11 @@ export function buildUpdatedCell(form: CellFormState, cell: TableCell): TableCel
           ...(form.choiceBranchRule
             ? { branchRule: { ...form.choiceBranchRule, value: cell.id } }
             : {}),
+          // 그룹 귀속. 빈 문자열이면 기존 셀에 있던 choiceGroupId 도 제거된다.
+          // (choice_opt block 이 cellBase spread 이후에 위치하므로 빈 값 시
+          //  명시적으로 undefined 를 넣어 키를 덮어쓴다 — exactOptionalPropertyTypes 준수를 위해
+          //  후처리 delete 방식 대신 아래 updatedCell 후처리를 사용한다.)
+          ...(form.choiceGroupId ? { choiceGroupId: form.choiceGroupId } : {}),
         }
       : {}),
     // 셀 병합 속성 추가
@@ -275,6 +288,13 @@ export function buildUpdatedCell(form: CellFormState, cell: TableCell): TableCel
         }
       : {}),
   };
+
+  // choice_opt 또는 ranking_opt 에서 그룹 해제(빈 문자열)를 선택했을 때,
+  // cellBase spread 로 남아있을 수 있는 choiceGroupId 를 제거한다.
+  // exactOptionalPropertyTypes 상 undefined 할당은 금지이므로 delete 사용.
+  if (GROUPABLE_CELL_TYPES.has(contentType) && !form.choiceGroupId) {
+    delete (updatedCell as Partial<TableCell>).choiceGroupId;
+  }
 
   return updatedCell;
 }

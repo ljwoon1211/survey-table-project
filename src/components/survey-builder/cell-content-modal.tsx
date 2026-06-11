@@ -43,16 +43,17 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useEnsureSurveyInDb } from '@/hooks/use-ensure-survey-in-db';
-import { isValidUUID } from '@/lib/utils';
 import { generateId } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { useSurveyUIStore } from '@/stores/ui-store';
-import { TableCell } from '@/types/survey';
+import { ChoiceGroup, TableCell } from '@/types/survey';
+import { collectChoiceOptCells } from '@/utils/choice-source';
 import { isPartialNumericInput } from '@/utils/numeric-input';
 import { getMaxSpssCode } from '@/utils/option-code-generator';
-import { hasExistingOtherRankingCell } from '@/utils/ranking-source';
+import { collectRankingOptCells, hasExistingOtherRankingCell } from '@/utils/ranking-source';
 import {
   type ContentType,
+  GROUPABLE_CELL_TYPES,
   MOBILE_DISPLAY_CELL_TYPES,
   TEXT_POSITION_CELL_TYPES,
   buildUpdatedCell,
@@ -99,6 +100,10 @@ interface CellContentModalProps {
   rowLabel?: string | undefined;
   columnCode?: string | undefined;
   columnLabel?: string | undefined;
+  /** choice_opt 탭용: 질문 레벨 옵션 그룹 목록 (표시/편집용). 없으면 그룹 기능 비활성. */
+  choiceGroups?: ChoiceGroup[] | undefined;
+  /** choice_opt 그룹 변경 시 부모에게 통보 (prune 후 저장은 부모 책임) */
+  onChoiceGroupsChange?: ((groups: ChoiceGroup[]) => void) | undefined;
 }
 
 export function CellContentModal({
@@ -112,6 +117,8 @@ export function CellContentModal({
   rowLabel,
   columnCode,
   columnLabel,
+  choiceGroups: choiceGroupsProp,
+  onChoiceGroupsChange,
 }: CellContentModalProps) {
   const questions = useSurveyBuilderStore(useShallow((s) => s.currentSurvey.questions));
   const variableCatalog = useSurveyUIStore((s) => s.variableCatalog);
@@ -153,6 +160,7 @@ export function CellContentModal({
     choiceLabel,
     choiceAllowTextInput,
     choiceBranchRule,
+    choiceGroupId,
     horizontalAlign,
     mobileDisplay,
     verticalAlign,
@@ -167,6 +175,11 @@ export function CellContentModal({
     spssVarType,
     spssMeasure,
   } = form;
+  // 순위 옵션(ranking_opt, Case 2)은 순위형 질문의 내장 테이블에서만 렌더러가 있다.
+  // 테이블형 질문에서는 응답 select 가 나오지 않는 막다른 조합이 되므로 탭을 숨긴다.
+  // 단, 이미 ranking_opt 인 셀(과거 데이터)은 편집/다른 타입 전환이 가능하도록 노출 유지.
+  const parentQuestionType = questions.find((q) => q.id === currentQuestionId)?.type;
+  const showRankingOptTab = parentQuestionType === 'ranking' || contentType === 'ranking_opt';
   const {
     setContentType,
     setTextContent,
@@ -196,6 +209,7 @@ export function CellContentModal({
     setChoiceLabel,
     setChoiceAllowTextInput,
     setChoiceBranchRule,
+    setChoiceGroupId,
     setHorizontalAlign,
     setMobileDisplay,
     setVerticalAlign,
@@ -210,6 +224,40 @@ export function CellContentModal({
     setSpssVarType,
     setSpssMeasure,
   } = setters;
+
+  // choice_opt 탭용 로컬 그룹 편집 상태.
+  // 부모에서 choiceGroupsProp 를 전달받으면 그 값으로, 아니면 스토어 질문의 choiceGroups 를 사용한다.
+  // 모달이 열릴 때(isOpen + cell.id 변경) 재동기화하기 위해 useState 초기값은 lazy initializer 로 설정하지 않고
+  // useEffect 로 동기화한다. (isOpen 이 꺼지면 닫는 시점이므로 재설정이 무해하다.)
+  const [editChoiceGroups, setEditChoiceGroups] = useState<ChoiceGroup[]>(
+    () => choiceGroupsProp ?? [],
+  );
+  useEffect(() => {
+    if (isOpen) {
+      const storeQuestion = useSurveyBuilderStore
+        .getState()
+        .currentSurvey.questions.find((q) => q.id === currentQuestionId);
+      setEditChoiceGroups(choiceGroupsProp ?? storeQuestion?.choiceGroups ?? []);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, cell?.id]);
+
+  // 현재 질문 tableRowsData 기반으로 그룹별 멤버 셀 수를 계산한다 (표시용).
+  // 아직 저장되지 않은 이번 편집 셀은 카운트에 반영되지 않아도 무방하다.
+  const groupMemberCounts = (() => {
+    const storeQuestion = questions.find((q) => q.id === currentQuestionId);
+    const allCells = [
+      ...collectChoiceOptCells(storeQuestion?.tableRowsData),
+      ...collectRankingOptCells(storeQuestion?.tableRowsData),
+    ];
+    const counts: Record<string, number> = {};
+    for (const c of allCells) {
+      if (c.choiceGroupId) {
+        counts[c.choiceGroupId] = (counts[c.choiceGroupId] ?? 0) + 1;
+      }
+    }
+    return counts;
+  })();
 
   // 자동생성 셀코드/라벨 계산
   const autoCellCode = generateCellCode(questionCode, rowCode, columnCode);
@@ -262,8 +310,17 @@ export function CellContentModal({
       // 폼 상태를 저장될 TableCell 로 직렬화 (조건부 spread 로 optional 필드 처리).
       const updatedCell: TableCell = buildUpdatedCell(form, cell);
 
-      // 로컬 스토어 업데이트 (셀 저장)
+      // 로컬 스토어 업데이트 (셀 저장) — onChoiceGroupsChange 보다 먼저 수행해야
+      // dynamic-table-editor 의 currentRowsRef 가 이미 새 셀을 포함한 상태에서 prune 이 동작한다.
       onSave(updatedCell);
+
+      // choice_opt 또는 ranking_opt 탭에서 그룹 변경이 있었으면 정리 후 부모에게 통보.
+      // prune 은 updatedCell(이 셀 반영 후)의 rowsData 기준으로 계산해야 하므로
+      // onSave(셀 반영) 다음에 호출한다.
+      // 실질적인 prune(빈 그룹 제거)은 dynamic-table-editor 의 onChoiceGroupsChange 핸들러에서 수행한다.
+      if (GROUPABLE_CELL_TYPES.has(contentType)) {
+        onChoiceGroupsChange?.(editChoiceGroups);
+      }
 
       // 서버에 질문 저장/업데이트
       if (currentQuestionId && useSurveyBuilderStore.getState().currentSurvey.id) {
@@ -275,14 +332,40 @@ export function CellContentModal({
             cells: row.cells.map((c) => (c.id === cell.id ? updatedCell : c)),
           }));
 
+          // choice_opt 저장 시 choiceGroups 도 함께 저장한다.
+          // prune 은 updatedRowsData 기준으로 계산해 빈 그룹이 DB 에 남지 않도록 한다.
+          // 마지막 멤버 해제로 전부 비면 빈 배열을 명시 저장해야 phantom 그룹이 남지 않는다.
+          const prunedChoiceGroups = (() => {
+            if (!GROUPABLE_CELL_TYPES.has(contentType)) return undefined;
+            const memberIds = new Set(
+              [
+                ...collectChoiceOptCells(updatedRowsData),
+                ...collectRankingOptCells(updatedRowsData),
+              ]
+                .map((c) => c.choiceGroupId)
+                .filter((id): id is string => !!id),
+            );
+            const pruned = editChoiceGroups.filter((g) => memberIds.has(g.id));
+            // 원래도 그룹이 없던 질문이면 빈 배열을 굳이 쓰지 않는다 (NULL 유지)
+            if (pruned.length === 0 && (question.choiceGroups ?? []).length === 0) return undefined;
+            return pruned;
+          })();
+
+          // 신규 판정은 dirty 추적(questionChanges.added) 기준 — 로컬 id도 randomUUID라
+          // UUID 형식 검사로는 미영속 질문을 구분할 수 없다(0행 update로 저장 실패하던 버그).
+          const isNewQuestion = !!useSurveyBuilderStore.getState().questionChanges.added[currentQuestionId];
+
           try {
             await ensureSurvey();
 
-            if (isValidUUID(currentQuestionId)) {
+            if (!isNewQuestion) {
               // 이미 DB에 저장된 질문: 업데이트
               await client.surveyBuilder.questions.update({
                 questionId: currentQuestionId,
-                data: { tableRowsData: updatedRowsData },
+                data: {
+                  tableRowsData: updatedRowsData,
+                  ...(prunedChoiceGroups !== undefined ? { choiceGroups: prunedChoiceGroups } : {}),
+                },
               });
               // store 도 동일 데이터로 동기화. 표시 조건/장기 계산식 picker 가
               // store 를 직접 구독하므로 누락 시 셀 라벨 변경이 stale 로 표시됨.
@@ -290,13 +373,20 @@ export function CellContentModal({
                 currentSurvey: {
                   ...state.currentSurvey,
                   questions: state.currentSurvey.questions.map((q) =>
-                    q.id === currentQuestionId ? { ...q, tableRowsData: updatedRowsData } : q,
+                    q.id === currentQuestionId
+                      ? {
+                          ...q,
+                          tableRowsData: updatedRowsData,
+                          ...(prunedChoiceGroups !== undefined ? { choiceGroups: prunedChoiceGroups } : {}),
+                        }
+                      : q,
                   ),
                 },
               }));
             } else {
-              // 임시 질문: 생성하고 반환된 UUID로 로컬 스토어의 질문 ID 업데이트
+              // 미영속 질문: id를 그대로 전달해 서버에서 동일 id로 생성
               const createdQuestion = await client.surveyBuilder.questions.create({
+                id: currentQuestionId,
                 surveyId: useSurveyBuilderStore.getState().currentSurvey.id,
                 ...(question.groupId !== undefined ? { groupId: question.groupId } : {}),
                 type: question.type,
@@ -317,10 +407,19 @@ export function CellContentModal({
                 ...(question.requiresAcknowledgment !== undefined ? { requiresAcknowledgment: question.requiresAcknowledgment } : {}),
                 ...(question.tableValidationRules !== undefined ? { tableValidationRules: question.tableValidationRules } : {}),
                 ...(question.displayCondition !== undefined ? { displayCondition: question.displayCondition } : {}),
+                ...(prunedChoiceGroups !== undefined ? { choiceGroups: prunedChoiceGroups } : {}),
               });
 
-              // 반환된 UUID로 로컬 스토어의 질문 ID 업데이트 + Case 2 참조 동기화
               if (createdQuestion?.id) {
+                // DB에 생성 완료 → added에서 제거 (다음 모달 저장 시 UPDATE 경로 사용)
+                const { [currentQuestionId]: _, ...remainingAdded } =
+                  useSurveyBuilderStore.getState().questionChanges.added;
+                useSurveyBuilderStore.setState((state) => ({
+                  questionChanges: { ...state.questionChanges, added: remainingAdded },
+                }));
+              }
+              // id를 넘겼으므로 반환 id가 다를 경우에만 스토어 id 갱신
+              if (createdQuestion?.id && createdQuestion.id !== currentQuestionId) {
                 const newId = createdQuestion.id;
                 useSurveyBuilderStore.setState((state) => ({
                   currentSurvey: {
@@ -599,7 +698,7 @@ export function CellContentModal({
             }
           }}
         >
-          <TabsList className="grid w-full grid-cols-10">
+          <TabsList className={`grid w-full ${showRankingOptTab ? 'grid-cols-10' : 'grid-cols-9'}`}>
             <TabsTrigger value="text" className="flex items-center gap-2">
               <Type className="h-4 w-4" />
               텍스트
@@ -632,10 +731,12 @@ export function CellContentModal({
               <ListOrdered className="h-4 w-4" />
               순위형
             </TabsTrigger>
-            <TabsTrigger value="ranking_opt" className="flex items-center gap-2">
-              <Tag className="h-4 w-4" />
-              순위 옵션
-            </TabsTrigger>
+            {showRankingOptTab && (
+              <TabsTrigger value="ranking_opt" className="flex items-center gap-2">
+                <Tag className="h-4 w-4" />
+                순위 옵션
+              </TabsTrigger>
+            )}
             <TabsTrigger value="choice_opt" className="flex items-center gap-2">
               <Tag className="h-4 w-4" />
               보기 옵션
@@ -970,6 +1071,11 @@ export function CellContentModal({
               onSpssNumericCodeChange={setCellSpssNumericCode}
               isOtherRankingCell={isOtherRankingCell}
               onIsOtherRankingCellChange={setIsOtherRankingCell}
+              choiceGroups={editChoiceGroups}
+              groupMemberCounts={groupMemberCounts}
+              choiceGroupId={choiceGroupId}
+              onChoiceGroupIdChange={setChoiceGroupId}
+              onChoiceGroupsChange={setEditChoiceGroups}
             />
           </TabsContent>
 
@@ -986,6 +1092,11 @@ export function CellContentModal({
               onBranchRuleChange={setChoiceBranchRule}
               allQuestions={questions}
               currentQuestionId={currentQuestionId}
+              choiceGroups={editChoiceGroups}
+              groupMemberCounts={groupMemberCounts}
+              choiceGroupId={choiceGroupId}
+              onChoiceGroupIdChange={setChoiceGroupId}
+              onChoiceGroupsChange={setEditChoiceGroups}
             />
           </TabsContent>
         </Tabs>

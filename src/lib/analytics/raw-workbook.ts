@@ -196,6 +196,8 @@ export function row2Label(c: SPSSExportColumn): string {
   if (c.cellExportLabel) return c.cellExportLabel;
   if (
     c.type === 'checkbox-item' ||
+    c.type === 'choice-group' ||
+    c.type === 'choice-group-item' ||
     c.type === 'ranking-rank' ||
     c.type === 'ranking-other' ||
     c.type === 'option-text' ||

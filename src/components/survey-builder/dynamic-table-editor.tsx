@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import { generateId } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { useSurveyUIStore } from '@/stores/ui-store';
-import { DynamicRowGroupConfig, HeaderCell, QuestionConditionGroup, TableCell, TableColumn, TableRow } from '@/types/survey';
+import { ChoiceGroup, DynamicRowGroupConfig, HeaderCell, QuestionConditionGroup, TableCell, TableColumn, TableRow } from '@/types/survey';
+import { pruneChoiceGroups } from '@/utils/choice-group-helpers';
 
 import { BulkGeneratorModal, BulkColumnDef } from './bulk-generator';
 import { CellContentModal } from './cell-content-modal';
@@ -753,6 +754,22 @@ export function DynamicTableEditor(props: DynamicTableEditorProps) {
           columnCode={selectedCellContext.columnCode}
           columnLabel={selectedCellContext.columnLabel}
           cell={selectedCellContext.cell}
+          choiceGroups={currentQuestion?.choiceGroups}
+          onChoiceGroupsChange={(groups: ChoiceGroup[]) => {
+            if (!currentQuestionId) return;
+            // 모달 handleSave 에서 onSave(셀 반영) 이후에 호출된다 —
+            // currentRowsRef 는 이번 셀 변경을 이미 반영한 상태. DB prune 은
+            // 모달 쪽(updatedRowsData 기준)이 정확하고, 여기는 스토어 표시용 보정.
+            const qAfter = {
+              ...currentQuestion!,
+              tableRowsData: currentRowsRef.current,
+              choiceGroups: groups,
+            };
+            const pruned = pruneChoiceGroups(qAfter);
+            silentUpdateQuestion(currentQuestionId, {
+              ...(pruned !== undefined ? { choiceGroups: pruned } : { choiceGroups: [] }),
+            });
+          }}
           onSave={(cell) => {
             if (selectedCellContext.rowIndex !== -1 && selectedCellContext.cellIndex !== -1) {
               updateCell(selectedCellContext.rowIndex, selectedCellContext.cellIndex, cell);

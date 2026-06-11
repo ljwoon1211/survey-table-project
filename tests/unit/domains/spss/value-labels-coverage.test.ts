@@ -39,6 +39,45 @@ const checkboxManual = q({
   ],
 });
 
+const radioGrouped = q({
+  id: 'q4',
+  questionCode: 'Q4',
+  type: 'radio',
+  choiceGroups: [
+    { id: 'gg1', groupKey: 'rad1', type: 'radio', label: '그룹1' },
+  ],
+  tableRowsData: [
+    {
+      id: 'r1',
+      label: '행1',
+      cells: [
+        { id: 'cg1', content: '보기A', type: 'choice_opt', choiceGroupId: 'gg1', spssNumericCode: 1 },
+        { id: 'cg2', content: '보기B', type: 'choice_opt', choiceGroupId: 'gg1', spssNumericCode: 2 },
+      ],
+    },
+  ],
+});
+
+// checkbox 그룹 픽스처
+const checkboxGrouped = q({
+  id: 'q5',
+  questionCode: 'Q5',
+  type: 'checkbox',
+  choiceGroups: [
+    { id: 'gc1', groupKey: 'cb1', type: 'checkbox', label: '구매처' },
+  ],
+  tableRowsData: [
+    {
+      id: 'r1',
+      label: '행1',
+      cells: [
+        { id: 'cgc1', content: '온라인', type: 'choice_opt', choiceGroupId: 'gc1', spssNumericCode: 3 },
+        { id: 'cgc2', content: '오프라인', type: 'choice_opt', choiceGroupId: 'gc1', spssNumericCode: 5 },
+      ],
+    },
+  ],
+});
+
 const tableWithCells = q({
   id: 'q3',
   questionCode: 'Q3',
@@ -80,11 +119,11 @@ const tableWithCells = q({
 });
 
 describe('categorical 변수 VALUE LABELS 전수 보장', () => {
-  const questions = [radioManual, checkboxManual, tableWithCells];
+  const questions = [radioManual, checkboxManual, tableWithCells, radioGrouped, checkboxGrouped];
   const questionMap = new Map(questions.map((question) => [question.id, question]));
   const columns = generateSPSSColumns(questions);
 
-  const CATEGORICAL_TYPES = new Set(['single', 'checkbox-item', 'table-cell']);
+  const CATEGORICAL_TYPES = new Set(['single', 'checkbox-item', 'table-cell', 'choice-group', 'choice-group-item']);
 
   it('categorical 컬럼은 전부 value labels를 가진다 — 0빈도 보기 포함', () => {
     const categorical = columns.filter(
@@ -112,5 +151,24 @@ describe('categorical 변수 VALUE LABELS 전수 보장', () => {
       const measure = resolveMeasure(col, questionMap.get(col.questionId));
       expect([VariableMeasure.Nominal, VariableMeasure.Ordinal]).toContain(measure);
     }
+  });
+
+  it('choice-group 변수는 buildValueLabels가 전 보기를 반환한다', () => {
+    const groupCol = columns.find((c) => c.type === 'choice-group' && c.questionId === 'q4');
+    expect(groupCol).toBeDefined();
+    const labels = buildValueLabels(groupCol!, radioGrouped);
+    expect(labels).toEqual([
+      { value: 1, label: '보기A' },
+      { value: 2, label: '보기B' },
+    ]);
+  });
+
+  it('choice-group-item 변수는 buildValueLabels가 자체 counted 코드와 "선택" 라벨을 반환한다', () => {
+    const cgiCols = columns.filter((c) => c.type === 'choice-group-item' && c.questionId === 'q5');
+    expect(cgiCols.length).toBe(2);
+    const labels0 = buildValueLabels(cgiCols[0]!, checkboxGrouped);
+    const labels1 = buildValueLabels(cgiCols[1]!, checkboxGrouped);
+    expect(labels0).toEqual([{ value: 3, label: '선택' }]);
+    expect(labels1).toEqual([{ value: 5, label: '선택' }]);
   });
 });

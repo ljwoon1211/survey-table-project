@@ -81,4 +81,25 @@ describe('surveyBuilder.questions procedures', () => {
       client.questions.create({ surveyId: SURVEY_ID, type: 'text', title: 'Q1' }),
     ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
   });
+
+  it('update 서비스가 "질문 업데이트에 실패했습니다." 에러 throw 시 NOT_FOUND로 매핑한다', async () => {
+    // 미영속 질문에 대해 update 경로가 실행될 때(0행 매칭) 서비스가 throw하는 에러를
+    // oRPC가 Internal server error로 마스킹하지 않고 NOT_FOUND로 노출해야 한다.
+    vi.mocked(svc.updateQuestion).mockRejectedValue(new Error('질문 업데이트에 실패했습니다.'));
+    const client = createRouterClient({ questions }, { context: authedContext() });
+    await expect(
+      client.questions.update({ questionId: QUESTION_ID, data: { title: 'Q1-edit' } }),
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: '질문을 찾을 수 없습니다. 설문을 먼저 저장한 뒤 다시 시도하세요.',
+    });
+  });
+
+  it('update 서비스가 다른 에러 throw 시 그대로 재전파한다', async () => {
+    vi.mocked(svc.updateQuestion).mockRejectedValue(new Error('DB 연결 오류'));
+    const client = createRouterClient({ questions }, { context: authedContext() });
+    await expect(
+      client.questions.update({ questionId: QUESTION_ID, data: { title: 'Q1-edit' } }),
+    ).rejects.toMatchObject({ message: 'DB 연결 오류' });
+  });
 });

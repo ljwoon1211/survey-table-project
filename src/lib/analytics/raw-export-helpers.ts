@@ -69,6 +69,21 @@ export function buildCodebookValueLabel(
       }
       return '';
 
+    case 'choice-group':
+      if (col.choiceGroupValueLabels && col.choiceGroupValueLabels.length > 0) {
+        return col.choiceGroupValueLabels
+          .map(({ value, label }) => `${value}=${label}`)
+          .join(', ');
+      }
+      return '';
+
+    case 'choice-group-item': {
+      // checkbox-item 형식 재사용: 빈값=비선택, {code}=선택
+      const code = col.choiceGroupMemberCode;
+      if (code == null) return '';
+      return `빈값=비선택, ${code}=선택`;
+    }
+
     case 'ranking-rank':
     case 'table-cell-ranking': {
       const opts = col.cellOptions ?? (q ? resolveRankingOptions(q) : []);
