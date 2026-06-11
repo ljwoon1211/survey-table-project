@@ -43,7 +43,6 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useEnsureSurveyInDb } from '@/hooks/use-ensure-survey-in-db';
-import { isValidUUID } from '@/lib/utils';
 import { generateId } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { useSurveyUIStore } from '@/stores/ui-store';
@@ -347,10 +346,14 @@ export function CellContentModal({
             return pruned;
           })();
 
+          // 신규 판정은 dirty 추적(questionChanges.added) 기준 — 로컬 id도 randomUUID라
+          // UUID 형식 검사로는 미영속 질문을 구분할 수 없다(0행 update로 저장 실패하던 버그).
+          const isNewQuestion = !!useSurveyBuilderStore.getState().questionChanges.added[currentQuestionId];
+
           try {
             await ensureSurvey();
 
-            if (isValidUUID(currentQuestionId)) {
+            if (!isNewQuestion) {
               // 이미 DB에 저장된 질문: 업데이트
               await client.surveyBuilder.questions.update({
                 questionId: currentQuestionId,
@@ -376,8 +379,9 @@ export function CellContentModal({
                 },
               }));
             } else {
-              // 임시 질문: 생성하고 반환된 UUID로 로컬 스토어의 질문 ID 업데이트
+              // 미영속 질문: id를 그대로 전달해 서버에서 동일 id로 생성
               const createdQuestion = await client.surveyBuilder.questions.create({
+                id: currentQuestionId,
                 surveyId: useSurveyBuilderStore.getState().currentSurvey.id,
                 ...(question.groupId !== undefined ? { groupId: question.groupId } : {}),
                 type: question.type,
@@ -401,8 +405,16 @@ export function CellContentModal({
                 ...(prunedChoiceGroups !== undefined ? { choiceGroups: prunedChoiceGroups } : {}),
               });
 
-              // 반환된 UUID로 로컬 스토어의 질문 ID 업데이트 + Case 2 참조 동기화
               if (createdQuestion?.id) {
+                // DB에 생성 완료 → added에서 제거 (다음 모달 저장 시 UPDATE 경로 사용)
+                const { [currentQuestionId]: _, ...remainingAdded } =
+                  useSurveyBuilderStore.getState().questionChanges.added;
+                useSurveyBuilderStore.setState((state) => ({
+                  questionChanges: { ...state.questionChanges, added: remainingAdded },
+                }));
+              }
+              // id를 넘겼으므로 반환 id가 다를 경우에만 스토어 id 갱신
+              if (createdQuestion?.id && createdQuestion.id !== currentQuestionId) {
                 const newId = createdQuestion.id;
                 useSurveyBuilderStore.setState((state) => ({
                   currentSurvey: {
