@@ -69,6 +69,14 @@ export function buildCodebookValueLabel(
       }
       return '';
 
+    case 'choice-group':
+      if (col.choiceGroupValueLabels && col.choiceGroupValueLabels.length > 0) {
+        return col.choiceGroupValueLabels
+          .map(({ value, label }) => `${value}=${label}`)
+          .join(', ');
+      }
+      return '';
+
     case 'ranking-rank':
     case 'table-cell-ranking': {
       const opts = col.cellOptions ?? (q ? resolveRankingOptions(q) : []);

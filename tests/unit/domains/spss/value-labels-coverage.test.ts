@@ -39,6 +39,25 @@ const checkboxManual = q({
   ],
 });
 
+const radioGrouped = q({
+  id: 'q4',
+  questionCode: 'Q4',
+  type: 'radio',
+  choiceGroups: [
+    { id: 'gg1', groupKey: 'rad1', type: 'radio', label: '그룹1' },
+  ],
+  tableRowsData: [
+    {
+      id: 'r1',
+      label: '행1',
+      cells: [
+        { id: 'cg1', content: '보기A', type: 'choice_opt', choiceGroupId: 'gg1', spssNumericCode: 1 },
+        { id: 'cg2', content: '보기B', type: 'choice_opt', choiceGroupId: 'gg1', spssNumericCode: 2 },
+      ],
+    },
+  ],
+});
+
 const tableWithCells = q({
   id: 'q3',
   questionCode: 'Q3',
@@ -80,11 +99,11 @@ const tableWithCells = q({
 });
 
 describe('categorical 변수 VALUE LABELS 전수 보장', () => {
-  const questions = [radioManual, checkboxManual, tableWithCells];
+  const questions = [radioManual, checkboxManual, tableWithCells, radioGrouped];
   const questionMap = new Map(questions.map((question) => [question.id, question]));
   const columns = generateSPSSColumns(questions);
 
-  const CATEGORICAL_TYPES = new Set(['single', 'checkbox-item', 'table-cell']);
+  const CATEGORICAL_TYPES = new Set(['single', 'checkbox-item', 'table-cell', 'choice-group']);
 
   it('categorical 컬럼은 전부 value labels를 가진다 — 0빈도 보기 포함', () => {
     const categorical = columns.filter(
@@ -112,5 +131,15 @@ describe('categorical 변수 VALUE LABELS 전수 보장', () => {
       const measure = resolveMeasure(col, questionMap.get(col.questionId));
       expect([VariableMeasure.Nominal, VariableMeasure.Ordinal]).toContain(measure);
     }
+  });
+
+  it('choice-group 변수는 buildValueLabels가 전 보기를 반환한다', () => {
+    const groupCol = columns.find((c) => c.type === 'choice-group' && c.questionId === 'q4');
+    expect(groupCol).toBeDefined();
+    const labels = buildValueLabels(groupCol!, radioGrouped);
+    expect(labels).toEqual([
+      { value: 1, label: '보기A' },
+      { value: 2, label: '보기B' },
+    ]);
   });
 });

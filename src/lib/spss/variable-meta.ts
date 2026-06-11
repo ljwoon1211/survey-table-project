@@ -34,6 +34,7 @@ export function resolveVarType(col: SPSSExportColumn, question: Question | undef
     case 'notice-agree':
     case 'ranking-rank':
     case 'radio-group':
+    case 'choice-group':
     case 'table-cell-ranking':
       return VariableType.Numeric;
 
@@ -86,6 +87,11 @@ export function resolveMeasure(col: SPSSExportColumn, question: Question | undef
     return VariableMeasure.Ordinal;
   }
 
+  // choice-group (질문 레벨 choiceGroups 기반 단일선택) — 명목척도
+  if (col.type === 'choice-group') {
+    return VariableMeasure.Nominal;
+  }
+
   // 숫자 단답형(numericText) 은 척도(Continuous)
   if (col.type === 'text' && col.numericText) {
     return VariableMeasure.Continuous;
@@ -135,6 +141,7 @@ export function buildLabel(col: SPSSExportColumn): string {
         ? `${col.questionText} - ${col.optionLabel}`
         : col.questionText;
     case 'radio-group':
+    case 'choice-group':
       return col.optionLabel
         ? `${col.questionText} - ${col.optionLabel}`
         : col.questionText;

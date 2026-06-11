@@ -33,6 +33,11 @@ import {
   generateExportLabel,
   resolveRankVarName,
 } from '@/utils/table-cell-code-generator';
+import {
+  collectRadioGroups,
+  DEFAULT_GROUP_KEY,
+  isGroupedChoiceQuestion,
+} from '@/utils/choice-group-helpers';
 
 export interface SPSSExportColumn {
   spssVarName: string;
@@ -54,7 +59,8 @@ export interface SPSSExportColumn {
     | 'table-cell-ranking'
     | 'table-cell-ranking-other'
     | 'option-text'
-    | 'table-cell-option-text';
+    | 'table-cell-option-text'
+    | 'choice-group';
   optionIndex?: number;
   optionValue?: string;
   tableCellId?: string;
@@ -82,6 +88,13 @@ export interface SPSSExportColumn {
   cellExportLabel?: string;
   // 'text' 컬럼 전용: 숫자 단답형(question.inputType==='number') 이면 Numeric 변수로 처리
   numericText?: boolean;
+  // === 'choice-group' 전용: radio choiceGroups 기반 그룹별 단일선택 변수 ===
+  // 이 변수가 담당하는 그룹의 groupKey
+  choiceGroupKey?: string;
+  // 멤버 셀 id → 응답 시 기록할 숫자값 (spssNumericCode 또는 그룹 내 1-based 순서 폴백)
+  choiceGroupCellValueMap?: Record<string, number>;
+  // 숫자값 → SPSS VALUE LABEL 배열
+  choiceGroupValueLabels?: Array<{ value: number; label: string }>;
 }
 
 /**
@@ -155,6 +168,31 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
           optionLabel: '기타 입력',
           questionId: q.id,
           type: 'other-text',
+        });
+      }
+    } else if (q.type === 'radio' && isGroupedChoiceQuestion(q)) {
+      // choiceGroups 기반 radio — 그룹별 변수 1개씩 생성
+      for (const group of collectRadioGroups(q)) {
+        const cellValueMap: Record<string, number> = {};
+        const valueLabels: Array<{ value: number; label: string }> = [];
+        group.cells.forEach((cell, idx) => {
+          const code = cell.spssNumericCode ?? idx + 1;
+          cellValueMap[cell.id] = code;
+          valueLabels.push({
+            value: code,
+            label: (cell.choiceLabel ?? '').trim() || (cell.content ?? '').trim() || '(라벨 없음)',
+          });
+        });
+        const isDefault = group.groupKey === DEFAULT_GROUP_KEY;
+        columns.push({
+          spssVarName: isDefault ? q.questionCode : `${q.questionCode}_${group.groupKey}`,
+          questionText: q.title,
+          optionLabel: group.label || q.title,
+          questionId: q.id,
+          type: 'choice-group',
+          choiceGroupKey: group.groupKey,
+          choiceGroupCellValueMap: cellValueMap,
+          choiceGroupValueLabels: valueLabels,
         });
       }
     } else if (q.type === 'radio' || q.type === 'select') {
@@ -701,6 +739,16 @@ export function buildDataRow(
         }
 
         return transformTableChoiceCell(col.tableCellType || 'input', cellVal, col.cellOptions);
+      }
+
+      case 'choice-group': {
+        // rawValue는 그룹별 응답 맵: { groupKey: selectedCellId, ... }
+        // 해당 그룹의 선택 cellId를 꺼내 cellValueMap으로 숫자코드로 변환.
+        if (rawValue == null || typeof rawValue !== 'object' || Array.isArray(rawValue)) return null;
+        const groupAnswer = rawValue as Record<string, string>;
+        const cellId = groupAnswer[col.choiceGroupKey ?? ''];
+        if (!cellId) return null;
+        return col.choiceGroupCellValueMap?.[cellId] ?? null;
       }
 
       case 'radio-group': {

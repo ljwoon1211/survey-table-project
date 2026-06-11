@@ -73,6 +73,12 @@ export function buildValueLabels(
         .sort((a, b) => Number(a.value) - Number(b.value));
     }
 
+    case 'choice-group': {
+      // choice-group: generateSPSSColumns가 미리 계산한 choiceGroupValueLabels를 그대로 사용.
+      if (!col.choiceGroupValueLabels || col.choiceGroupValueLabels.length === 0) return undefined;
+      return [...col.choiceGroupValueLabels].sort((a, b) => a.value - b.value);
+    }
+
     case 'table-cell': {
       if (col.tableCellType === 'input') return undefined;
 
