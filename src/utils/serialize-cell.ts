@@ -216,6 +216,8 @@ export function buildUpdatedCell(form: CellFormState, cell: TableCell): TableCel
     ...(contentType === 'ranking_opt' && form.rankingLabel.trim().length > 0
       ? { rankingLabel: form.rankingLabel.trim() }
       : {}),
+    // ranking_opt 그룹 귀속. 빈 문자열이면 기존 셀의 choiceGroupId 를 후처리 delete 로 제거.
+    ...(contentType === 'ranking_opt' && form.choiceGroupId ? { choiceGroupId: form.choiceGroupId } : {}),
     // ranking_opt / choice_opt 전용 spssNumericCode (Case 2/A SPSS 재-export 안정성)
     // isOther 모드면 numeric 변수가 system-missing 이라 spssNumericCode 는 의미 없음 → 강제 undefined.
     ...(((contentType === 'ranking_opt' && !form.isOtherRankingCell) ||
@@ -284,9 +286,10 @@ export function buildUpdatedCell(form: CellFormState, cell: TableCell): TableCel
       : {}),
   };
 
-  // choice_opt 에서 그룹 해제(빈 문자열)를 선택했을 때, cellBase spread 로 남아있을 수 있는
-  // choiceGroupId 를 제거한다. exactOptionalPropertyTypes 상 undefined 할당은 금지이므로 delete 사용.
-  if (contentType === 'choice_opt' && !form.choiceGroupId) {
+  // choice_opt 또는 ranking_opt 에서 그룹 해제(빈 문자열)를 선택했을 때,
+  // cellBase spread 로 남아있을 수 있는 choiceGroupId 를 제거한다.
+  // exactOptionalPropertyTypes 상 undefined 할당은 금지이므로 delete 사용.
+  if ((contentType === 'choice_opt' || contentType === 'ranking_opt') && !form.choiceGroupId) {
     delete (updatedCell as Partial<TableCell>).choiceGroupId;
   }
 

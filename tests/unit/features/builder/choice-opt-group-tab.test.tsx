@@ -126,14 +126,14 @@ describe('ChoiceOptCellTab — 옵션 그룹 지정 UI', () => {
     expect(onChoiceGroupIdChange).toHaveBeenCalledWith('');
   });
 
-  it('순위 세그먼트 버튼만 disabled 상태다', () => {
+  it('순위 세그먼트 버튼이 존재하지 않는다 (ranking_opt 전용으로 이동)', () => {
     render(<ChoiceOptCellTab {...makeProps()} />);
 
-    // 체크박스는 활성, 순위만 disabled
+    // 라디오·체크박스 버튼은 활성
     const checkboxBtn = screen.getByRole('button', { name: /체크박스/ });
-    const rankingBtn = screen.getByRole('button', { name: /순위/ });
     expect(checkboxBtn).not.toBeDisabled();
-    expect(rankingBtn).toBeDisabled();
+    // 순위 버튼은 제거됨
+    expect(screen.queryByRole('button', { name: /순위/ })).not.toBeInTheDocument();
   });
 
   it('초기 상태에서 라디오 버튼이 aria-pressed="true"다', () => {

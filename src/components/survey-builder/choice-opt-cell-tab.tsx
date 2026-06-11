@@ -102,7 +102,7 @@ export function ChoiceOptCellTab({
 
   return (
     <div className="space-y-4">
-      {/* 옵션 종류 세그먼트 — 라디오·체크박스 활성, 순위 disabled */}
+      {/* 옵션 종류 세그먼트 — 라디오·체크박스 (순위는 ranking_opt 셀 전용으로 분리) */}
       <div className="space-y-1.5">
         <Label className="text-sm font-medium">옵션 종류</Label>
         <div className="flex gap-1">
@@ -129,14 +129,6 @@ export function ChoiceOptCellTab({
             }
           >
             체크박스
-          </button>
-          <button
-            type="button"
-            disabled
-            title="추후 지원"
-            className="cursor-not-allowed rounded-md bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-400"
-          >
-            순위
           </button>
         </div>
       </div>

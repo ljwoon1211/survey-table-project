@@ -51,7 +51,7 @@ import { ChoiceGroup, TableCell } from '@/types/survey';
 import { collectChoiceOptCells } from '@/utils/choice-source';
 import { isPartialNumericInput } from '@/utils/numeric-input';
 import { getMaxSpssCode } from '@/utils/option-code-generator';
-import { hasExistingOtherRankingCell } from '@/utils/ranking-source';
+import { collectRankingOptCells, hasExistingOtherRankingCell } from '@/utils/ranking-source';
 import {
   type ContentType,
   MOBILE_DISPLAY_CELL_TYPES,
@@ -306,11 +306,11 @@ export function CellContentModal({
       // dynamic-table-editor 의 currentRowsRef 가 이미 새 셀을 포함한 상태에서 prune 이 동작한다.
       onSave(updatedCell);
 
-      // choice_opt 탭에서 그룹 변경이 있었으면 정리 후 부모에게 통보.
+      // choice_opt 또는 ranking_opt 탭에서 그룹 변경이 있었으면 정리 후 부모에게 통보.
       // prune 은 updatedCell(이 셀 반영 후)의 rowsData 기준으로 계산해야 하므로
       // onSave(셀 반영) 다음에 호출한다.
       // 실질적인 prune(빈 그룹 제거)은 dynamic-table-editor 의 onChoiceGroupsChange 핸들러에서 수행한다.
-      if (contentType === 'choice_opt') {
+      if (contentType === 'choice_opt' || contentType === 'ranking_opt') {
         onChoiceGroupsChange?.(editChoiceGroups);
       }
 
@@ -328,9 +328,12 @@ export function CellContentModal({
           // prune 은 updatedRowsData 기준으로 계산해 빈 그룹이 DB 에 남지 않도록 한다.
           // 마지막 멤버 해제로 전부 비면 빈 배열을 명시 저장해야 phantom 그룹이 남지 않는다.
           const prunedChoiceGroups = (() => {
-            if (contentType !== 'choice_opt') return undefined;
+            if (contentType !== 'choice_opt' && contentType !== 'ranking_opt') return undefined;
             const memberIds = new Set(
-              collectChoiceOptCells(updatedRowsData)
+              [
+                ...collectChoiceOptCells(updatedRowsData),
+                ...collectRankingOptCells(updatedRowsData),
+              ]
                 .map((c) => c.choiceGroupId)
                 .filter((id): id is string => !!id),
             );
@@ -1045,6 +1048,11 @@ export function CellContentModal({
               onSpssNumericCodeChange={setCellSpssNumericCode}
               isOtherRankingCell={isOtherRankingCell}
               onIsOtherRankingCellChange={setIsOtherRankingCell}
+              choiceGroups={editChoiceGroups}
+              groupMemberCounts={groupMemberCounts}
+              choiceGroupId={choiceGroupId}
+              onChoiceGroupIdChange={setChoiceGroupId}
+              onChoiceGroupsChange={setEditChoiceGroups}
             />
           </TabsContent>
 
