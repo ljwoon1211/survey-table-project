@@ -31,21 +31,17 @@ function buildRankingOptLabel(cell: TableCell, fallback: string): string {
 }
 
 /**
- * 순위형 질문의 옵션 소스를 통합 반환.
- * - 수동 (optionsSource !== 'table'): question.options 그대로
- * - 테이블 옵션 (optionsSource === 'table'): 자신의 tableRowsData 에서 'ranking_opt' 셀을 옵션으로 수집
- *   - id/value: cell.id (UUID — 셀 이동/라벨 변경에 강건)
- *   - label: content > rankingLabel > '(라벨 없음)'
- *   - spssNumericCode: 셀의 spssNumericCode 우선, 없으면 수집 순서 1-based 인덱스
- *   - isOtherRankingCell=true 셀은 value=RANKING_OTHER_VALUE 로 변환, spssNumericCode 없음.
- *     선택 시 기타 자유입력 UI 가 나타나고 `_rk{k}` 는 system-missing 으로 기록됨.
+ * ranking_opt 셀 배열을 QuestionOption 배열로 변환.
+ *
+ * - id/value: cell.id (UUID — 셀 이동/라벨 변경에 강건)
+ * - label: content > rankingLabel > '(라벨 없음)'
+ * - spssNumericCode: 셀의 spssNumericCode 우선, 없으면 **전달된 셀 배열 내 1-based 순번**.
+ *   비그룹 경로는 전체 셀을 전달하므로 기존 질문-전체 순번과 동일(동작 불변).
+ *   그룹별 호출 시 자연스럽게 그룹 내 순번이 된다(checkbox 그룹 컨벤션).
+ * - isOtherRankingCell=true 셀: value=RANKING_OTHER_VALUE, spssNumericCode 없음.
+ *   선택 시 기타 자유입력 UI 가 나타나고 `_rk{k}` 는 system-missing 으로 기록됨.
  */
-export function resolveRankingOptions(question: Question): QuestionOption[] {
-  if (question.rankingConfig?.optionsSource !== 'table') {
-    return question.options ?? [];
-  }
-
-  const cells = collectRankingOptCells(question.tableRowsData);
+export function resolveRankingOptionsFromCells(cells: TableCell[]): QuestionOption[] {
   return cells.map((cell, idx) => {
     if (cell.isOtherRankingCell === true) {
       return {
@@ -61,6 +57,21 @@ export function resolveRankingOptions(question: Question): QuestionOption[] {
       spssNumericCode: cell.spssNumericCode ?? idx + 1,
     };
   });
+}
+
+/**
+ * 순위형 질문의 옵션 소스를 통합 반환.
+ * - 수동 (optionsSource !== 'table'): question.options 그대로
+ * - 테이블 옵션 (optionsSource === 'table'): 자신의 tableRowsData 에서 'ranking_opt' 셀을 옵션으로 수집.
+ *   셀→옵션 변환은 resolveRankingOptionsFromCells 에 위임.
+ */
+export function resolveRankingOptions(question: Question): QuestionOption[] {
+  if (question.rankingConfig?.optionsSource !== 'table') {
+    return question.options ?? [];
+  }
+
+  const cells = collectRankingOptCells(question.tableRowsData);
+  return resolveRankingOptionsFromCells(cells);
 }
 
 /**
