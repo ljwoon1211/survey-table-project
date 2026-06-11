@@ -282,6 +282,93 @@ describe('isQuestionAnswered — 그룹별 선택 radio (choiceGroups)', () => {
   });
 });
 
+// ── grouped 순위형 픽스처 ──
+// rnk1 그룹(cellR1, cellR2), rnk2 그룹(cellR3), 미소속 ranking_opt 없음
+function groupedRankingQ(): Question {
+  return {
+    id: 'qrnk',
+    type: 'ranking',
+    title: '그룹 순위형',
+    required: true,
+    order: 0,
+    rankingConfig: { optionsSource: 'table' },
+    tableColumns: [{ id: 'c1', label: '열' }],
+    tableRowsData: [
+      {
+        id: 'r1',
+        label: '',
+        cells: [
+          { id: 'cellR1', type: 'ranking_opt', content: '항목1', choiceGroupId: 'rgrp1' },
+          { id: 'cellR2', type: 'ranking_opt', content: '항목2', choiceGroupId: 'rgrp1' },
+          { id: 'cellR3', type: 'ranking_opt', content: '항목3', choiceGroupId: 'rgrp2' },
+        ],
+      },
+    ],
+    choiceGroups: [
+      { id: 'rgrp1', type: 'ranking', groupKey: 'rnk1', label: '그룹1' },
+      { id: 'rgrp2', type: 'ranking', groupKey: 'rnk2', label: '그룹2' },
+    ],
+  } as unknown as Question;
+}
+
+describe('isQuestionAnswered — grouped 순위형 그룹당 1순위 검증', () => {
+  it('두 그룹 모두 1개 이상 → 응답 충족', () => {
+    const gq = groupedRankingQ();
+    expect(
+      isQuestionAnswered(gq, {
+        rnk1: [{ rank: 1, optionValue: 'cellR1' }],
+        rnk2: [{ rank: 1, optionValue: 'cellR3' }],
+      }),
+    ).toBe(true);
+  });
+
+  it('rnk2 키 없음 → 미응답', () => {
+    const gq = groupedRankingQ();
+    expect(
+      isQuestionAnswered(gq, {
+        rnk1: [{ rank: 1, optionValue: 'cellR1' }],
+      }),
+    ).toBe(false);
+  });
+
+  it('rnk2 빈 배열 → 미응답', () => {
+    const gq = groupedRankingQ();
+    expect(
+      isQuestionAnswered(gq, {
+        rnk1: [{ rank: 1, optionValue: 'cellR1' }],
+        rnk2: [],
+      }),
+    ).toBe(false);
+  });
+
+  it('legacy flat 배열 응답(RankingAnswer[]) + grouped 질문 → 미응답(알려진 엣지)', () => {
+    const gq = groupedRankingQ();
+    // 이식 직후 진행중 응답이 flat 배열로 저장된 경우 — 맵이 아니므로 미충족 처리
+    expect(
+      isQuestionAnswered(gq, [
+        { rank: 1, optionValue: 'cellR1' },
+        { rank: 1, optionValue: 'cellR3' },
+      ]),
+    ).toBe(false);
+  });
+
+  it('undefined/null 은 상단 가드로 미응답', () => {
+    const gq = groupedRankingQ();
+    expect(isQuestionAnswered(gq, undefined)).toBe(false);
+    expect(isQuestionAnswered(gq, null)).toBe(false);
+  });
+
+  it('비그룹 순위형: 빈 배열도 응답으로 취급(기존 동작 불변)', () => {
+    expect(isQuestionAnswered(q('ranking'), [])).toBe(true);
+  });
+
+  it('비그룹 순위형: flat RankingAnswer[] 도 응답으로 취급(기존 동작 불변)', () => {
+    expect(
+      isQuestionAnswered(q('ranking'), [{ rank: 1, optionValue: 'a' }]),
+    ).toBe(true);
+  });
+});
+
 describe('isQuestionAnswered — checkbox 그룹 검증', () => {
   it('cb1 에 1개 이상 선택 + rad1 선택 → 응답 충족', () => {
     const gq = groupedWithCheckboxQ();
