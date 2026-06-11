@@ -85,6 +85,29 @@ describe('collectRadioGroups', () => {
     });
     expect(collectRadioGroups(noDefault).map((g) => g.groupKey)).toEqual(['rad1']);
   });
+
+  it('멤버 0인 명시 그룹은 collectRadioGroups 에서 제외된다', () => {
+    // rad1 은 멤버 있음, rad2 는 멤버 없음(phantom)
+    const withPhantom = makeQuestion({
+      choiceGroups: [rad1, rad2],
+      tableRowsData: [{ id: 'r1', label: '행1', cells: [
+        { id: 'cellA', content: 'UHD', type: 'choice_opt', choiceGroupId: 'g1' },
+        { id: 'cellD', content: '미소속', type: 'choice_opt' },
+      ] }],
+    });
+    const groups = collectRadioGroups(withPhantom);
+    // rad2(g2)는 멤버 0이므로 제외. rad1 + default(미소속 셀) 만 반환.
+    expect(groups.map((g) => g.groupKey)).toEqual(['rad1', DEFAULT_GROUP_KEY]);
+  });
+
+  it('멤버 0인 명시 그룹만 있을 때 미소속 셀이 없으면 빈 배열', () => {
+    // 모든 그룹이 phantom 이고 미소속 셀도 없는 극단 케이스
+    const allPhantom = makeQuestion({
+      choiceGroups: [rad1, rad2],
+      tableRowsData: [{ id: 'r1', label: '행1', cells: [] }],
+    });
+    expect(collectRadioGroups(allPhantom)).toEqual([]);
+  });
 });
 
 describe('nextGroupKey', () => {

@@ -78,6 +78,92 @@ describe('radio 옵션 그룹 export — generateSPSSColumns', () => {
     const cols = generateSPSSColumns([plain]);
     expect(cols.filter((c) => c.questionId === 'q2').map((c) => c.type)).toEqual(['single']);
   });
+
+});
+
+describe('radio 옵션 그룹 export — allowTextInput 사이드카 텍스트 변수', () => {
+  // allowTextInput 이 있는 셀을 포함하는 픽스처
+  const groupedWithText = {
+    id: 'q_txt',
+    type: 'radio',
+    title: 'TV 텍스트 질문',
+    required: false,
+    order: 1,
+    questionCode: 'QT',
+    choiceGroups: [
+      { id: 'g1', groupKey: 'rad1', type: 'radio', label: 'TV보유' },
+    ],
+    tableRowsData: [
+      {
+        id: 'r1',
+        label: '행1',
+        cells: [
+          { id: 'cellA', content: 'UHD', type: 'choice_opt', choiceGroupId: 'g1', spssNumericCode: 1, allowTextInput: true },
+          { id: 'cellB', content: 'FHD', type: 'choice_opt', choiceGroupId: 'g1', spssNumericCode: 2 },
+        ],
+      },
+    ],
+  } as unknown as Question;
+
+  it('allowTextInput 멤버 셀마다 option-text 사이드카 변수를 생성한다', () => {
+    const cols = generateSPSSColumns([groupedWithText]);
+    const names = cols.map((c) => c.spssVarName);
+    // 그룹 주변수
+    expect(names).toContain('QT_rad1');
+    // cellA 에 allowTextInput=true → 사이드카 변수
+    expect(names).toContain('QT_rad1_1_text');
+    // cellB 는 allowTextInput 없음 → 사이드카 없음
+    expect(names).not.toContain('QT_rad1_2_text');
+  });
+
+  it('사이드카 컬럼은 type=option-text 이고 optionId=cell.id 이다', () => {
+    const cols = generateSPSSColumns([groupedWithText]);
+    const sidecar = cols.find((c) => c.spssVarName === 'QT_rad1_1_text');
+    expect(sidecar?.type).toBe('option-text');
+    expect(sidecar?.optionId).toBe('cellA');
+  });
+
+  it('buildDataRows 에서 사이드카 옵션텍스트를 __optTexts__ 경로로 추출한다', () => {
+    const cols = generateSPSSColumns([groupedWithText]);
+    const sub = makeSubmission({
+      q_txt: { rad1: 'cellA' },
+      __optTexts__: { q_txt: { cellA: '직접입력' } },
+    });
+    const rows = buildDataRows(cols, [groupedWithText], [sub]);
+    const row = rows[0];
+    if (row == null) throw new Error('row 없음');
+    const sidecarIdx = cols.findIndex((c) => c.spssVarName === 'QT_rad1_1_text');
+    expect(row[sidecarIdx]).toBe('직접입력');
+  });
+
+  it('멤버 0인 phantom 그룹에 대한 choice-group 변수는 생성되지 않는다', () => {
+    // rad2 그룹은 선언됐지만 소속 셀이 없는 phantom
+    const withPhantom = {
+      ...grouped,
+      id: 'q_phantom',
+      questionCode: 'QP',
+      choiceGroups: [
+        { id: 'g1', groupKey: 'rad1', type: 'radio', label: 'TV보유' },
+        { id: 'g_phantom', groupKey: 'rad2', type: 'radio', label: '팬텀' },
+      ],
+      tableRowsData: [
+        {
+          id: 'r1',
+          label: '행1',
+          cells: [
+            // cellA/cellB 는 g1 소속, g_phantom 에는 아무 셀도 없음
+            { id: 'cellA', content: 'UHD', type: 'choice_opt', choiceGroupId: 'g1', spssNumericCode: 1 },
+            { id: 'cellB', content: 'FHD', type: 'choice_opt', choiceGroupId: 'g1', spssNumericCode: 2 },
+          ],
+        },
+      ],
+    } as unknown as Question;
+    const cols = generateSPSSColumns([withPhantom]);
+    const names = cols.filter((c) => c.questionId === 'q_phantom').map((c) => c.spssVarName);
+    // rad1 변수만 생성. rad2(phantom)는 없어야 한다.
+    expect(names).toContain('QP_rad1');
+    expect(names).not.toContain('QP_rad2');
+  });
 });
 
 describe('radio 옵션 그룹 export — buildDataRows 응답값 변환', () => {

@@ -41,6 +41,9 @@ export function collectRadioGroups(question: Question): RadioGroupWithCells[] {
   for (const group of question.choiceGroups ?? []) {
     if (group.type !== 'radio') continue;
     const cells = allCells.filter((c) => c.choiceGroupId === group.id);
+    // 멤버 0 그룹은 응답 불가능한 요구가 되므로 제외한다 — 행/열 삭제 등으로
+    // prune 을 비껴간 phantom 그룹(이미 snapshot 에 박힌 것 포함)을 무해화.
+    if (cells.length === 0) continue;
     for (const c of cells) claimed.add(c.id);
     groups.push({ groupKey: group.groupKey, label: group.label, cells });
   }

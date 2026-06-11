@@ -220,4 +220,34 @@ describe('isQuestionAnswered — 그룹별 선택 radio (choiceGroups)', () => {
     expect(isQuestionAnswered(q('radio'), 'opt1')).toBe(true);
     expect(isQuestionAnswered(q('radio'), '')).toBe(false);
   });
+
+  it('phantom 그룹(멤버 0) 이 있어도 살아있는 그룹만 채우면 isQuestionAnswered=true', () => {
+    // rad2 는 멤버가 없는 phantom — collectRadioGroups 가 제외하므로 요구 그룹이 줄어든다.
+    const withPhantom: Question = {
+      id: 'qp',
+      type: 'radio',
+      title: '팬텀 그룹 테스트',
+      required: true,
+      order: 0,
+      tableColumns: [{ id: 'c1', label: '열' }],
+      tableRowsData: [
+        {
+          id: 'r1',
+          label: '',
+          cells: [
+            { id: 'cellA', type: 'choice_opt', content: '', choiceGroupId: 'grp1' },
+            // grp2 에 소속된 셀 없음 — phantom
+          ],
+        },
+      ],
+      choiceGroups: [
+        { id: 'grp1', type: 'radio', groupKey: 'rad1', label: '그룹1' },
+        { id: 'grp2', type: 'radio', groupKey: 'rad2', label: '팬텀' },
+      ],
+    } as unknown as Question;
+    // rad1 만 선택해도 살아있는 그룹은 rad1 뿐이므로 응답 충족
+    expect(isQuestionAnswered(withPhantom, { rad1: 'cellA' })).toBe(true);
+    // 아무것도 선택 안 하면 미응답
+    expect(isQuestionAnswered(withPhantom, {})).toBe(false);
+  });
 });
