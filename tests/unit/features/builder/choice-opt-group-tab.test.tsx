@@ -126,13 +126,131 @@ describe('ChoiceOptCellTab — 옵션 그룹 지정 UI', () => {
     expect(onChoiceGroupIdChange).toHaveBeenCalledWith('');
   });
 
-  it('체크박스·순위 세그먼트 버튼은 disabled 상태다', () => {
+  it('순위 세그먼트 버튼만 disabled 상태다', () => {
     render(<ChoiceOptCellTab {...makeProps()} />);
 
-    // 라디오는 활성, 나머지는 disabled
+    // 체크박스는 활성, 순위만 disabled
     const checkboxBtn = screen.getByRole('button', { name: /체크박스/ });
     const rankingBtn = screen.getByRole('button', { name: /순위/ });
-    expect(checkboxBtn).toBeDisabled();
+    expect(checkboxBtn).not.toBeDisabled();
     expect(rankingBtn).toBeDisabled();
+  });
+
+  it('초기 상태에서 라디오 버튼이 aria-pressed="true"다', () => {
+    render(<ChoiceOptCellTab {...makeProps()} />);
+
+    const radioBtn = screen.getByRole('button', { name: /라디오/ });
+    const checkboxBtn = screen.getByRole('button', { name: /체크박스/ });
+    expect(radioBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(checkboxBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('체크박스 버튼 클릭 시 드롭다운이 checkbox 그룹만 표시하고 "+ 새 그룹 (cb1)" 발번 문구가 나타난다', async () => {
+    const cb1: ChoiceGroup = { id: 'cg1', groupKey: 'cb1', type: 'checkbox', label: '구매품목' };
+    render(
+      <ChoiceOptCellTab
+        {...makeProps({
+          choiceGroups: [rad1, rad2, cb1],
+          groupMemberCounts: { g1: 2, g2: 3, cg1: 1 },
+        })}
+      />,
+    );
+
+    const checkboxBtn = screen.getByRole('button', { name: /체크박스/ });
+    await userEvent.click(checkboxBtn);
+
+    // 체크박스 그룹만 드롭다운에 표시되어야 한다
+    expect(screen.getByRole('option', { name: /구매품목/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /TV보유/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /구매의향/ })).not.toBeInTheDocument();
+
+    // "+ 새 그룹"에 cb2 발번 문구가 있어야 한다
+    expect(screen.getByRole('option', { name: /\+ 새 그룹 \(cb2\)/ })).toBeInTheDocument();
+  });
+
+  it('체크박스 세그먼트에서 "+ 새 그룹" 선택 시 type이 checkbox인 cb1 그룹이 생성된다', async () => {
+    const onChoiceGroupsChange = vi.fn();
+    const onChoiceGroupIdChange = vi.fn();
+
+    render(
+      <ChoiceOptCellTab
+        {...makeProps({
+          choiceGroups: [rad1, rad2],
+          groupMemberCounts: { g1: 2, g2: 3 },
+          onChoiceGroupsChange,
+          onChoiceGroupIdChange,
+        })}
+      />,
+    );
+
+    // 체크박스 세그먼트로 전환
+    const checkboxBtn = screen.getByRole('button', { name: /체크박스/ });
+    await userEvent.click(checkboxBtn);
+
+    // "+ 새 그룹 (cb1)" 선택
+    const select = screen.getByRole('combobox', { name: /그룹/ });
+    await userEvent.selectOptions(select, '__new__');
+
+    // 새 그룹이 checkbox type, cb1 groupKey로 생성되어야 한다
+    expect(onChoiceGroupsChange).toHaveBeenCalledOnce();
+    const newGroups: ChoiceGroup[] = onChoiceGroupsChange.mock.calls[0]![0] as ChoiceGroup[];
+    const newGroup = newGroups[newGroups.length - 1]!;
+    expect(newGroup.type).toBe('checkbox');
+    expect(newGroup.groupKey).toBe('cb1');
+
+    expect(onChoiceGroupIdChange).toHaveBeenCalledWith(newGroup.id);
+  });
+
+  it('라디오에서 체크박스로 종류 전환 시 onChoiceGroupIdChange("")가 호출된다', async () => {
+    const onChoiceGroupIdChange = vi.fn();
+
+    render(
+      <ChoiceOptCellTab
+        {...makeProps({
+          choiceGroups: [rad1],
+          groupMemberCounts: { g1: 1 },
+          choiceGroupId: 'g1',
+          onChoiceGroupIdChange,
+        })}
+      />,
+    );
+
+    const checkboxBtn = screen.getByRole('button', { name: /체크박스/ });
+    await userEvent.click(checkboxBtn);
+
+    // 다른 type 그룹에 남지 않도록 소속 해제 호출
+    expect(onChoiceGroupIdChange).toHaveBeenCalledWith('');
+  });
+
+  it('cb 그룹 소속 셀로 열리면 세그먼트가 체크박스 선택 상태(aria-pressed)로 초기화된다', () => {
+    const cb1: ChoiceGroup = { id: 'cg1', groupKey: 'cb1', type: 'checkbox', label: '구매품목' };
+
+    render(
+      <ChoiceOptCellTab
+        {...makeProps({
+          choiceGroups: [rad1, cb1],
+          groupMemberCounts: { g1: 2, cg1: 1 },
+          choiceGroupId: 'cg1',
+        })}
+      />,
+    );
+
+    const radioBtn = screen.getByRole('button', { name: /라디오/ });
+    const checkboxBtn = screen.getByRole('button', { name: /체크박스/ });
+    expect(checkboxBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(radioBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('체크박스 종류에서 안내 문구가 체크박스용으로 바뀐다', async () => {
+    render(<ChoiceOptCellTab {...makeProps()} />);
+
+    // 초기(라디오) 안내문
+    expect(screen.getByText(/하나만 선택됩니다/)).toBeInTheDocument();
+
+    // 체크박스로 전환
+    await userEvent.click(screen.getByRole('button', { name: /체크박스/ }));
+
+    expect(screen.getByText(/여러 개를 선택할 수 있습니다/)).toBeInTheDocument();
+    expect(screen.queryByText(/하나만 선택됩니다/)).not.toBeInTheDocument();
   });
 });

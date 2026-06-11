@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -54,17 +56,34 @@ export function ChoiceOptCellTab({
   onChoiceGroupIdChange,
   onChoiceGroupsChange,
 }: ChoiceOptCellTabProps) {
-  const radioGroups = choiceGroups.filter((g) => g.type === 'radio');
-  const nextKey = nextGroupKey(radioGroups, 'radio');
-  const currentGroup = radioGroups.find((g) => g.id === choiceGroupId);
+  // 현재 셀이 소속된 그룹의 type을 초기값으로 사용하고, 미소속이면 '라디오' 기본값
+  const currentGroupType =
+    choiceGroups.find((g) => g.id === choiceGroupId)?.type ?? 'radio';
+  // ranking 그룹에 소속된 경우도 '라디오'로 폴백 (세그먼트에 ranking 없음)
+  const initialSelectedType: 'radio' | 'checkbox' =
+    currentGroupType === 'checkbox' ? 'checkbox' : 'radio';
+
+  const [selectedType, setSelectedType] = useState<'radio' | 'checkbox'>(initialSelectedType);
+
+  // 선택된 종류의 그룹만 드롭다운에 표시
+  const filteredGroups = choiceGroups.filter((g) => g.type === selectedType);
+  const nextKey = nextGroupKey(filteredGroups, selectedType);
+  const currentGroup = filteredGroups.find((g) => g.id === choiceGroupId);
+
+  function handleTypeSelect(type: 'radio' | 'checkbox') {
+    if (type === selectedType) return;
+    setSelectedType(type);
+    // 다른 type 그룹에 남지 않도록 소속 해제
+    onChoiceGroupIdChange('');
+  }
 
   function handleGroupSelectChange(value: string) {
     if (value === '__new__') {
-      const key = nextGroupKey(choiceGroups, 'radio');
+      const key = nextGroupKey(choiceGroups, selectedType);
       const newGroup: ChoiceGroup = {
         id: generateId(),
         groupKey: key,
-        type: 'radio',
+        type: selectedType,
         label: '',
       };
       onChoiceGroupsChange([...choiceGroups, newGroup]);
@@ -83,22 +102,31 @@ export function ChoiceOptCellTab({
 
   return (
     <div className="space-y-4">
-      {/* 옵션 종류 세그먼트 — 라디오만 활성 */}
+      {/* 옵션 종류 세그먼트 — 라디오·체크박스 활성, 순위 disabled */}
       <div className="space-y-1.5">
         <Label className="text-sm font-medium">옵션 종류</Label>
         <div className="flex gap-1">
           <button
             type="button"
-            aria-pressed="true"
-            className="rounded-md bg-blue-500 px-3 py-1.5 text-xs font-medium text-white"
+            aria-pressed={selectedType === 'radio'}
+            onClick={() => handleTypeSelect('radio')}
+            className={
+              selectedType === 'radio'
+                ? 'rounded-md bg-blue-500 px-3 py-1.5 text-xs font-medium text-white'
+                : 'rounded-md bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-200'
+            }
           >
             라디오
           </button>
           <button
             type="button"
-            disabled
-            title="추후 지원"
-            className="cursor-not-allowed rounded-md bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-400"
+            aria-pressed={selectedType === 'checkbox'}
+            onClick={() => handleTypeSelect('checkbox')}
+            className={
+              selectedType === 'checkbox'
+                ? 'rounded-md bg-blue-500 px-3 py-1.5 text-xs font-medium text-white'
+                : 'rounded-md bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-200'
+            }
           >
             체크박스
           </button>
@@ -127,7 +155,7 @@ export function ChoiceOptCellTab({
             className="flex-1 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">(그룹 없음)</option>
-            {radioGroups.map((g) => (
+            {filteredGroups.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.groupKey}
                 {g.label ? ` — ${g.label}` : ''}
@@ -147,7 +175,9 @@ export function ChoiceOptCellTab({
           />
         </div>
         <p className="text-xs text-gray-500">
-          같은 그룹의 셀들 중 하나만 선택됩니다. 그룹 라벨 수정은 그룹 전체에 반영됩니다.
+          {selectedType === 'checkbox'
+            ? '같은 그룹에서 여러 개를 선택할 수 있습니다. 그룹 라벨 수정은 그룹 전체에 반영됩니다.'
+            : '같은 그룹의 셀들 중 하나만 선택됩니다. 그룹 라벨 수정은 그룹 전체에 반영됩니다.'}
         </p>
       </div>
 
