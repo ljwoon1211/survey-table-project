@@ -175,6 +175,11 @@ export function CellContentModal({
     spssVarType,
     spssMeasure,
   } = form;
+  // 순위 옵션(ranking_opt, Case 2)은 순위형 질문의 내장 테이블에서만 렌더러가 있다.
+  // 테이블형 질문에서는 응답 select 가 나오지 않는 막다른 조합이 되므로 탭을 숨긴다.
+  // 단, 이미 ranking_opt 인 셀(과거 데이터)은 편집/다른 타입 전환이 가능하도록 노출 유지.
+  const parentQuestionType = questions.find((q) => q.id === currentQuestionId)?.type;
+  const showRankingOptTab = parentQuestionType === 'ranking' || contentType === 'ranking_opt';
   const {
     setContentType,
     setTextContent,
@@ -693,7 +698,7 @@ export function CellContentModal({
             }
           }}
         >
-          <TabsList className="grid w-full grid-cols-10">
+          <TabsList className={`grid w-full ${showRankingOptTab ? 'grid-cols-10' : 'grid-cols-9'}`}>
             <TabsTrigger value="text" className="flex items-center gap-2">
               <Type className="h-4 w-4" />
               텍스트
@@ -726,10 +731,12 @@ export function CellContentModal({
               <ListOrdered className="h-4 w-4" />
               순위형
             </TabsTrigger>
-            <TabsTrigger value="ranking_opt" className="flex items-center gap-2">
-              <Tag className="h-4 w-4" />
-              순위 옵션
-            </TabsTrigger>
+            {showRankingOptTab && (
+              <TabsTrigger value="ranking_opt" className="flex items-center gap-2">
+                <Tag className="h-4 w-4" />
+                순위 옵션
+              </TabsTrigger>
+            )}
             <TabsTrigger value="choice_opt" className="flex items-center gap-2">
               <Tag className="h-4 w-4" />
               보기 옵션
