@@ -685,12 +685,14 @@ export async function preflightRecipients(args: {
  * 주어진 컨택 id 중 "발송 가능한 email cipher" 를 가진 id Set 반환.
  *
  * createCampaign(mail-campaigns.service.ts) 의 발송 명단 산출과 동일 기준:
- *   - 한 컨택에 email 컬럼이 여러 개면 column_key 알파벳 순 첫 번째만 사용.
- *   - cipher 복호화 결과가 빈 문자열/공백뿐이면 제외.
- *   - 복호화 자체가 throw 하면(키 미스매치/cipher 손상) 제외.
+ *   - 한 컨택에 email 컬럼이 여러 개면 column_key 알파벳 순으로 훑어
+ *     "복호화에 성공한(빈 문자열/공백 아님) 첫 컬럼" 을 발송 email 로 채택.
+ *   - 첫 컬럼이 blank/공백/복호화 실패면 다음 컬럼으로 폴백한다.
+ *   - 어떤 컬럼도 usable 하지 않으면 제외.
  *
  * preflight 가 EXISTS(contact_pii) 만으로 valid 를 세면 위 케이스를 놓쳐 과대 보고하므로,
- * 후보(EXISTS 통과)에 한해 실제 복호화로 재검증한다.
+ * 후보(EXISTS 통과)에 한해 실제 복호화로 재검증한다. send path 가 SoT 이므로
+ * "첫 usable 컬럼" 폴백 동작까지 동일하게 맞춰야 큐잉 수와 preflight 카운트가 일치한다.
  */
 async function fetchContactIdsWithUsableEmail(
   contactIds: readonly string[],
@@ -713,15 +715,20 @@ async function fetchContactIdsWithUsableEmail(
     )
     .orderBy(asc(contactPii.contactTargetId), asc(contactPii.columnKey));
 
+  // send path(createCampaign) 와 동일하게 "첫 usable 컬럼" 폴백:
+  // blank/공백/복호화 실패 컬럼에서는 seen 을 마킹하지 않고 다음 컬럼으로 넘어간다.
+  // 한 컨택이라도 usable 컬럼이 하나 나오면 그 시점에만 seen 처리해 중복을 차단한다.
   const seen = new Set<string>();
   for (const r of rows) {
-    if (seen.has(r.contactTargetId)) continue; // 첫 컬럼만
-    seen.add(r.contactTargetId);
+    if (seen.has(r.contactTargetId)) continue; // 이미 usable 컬럼을 찾은 컨택
     try {
       const email = decryptPii(r.cipher);
-      if (email && email.trim()) usable.add(r.contactTargetId);
+      if (email && email.trim()) {
+        usable.add(r.contactTargetId);
+        seen.add(r.contactTargetId);
+      }
     } catch {
-      // 복호화 실패 행은 발송 불가 — usable 에 넣지 않음
+      // 복호화 실패 컬럼은 건너뛰고 다음 컬럼으로 폴백 (seen 미마킹)
     }
   }
   return usable;

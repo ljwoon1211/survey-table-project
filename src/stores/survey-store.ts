@@ -273,9 +273,11 @@ export const useSurveyBuilderStore = create<SurveyBuilderState>()(
           : [];
         const allOrders = [
           ...siblingGroups.map((g) => g.order),
-          ...siblingQuestions.map(() => 0), // 질문 수만큼 슬롯 차지
+          ...siblingQuestions.map((q) => q.order), // 질문의 실제 order 값
         ];
-        // 삭제로 생긴 order 공백 때문에 개수 기반 계산은 충돌을 일으킨다.
+        // 삭제로 생긴 order 공백과 형제 질문 order 를 함께 고려해야 한다.
+        // 형제 질문 order 를 0 으로 뭉개면 maxOrder 가 낮아져 새 그룹이
+        // 인터리브 슬롯 중간에 끼어든다(append 가 아니라 interleave).
         // 실제 order 값의 최댓값을 사용해 항상 마지막 슬롯 뒤에 배치한다.
         const maxOrder = allOrders.length > 0 ? Math.max(...allOrders) : -1;
 

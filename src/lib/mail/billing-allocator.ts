@@ -5,7 +5,9 @@
  *  - 단체 메일 정렬: `startedAt ASC`. 같은 시각이면 `campaignId` 사전순.
  *  - 누적 한도까지는 포함분(0원), 그 이후는 초과분 (per-1K KRW 단가).
  *  - 라운딩: 사이클 총 초과비 = round(sum(overage_count * per1k) / 1000) 을 먼저 확정 → 회차별 round 후
- *    sum(회차) 와 사이클 총 사이의 차이를 마지막 회차가 흡수. 회차 합 ≡ 사이클 합 보장.
+ *    sum(회차) 와 사이클 총 사이의 차이(drift)를 초과분이 있는 회차가 흡수. 양수는 마지막 초과 회차가,
+ *    음수는 초과 회차에서 차감하되 회차별 0 clamp 후 잔여분을 다음 초과 회차로 이월. 모든 회차 cost>=0 +
+ *    회차 합 ≡ 사이클 합 보장.
  *  - 빈 단체 메일 입력은 비용 0.
  */
 
@@ -99,23 +101,36 @@ export function allocateCycleCosts(args: {
   const cycleOverageKrw = Math.round(cycleOverageMicros / 1000);
 
   // 2차 패스: 회차별 round 후 잔액 흡수.
-  // 잔액은 "실제 초과분이 있는 마지막 회차"가 흡수한다. 초과분이 0인 회차에
-  // 음수 drift 를 넣으면 그 회차 costKrw 가 음수가 되어 청구 UI 에 노출되므로 금지.
+  // 잔액은 "실제 초과분이 있는 회차"만 흡수한다. 초과분이 0인 회차에
+  // drift 를 넣으면 그 회차 costKrw 가 양/음으로 흔들려 청구 UI 에 노출되므로 금지.
   const preliminary = breakdown.map((b) => Math.round((b.overage * per1k) / 1000));
   if (preliminary.length > 0) {
     const sumPreliminary = preliminary.reduce((a, b) => a + b, 0);
-    const drift = cycleOverageKrw - sumPreliminary;
+    let drift = cycleOverageKrw - sumPreliminary;
     if (drift !== 0) {
-      let absorbIdx = -1;
+      // 초과분이 있는 회차 인덱스 (뒤에서 앞 순서).
+      const overageIdx: number[] = [];
       for (let i = breakdown.length - 1; i >= 0; i -= 1) {
-        if ((breakdown[i]?.overage ?? 0) > 0) {
-          absorbIdx = i;
-          break;
-        }
+        if ((breakdown[i]?.overage ?? 0) > 0) overageIdx.push(i);
       }
-      const target = absorbIdx >= 0 ? preliminary[absorbIdx] : undefined;
-      if (absorbIdx >= 0 && target !== undefined) {
-        preliminary[absorbIdx] = target + drift;
+      if (drift > 0) {
+        // 양수 drift 는 마지막 초과 회차가 전부 흡수해도 음수가 될 수 없다.
+        const idx = overageIdx[0];
+        if (idx !== undefined) {
+          preliminary[idx] = (preliminary[idx] ?? 0) + drift;
+          drift = 0;
+        }
+      } else {
+        // 음수 drift 는 초과 회차에서 차감하되 회차별로 0 에서 clamp 하고
+        // 남는 음수 drift 를 다음 초과 회차로 이월(redistribute)한다.
+        // cycleOverageKrw >= 0 + sum(preliminary) >= |drift| 이므로 항상 0 으로 수렴.
+        for (const idx of overageIdx) {
+          if (drift === 0) break;
+          const current = preliminary[idx] ?? 0;
+          const applied = Math.max(current + drift, 0);
+          drift += current - applied; // 0 으로 clamp 되어 남은 음수만큼 다음으로 이월.
+          preliminary[idx] = applied;
+        }
       }
     }
   }

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { useSurveyBuilderStore } from '@/stores/survey-store';
-import type { QuestionGroup, Survey } from '@/types/survey';
+import type { Question, QuestionGroup, Survey } from '@/types/survey';
 
 // addGroup 이 형제 그룹의 실제 order 값(개수 아님)을 기준으로 새 order 를 계산하는지 검증한다.
 // deleteGroup 은 형제 order 를 재정렬하지 않으므로 삭제 후에는 order 공백이 생긴다.
@@ -19,7 +19,18 @@ function makeGroup(id: string, order: number, parentGroupId?: string): QuestionG
   };
 }
 
-function makeSurvey(groups: QuestionGroup[]): Survey {
+function makeQuestion(id: string, order: number, groupId: string): Question {
+  return {
+    id,
+    type: 'text',
+    title: id,
+    required: false,
+    order,
+    groupId,
+  };
+}
+
+function makeSurvey(groups: QuestionGroup[], questions: Question[] = []): Survey {
   return {
     id: SURVEY_ID,
     title: 'test',
@@ -27,7 +38,7 @@ function makeSurvey(groups: QuestionGroup[]): Survey {
     slug: '',
     privateToken: 'token',
     groups,
-    questions: [],
+    questions,
     lookups: [],
     settings: useSurveyBuilderStore.getState().currentSurvey.settings,
     createdAt: new Date(),
@@ -82,6 +93,48 @@ describe('survey-store addGroup order 계산', () => {
       (g) => g.name === 'child-new',
     );
     expect(newGroup?.order).toBe(2);
+  });
+
+  it('형제 질문이 있고 형제 그룹이 없을 때 마지막 질문 뒤에 배치한다', () => {
+    // parent 하위에 질문 order [0, 1, 2], 형제 그룹 없음.
+    // 형제 질문 order 를 0 으로 뭉개는 버그라면 maxOrder=0 → 새 그룹 order=1 이 되어
+    // 인터리브 시 질문(order 2) 앞에 끼어든다(interleave). 실제 order 기준이면 order=3.
+    const parentId = 'parent';
+    useSurveyBuilderStore.getState().setSurvey(
+      makeSurvey(
+        [makeGroup(parentId, 0)],
+        [
+          makeQuestion('q-a', 0, parentId),
+          makeQuestion('q-b', 1, parentId),
+          makeQuestion('q-c', 2, parentId),
+        ],
+      ),
+    );
+
+    useSurveyBuilderStore.getState().addGroup('child-new', undefined, parentId);
+
+    const newGroup = (useSurveyBuilderStore.getState().currentSurvey.groups ?? []).find(
+      (g) => g.name === 'child-new',
+    );
+    expect(newGroup?.order).toBe(3);
+  });
+
+  it('형제 질문과 형제 그룹이 섞여 있을 때 둘 중 최대 order 뒤에 배치한다', () => {
+    // 질문 order [0, 1], 형제 그룹 order 5 — 그룹 최대(5) 가 질문 최대(1) 보다 큼.
+    const parentId = 'parent';
+    useSurveyBuilderStore.getState().setSurvey(
+      makeSurvey(
+        [makeGroup(parentId, 0), makeGroup('child-existing', 5, parentId)],
+        [makeQuestion('q-a', 0, parentId), makeQuestion('q-b', 1, parentId)],
+      ),
+    );
+
+    useSurveyBuilderStore.getState().addGroup('child-new', undefined, parentId);
+
+    const newGroup = (useSurveyBuilderStore.getState().currentSurvey.groups ?? []).find(
+      (g) => g.name === 'child-new',
+    );
+    expect(newGroup?.order).toBe(6);
   });
 
   it('형제 그룹이 없으면 order 는 0 이다', () => {

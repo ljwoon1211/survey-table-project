@@ -153,4 +153,51 @@ describe('reconcileHeaderGridForColumnChange - rowspan 보존', () => {
     // 상단행에서 좌(colspan1 rowspan2)가 제거됨 → 그룹만 남음
     expect(next[0]!.map((c) => c.label)).toEqual(['그룹']);
   });
+
+  it('colspan+rowspan 둘 다 큰 셀 내부(slot=1)에 열 추가 시 하위 행이 덮인 슬롯에 셀을 끼우지 않는다', () => {
+    // 상단행: [그룹(colspan2 rowspan2)] [그룹2(colspan2)]
+    // 하단행:                          [d] [e]
+    // 슬롯: 그룹=col0~1(2행 점유), 그룹2=col2~3, d=col2, e=col3
+    const grid: HeaderCell[][] = [
+      [hc('그룹', { colspan: 2, rowspan: 2 }), hc('그룹2', { colspan: 2 })],
+      [hc('d'), hc('e')],
+    ];
+    expect(getHeaderGridColumnCount(grid)).toBe(4);
+    expect(validateHeaderGrid(grid, 4)).toBe(true);
+
+    // slot=1은 그룹 내부(0~1) → 그룹 colspan 2→3. 그룹 rowspan이 하위 행 col0~2를 덮으므로
+    // 하단행은 col3(e 위치)만 변동 없이 유지되어야 한다.
+    const next = reconcileHeaderGridForColumnChange(grid, { type: 'add', slot: 1 });
+
+    expect(getHeaderGridColumnCount(next)).toBe(5);
+    expect(validateHeaderGrid(next, 5)).toBe(true);
+    // 그룹 colspan 3, rowspan 2 유지
+    expect(next[0]![0]!.label).toBe('그룹');
+    expect(next[0]![0]!.colspan).toBe(3);
+    expect(next[0]![0]!.rowspan).toBe(2);
+    // 하단행은 그룹 rowspan이 col0~2를 덮으므로 d/e 그대로 (덮인 슬롯에 신규 셀 삽입 금지)
+    expect(next[1]!.map((c) => c.label)).toEqual(['d', 'e']);
+  });
+
+  it('rowspan이 3행을 덮는 셀 내부에 열 추가 시 모든 하위 행이 덮인 슬롯을 보존한다', () => {
+    // 상단행: [그룹(colspan2 rowspan3)] [그룹2(colspan2)]
+    // 중간행:                          [m1] [m2]
+    // 하단행:                          [n1] [n2]
+    const grid: HeaderCell[][] = [
+      [hc('그룹', { colspan: 2, rowspan: 3 }), hc('그룹2', { colspan: 2 })],
+      [hc('m1'), hc('m2')],
+      [hc('n1'), hc('n2')],
+    ];
+    expect(getHeaderGridColumnCount(grid)).toBe(4);
+    expect(validateHeaderGrid(grid, 4)).toBe(true);
+
+    const next = reconcileHeaderGridForColumnChange(grid, { type: 'add', slot: 1 });
+
+    expect(getHeaderGridColumnCount(next)).toBe(5);
+    expect(validateHeaderGrid(next, 5)).toBe(true);
+    expect(next[0]![0]!.colspan).toBe(3);
+    expect(next[0]![0]!.rowspan).toBe(3);
+    expect(next[1]!.map((c) => c.label)).toEqual(['m1', 'm2']);
+    expect(next[2]!.map((c) => c.label)).toEqual(['n1', 'n2']);
+  });
 });

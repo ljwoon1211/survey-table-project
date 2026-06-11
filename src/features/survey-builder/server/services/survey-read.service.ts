@@ -180,6 +180,8 @@ export async function getSurveyForResponse(
           endDate?: string;
           maxResponses?: number;
           thankYouMessage: string;
+          // publish 시점 freeze 값. 이전 publish 본은 undefined → 현재 surveys 행으로 fallback.
+          requireInviteToken?: boolean;
         };
         // T17 이후 snapshot 에 포함. 이전 publish 본은 undefined → DB 의 현재 lookups 로 fallback.
         lookups?: SurveyType['lookups'];
@@ -212,7 +214,10 @@ export async function getSurveyForResponse(
         settings: {
           ...snapshotSettingsRest,
           ...(snapshotEndDate ? { endDate: new Date(snapshotEndDate) } : {}),
-          requireInviteToken: survey.requireInviteToken,
+          // snapshot 기반 원칙: published 응답 페이지는 freeze 된 snapshot 값을 따른다.
+          // 빌더 draft 의 invite-token 토글이 live 응답 페이지에 새지 않도록 현재 surveys 행으로
+          // 덮어쓰지 않는다. snapshot 에 값이 없는 이전 publish 본만 현재 행으로 fallback.
+          requireInviteToken: snapshot.settings.requireInviteToken ?? survey.requireInviteToken,
         },
         lookups: snapshot.lookups ?? survey.lookups ?? [],
         ...(survey.contactColumns != null ? { contactColumns: survey.contactColumns } : {}),

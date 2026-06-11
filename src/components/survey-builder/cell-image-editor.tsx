@@ -23,10 +23,13 @@ export function CellImageEditor({ imageUrl, onImageUrlChange }: CellImageEditorP
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadAbortController = useRef<AbortController | null>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const mountedRef = useRef(true);
 
   // 언마운트 시 진행 중인 업로드 중단
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (xhrRef.current) {
         xhrRef.current.abort();
         xhrRef.current = null;
@@ -152,6 +155,10 @@ export function CellImageEditor({ imageUrl, onImageUrlChange }: CellImageEditorP
 
       const uploadedImageUrl = await uploadPromise;
 
+      // 성공 직후~await 재개 사이에 언마운트되면 abort 가 no-op 이라 성공 경로로 진행하므로,
+      // 성공 후속 setState 도 언마운트 가드로 막는다(sibling attachment-section 패턴과 일치).
+      if (!mountedRef.current) return;
+
       // 이미지 URL 설정
       onImageUrlChange(uploadedImageUrl);
       setPreviewUrl(uploadedImageUrl);
@@ -160,13 +167,18 @@ export function CellImageEditor({ imageUrl, onImageUrlChange }: CellImageEditorP
       setSelectedFile(null);
       setUploadProgress(0);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : '업로드 중 오류가 발생했습니다.';
-      setUploadError(errorMessage);
-      setUploadProgress(0);
+      // 언마운트(취소 abort 포함) 후에는 setState 호출 금지
+      if (mountedRef.current) {
+        const errorMessage =
+          error instanceof Error ? error.message : '업로드 중 오류가 발생했습니다.';
+        setUploadError(errorMessage);
+        setUploadProgress(0);
+      }
     } finally {
-      setIsUploading(false);
       uploadAbortController.current = null;
+      if (mountedRef.current) {
+        setIsUploading(false);
+      }
     }
   }, [selectedFile, onImageUrlChange]);
 

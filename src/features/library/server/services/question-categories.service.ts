@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { asc, eq } from 'drizzle-orm';
+import { asc, eq, sql } from 'drizzle-orm';
 
 import { db } from '@/db';
 import { NewQuestionCategory, questionCategories, savedQuestions } from '@/db/schema/surveys';
@@ -42,18 +42,20 @@ export async function listCategories(): Promise<QuestionCategory[]> {
 // 뮤테이션
 // ========================
 
-/** 카테고리 생성 — order는 기존 최댓값 + 1로 발번 */
+/**
+ * 카테고리 생성 — order는 기존 최댓값 + 1로 발번.
+ * read-then-write race를 막기 위해 order 발번을 단일 INSERT 안의 상관 서브쿼리로 처리한다.
+ * COALESCE(MAX(order), -1) + 1 → 빈 테이블일 때 0부터 시작.
+ */
 export async function createCategory(input: CreateCategoryInput): Promise<QuestionCategory> {
-  const categories = await listCategories();
-  const maxOrder = categories.length > 0 ? Math.max(...categories.map((c) => c.order)) : -1;
-
-  const newCategory: NewQuestionCategory = {
-    name: input.name,
-    color: input.color ?? 'bg-gray-100 text-gray-600',
-    order: maxOrder + 1,
-  };
-
-  const [category] = await db.insert(questionCategories).values(newCategory).returning();
+  const [category] = await db
+    .insert(questionCategories)
+    .values({
+      name: input.name,
+      color: input.color ?? 'bg-gray-100 text-gray-600',
+      order: sql`(SELECT COALESCE(MAX(${questionCategories.order}), -1) + 1 FROM ${questionCategories})`,
+    })
+    .returning();
   if (!category) throw new Error('카테고리 생성에 실패했습니다.');
   return toDomainQuestionCategory(category);
 }

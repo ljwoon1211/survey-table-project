@@ -208,8 +208,16 @@ export function GroupManager({ className }: GroupManagerProps) {
         // DB에서 생성된 그룹의 UUID를 사용하여 직접 추가
         const currentGroups = groupsOrEmpty;
         const siblingGroups = currentGroups.filter((g) => g.parentGroupId === parentGroupIdForNew);
-        const maxOrder =
-          siblingGroups.length > 0 ? Math.max(...siblingGroups.map((g) => g.order)) : -1;
+        // 질문 + 형제그룹 통합 order 공간에서 maxOrder 계산 (store.addGroup 과 동일).
+        // 형제 질문 order 를 무시하면 새 하위그룹이 질문 앞에 끼어든다(append 가 아니라 interleave).
+        const siblingQuestions = parentGroupIdForNew
+          ? questions.filter((q) => q.groupId === parentGroupIdForNew)
+          : [];
+        const allOrders = [
+          ...siblingGroups.map((g) => g.order),
+          ...siblingQuestions.map((q) => q.order),
+        ];
+        const maxOrder = allOrders.length > 0 ? Math.max(...allOrders) : -1;
 
         const newGroup: QuestionGroup = {
           id: createdGroupId,

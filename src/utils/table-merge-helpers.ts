@@ -588,9 +588,30 @@ export function reconcileHeaderGridForColumnChange(
         (s) => change.slot > s.startCol && change.slot < s.startCol + s.colspan,
       );
       if (containingIdx >= 0) {
+        // 확장 대상 셀이 rowspan>1이면 그 셀이 덮는 하위 행의 occupied도 확장 범위로 갱신.
+        // computeHeaderRowSlots는 상위 행 처리 시 옛 colspan으로 occupied를 마킹했으므로,
+        // 그대로 두면 하위 행이 확장된 rowspan에 덮인 슬롯에 새 셀을 끼워 그리드가 겹친다.
+        // 삽입 슬롯(change.slot)을 점유 처리하고 그 이상 위치는 +1 시프트한다.
+        const containingCell = row[containingIdx];
+        const containingRowspan = containingCell?.rowspan || 1;
+        if (containingRowspan > 1) {
+          for (let r = rowIdx + 1; r < rowIdx + containingRowspan && r < occupied.length; r++) {
+            const lowerOccupied = occupied[r];
+            if (!lowerOccupied) continue;
+            const shifted = new Set<number>();
+            for (const c of lowerOccupied) shifted.add(c >= change.slot ? c + 1 : c);
+            shifted.add(change.slot);
+            occupied[r] = shifted;
+          }
+        }
         return row.map((cell, i) =>
           i === containingIdx ? { ...cell, colspan: (cell.colspan || 1) + 1 } : cell,
         );
+      }
+      // 삽입 슬롯이 상위 행 rowspan에 이미 덮여 있으면(occupied) 이 행은 그 셀이 폭을
+      // 책임지므로 새 셀을 끼우지 않는다. (rowspan 셀 colspan 확장으로 occupied가 갱신된 경우 포함)
+      if (occupied[rowIdx]?.has(change.slot)) {
+        return row;
       }
       // 경계/말단: 삽입 슬롯 이후의 첫 셀 앞에 새 1x1 리프 셀 삽입(없으면 끝에 추가).
       const insertIdx = slots.findIndex((s) => s.startCol >= change.slot);

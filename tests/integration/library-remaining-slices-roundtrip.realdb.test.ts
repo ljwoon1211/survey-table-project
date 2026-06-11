@@ -166,6 +166,17 @@ describe.skipIf(!isLocalDb)('question-categories procedure round-trip (real loca
     expect(created.color).toBe('bg-red-100 text-red-600');
   });
 
+  it('연속 생성: order가 단일 INSERT 상관 서브쿼리로 max+1 발번되어 단조 증가한다', async () => {
+    // read-then-write race fix 회귀 검증.
+    // 두 번 연속 생성 시 두 번째 order가 첫 번째보다 정확히 1 크거나 최소한 더 커야 한다.
+    const first = await client.questionCategories.create({ name: `order-seq-1-${nanoid(6)}` });
+    createdIds.push(first.id);
+    const second = await client.questionCategories.create({ name: `order-seq-2-${nanoid(6)}` });
+    createdIds.push(second.id);
+
+    expect(second.order).toBeGreaterThan(first.order);
+  });
+
   it('icon이 있는 카테고리: toDomainQuestionCategory가 icon을 string으로 반환한다', async () => {
     // DB에는 icon 컬럼이 있으므로 initializeDefaults나 직접 삽입으로 icon이 있는 행 생성.
     // create procedure는 icon을 입력받지 않으므로, DB에 직접 삽입 후 list로 확인한다.

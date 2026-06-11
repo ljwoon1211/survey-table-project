@@ -169,6 +169,28 @@ describe('allocateCycleCosts', () => {
     expect(sumCosts).toBe(r.overageCostKrw);
   });
 
+  it('누적 음수 drift 가 흡수 회차의 preliminary 를 초과해도 모든 회차 cost 가 0 이상', () => {
+    // 회차가 많고 회차당 overage 가 작아 누적 |drift| 가 흡수 회차의 반올림값을 초과하는 케이스.
+    // 10회차 각 overage=1, per1k=600 → 회차별 round(0.6)=1, 합=10.
+    // 사이클 총 = round(10*600/1000)=6 → drift=-4 가 단일 회차(=1)를 초과해 음수가 되는 회귀.
+    const plan: AllocatorInputPlan = {
+      includedEmails: 0,
+      monthlyFeeKrw: 0,
+      overagePer1kKrw: 600,
+    };
+    const campaigns = Array.from({ length: 10 }, (_, i) =>
+      campaign(String.fromCharCode(97 + i), 1, `2026-04-${String(10 + i).padStart(2, '0')}T10:00:00Z`),
+    );
+    const r = allocateCycleCosts({ plan, campaigns });
+
+    // 모든 회차 cost 0 이상 (음수 금지).
+    expect(r.campaigns.every((c) => c.costKrw >= 0)).toBe(true);
+    // 회차 cost 합 ≡ 사이클 총 초과비 (잔액 흡수 불변식 유지).
+    const sumCosts = r.campaigns.reduce((acc, c) => acc + c.costKrw, 0);
+    expect(sumCosts).toBe(r.overageCostKrw);
+    expect(r.overageCostKrw).toBe(6);
+  });
+
   it('같은 startedAt 이면 campaignId 사전순 정렬', () => {
     const r = allocateCycleCosts({
       plan: PRO_50K,
