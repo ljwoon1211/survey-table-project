@@ -100,8 +100,13 @@ export function generateMrsetsSyntax(
     const [questionId, groupKey] = key.split('::') as [string, string];
     const question = questionMap.get(questionId);
     if (!question?.questionCode) continue;
-    // MCGROUP 세트명: default 그룹은 questionCode_default, 명시 그룹은 questionCode_groupKey
-    const setName = `${question.questionCode}_${groupKey}`;
+    // MCGROUP 세트명: 명시 그룹은 questionCode_groupKey. default 그룹(미소속 셀)은
+    // 그룹 도입 전과 동일한 questionCode — 변수명(Q8_1...)과 마찬가지로 하위호환 유지.
+    // (그룹 있는 질문은 checkbox-item 을 emit 하지 않으므로 질문 단위 세트와 충돌 없음)
+    const setName =
+      groupKey === DEFAULT_GROUP_KEY
+        ? question.questionCode
+        : `${question.questionCode}_${groupKey}`;
     // LABEL: question.choiceGroups 에서 그룹 라벨 lookup;
     // default 그룹이면 question.exportLabel || question.title 폴백
     let groupLabel: string;

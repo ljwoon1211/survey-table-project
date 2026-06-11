@@ -533,13 +533,14 @@ describe('checkbox 그룹 export — mrsets-syntax', () => {
     expect(syntax).not.toMatch(/NAME=\$Q7[^_]/);
   });
 
-  it('default cb 그룹은 $Q8_default 이름으로 MCGROUP을 생성한다', () => {
+  it('default cb 그룹은 그룹 도입 전과 동일한 $질문코드 이름으로 MCGROUP을 생성한다', () => {
     // checkboxGroupQuestion: gc2(cb2) + default(미소속 cellI)
     const questions = [checkboxGroupQuestion];
     const cols = generateSPSSColumns(questions);
     const syntax = generateMrsetsSyntax(cols, questions);
-    // default 그룹 세트
-    expect(syntax).toContain('/MCGROUP NAME=$Q8_default');
+    // 변수명(Q8_1...)과 마찬가지로 세트명도 하위호환 — 내부 예약어 default 미노출
+    expect(syntax).toContain('/MCGROUP NAME=$Q8 ');
+    expect(syntax).not.toContain('$Q8_default');
   });
 });
 
