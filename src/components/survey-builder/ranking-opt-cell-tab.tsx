@@ -5,6 +5,9 @@ import { Tag } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { ChoiceGroup } from '@/types/survey';
+import { generateId } from '@/lib/utils';
+import { nextGroupKey } from '@/utils/choice-group-helpers';
 
 interface RankingOptCellTabProps {
   rankingLabel: string;
@@ -13,6 +16,14 @@ interface RankingOptCellTabProps {
   onSpssNumericCodeChange: (v: number | '') => void;
   isOtherRankingCell: boolean;
   onIsOtherRankingCellChange: (v: boolean) => void;
+  /** 질문 레벨의 ranking 그룹 목록 */
+  choiceGroups: ChoiceGroup[];
+  /** 그룹 id → 멤버 셀 수 (표시용) */
+  groupMemberCounts: Record<string, number>;
+  /** 현재 셀이 속한 그룹 id. 빈 문자열 = 미소속 */
+  choiceGroupId: string;
+  onChoiceGroupIdChange: (id: string) => void;
+  onChoiceGroupsChange: (groups: ChoiceGroup[]) => void;
 }
 
 /**
@@ -26,8 +37,42 @@ export function RankingOptCellTab({
   onSpssNumericCodeChange,
   isOtherRankingCell,
   onIsOtherRankingCellChange,
+  choiceGroups,
+  groupMemberCounts,
+  choiceGroupId,
+  onChoiceGroupIdChange,
+  onChoiceGroupsChange,
 }: RankingOptCellTabProps) {
   const isOther = isOtherRankingCell === true;
+
+  // ranking 타입 그룹만 드롭다운에 표시
+  const filteredGroups = choiceGroups.filter((g) => g.type === 'ranking');
+  const nextKey = nextGroupKey(choiceGroups, 'ranking');
+  const currentGroup = filteredGroups.find((g) => g.id === choiceGroupId);
+
+  function handleGroupSelectChange(value: string) {
+    if (value === '__new__') {
+      const key = nextGroupKey(choiceGroups, 'ranking');
+      const newGroup: ChoiceGroup = {
+        id: generateId(),
+        groupKey: key,
+        type: 'ranking',
+        label: '',
+      };
+      onChoiceGroupsChange([...choiceGroups, newGroup]);
+      onChoiceGroupIdChange(newGroup.id);
+    } else {
+      onChoiceGroupIdChange(value);
+    }
+  }
+
+  function handleGroupLabelChange(label: string) {
+    if (!currentGroup) return;
+    onChoiceGroupsChange(
+      choiceGroups.map((g) => (g.id === choiceGroupId ? { ...g, label } : g)),
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
@@ -41,6 +86,44 @@ export function RankingOptCellTab({
             </p>
           </div>
         </div>
+      </div>
+
+      {/* 그룹 select + 그룹 라벨 한 줄 */}
+      <div className="space-y-1.5">
+        <Label htmlFor="ranking-opt-group-select" className="text-sm font-medium">
+          그룹
+        </Label>
+        <div className="flex gap-2">
+          <select
+            id="ranking-opt-group-select"
+            aria-label="그룹"
+            value={choiceGroupId}
+            onChange={(e) => handleGroupSelectChange(e.target.value)}
+            className="flex-1 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">(그룹 없음)</option>
+            {filteredGroups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.groupKey}
+                {g.label ? ` — ${g.label}` : ''}
+                {' · 셀 '}
+                {groupMemberCounts[g.id] ?? 0}
+              </option>
+            ))}
+            <option value="__new__">+ 새 그룹 ({nextKey})</option>
+          </select>
+          <Input
+            aria-label="그룹 라벨"
+            placeholder="그룹 라벨 (그룹을 선택하세요)"
+            value={currentGroup?.label ?? ''}
+            disabled={!currentGroup}
+            onChange={(e) => handleGroupLabelChange(e.target.value)}
+            className="flex-1"
+          />
+        </div>
+        <p className="text-xs text-gray-500">
+          같은 그룹의 셀들이 하나의 순위 select 세트가 됩니다. 그룹 라벨 수정은 그룹 전체에 반영됩니다.
+        </p>
       </div>
 
       <div className="flex items-center justify-between gap-4">

@@ -4,6 +4,7 @@ import type { BranchRule, TableCell } from '@/types/survey';
 import {
   buildUpdatedCell,
   cellToFormState,
+  GROUPABLE_CELL_TYPES,
   type CellFormState,
   type ContentType,
 } from '@/utils/serialize-cell';
@@ -234,6 +235,39 @@ describe('buildUpdatedCell — 셀타입별 characterization', () => {
     expect(out).not.toHaveProperty('spssNumericCode');
   });
 
+  it('ranking_opt: choiceGroupId 설정 시 저장되고 해제(빈 문자열) 시 키가 제거된다', () => {
+    const cellWithGroup: TableCell = { id: 'c1', type: 'ranking_opt', content: '', choiceGroupId: 'rg1' };
+
+    // 그룹 설정: choiceGroupId='rg1'
+    const formSet: CellFormState = { ...baseForm('ranking_opt'), choiceGroupId: 'rg1' };
+    const outSet = buildUpdatedCell(formSet, baseCell);
+    expect(outSet.choiceGroupId).toBe('rg1');
+
+    // 그룹 해제: choiceGroupId='' — 기존 셀에 choiceGroupId 가 있어도 키가 제거되어야 한다
+    const formRelease: CellFormState = { ...baseForm('ranking_opt'), choiceGroupId: '' };
+    const outRelease = buildUpdatedCell(formRelease, cellWithGroup);
+    expect(outRelease).not.toHaveProperty('choiceGroupId');
+  });
+
+  it('choice_opt: choiceGroupId 설정·해제가 ranking_opt 경로에 영향을 주지 않는다 (회귀)', () => {
+    // choice_opt 기존 케이스 불변 확인
+    const cellWithGroup: TableCell = { id: 'c1', type: 'choice_opt', content: '', choiceGroupId: 'g1' };
+    const formSet: CellFormState = { ...baseForm('choice_opt'), choiceGroupId: 'g1' };
+    const outSet = buildUpdatedCell(formSet, baseCell);
+    expect(outSet.choiceGroupId).toBe('g1');
+
+    const formRelease: CellFormState = { ...baseForm('choice_opt'), choiceGroupId: '' };
+    const outRelease = buildUpdatedCell(formRelease, cellWithGroup);
+    expect(outRelease).not.toHaveProperty('choiceGroupId');
+
+    // ranking_opt 그룹 설정 시 choice_opt 전용 필드(choiceLabel 등)는 섞이지 않아야 한다
+    const formRnk: CellFormState = { ...baseForm('ranking_opt'), choiceGroupId: 'rg1' };
+    const outRnk = buildUpdatedCell(formRnk, baseCell);
+    expect(outRnk).not.toHaveProperty('choiceLabel');
+    expect(outRnk).not.toHaveProperty('allowTextInput');
+    expect(outRnk).not.toHaveProperty('branchRule');
+  });
+
   it('choice_opt: choiceLabel + allowTextInput + branchRule(value=cell.id 강제) + spssNumericCode', () => {
     const branch: BranchRule = {
       id: 'b1',
@@ -327,6 +361,18 @@ describe('buildUpdatedCell — 셀타입별 characterization', () => {
     // hidden 은 저장 안 함
     const hidden = buildUpdatedCell({ ...baseForm('text'), mobileDisplay: 'hidden' }, baseCell);
     expect(hidden).not.toHaveProperty('mobileDisplay');
+  });
+});
+
+describe('GROUPABLE_CELL_TYPES', () => {
+  it('choice_opt 와 ranking_opt 를 포함하고 다른 타입은 포함하지 않는다', () => {
+    expect(GROUPABLE_CELL_TYPES.has('choice_opt')).toBe(true);
+    expect(GROUPABLE_CELL_TYPES.has('ranking_opt')).toBe(true);
+
+    const notGroupable: TableCell['type'][] = ['text', 'image', 'video', 'input', 'checkbox', 'radio', 'select', 'ranking'];
+    for (const t of notGroupable) {
+      expect(GROUPABLE_CELL_TYPES.has(t)).toBe(false);
+    }
   });
 });
 
