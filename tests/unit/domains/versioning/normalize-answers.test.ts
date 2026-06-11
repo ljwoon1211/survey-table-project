@@ -158,4 +158,20 @@ describe('normalizeToAnswers', () => {
     expect(answer!.objectValue).toEqual({ level1: 'seoul', level2: 'gangnam' });
     expect(answer!.questionType).toBe('multiselect');
   });
+
+  it('그룹별 선택 radio 응답(GroupedChoiceAnswer 맵)은 objectValue에 저장된다', () => {
+    // grouped radio 응답은 Record<groupKey, cellId> — 일반 object 이므로 objectValue 경로
+    const responses = {
+      'q-radio': { rad1: 'cellA', rad2: 'cellC' },
+    };
+
+    const answers = normalizeToAnswers(RESPONSE_ID, responses, mockQuestions);
+
+    const answer = answers.find((a) => a.questionId === 'q-radio');
+    expect(answer).toBeDefined();
+    expect(answer!.textValue).toBeNull();
+    expect(answer!.arrayValue).toBeNull();
+    expect(answer!.objectValue).toEqual({ rad1: 'cellA', rad2: 'cellC' });
+    expect(answer!.questionType).toBe('radio');
+  });
 });

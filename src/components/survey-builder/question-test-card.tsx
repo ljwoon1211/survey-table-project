@@ -443,7 +443,7 @@ function QuestionTestInput({
       <ChoiceTableResponse
         question={question}
         value={value}
-        onChange={onChange as (v: string | string[] | null) => void}
+        onChange={onChange as (v: unknown) => void}
       />
     );
   }

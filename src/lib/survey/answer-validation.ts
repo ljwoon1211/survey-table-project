@@ -1,4 +1,8 @@
 import type { Question } from '@/types/survey';
+import {
+  isGroupedChoiceQuestion,
+  collectRadioGroups,
+} from '@/utils/choice-group-helpers';
 
 /**
  * 질문 타입별 응답 충족 여부를 판정하는 순수 함수.
@@ -36,6 +40,14 @@ export function isQuestionAnswered(question: Question, response: unknown): boole
     case 'textarea':
       return typeof response === 'string' && response.trim().length > 0;
     case 'radio':
+      // 그룹별 선택 radio: 모든 그룹(default 포함)에 선택이 있어야 충족
+      if (isGroupedChoiceQuestion(question)) {
+        const map = (response ?? {}) as Record<string, unknown>;
+        return collectRadioGroups(question).every(
+          (g) => typeof map[g.groupKey] === 'string' && map[g.groupKey] !== '',
+        );
+      }
+      return response !== null && response !== undefined && response !== '';
     case 'select':
       return response !== null && response !== undefined && response !== '';
     case 'checkbox':

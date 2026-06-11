@@ -18,6 +18,7 @@ import { evaluateComparisonWithFailSafe, type ComparisonResult } from '@/lib/loo
 import { evaluateRightOperand } from '@/lib/lookup/evaluate-lookup';
 import type { LookupEvalCtx } from '@/lib/lookup/types';
 import { resolveChoiceOptions } from '@/utils/choice-source';
+import { isGroupedChoiceQuestion } from '@/utils/choice-group-helpers';
 
 // numeric-input 의 parseNumericInput 는 evaluateComparisonWithFailSafe 내부 (evaluate-arith) 에서 사용.
 
@@ -128,12 +129,28 @@ function getBranchRuleForRanking(question: Question, response: unknown): BranchR
 }
 
 /**
- * 라디오 버튼 응답의 분기 규칙 찾기
+ * 라디오 버튼 응답의 분기 규칙 찾기.
+ * 그룹별 선택(GroupedChoiceAnswer) 응답 맵도 지원한다.
+ * 맵의 경우 선택된 모든 cell.id 중 branchRule 이 있는 첫 번째 옵션을 반환한다.
  */
 function getBranchRuleForRadio(question: Question, response: unknown): BranchRule | null {
   // manual: question.options 그대로 / table-source: choice_opt 셀에서 변환된 옵션
   const options = resolveChoiceOptions(question);
   if (!options.length) return null;
+
+  // 그룹별 선택 모드: 응답 맵의 값 목록(선택 cell.id 들)을 대상으로 검색
+  if (
+    isGroupedChoiceQuestion(question) &&
+    typeof response === 'object' &&
+    response !== null &&
+    !Array.isArray(response)
+  ) {
+    const selectedValues = Object.values(response as Record<string, string>);
+    const selectedOption = options.find(
+      (opt) => selectedValues.includes(opt.value as string) && opt.branchRule,
+    );
+    return selectedOption?.branchRule ?? null;
+  }
 
   // 응답이 객체인 경우 (기타 옵션)
   const selectedValue =
