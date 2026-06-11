@@ -302,16 +302,17 @@ export function CellContentModal({
       // 폼 상태를 저장될 TableCell 로 직렬화 (조건부 spread 로 optional 필드 처리).
       const updatedCell: TableCell = buildUpdatedCell(form, cell);
 
+      // 로컬 스토어 업데이트 (셀 저장) — onChoiceGroupsChange 보다 먼저 수행해야
+      // dynamic-table-editor 의 currentRowsRef 가 이미 새 셀을 포함한 상태에서 prune 이 동작한다.
+      onSave(updatedCell);
+
       // choice_opt 탭에서 그룹 변경이 있었으면 정리 후 부모에게 통보.
-      // prune 은 updatedCell(이 셀 반영 후)의 rowsData 기준으로 계산해야 하지만,
-      // prune 함수가 question 전체를 인자로 받으므로 여기서는 editChoiceGroups 를 직접 전달한다.
+      // prune 은 updatedCell(이 셀 반영 후)의 rowsData 기준으로 계산해야 하므로
+      // onSave(셀 반영) 다음에 호출한다.
       // 실질적인 prune(빈 그룹 제거)은 dynamic-table-editor 의 onChoiceGroupsChange 핸들러에서 수행한다.
       if (contentType === 'choice_opt') {
         onChoiceGroupsChange?.(editChoiceGroups);
       }
-
-      // 로컬 스토어 업데이트 (셀 저장)
-      onSave(updatedCell);
 
       // 서버에 질문 저장/업데이트
       if (currentQuestionId && useSurveyBuilderStore.getState().currentSurvey.id) {
@@ -390,6 +391,7 @@ export function CellContentModal({
                 ...(question.requiresAcknowledgment !== undefined ? { requiresAcknowledgment: question.requiresAcknowledgment } : {}),
                 ...(question.tableValidationRules !== undefined ? { tableValidationRules: question.tableValidationRules } : {}),
                 ...(question.displayCondition !== undefined ? { displayCondition: question.displayCondition } : {}),
+                ...(prunedChoiceGroups !== undefined ? { choiceGroups: prunedChoiceGroups } : {}),
               });
 
               // 반환된 UUID로 로컬 스토어의 질문 ID 업데이트 + Case 2 참조 동기화
