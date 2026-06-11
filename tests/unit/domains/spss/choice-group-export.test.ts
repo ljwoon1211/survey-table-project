@@ -525,7 +525,7 @@ describe('checkbox 그룹 export — mrsets-syntax', () => {
     expect(syntax).toContain('$Q7_cb1');
   });
 
-  it('grouepd checkbox 질문 존재 시 질문 단위 $Q7 세트가 생성되지 않는다 — 배타성', () => {
+  it('grouped checkbox 질문 존재 시 질문 단위 $Q7 세트가 생성되지 않는다 — 배타성', () => {
     const questions = [mixedGroupsQuestion];
     const cols = generateSPSSColumns(questions);
     const syntax = generateMrsetsSyntax(cols, questions);
@@ -563,5 +563,54 @@ describe('value-labels-coverage — choice-group-item 추가', () => {
       expect(labels, `${col.spssVarName} value labels 누락`).toBeDefined();
       expect(labels!.length).toBeGreaterThan(0);
     }
+  });
+});
+
+// ────────────────────────────────────────────────────────────
+// 최종리뷰 보강 — 혼재 단일 응답 행 + 사이드카 변수명 하위호환
+// ────────────────────────────────────────────────────────────
+
+describe('혼재 그룹 단일 응답 행 — radio와 checkbox 그룹 동시 추출', () => {
+  it('한 submission에서 rad1 1변수와 cb1 N변수가 동시에 정확히 추출된다', () => {
+    const cols = generateSPSSColumns([mixedGroupsQuestion]);
+    const sub = makeSubmission({ q7: { rad1: 'cellR', cb1: ['cellE'] } });
+    const rows = buildDataRows(cols, [mixedGroupsQuestion], [sub]);
+    const row = rows[0]!;
+    const idx = (name: string) => cols.findIndex((c) => c.spssVarName === name);
+    expect(row[idx('Q7_rad1')]).toBe(1);       // rad1 선택 cellR 코드
+    expect(row[idx('Q7_cb1_1')]).toBe(5);      // cellE 선택 counted
+    expect(row[idx('Q7_cb1_2')]).toBeNull();   // cellF 미선택 system-missing
+  });
+});
+
+describe('checkbox 그룹 allowTextInput 사이드카 — 변수명 하위호환', () => {
+  const withTextQuestion = {
+    id: 'q10',
+    type: 'checkbox',
+    title: '경로',
+    required: false,
+    order: 4,
+    questionCode: 'Q10',
+    choiceGroups: [{ id: 'gt1', groupKey: 'cb1', type: 'checkbox', label: '경로' }],
+    tableRowsData: [
+      {
+        id: 'r1',
+        label: '행1',
+        cells: [
+          { id: 'cellT', content: '보기T', type: 'choice_opt', choiceGroupId: 'gt1', spssNumericCode: 9, allowTextInput: true },
+          // 미소속(default) + 텍스트 입력 — 기존 비그룹 checkbox 사이드카 규칙과 동일해야 함
+          { id: 'cellU', content: '기타', type: 'choice_opt', allowTextInput: true },
+        ],
+      },
+    ],
+  } as unknown as Question;
+
+  it('명시 그룹 사이드카는 질문코드_groupKey_순번_text, default는 질문코드_순번_text', () => {
+    const cols = generateSPSSColumns([withTextQuestion]);
+    const names = cols.filter((c) => c.type === 'option-text').map((c) => c.spssVarName);
+    expect(names).toContain('Q10_cb1_1_text');
+    expect(names).toContain('Q10_1_text');
+    // 보기 인덱스가 base 변수명에 이중 포함되지 않는다
+    expect(names).not.toContain('Q10_cb1_1_9_text');
   });
 });

@@ -209,11 +209,12 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
               choiceGroupMemberCode: code,
               optionIndex: idx,
             });
-            // allowTextInput 사이드카: 기존 checkbox 패턴과 동일
+            // allowTextInput 사이드카: base 는 그룹 변수명 접두(질문코드[_groupKey]).
+            // default 그룹은 기존 비그룹 checkbox 사이드카(Q8_1_text)와 동일해야 한다 — 하위호환.
             if (cell.allowTextInput) {
-              const varNumber = cell.spssNumericCode != null ? String(cell.spssNumericCode) : String(idx + 1);
+              const sidecarBase = isDefault ? qCode : `${qCode}_${group.groupKey}`;
               columns.push({
-                spssVarName: buildOptionTextVarName(varName, varNumber),
+                spssVarName: buildOptionTextVarName(sidecarBase, String(idx + 1)),
                 questionText: q.title,
                 optionLabel: `${optLabel} (텍스트)`,
                 questionId: q.id,
