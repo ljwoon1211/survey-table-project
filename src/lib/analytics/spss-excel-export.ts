@@ -184,8 +184,9 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
           });
         });
         const isDefault = group.groupKey === DEFAULT_GROUP_KEY;
+        const groupVarName = isDefault ? q.questionCode : `${q.questionCode}_${group.groupKey}`;
         columns.push({
-          spssVarName: isDefault ? q.questionCode : `${q.questionCode}_${group.groupKey}`,
+          spssVarName: groupVarName,
           questionText: q.title,
           optionLabel: group.label || q.title,
           questionId: q.id,
@@ -193,6 +194,21 @@ export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
           choiceGroupKey: group.groupKey,
           choiceGroupCellValueMap: cellValueMap,
           choiceGroupValueLabels: valueLabels,
+        });
+        // allowTextInput 멤버 셀마다 STRING 사이드카 텍스트 변수 생성.
+        // 저장 경로는 __optTexts__[questionId][cell.id] 로 비그룹과 동일하므로
+        // optionId=cell.id 를 그대로 사용해 기존 option-text 추출 case 가 동작한다.
+        group.cells.forEach((cell, idx) => {
+          if (!cell.allowTextInput) return;
+          const varNumber = cell.spssNumericCode != null ? String(cell.spssNumericCode) : String(idx + 1);
+          columns.push({
+            spssVarName: buildOptionTextVarName(groupVarName, varNumber),
+            questionText: q.title,
+            optionLabel: `${(cell.choiceLabel ?? '').trim() || (cell.content ?? '').trim() || '(라벨 없음)'} (텍스트)`,
+            questionId: q.id,
+            type: 'option-text',
+            optionId: cell.id,
+          });
         });
       }
     } else if (q.type === 'radio' || q.type === 'select') {
