@@ -40,24 +40,34 @@ export function isQuestionAnswered(question: Question, response: unknown): boole
     case 'textarea':
       return typeof response === 'string' && response.trim().length > 0;
     case 'radio':
-      // 그룹별 선택 radio: 모든 그룹(default 포함)에 선택이 있어야 충족
+    // fallthrough: checkbox 질문도 choiceGroups 가 있으면 grouped 경로를 밟는다.
+    case 'checkbox':
+      // 그룹별 선택(radio 또는 checkbox 그룹 1개 이상): 모든 그룹에 선택이 있어야 충족.
+      // 그룹 type별 검증:
+      //   - radio 그룹: 비어있지 않은 string 값이 있어야 한다.
+      //   - checkbox 그룹: 1개 이상의 요소를 가진 배열이어야 한다.
       if (isGroupedChoiceQuestion(question)) {
         const map = (response ?? {}) as Record<string, unknown>;
-        // Task 3에서 그룹 type별로 검증 로직을 분리 예정.
-        // 현재는 radio 그룹 전제의 string 존재 여부만 확인한다(동작 무변화).
-        return collectChoiceGroups(question).every(
-          (g) => typeof map[g.groupKey] === 'string' && map[g.groupKey] !== '',
-        );
+        return collectChoiceGroups(question).every((g) => {
+          if (g.type === 'checkbox') {
+            return Array.isArray(map[g.groupKey]) && (map[g.groupKey] as unknown[]).length > 0;
+          }
+          // radio 그룹
+          return typeof map[g.groupKey] === 'string' && map[g.groupKey] !== '';
+        });
       }
+      // 비그룹 checkbox — 기존 배열 + minSelections 검증
+      if (question.type === 'checkbox') {
+        if (!Array.isArray(response) || response.length === 0) return false;
+        if (question.minSelections !== undefined && question.minSelections > 0) {
+          return response.length >= question.minSelections;
+        }
+        return true;
+      }
+      // 비그룹 radio
       return response !== null && response !== undefined && response !== '';
     case 'select':
       return response !== null && response !== undefined && response !== '';
-    case 'checkbox':
-      if (!Array.isArray(response) || response.length === 0) return false;
-      if (question.minSelections !== undefined && question.minSelections > 0) {
-        return response.length >= question.minSelections;
-      }
-      return true;
     case 'multiselect':
       return Array.isArray(response) && response.length > 0;
     case 'table':

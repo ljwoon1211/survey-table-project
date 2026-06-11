@@ -138,14 +138,20 @@ function getBranchRuleForRadio(question: Question, response: unknown): BranchRul
   const options = resolveChoiceOptions(question);
   if (!options.length) return null;
 
-  // 그룹별 선택 모드: 응답 맵의 값 목록(선택 cell.id 들)을 대상으로 검색
+  // 그룹별 선택 모드: 응답 맵의 값들을 flat 해서 선택된 모든 cell.id 를 추출.
+  // radio 그룹 값 = string, checkbox 그룹 값 = string[] — .flat() 으로 통합.
   if (
     isGroupedChoiceQuestion(question) &&
     typeof response === 'object' &&
     response !== null &&
     !Array.isArray(response)
   ) {
-    const selectedValues = Object.values(response as Record<string, string>);
+    const selectedValues = Object.values(response as Record<string, string | string[]>)
+      .flatMap((v): string[] => {
+        if (typeof v === 'string' && v !== '') return [v];
+        if (Array.isArray(v)) return v.filter((s): s is string => typeof s === 'string');
+        return [];
+      });
     const selectedOption = options.find(
       (opt) => selectedValues.includes(opt.value as string) && opt.branchRule,
     );
@@ -164,15 +170,40 @@ function getBranchRuleForRadio(question: Question, response: unknown): BranchRul
 }
 
 /**
- * 체크박스 응답의 분기 규칙 찾기
- * 여러 옵션이 선택된 경우 첫 번째 branchRule을 우선 적용
+ * 체크박스 응답의 분기 규칙 찾기.
+ * 여러 옵션이 선택된 경우 첫 번째 branchRule 을 우선 적용.
+ * grouped 응답 맵(checkbox 질문에 choiceGroups 존재) 도 지원한다.
  */
 function getBranchRuleForCheckbox(question: Question, response: unknown): BranchRule | null {
   // manual: question.options 그대로 / table-source: choice_opt 셀에서 변환된 옵션
   const options = resolveChoiceOptions(question);
-  if (!options.length || !Array.isArray(response)) return null;
+  if (!options.length) return null;
 
-  // 체크된 값들 추출
+  // 그룹별 선택 모드: checkbox 질문도 choiceGroups 가 있으면 grouped 맵일 수 있다.
+  if (
+    isGroupedChoiceQuestion(question) &&
+    typeof response === 'object' &&
+    response !== null &&
+    !Array.isArray(response)
+  ) {
+    // 맵 값 flat — checkbox 그룹 값은 string[], radio 그룹 값은 string
+    const selectedValues = Object.values(response as Record<string, string | string[]>)
+      .flatMap((v): string[] => {
+        if (typeof v === 'string' && v !== '') return [v];
+        if (Array.isArray(v)) return v.filter((s): s is string => typeof s === 'string');
+        return [];
+      });
+    for (const option of options) {
+      if (selectedValues.includes(option.value as string) && option.branchRule) {
+        return option.branchRule;
+      }
+    }
+    return null;
+  }
+
+  if (!Array.isArray(response)) return null;
+
+  // 체크된 값들 추출 (비그룹 checkbox 경로)
   const checkedValues = response.map((val: unknown) =>
     typeof val === 'object' && val !== null && 'selectedValue' in val
       ? (val as { selectedValue: string }).selectedValue

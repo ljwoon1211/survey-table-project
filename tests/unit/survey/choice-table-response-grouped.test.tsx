@@ -1,8 +1,9 @@
 /**
- * 그룹별 선택 radio (choiceGroups) 렌더 동작 테스트
+ * 그룹별 선택 radio/checkbox (choiceGroups) 렌더 동작 테스트
  *
- * 픽스처: rad1(cellA, cellB), rad2(cellC), 미소속(cellD)
- * Step 1 — 실패 테스트 먼저 작성 (TDD Red 단계)
+ * 픽스처(radio): rad1(cellA, cellB), rad2(cellC), 미소속(cellD)
+ * 픽스처(checkbox): cb1(cellE, cellF) 추가 — checkbox 그룹 복수 선택 케이스
+ * Step 3 — checkbox 그룹 구현 완료 후 전체 통과
  */
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -157,6 +158,179 @@ describe('ChoiceTableResponse — 그룹별 선택 radio', () => {
     expect(inputA.checked).toBe(true);
     expect(inputB.checked).toBe(false);
     expect(inputC.checked).toBe(false);
+  });
+});
+
+/**
+ * radio 질문에 checkbox 그룹(cb1)과 radio 그룹(rad1)이 혼재하는 픽스처.
+ * - rad1: cellA, cellB (radio)
+ * - cb1: cellE, cellF (checkbox)
+ * - 미소속(default): cellD  → 질문 type=radio 이므로 default=radio
+ */
+function mixedGroupQuestion(): Question {
+  return {
+    id: 'qmix',
+    type: 'radio',
+    title: '혼합 그룹',
+    required: true,
+    order: 0,
+    tableColumns: [{ id: 'col1', label: '열1' }],
+    tableRowsData: [
+      {
+        id: 'row1',
+        label: '',
+        cells: [
+          { id: 'cellA', type: 'choice_opt', content: '', choiceLabel: '보기A', choiceGroupId: 'grp1' },
+          { id: 'cellB', type: 'choice_opt', content: '', choiceLabel: '보기B', choiceGroupId: 'grp1' },
+          { id: 'cellE', type: 'choice_opt', content: '', choiceLabel: '보기E', choiceGroupId: 'grpCb' },
+          { id: 'cellF', type: 'choice_opt', content: '', choiceLabel: '보기F', choiceGroupId: 'grpCb' },
+          { id: 'cellD', type: 'choice_opt', content: '', choiceLabel: '보기D' },
+        ],
+      },
+    ],
+    choiceGroups: [
+      { id: 'grp1', type: 'radio', groupKey: 'rad1', label: 'Radio그룹' },
+      { id: 'grpCb', type: 'checkbox', groupKey: 'cb1', label: 'CB그룹' },
+    ],
+  } as unknown as Question;
+}
+
+/**
+ * checkbox 질문에 checkbox 그룹(cb1)이 있는 픽스처.
+ * 미소속 셀도 default=checkbox 동작 검증.
+ */
+function checkboxGroupQuestion(): Question {
+  return {
+    id: 'qcb',
+    type: 'checkbox',
+    title: 'Checkbox 질문',
+    required: true,
+    order: 0,
+    tableColumns: [{ id: 'col1', label: '열1' }],
+    tableRowsData: [
+      {
+        id: 'row1',
+        label: '',
+        cells: [
+          { id: 'cellE', type: 'choice_opt', content: '', choiceLabel: '보기E', choiceGroupId: 'grpCb' },
+          { id: 'cellF', type: 'choice_opt', content: '', choiceLabel: '보기F', choiceGroupId: 'grpCb' },
+          { id: 'cellD', type: 'choice_opt', content: '', choiceLabel: '보기D' },
+        ],
+      },
+    ],
+    choiceGroups: [
+      { id: 'grpCb', type: 'checkbox', groupKey: 'cb1', label: 'CB그룹' },
+    ],
+  } as unknown as Question;
+}
+
+describe('ChoiceTableResponse — checkbox 그룹 복수 선택', () => {
+  it('cb1 셀 하나(cellE) 선택 → { cb1: [cellE] }', () => {
+    const onChange = vi.fn();
+    render(
+      <ChoiceTableResponse
+        question={mixedGroupQuestion()}
+        value={null}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText('보기E'));
+    expect(onChange).toHaveBeenCalledWith({ cb1: ['cellE'] });
+  });
+
+  it('cellE 선택 후 cellF 추가 → { cb1: [cellE, cellF] }', () => {
+    const onChange = vi.fn();
+    render(
+      <ChoiceTableResponse
+        question={mixedGroupQuestion()}
+        value={{ cb1: ['cellE'] }}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText('보기F'));
+    expect(onChange).toHaveBeenCalledWith({ cb1: ['cellE', 'cellF'] });
+  });
+
+  it('cellE, cellF 선택 상태에서 cellE 해제 → { cb1: [cellF] }', () => {
+    const onChange = vi.fn();
+    render(
+      <ChoiceTableResponse
+        question={mixedGroupQuestion()}
+        value={{ cb1: ['cellE', 'cellF'] }}
+        onChange={onChange}
+      />,
+    );
+    // 체크된 cellE 클릭 → 해제
+    fireEvent.click(screen.getByLabelText('보기E'));
+    expect(onChange).toHaveBeenCalledWith({ cb1: ['cellF'] });
+  });
+
+  it('마지막 셀도 해제하면 cb1 키가 삭제됨 → {}', () => {
+    const onChange = vi.fn();
+    render(
+      <ChoiceTableResponse
+        question={mixedGroupQuestion()}
+        value={{ cb1: ['cellE'] }}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText('보기E'));
+    expect(onChange).toHaveBeenCalledWith({});
+  });
+
+  it('rad1 선택과 cb1 복수 선택이 한 맵에 공존: { rad1: cellA, cb1: [cellE] }', () => {
+    const onChange = vi.fn();
+    render(
+      <ChoiceTableResponse
+        question={mixedGroupQuestion()}
+        value={{ rad1: 'cellA' }}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText('보기E'));
+    expect(onChange).toHaveBeenCalledWith({ rad1: 'cellA', cb1: ['cellE'] });
+  });
+
+  it('checkbox 그룹 선택 상태 표시: value={ cb1: [cellE] }이면 cellE만 checked', () => {
+    render(
+      <ChoiceTableResponse
+        question={mixedGroupQuestion()}
+        value={{ cb1: ['cellE'] }}
+        onChange={vi.fn()}
+      />,
+    );
+    const inputE = screen.getByLabelText('보기E') as HTMLInputElement;
+    const inputF = screen.getByLabelText('보기F') as HTMLInputElement;
+    expect(inputE.checked).toBe(true);
+    expect(inputF.checked).toBe(false);
+  });
+});
+
+describe('ChoiceTableResponse — checkbox 질문 + checkbox 그룹', () => {
+  it('checkbox 질문의 그룹 셀도 배열 응답 동작', () => {
+    const onChange = vi.fn();
+    render(
+      <ChoiceTableResponse
+        question={checkboxGroupQuestion()}
+        value={null}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText('보기E'));
+    expect(onChange).toHaveBeenCalledWith({ cb1: ['cellE'] });
+  });
+
+  it('checkbox 질문의 미소속 셀(default=checkbox): 클릭 → { default: [cellD] }', () => {
+    const onChange = vi.fn();
+    render(
+      <ChoiceTableResponse
+        question={checkboxGroupQuestion()}
+        value={null}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText('보기D'));
+    expect(onChange).toHaveBeenCalledWith({ default: ['cellD'] });
   });
 });
 

@@ -166,6 +166,78 @@ describe('그룹별 선택 radio 분기 로직', () => {
   });
 });
 
+/**
+ * checkbox 그룹이 포함된 grouped 응답 맵에서 branchRule 탐색.
+ * { cb1: ['cellE'] } 에서 cellE 의 branchRule 반환.
+ */
+function groupedCheckboxBranchQ(): Question {
+  return {
+    id: 'qgcb',
+    type: 'radio',
+    title: '혼합 분기 질문',
+    required: false,
+    order: 0,
+    tableColumns: [{ id: 'c1', label: '열' }],
+    tableRowsData: [
+      {
+        id: 'row1',
+        label: '',
+        cells: [
+          {
+            id: 'cellA',
+            type: 'choice_opt',
+            content: '',
+            choiceGroupId: 'grp1',
+          },
+          {
+            id: 'cellE',
+            type: 'choice_opt',
+            content: '',
+            choiceGroupId: 'grpCb',
+            branchRule: { id: 'bE', value: 'cellE', action: 'end' },
+          },
+          {
+            id: 'cellF',
+            type: 'choice_opt',
+            content: '',
+            choiceGroupId: 'grpCb',
+          },
+        ],
+      },
+    ],
+    choiceGroups: [
+      { id: 'grp1', type: 'radio', groupKey: 'rad1', label: 'Radio그룹' },
+      { id: 'grpCb', type: 'checkbox', groupKey: 'cb1', label: 'CB그룹' },
+    ],
+  } as unknown as Question;
+}
+
+describe('checkbox 그룹 분기 로직', () => {
+  it('{ cb1: [cellE] } 에서 cellE branchRule 반환', () => {
+    const q = groupedCheckboxBranchQ();
+    const rule = getBranchRuleForResponse(q, { rad1: 'cellA', cb1: ['cellE'] });
+    expect(rule?.action).toBe('end');
+  });
+
+  it('branchRule 없는 셀만 선택된 경우 null', () => {
+    const q = groupedCheckboxBranchQ();
+    const rule = getBranchRuleForResponse(q, { rad1: 'cellA', cb1: ['cellF'] });
+    expect(rule).toBeNull();
+  });
+
+  it('{ cb1: [cellE, cellF] } — cellE branchRule 반환(첫 번째 매칭)', () => {
+    const q = groupedCheckboxBranchQ();
+    const rule = getBranchRuleForResponse(q, { cb1: ['cellE', 'cellF'] });
+    expect(rule?.action).toBe('end');
+  });
+
+  it('빈 맵({})이면 null', () => {
+    const q = groupedCheckboxBranchQ();
+    const rule = getBranchRuleForResponse(q, {});
+    expect(rule).toBeNull();
+  });
+});
+
 describe('choice table-source SPSS 단일/복수 변수 계약', () => {
   function radioTableQ(): Question {
     return {

@@ -48,6 +48,36 @@ function groupedRadioQ(): Question {
   } as unknown as Question;
 }
 
+/**
+ * checkbox 그룹이 포함된 질문 빌더.
+ * rad1(cellA) + cb1(cellE, cellF) — radio 질문에 checkbox 그룹 혼재
+ */
+function groupedWithCheckboxQ(): Question {
+  return {
+    id: 'qgcb',
+    type: 'radio',
+    title: '혼합 그룹',
+    required: true,
+    order: 0,
+    tableColumns: [{ id: 'c1', label: '열' }],
+    tableRowsData: [
+      {
+        id: 'r1',
+        label: '',
+        cells: [
+          { id: 'cellA', type: 'choice_opt', content: '', choiceGroupId: 'grp1' },
+          { id: 'cellE', type: 'choice_opt', content: '', choiceGroupId: 'grpCb' },
+          { id: 'cellF', type: 'choice_opt', content: '', choiceGroupId: 'grpCb' },
+        ],
+      },
+    ],
+    choiceGroups: [
+      { id: 'grp1', type: 'radio', groupKey: 'rad1', label: 'Radio그룹' },
+      { id: 'grpCb', type: 'checkbox', groupKey: 'cb1', label: 'CB그룹' },
+    ],
+  } as unknown as Question;
+}
+
 describe('isQuestionAnswered (survey-response-flow 추출 characterization)', () => {
   // 모든 타입 공통: null/undefined 응답은 미응답.
   it('응답값이 undefined/null 이면 모든 타입에서 미응답', () => {
@@ -249,5 +279,35 @@ describe('isQuestionAnswered — 그룹별 선택 radio (choiceGroups)', () => {
     expect(isQuestionAnswered(withPhantom, { rad1: 'cellA' })).toBe(true);
     // 아무것도 선택 안 하면 미응답
     expect(isQuestionAnswered(withPhantom, {})).toBe(false);
+  });
+});
+
+describe('isQuestionAnswered — checkbox 그룹 검증', () => {
+  it('cb1 에 1개 이상 선택 + rad1 선택 → 응답 충족', () => {
+    const gq = groupedWithCheckboxQ();
+    expect(isQuestionAnswered(gq, { rad1: 'cellA', cb1: ['cellE'] })).toBe(true);
+    expect(isQuestionAnswered(gq, { rad1: 'cellA', cb1: ['cellE', 'cellF'] })).toBe(true);
+  });
+
+  it('cb1 키 없음 → 미응답', () => {
+    const gq = groupedWithCheckboxQ();
+    // rad1만 있고 cb1 없음
+    expect(isQuestionAnswered(gq, { rad1: 'cellA' })).toBe(false);
+  });
+
+  it('cb1 빈 배열 → 미응답', () => {
+    const gq = groupedWithCheckboxQ();
+    expect(isQuestionAnswered(gq, { rad1: 'cellA', cb1: [] })).toBe(false);
+  });
+
+  it('cb1 값이 배열이 아닌 경우(잘못된 형태) → 미응답', () => {
+    const gq = groupedWithCheckboxQ();
+    // cb1 에 string이 들어간 잘못된 응답 — 배열이어야 충족
+    expect(isQuestionAnswered(gq, { rad1: 'cellA', cb1: 'cellE' })).toBe(false);
+  });
+
+  it('radio 그룹 검증 기존 동작 유지: rad1 없으면 미응답', () => {
+    const gq = groupedWithCheckboxQ();
+    expect(isQuestionAnswered(gq, { cb1: ['cellE'] })).toBe(false);
   });
 });
