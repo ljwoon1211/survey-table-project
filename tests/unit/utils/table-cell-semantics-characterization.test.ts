@@ -653,27 +653,26 @@ describe('characterization: 표시조건 table-cell-check', () => {
   });
 });
 
-// ─── 6. isHidden 현행 동작 — 3단계(동작 변경 커밋)에서 기대값이 뒤집힌다 ──────
+// ─── 6. isHidden 셀 — 평가에서 제외 (렌더·행 완료 판정과 정합) ────────────────
 
-describe('characterization: isHidden 셀 — 현행은 평가에 포함 (3단계에서 제외로 전환 예정)', () => {
+describe('isHidden 셀 — 분기·검증 평가에서 제외', () => {
   const qHidden = makeTableQuestion([
     { rowId: 'row-1', cellIndex: 1, patch: { isHidden: true } },
   ]);
 
-  it('검증 룰: hidden radio 셀의 잔존 응답값이 현행은 매칭에 사용된다', () => {
+  it('검증 룰: hidden radio 셀의 잔존 응답값은 매칭에 사용되지 않는다', () => {
     const rule = makeRule({
       type: 'any-of',
       rowIds: ['row-1'],
       cellColumnIndex: 1,
       expectedValues: ['yes'],
     });
-    // 3단계 전환 후 이 기대값은 false 가 된다.
     expect(
       checkTableValidationRule(qHidden, { 'r1-radio': { optionId: 'r1-radio-yes' } }, rule),
-    ).toBe(true);
+    ).toBe(false);
   });
 
-  it('표시조건: hidden 셀 잔존 값이 현행은 매칭에 사용된다', () => {
+  it('표시조건: hidden 셀 잔존 값은 매칭에 사용되지 않는다', () => {
     const condition: QuestionCondition = {
       id: 'cond-1',
       sourceQuestionId: 'q-table',
@@ -695,14 +694,57 @@ describe('characterization: isHidden 셀 — 현행은 평가에 포함 (3단계
       order: 1,
       displayCondition: { conditions: [condition], logicType: 'AND' },
     } as unknown as Question;
-    // 3단계 전환 후 이 기대값은 false 가 된다.
     expect(
       shouldDisplayQuestion(
         target,
         { 'q-table': { 'r1-radio': { optionId: 'r1-radio-yes' } } },
         [qHidden, target],
       ),
+    ).toBe(false);
+  });
+
+  it('비인터랙티브 폴백: hidden 첫 인터랙티브 셀은 건너뛰고 다음 인터랙티브 셀로 대체', () => {
+    // 라벨 열(0) 지정 → 폴백이 radio(1, hidden)를 건너뛰고 checkbox(2)를 선택해야 한다
+    const rule = makeRule({
+      type: 'any-of',
+      rowIds: ['row-1'],
+      cellColumnIndex: 0,
+      expectedValues: ['A'],
+    });
+    expect(
+      checkTableValidationRule(
+        qHidden,
+        {
+          'r1-radio': { optionId: 'r1-radio-yes' },
+          'r1-chk': [{ optionId: 'r1-chk-a' }],
+        },
+        rule,
+      ),
     ).toBe(true);
+  });
+
+  it('exclusive-check: 지정 외 행의 hidden 셀 잔존 값은 독점성을 깨지 않는다', () => {
+    const qHiddenRow2 = makeTableQuestion([
+      { rowId: 'row-2', cellIndex: 1, patch: { isHidden: true } },
+    ]);
+    const rule = makeRule({ type: 'exclusive-check', rowIds: ['row-1'], cellColumnIndex: 1 });
+    expect(
+      checkTableValidationRule(
+        qHiddenRow2,
+        {
+          'r1-radio': { optionId: 'r1-radio-yes' },
+          'r2-radio': { optionId: 'r2-radio-no' },
+        },
+        rule,
+      ),
+    ).toBe(true);
+  });
+
+  it('cellColumnIndex 미지정(모든 셀 스캔)에서도 hidden 셀은 제외된다', () => {
+    const rule = makeRule({ type: 'any-of', rowIds: ['row-1'], expectedValues: ['yes'] });
+    expect(
+      checkTableValidationRule(qHidden, { 'r1-radio': { optionId: 'r1-radio-yes' } }, rule),
+    ).toBe(false);
   });
 });
 

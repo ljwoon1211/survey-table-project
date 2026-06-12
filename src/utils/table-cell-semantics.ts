@@ -61,12 +61,12 @@ export interface RowScanSpec {
 /**
  * isHidden 셀 평가 게이트 — 이 모듈의 유일한 동작 전환점.
  *
- * 1단계(byte-for-byte 추출): 항상 true — 현행과 동일하게 hidden 셀도 평가 대상.
- * 2단계(동작 변경 커밋): `!cell.isHidden` 으로 전환 — 렌더(interactive-table-response 의
- * isHidden return null)·행 완료 판정(table-row-completion)과 정합을 맞춘다.
- * 셀 후보 선정과 비인터랙티브 폴백 탐색이 모두 이 게이트를 통과하므로 한 줄 변경으로 충분하다.
+ * isHidden 셀은 렌더되지 않아(interactive-table-response 의 isHidden return null) 응답이
+ * 불가능하다. 행 완료 판정(table-row-completion)과 동일하게 평가에서도 제외해, colspan 병합
+ * 등으로 숨겨진 셀의 잔존 응답값이 분기·검증 결과를 바꾸는 비대칭을 막는다.
+ * 셀 후보 선정과 비인터랙티브 폴백 탐색이 모두 이 게이트를 통과한다.
  */
-const isEvaluableCell = (_cell: TableCell): boolean => true;
+const isEvaluableCell = (cell: TableCell): boolean => !cell.isHidden;
 
 // ─── 내부: criterion 정규화 ──────────────────────────────────────────────────
 
