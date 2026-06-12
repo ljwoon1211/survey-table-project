@@ -46,6 +46,7 @@ function recalculateGlobalOrder(questions: Question[], groups: QuestionGroup[]):
 import { generatePrivateToken, generateSlugFromTitle } from '@/lib/survey-url';
 import { generateId } from '@/lib/utils';
 import { client } from '@/shared/lib/rpc';
+import { isOptionListType } from '@/types/question-types';
 import {
   Question,
   QuestionGroup,
@@ -748,7 +749,7 @@ function getDefaultQuestionTitle(type: QuestionType): string {
 }
 
 function needsOptions(type: QuestionType): boolean {
-  return ['radio', 'checkbox', 'select', 'ranking'].includes(type);
+  return isOptionListType(type);
 }
 
 function needsSelectLevels(type: QuestionType): boolean {

@@ -36,6 +36,7 @@ import { generateId } from '@/lib/utils';
 import { generateOptionCode } from '@/utils/option-code-generator';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { useSurveyUIStore } from '@/stores/ui-store';
+import { isOptionListType } from '@/types/question-types';
 import { Question, QuestionOption, SelectLevel } from '@/types/survey';
 
 import { OptionPlaceholderEditor } from './option-placeholder-editor';
@@ -144,7 +145,7 @@ export function QuestionBasicTab({
     (question.type === 'radio' || question.type === 'checkbox')
     && (formData.tableColumns?.length ?? 0) > 0;
   const needsOptions =
-    ['radio', 'checkbox', 'select', 'ranking'].includes(question.type)
+    isOptionListType(question.type)
     && !isRankingTableSource
     && !isChoiceTableMode;
   // 자체 내장 테이블 편집기 노출 조건: table 타입 자체 OR ranking 테이블 소스 OR radio/checkbox 설명 테이블 모드

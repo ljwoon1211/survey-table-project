@@ -4,6 +4,7 @@ import { desc, eq } from 'drizzle-orm';
 
 import { db } from '@/db';
 import { questionGroups, questions, surveys } from '@/db/schema';
+import { isCodedChoiceType } from '@/types/question-types';
 import type { QuestionGroup, Question as QuestionType, Survey as SurveyType } from '@/types/survey';
 import { generateAllOptionCodes } from '@/utils/option-code-generator';
 import { generateAllCellCodes } from '@/utils/table-cell-code-generator';
@@ -132,7 +133,7 @@ export async function getSurveyWithDetails(surveyId: string): Promise<SurveyType
         );
       }
       // 일반 질문 옵션 코드 복원
-      if (mapped.options && ['radio', 'checkbox', 'select', 'multiselect'].includes(mapped.type)) {
+      if (mapped.options && isCodedChoiceType(mapped.type)) {
         mapped.options = generateAllOptionCodes(mapped.options);
       }
       return mapped;

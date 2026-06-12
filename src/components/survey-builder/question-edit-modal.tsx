@@ -26,6 +26,7 @@ import { deleteImagesFromR2 } from '@/lib/image-utils';
 import { isValidUUID } from '@/lib/utils';
 import { useSurveyBuilderStore } from '@/stores/survey-store';
 import { useSurveyUIStore } from '@/stores/ui-store';
+import { isOptionListType } from '@/types/question-types';
 import { Question } from '@/types/survey';
 import { collectChoiceOptCells, resolveChoiceOptions } from '@/utils/choice-source';
 import { collectRankingOptCells } from '@/utils/ranking-source';
@@ -197,7 +198,7 @@ export function QuestionEditModal({ questionId, isOpen, onClose }: QuestionEditM
       (question.type === 'radio' || question.type === 'checkbox')
       && collectChoiceOptCells(currentFormData.tableRowsData).length > 0;
     const needsOptions =
-      ['radio', 'checkbox', 'select', 'ranking'].includes(question.type)
+      isOptionListType(question.type)
       && !isRankingTableSource
       && !isChoiceTableSource;
     const needsSelectLevels = question.type === 'multiselect';

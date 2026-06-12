@@ -1,8 +1,7 @@
+import { isCodedChoiceType } from '@/types/question-types';
 import type { Question } from '@/types/survey';
 import { generateAllOptionCodes } from '@/utils/option-code-generator';
 import { generateAllCellCodes } from '@/utils/table-cell-code-generator';
-
-const CHOICE_TYPES = new Set(['radio', 'checkbox', 'select', 'multiselect']);
 
 /**
  * DB에 strip 저장된 파생 필드(cellCode, exportLabel, optionCode)를 복원한다.
@@ -21,7 +20,7 @@ export function hydrateQuestionsForSpss(questions: Question[]): Question[] {
       };
     }
     const opts = next.options;
-    if (opts && CHOICE_TYPES.has(next.type)) {
+    if (opts && isCodedChoiceType(next.type)) {
       // 테이블 분기에서 이미 새 객체가 만들어졌으면 spread 불필요
       if (next === q) next = { ...next };
       next = { ...next, options: generateAllOptionCodes(opts) };
