@@ -61,16 +61,17 @@ describe('isTableRowCompleted', () => {
     expect(isTableRowCompleted(r, { c1: 'v', c2: '', c3: '값' })).toBe(true);
   });
 
-  it('isHidden 멤버는 그룹 카운트에서 제외 — 가시 멤버가 1개뿐이면 그룹 미형성(렌더 경로와 동일)', () => {
-    // 가시 멤버 1 + 숨김 멤버 1 → 멤버 ≥ 2 그룹으로 안 묶인다(resolveRadioGroupProps 와 동일).
-    // 가시 멤버 c1 은 단일 radio 로 per-cell 판정된다.
-    // 주의: per-cell 답안 검사는 기존 checkRow 동작을 그대로 보존하므로 isHidden 셀도 검사 대상이다.
-    // 따라서 isHidden c2 가 ''(빈값)이면 미완료로 본다(기존 동작 보존, M52 범위 밖이라 변경하지 않음).
+  it('isHidden 셀은 렌더되지 않아 응답 불가하므로 완료 판정에서 제외한다', () => {
+    // interactive-table-response 가 isHidden 셀을 return null 로 렌더하지 않아 사용자가 응답할 수 없다.
+    // buildRadioGroupBuckets 도 isHidden 을 그룹에서 제외하므로, 완료 판정도 동일하게 제외해야 정합이다.
+    // (제외하지 않으면 응답 불가한 숨김 셀이 행을 영구 미완료로 만든다.)
     const r = row([
       cell({ id: 'c1', type: 'radio', radioGroupName: 'g' }),
       cell({ id: 'c2', type: 'radio', radioGroupName: 'g', isHidden: true }),
     ]);
-    expect(isTableRowCompleted(r, { c1: 'v', c2: '' })).toBe(false);
+    // c2(isHidden) 는 무시되고 가시 셀 c1 으로만 판정 → c1 응답되면 완료
+    expect(isTableRowCompleted(r, { c1: 'v', c2: '' })).toBe(true);
+    // c1 미응답이면 미완료(숨김 c2 와 무관)
     expect(isTableRowCompleted(r, { c1: '', c2: '' })).toBe(false);
   });
 

@@ -619,8 +619,10 @@ export function checkTableValidationRule(
   let additionalConditionResult = false;
   const additionalColIndex = additionalConditions.cellColumnIndex;
 
-  // 메인 조건에서 체크된 행들만 확인 (같은 행에서 두 조건을 모두 만족해야 함)
-  for (const rowId of checkedRowsInTarget) {
+  // additionalConditions.rowIds 가 지정되면 그 제한된 행만, 아니면 메인 통과 행을 확인.
+  // (rowsToCheckForAdditional 가 제한을 반영 — evaluateQuestionCondition 과 동일하게 실제 평가에도 적용.
+  //  rowIds 미지정 시 checkedRowsInTarget 과 동일하므로 기존 동작 보존.)
+  for (const rowId of rowsToCheckForAdditional) {
     const row = question.tableRowsData.find((r) => r.id === rowId);
     if (!row) continue;
 

@@ -61,6 +61,10 @@ export function isTableRowCompleted(
 
   return row.cells.every((cell: TableCell) => {
     if (cell._isContinuation) return true;
+    // isHidden 셀은 렌더되지 않아(interactive-table-response 의 isHidden return null) 응답이 불가능하다.
+    // buildRadioGroupBuckets 도 isHidden 을 제외하므로 완료 판정도 동일하게 제외해 정합을 맞춘다.
+    // (colspan 병합으로 숨겨진 answerable 셀이 미응답으로 남아 행을 영구 미완료로 만드는 비대칭 방지.)
+    if (cell.isHidden) return true;
     if (!ANSWERABLE_CELL_TYPES.includes(cell.type as (typeof ANSWERABLE_CELL_TYPES)[number])) {
       return true;
     }
