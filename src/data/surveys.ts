@@ -99,8 +99,6 @@ export async function getSurveyWithDetails(surveyId: string): Promise<SurveyType
         ...(q.tableColumns != null ? { tableColumns: q.tableColumns as NonNullable<QuestionType['tableColumns']> } : {}),
         ...(q.tableRowsData != null ? { tableRowsData: q.tableRowsData as NonNullable<QuestionType['tableRowsData']> } : {}),
         ...(q.tableHeaderGrid != null ? { tableHeaderGrid: q.tableHeaderGrid as NonNullable<QuestionType['tableHeaderGrid']> } : {}),
-        ...(q.imageUrl != null ? { imageUrl: q.imageUrl } : {}),
-        ...(q.videoUrl != null ? { videoUrl: q.videoUrl } : {}),
         order: q.order,
         ...(q.allowOtherOption != null ? { allowOtherOption: q.allowOtherOption } : {}),
         ...(q.optionsColumns != null ? { optionsColumns: q.optionsColumns } : {}),

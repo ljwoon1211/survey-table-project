@@ -228,8 +228,6 @@ export async function duplicateSurvey(
         tableColumns: question.tableColumns as NewQuestion['tableColumns'],
         tableRowsData: question.tableRowsData as NewQuestion['tableRowsData'],
         tableHeaderGrid: question.tableHeaderGrid as NewQuestion['tableHeaderGrid'],
-        imageUrl: question.imageUrl,
-        videoUrl: question.videoUrl,
         allowOtherOption: question.allowOtherOption,
         optionsColumns: question.optionsColumns,
         minSelections: question.minSelections,

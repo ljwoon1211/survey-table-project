@@ -43,8 +43,6 @@ export async function createQuestion(data: CreateQuestionInput): Promise<Questio
     tableColumns: data.tableColumns as NewQuestion['tableColumns'],
     tableRowsData: data.tableRowsData as NewQuestion['tableRowsData'],
     tableHeaderGrid: data.tableHeaderGrid as NewQuestion['tableHeaderGrid'],
-    imageUrl: data.imageUrl,
-    videoUrl: data.videoUrl,
     allowOtherOption: data.allowOtherOption,
     optionsColumns: data.optionsColumns,
     minSelections: data.minSelections,
@@ -99,8 +97,6 @@ export async function updateQuestion(
   if (data.tableColumns !== undefined) allowed.tableColumns = data.tableColumns as NewQuestion['tableColumns'];
   if (data.tableRowsData !== undefined) allowed.tableRowsData = data.tableRowsData as NewQuestion['tableRowsData'];
   if (data.tableHeaderGrid !== undefined) allowed.tableHeaderGrid = data.tableHeaderGrid as NewQuestion['tableHeaderGrid'];
-  if (data.imageUrl !== undefined) allowed.imageUrl = data.imageUrl;
-  if (data.videoUrl !== undefined) allowed.videoUrl = data.videoUrl;
   if (data.allowOtherOption !== undefined) allowed.allowOtherOption = data.allowOtherOption;
   if (data.optionsColumns !== undefined) allowed.optionsColumns = data.optionsColumns;
   if (data.minSelections !== undefined) allowed.minSelections = data.minSelections;

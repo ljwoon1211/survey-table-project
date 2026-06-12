@@ -116,8 +116,6 @@ export interface QuestionData {
   tableColumns?: TableColumn[];
   tableRowsData?: TableRow[];
   tableHeaderGrid?: HeaderCell[][];
-  imageUrl?: string;
-  videoUrl?: string;
   order: number;
   allowOtherOption?: boolean;
   optionsColumns?: number;

@@ -94,7 +94,7 @@ export const questions = pgTable('questions', {
     .references(() => surveys.id, { onDelete: 'cascade' }),
   groupId: uuid('group_id').references(() => questionGroups.id, { onDelete: 'set null' }),
 
-  type: text('type').notNull(), // 'text' | 'textarea' | 'radio' | 'checkbox' | 'select' | 'multiselect' | 'table' | 'notice'
+  type: text('type').notNull(), // QuestionType 9종 — 런타임 SoT 는 @/types/question-types 의 QUESTION_TYPES
   title: text('title').notNull(),
   description: text('description'),
   required: boolean('required').default(false).notNull(),
@@ -112,7 +112,8 @@ export const questions = pgTable('questions', {
   tableRowsData: jsonb('table_rows_data').$type<TableRow[]>(),
   tableHeaderGrid: jsonb('table_header_grid').$type<HeaderCell[][]>(),
 
-  // 미디어
+  // 레거시 — 질문 레벨 미디어는 어디서도 읽고 쓰지 않는다(Question 타입에서 제거됨, 실DB 값 0건 확인).
+  // 컬럼 자체는 비파괴 원칙으로 잔존. drop 은 별도 마이그레이션 결정 사안.
   imageUrl: text('image_url'),
   videoUrl: text('video_url'),
 

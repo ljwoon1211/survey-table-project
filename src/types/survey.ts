@@ -462,18 +462,12 @@ export interface Question {
   groupId?: string; // 소속 그룹 ID (QuestionGroup의 id 참조)
   options?: QuestionOption[];
   selectLevels?: SelectLevel[]; // 다단계 select용
-  tableRows?: string[];
-  tableCols?: string[];
-  tableType?: string; // ✨ 테이블 타입 (매트릭스 등) - "matrix", "loop" 등
-  loopConfig?: any; // ✨ 반복 질문 설정
 
-  // 새로운 테이블 구조
+  // 테이블 구조 — table 전용이 아니라 radio/checkbox(choice_opt 소스)·ranking(ranking_opt 소스)도 보유
   tableTitle?: string;
   tableColumns?: TableColumn[];
   tableRowsData?: TableRow[];
   tableHeaderGrid?: HeaderCell[][]; // 다단계 헤더 그리드 (없으면 tableColumns로 단일 행 폴백)
-  imageUrl?: string;
-  videoUrl?: string;
   order: number;
   allowOtherOption?: boolean; // 기타 옵션 허용 여부 (radio, checkbox, select용)
   // 옵션 리스트 렌더 방식 (radio/checkbox/ranking 공통)
@@ -574,14 +568,6 @@ export interface SurveySubmission {
   questionResponses: Record<string, any>; // JSON 저장된 응답들 (questionId -> value)
   userAgent?: string | null;
   updatedAt: Date;
-}
-
-export interface QuestionTypeInfo {
-  type: QuestionType;
-  label: string;
-  icon: string;
-  description: string;
-  color: string;
 }
 
 // 보관함 (라이브러리용)

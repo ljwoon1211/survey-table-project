@@ -408,8 +408,6 @@ export function CellContentModal({
                 ...(question.tableTitle !== undefined ? { tableTitle: question.tableTitle } : {}),
                 ...(question.tableColumns !== undefined ? { tableColumns: question.tableColumns } : {}),
                 tableRowsData: updatedRowsData,
-                ...(question.imageUrl !== undefined ? { imageUrl: question.imageUrl } : {}),
-                ...(question.videoUrl !== undefined ? { videoUrl: question.videoUrl } : {}),
                 ...(question.allowOtherOption !== undefined ? { allowOtherOption: question.allowOtherOption } : {}),
                 ...(question.optionsColumns !== undefined ? { optionsColumns: question.optionsColumns } : {}),
                 ...(question.noticeContent !== undefined ? { noticeContent: question.noticeContent } : {}),

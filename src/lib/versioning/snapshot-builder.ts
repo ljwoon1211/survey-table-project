@@ -41,8 +41,6 @@ interface SnapshotQuestion {
   tableColumns?: Question['tableColumns'] | undefined;
   tableRowsData?: Question['tableRowsData'] | undefined;
   tableHeaderGrid?: Question['tableHeaderGrid'] | undefined;
-  imageUrl?: string | undefined;
-  videoUrl?: string | undefined;
   order: number;
   allowOtherOption?: boolean | undefined;
   optionsColumns?: number | undefined;
@@ -104,8 +102,6 @@ export function buildSurveySnapshot(survey: Survey): SurveySnapshot {
         ? stripTableRowsData(q.tableRowsData)
         : q.tableRowsData,
       tableHeaderGrid: q.tableHeaderGrid,
-      imageUrl: q.imageUrl,
-      videoUrl: q.videoUrl,
       order: q.order,
       allowOtherOption: q.allowOtherOption,
       optionsColumns: q.optionsColumns,
