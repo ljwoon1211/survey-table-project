@@ -206,6 +206,10 @@ function getBranchRuleForTable(question: Question, response: unknown): BranchRul
 
   for (const row of question.tableRowsData) {
     for (const cell of row.cells) {
+      // isHidden 셀은 렌더되지 않아 응답이 불가능 — 잔존 값이 분기를 결정하지 않도록 제외
+      // (table-cell-semantics 의 isEvaluableCell 게이트와 동일 정책)
+      if (cell.isHidden) continue;
+
       const cellValue = tableResponse[cell.id];
       if (!cellValue) continue;
 
@@ -381,6 +385,13 @@ export function checkTableValidationRule(
   // 추가 조건에서 확인할 행들 결정 — rowIds 지정 시 그 제한된 행만, 아니면 메인 통과 행.
   // (같은-행 교집합 의미론은 검증 규칙 소유 — 셀 의미론으로 내리지 않는다.)
   const additionalConditions = rule.additionalConditions;
+
+  // legacy JSONB 에서 cellColumnIndex 누락 시 구버전과 동일하게 불충족 처리.
+  // (미지정을 모듈에 넘기면 "행의 모든 셀 스캔" 의미가 되어 fail-closed 가 fail-open 으로 반전)
+  if (typeof additionalConditions.cellColumnIndex !== 'number') {
+    return false;
+  }
+
   const rowsToCheckForAdditional =
     additionalConditions.rowIds && additionalConditions.rowIds.length > 0
       ? additionalConditions.rowIds
@@ -418,8 +429,13 @@ export function getTableValidationBranchRule(
       // 조건을 만족하면 해당 분기 규칙 반환
       let targetQuestionId = rule.targetQuestionId;
 
-      // 동적 분기: targetQuestionMap이 있고 추가 조건이 있으면 값에 따라 질문 선택
-      if (rule.targetQuestionMap && rule.additionalConditions) {
+      // 동적 분기: targetQuestionMap이 있고 추가 조건이 있으면 값에 따라 질문 선택.
+      // legacy JSONB 에서 cellColumnIndex 누락 시 구버전과 동일하게 추출 생략(기본 타겟 유지).
+      if (
+        rule.targetQuestionMap &&
+        rule.additionalConditions &&
+        typeof rule.additionalConditions.cellColumnIndex === 'number'
+      ) {
         const tableResponse = response as Record<string, unknown>;
         const rowsToCheck =
           rule.additionalConditions.rowIds && rule.additionalConditions.rowIds.length > 0
@@ -432,7 +448,11 @@ export function getTableValidationBranchRule(
           rowIds: rowsToCheck,
           columnIndex: rule.additionalConditions.cellColumnIndex,
         });
-        const mappedValue = candidateValues.find((value) => rule.targetQuestionMap?.[value]);
+        // 빈 문자열 대표값('' value 옵션)은 매핑 후보에서 제외 — find 가 ''를 히트로 소비하면
+        // 바깥 falsy 가드가 폐기해 후속 행의 유효 매핑이 무시된다 (구버전 행별 truthy 가드 보존)
+        const mappedValue = candidateValues.find(
+          (value) => value && rule.targetQuestionMap?.[value],
+        );
         if (mappedValue) {
           targetQuestionId = rule.targetQuestionMap[mappedValue];
         }
@@ -790,6 +810,11 @@ function evaluateQuestionCondition(
   const tableResponse = sourceResponse as Record<string, unknown>;
   const additionalConditions = condition.additionalConditions;
   const additionalColIndex = additionalConditions.cellColumnIndex;
+
+  // legacy JSONB 에서 cellColumnIndex 누락 시 구버전과 동일하게 불충족 처리 (fail-closed 유지)
+  if (typeof additionalColIndex !== 'number') {
+    return false;
+  }
 
   // 메인 조건에서 체크된 행들 가져오기
   let checkedRowsInTarget: string[] = [];

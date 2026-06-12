@@ -22,8 +22,12 @@ import { emptyBranchEvalCtx, evaluateNumericComparisonV2, type BranchEvalCtx } f
  * 전부 "불일치(false)" 또는 "빈 결과([] / null)" 로 수렴한다 (fail-closed).
  */
 
-/** 조건 평가에 참여하는 인터랙티브 셀 타입 */
-export const INTERACTIVE_CELL_TYPES = ['checkbox', 'radio', 'select', 'input'] as const;
+/**
+ * 조건 평가에 참여하는 인터랙티브 셀 타입.
+ * 비공개 — table-cell-code-generator.ts 의 동명 export(SPSS 변수 대상, ranking_opt/choice_opt
+ * 포함)와 의미·멤버가 달라 auto-import 오선택을 막기 위해 모듈 내부에만 둔다.
+ */
+const INTERACTIVE_CELL_TYPES = ['checkbox', 'radio', 'select', 'input'] as const;
 
 /**
  * 셀 매칭 기준. 모든 필드 생략 = "응답됨" 판정.
@@ -72,7 +76,6 @@ const isEvaluableCell = (cell: TableCell): boolean => !cell.isHidden;
 
 type CellCriterion =
   | { kind: 'answered' }
-  | { kind: 'value-present' }
   | { kind: 'value-in'; expectedValues: string[] }
   | { kind: 'numeric'; comparison: NumericComparison; fallback: CellCriterion; ctx?: BranchEvalCtx };
 
@@ -238,7 +241,6 @@ export function matchCell(cell: TableCell, value: unknown, criteria?: CellCriter
 }
 
 function matchCellCriterion(cell: TableCell, value: unknown, criterion: CellCriterion): boolean {
-  if (criterion.kind === 'value-present') return isCellValuePresent(value);
   if (!value) return false;
   const semantics = SEMANTICS[cell.type];
   if (!semantics) return false;

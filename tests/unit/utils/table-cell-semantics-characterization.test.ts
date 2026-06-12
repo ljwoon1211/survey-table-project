@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { Question, QuestionCondition, TableValidationRule } from '@/types/survey';
 import {
   checkTableValidationRule,
+  getBranchRuleForResponse,
   getTableValidationBranchRule,
   shouldDisplayQuestion,
   shouldDisplayRow,
@@ -14,7 +15,7 @@ import {
  * 표시조건 추가조건/checkTableCellCondition)의 관측 가능 동작을 공개 seam 을 통해 핀 고정한다.
  * 추출(2단계 커밋)은 이 스위트가 전부 green 인 상태를 유지해야 한다.
  *
- * 주의: "isHidden 현행 동작" describe 는 3단계(동작 변경 커밋)에서 기대값이 뒤집힌다.
+ * isHidden describe 는 동작 변경 커밋(분기·검증 평가에서 isHidden 셀 제외) 이후의 동작을 단언한다.
  */
 
 // ─── 픽스처 ──────────────────────────────────────────────────────────────────
@@ -210,6 +211,16 @@ describe('characterization: checkTableValidationRule 셀 값 해석', () => {
     const rule = makeRule({ type: 'any-of', rowIds: ['row-1'], cellColumnIndex: 1 });
     expect(checkTableValidationRule(q, { 'r1-radio': { optionId: 'ghost' } }, rule)).toBe(true);
     expect(checkTableValidationRule(q, {}, rule)).toBe(false);
+  });
+
+  it('expectedValues 빈 배열은 미지정과 동일(응답됨 격하)', () => {
+    const rule = makeRule({
+      type: 'any-of',
+      rowIds: ['row-1'],
+      cellColumnIndex: 1,
+      expectedValues: [],
+    });
+    expect(checkTableValidationRule(q, { 'r1-radio': { optionId: 'ghost' } }, rule)).toBe(true);
   });
 
   it('cellColumnIndex 미지정 시 행의 모든 셀을 검사', () => {
@@ -431,6 +442,20 @@ describe('characterization: checkTableValidationRule 추가조건', () => {
     expect(checkTableValidationRule(q, { 'r1-chk': [{ optionId: 'r1-chk-a' }] }, rule)).toBe(true);
     expect(checkTableValidationRule(q, {}, rule)).toBe(false);
   });
+
+  it('legacy: 추가조건 cellColumnIndex 누락 시 불충족(false) — fail-closed 유지', () => {
+    const rule = makeRule({
+      type: 'any-of',
+      rowIds: ['row-1'],
+      cellColumnIndex: 1,
+      additionalConditions: {
+        checkType: 'radio',
+      } as unknown as TableValidationRule['additionalConditions'],
+    });
+    expect(checkTableValidationRule(q, { 'r1-radio': { optionId: 'r1-radio-yes' } }, rule)).toBe(
+      false,
+    );
+  });
 });
 
 // ─── 4. getTableValidationBranchRule — 분기값 추출 (사본 ③) ──────────────────
@@ -550,6 +575,91 @@ describe('characterization: getTableValidationBranchRule 분기값 추출', () =
     });
     expect(branch?.targetQuestionId).toBe('q-default');
   });
+
+  it('select: 추가조건 열의 선택값으로 targetQuestionMap 분기', () => {
+    const rule = makeRule({
+      type: 'any-of',
+      rowIds: ['row-1'],
+      cellColumnIndex: 1,
+      expectedValues: ['yes'],
+      additionalConditions: { cellColumnIndex: 3, checkType: 'select' },
+      targetQuestionMap: { S1: 'q-s1', S2: 'q-s2' },
+    });
+    const branch = getTableValidationBranchRule(makeQuestionWithRule(rule), {
+      'r1-radio': { optionId: 'r1-radio-yes' },
+      'r1-sel': { optionId: 'r1-sel-2' },
+    });
+    expect(branch?.targetQuestionId).toBe('q-s2');
+  });
+
+  it('회귀: 빈 value 옵션을 선택한 행은 건너뛰고 후속 행의 유효 매핑을 사용한다', () => {
+    // 빌더의 매핑 추가 버튼이 { '': '' } 엔트리를 만들 수 있어 map 에 '' 키가 실재 가능.
+    // find 가 ''를 히트로 소비한 뒤 falsy 가드가 폐기하면 후속 행의 유효 매핑이 무시된다.
+    const qEmptyOpt = makeTableQuestion([
+      {
+        rowId: 'row-1',
+        cellIndex: 1,
+        patch: {
+          radioOptions: [
+            { id: 'r1-radio-empty', label: '없음', value: '' },
+            { id: 'r1-radio-yes', label: '예', value: 'yes' },
+          ],
+        },
+      },
+    ]);
+    const rule = makeRule({
+      type: 'any-of',
+      rowIds: ['row-1', 'row-2'],
+      cellColumnIndex: 1,
+      additionalConditions: {
+        cellColumnIndex: 1,
+        checkType: 'radio',
+        rowIds: ['row-1', 'row-2'],
+      },
+      targetQuestionId: 'q-default',
+      targetQuestionMap: { '': 'q-empty', yes: 'q-yes' },
+    });
+    (qEmptyOpt as unknown as { tableValidationRules: TableValidationRule[] }).tableValidationRules =
+      [rule];
+    const branch = getTableValidationBranchRule(qEmptyOpt, {
+      'r1-radio': { optionId: 'r1-radio-empty' },
+      'r2-radio': { optionId: 'r2-radio-yes' },
+    });
+    expect(branch?.targetQuestionId).toBe('q-yes');
+  });
+
+  it('legacy: 추가조건 cellColumnIndex 누락 시 분기값 추출을 생략하고 기본 타겟 유지', () => {
+    const rule = makeRule({
+      type: 'any-of',
+      rowIds: ['row-1'],
+      cellColumnIndex: 1,
+      expectedValues: ['yes'],
+      additionalConditions: {
+        checkType: 'radio',
+        rowIds: ['row-1'],
+      } as unknown as TableValidationRule['additionalConditions'],
+      targetQuestionId: 'q-default',
+      targetQuestionMap: { yes: 'q-yes' },
+    });
+    // 메인 조건은 추가조건 누락 가드(false)에 걸리므로, 추가조건 없는 쌍둥이 규칙으로 만족시킨다
+    const ruleSatisfied = makeRule({
+      type: 'any-of',
+      rowIds: ['row-1'],
+      cellColumnIndex: 1,
+      expectedValues: ['yes'],
+      targetQuestionId: 'q-plain',
+    });
+    const q2 = makeQuestionWithRule(rule);
+    (q2 as unknown as { tableValidationRules: TableValidationRule[] }).tableValidationRules = [
+      rule,
+      ruleSatisfied,
+    ];
+    const branch = getTableValidationBranchRule(q2, {
+      'r1-radio': { optionId: 'r1-radio-yes' },
+    });
+    // cellColumnIndex 누락 규칙은 추가조건 불충족으로 매칭 자체가 안 되고, 다음 규칙으로 넘어간다
+    expect(branch?.targetQuestionId).toBe('q-plain');
+  });
 });
 
 // ─── 5. 표시조건 경로 — checkTableCellCondition (사본 ⑤) + 추가조건 (사본 ④) ──
@@ -651,6 +761,78 @@ describe('characterization: 표시조건 table-cell-check', () => {
       ),
     ).toBe(false);
   });
+
+  it('radio: 평면 string(optionId) legacy 저장값도 표시조건 경로에서 해석', () => {
+    const tc = {
+      rowIds: ['row-1'],
+      cellColumnIndex: 1,
+      checkType: 'any' as const,
+      expectedValues: ['yes'],
+    };
+    expect(evalDisplay({ 'r1-radio': 'r1-radio-yes' }, tc)).toBe(true);
+    expect(evalDisplay({ 'r1-radio': 'r1-radio-no' }, tc)).toBe(false);
+  });
+
+  it('checkbox 메인: optionId 배열을 value 로 해석해 비교', () => {
+    const tc = {
+      rowIds: ['row-1'],
+      cellColumnIndex: 2,
+      checkType: 'any' as const,
+      expectedValues: ['B'],
+    };
+    expect(evalDisplay({ 'r1-chk': [{ optionId: 'r1-chk-b' }] }, tc)).toBe(true);
+    expect(evalDisplay({ 'r1-chk': [{ optionId: 'r1-chk-a' }] }, tc)).toBe(false);
+  });
+
+  it('expectedValues 빈 배열은 미지정과 동일(응답됨 격하)', () => {
+    const tc = {
+      rowIds: ['row-1'],
+      cellColumnIndex: 1,
+      checkType: 'any' as const,
+      expectedValues: [],
+    };
+    expect(evalDisplay({ 'r1-radio': { optionId: 'ghost' } }, tc)).toBe(true);
+  });
+
+  it('추가조건 numericComparison: input 셀 값으로 숫자 비교 (사본 ④ 전용 경로)', () => {
+    const tc = {
+      rowIds: ['row-1'],
+      cellColumnIndex: 1,
+      checkType: 'any' as const,
+      expectedValues: ['yes'],
+    };
+    const ac = {
+      cellColumnIndex: 4,
+      checkType: 'input' as const,
+      numericComparison: {
+        operator: '>=' as const,
+        comparand: { kind: 'literal' as const, value: 10 },
+      },
+    };
+    expect(
+      evalDisplay({ 'r1-radio': { optionId: 'r1-radio-yes' }, 'r1-input': '12' }, tc, ac),
+    ).toBe(true);
+    expect(
+      evalDisplay({ 'r1-radio': { optionId: 'r1-radio-yes' }, 'r1-input': '5' }, tc, ac),
+    ).toBe(false);
+  });
+
+  it('legacy: 추가조건 cellColumnIndex 누락 시 숨김(false) — fail-closed 유지', () => {
+    const tc = {
+      rowIds: ['row-1'],
+      cellColumnIndex: 1,
+      checkType: 'any' as const,
+      expectedValues: ['yes'],
+    };
+    const ac = { checkType: 'checkbox' } as unknown as QuestionCondition['additionalConditions'];
+    expect(
+      evalDisplay(
+        { 'r1-radio': { optionId: 'r1-radio-yes' }, 'r1-chk': [{ optionId: 'r1-chk-a' }] },
+        tc,
+        ac,
+      ),
+    ).toBe(false);
+  });
 });
 
 // ─── 6. isHidden 셀 — 평가에서 제외 (렌더·행 완료 판정과 정합) ────────────────
@@ -745,6 +927,83 @@ describe('isHidden 셀 — 분기·검증 평가에서 제외', () => {
     expect(
       checkTableValidationRule(qHidden, { 'r1-radio': { optionId: 'r1-radio-yes' } }, rule),
     ).toBe(false);
+  });
+
+  // 아래 3건은 제외 정책이 결과를 "만족" 방향으로 뒤집는 위험 방향 — 게이트 회귀 시 즉시 적발용
+  it("none-of: hidden 잔존값 제외로 '아무도 매칭 안 됨'이 새로 만족된다", () => {
+    const rule = makeRule({
+      type: 'none-of',
+      rowIds: ['row-1'],
+      cellColumnIndex: 1,
+      expectedValues: ['yes'],
+    });
+    expect(
+      checkTableValidationRule(qHidden, { 'r1-radio': { optionId: 'r1-radio-yes' } }, rule),
+    ).toBe(true);
+  });
+
+  it("표시조건 checkType 'none': hidden 잔존값 제외로 질문이 새로 표시된다", () => {
+    const condition: QuestionCondition = {
+      id: 'cond-1',
+      sourceQuestionId: 'q-table',
+      conditionType: 'table-cell-check',
+      logicType: 'AND',
+      tableConditions: {
+        rowIds: ['row-1'],
+        cellColumnIndex: 1,
+        checkType: 'none',
+        expectedValues: ['yes'],
+      },
+    } as QuestionCondition;
+    const target = {
+      id: 'q-target',
+      surveyId: 's1',
+      type: 'text',
+      title: '대상',
+      required: false,
+      order: 1,
+      displayCondition: { conditions: [condition], logicType: 'AND' },
+    } as unknown as Question;
+    expect(
+      shouldDisplayQuestion(
+        target,
+        { 'q-table': { 'r1-radio': { optionId: 'r1-radio-yes' } } },
+        [qHidden, target],
+      ),
+    ).toBe(true);
+  });
+
+  it('exclusive-check: 지정 행의 응답 셀이 hidden 이면 체크된 행이 없어 false', () => {
+    const rule = makeRule({ type: 'exclusive-check', rowIds: ['row-1'], cellColumnIndex: 1 });
+    expect(
+      checkTableValidationRule(qHidden, { 'r1-radio': { optionId: 'r1-radio-yes' } }, rule),
+    ).toBe(false);
+  });
+});
+
+// ─── 6b. isHidden 셀 — 셀 옵션 branchRule 경로 (getBranchRuleForTable) ────────
+
+describe('isHidden 셀 — 셀 옵션 branchRule 분기에서도 제외', () => {
+  it('hidden radio 셀 옵션의 branchRule 은 분기를 결정하지 않는다', () => {
+    const q = makeTableQuestion([
+      {
+        rowId: 'row-1',
+        cellIndex: 1,
+        patch: {
+          isHidden: true,
+          radioOptions: [
+            {
+              id: 'r1-radio-yes',
+              label: '예',
+              value: 'yes',
+              branchRule: { id: 'br-1', value: 'yes', action: 'goto', targetQuestionId: 'q-9' },
+            },
+            { id: 'r1-radio-no', label: '아니오', value: 'no' },
+          ],
+        },
+      },
+    ]);
+    expect(getBranchRuleForResponse(q, { 'r1-radio': 'r1-radio-yes' })).toBeNull();
   });
 });
 
