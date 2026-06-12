@@ -80,7 +80,7 @@ describe('useCellResponse — 실응답 모드 (value/onChange adapter)', () => 
     const { result, rerender } = renderHook(
       ({ value }: { value: Record<string, unknown> }) =>
         useCellResponse('q1', 'c1', false, value, onChange),
-      { initialProps: { value: { c0: '구버전' } } },
+      { initialProps: { value: { c0: '구버전' } as Record<string, unknown> } },
     );
 
     rerender({ value: { c0: '신버전', c9: '추가' } });
