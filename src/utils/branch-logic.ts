@@ -1315,8 +1315,10 @@ function evaluateQuestionCondition(
   // (메인 조건에서 체크된 행들 중에서, 같은 행에서 추가 조건도 만족하는 행이 있는지 확인)
   let additionalConditionResult = false;
 
-  // 평가 행 집합을 순회 (any/all 은 메인 통과 행, 'none' 은 메인 검사 대상 행)
-  for (const rowId of rowsForAdditionalEval) {
+  // 평가 행 집합을 순회. additionalConditions.rowIds 가 지정되면 그 제한된 부분집합만 본다.
+  // (rowsToCheckForAdditional = rowIds 지정 시 그것, 아니면 rowsForAdditionalEval:
+  //  any/all 은 메인 통과 행, 'none' 은 메인 검사 대상 행.)
+  for (const rowId of rowsToCheckForAdditional) {
     const row = sourceQuestion.tableRowsData.find((r) => r.id === rowId);
     if (!row) continue;
 

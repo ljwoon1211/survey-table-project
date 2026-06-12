@@ -77,6 +77,7 @@ function makeSourceQuestion(): Question {
 function makeTargetQuestion(
   mainCheckType: 'any' | 'all' | 'none',
   withAdditional: boolean,
+  additionalRowIds?: string[],
 ): Question {
   const condition: QuestionCondition = {
     id: 'cond-1',
@@ -93,6 +94,7 @@ function makeTargetQuestion(
           additionalConditions: {
             cellColumnIndex: 2, // col-b
             checkType: 'checkbox' as const,
+            ...(additionalRowIds ? { rowIds: additionalRowIds } : {}),
           },
         }
       : {}),
@@ -116,9 +118,10 @@ function evalDisplay(
   mainCheckType: 'any' | 'all' | 'none',
   withAdditional: boolean,
   responses: Record<string, unknown>,
+  additionalRowIds?: string[],
 ): boolean {
   const sourceQuestion = makeSourceQuestion();
-  const targetQuestion = makeTargetQuestion(mainCheckType, withAdditional);
+  const targetQuestion = makeTargetQuestion(mainCheckType, withAdditional, additionalRowIds);
   return shouldDisplayQuestion(targetQuestion, responses, [sourceQuestion, targetQuestion]);
 }
 
@@ -174,5 +177,18 @@ describe('branch-logic — checkType none + additionalConditions', () => {
       },
     };
     expect(evalDisplay('any', true, responses)).toBe(false);
+  });
+
+  // 회귀(codex 3차 P2): 'none' 경로가 additionalConditions.rowIds 제한을 무시하던 버그
+  it("회귀: 메인 'none' + additional.rowIds=[row-1] 제한 시 제한 밖 row-2 충족은 무시 → 숨김(false)", () => {
+    // col-a 두 행 미체크('none' 만족), col-b 는 row-2 에만 체크.
+    // additional 이 row-1 로 스코프되므로 제한 밖 row-2 의 충족은 무시되어야 한다.
+    // (버그: 제한을 무시하고 row-2 까지 평가하면 잘못 표시 true)
+    const responses: Record<string, unknown> = {
+      'q-source': {
+        'r2-b': [{ optionId: 'opt-b2' }],
+      },
+    };
+    expect(evalDisplay('none', true, responses, ['row-1'])).toBe(false);
   });
 });
