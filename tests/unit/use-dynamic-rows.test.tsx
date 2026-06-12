@@ -113,6 +113,60 @@ describe('useDynamicRows — 가시 행 필터링 (이관된 접착 로직)', ()
     // g1 비활성 → d1/d2 는 일반 행처럼 표시, s1(showWhen g1)도 표시
     expect(result.current.displayRows.map((r) => r.id)).toEqual(['r1', 'r2', 'd1', 'd2', 's1']);
   });
+
+  it('조건 필터와 동적 그룹 제외가 동시에 적용된다 — 조건이 동적 행을 포함해도 제외가 우선', () => {
+    const { result } = setup({
+      dynamicRowConfigs: makeConfigs('g1', 'g2'),
+      conditionVisibleRowIds: new Set(['r1', 'd1', 's1']),
+    });
+    // d1/s1 은 조건상 보이지만 동적 제외로 빠지고, r2 는 조건으로 빠진다
+    expect(result.current.displayRows.map((r) => r.id)).toEqual(['r1']);
+  });
+
+  it('병합 그룹 중간 행이 동적 제외로 숨겨지면 rowspan 이 축소된다', () => {
+    const rows = [
+      {
+        id: 'm1',
+        label: 'm1',
+        cells: [
+          { id: 'm1-c0', content: '병합', type: 'text', rowspan: 3 },
+          { id: 'm1-c1', content: '', type: 'input' },
+        ],
+      },
+      {
+        id: 'm2',
+        label: 'm2',
+        dynamicGroupId: 'g1',
+        cells: [
+          { id: 'm2-c0', content: '', type: 'text', isHidden: true },
+          { id: 'm2-c1', content: '', type: 'input' },
+        ],
+      },
+      {
+        id: 'm3',
+        label: 'm3',
+        cells: [
+          { id: 'm3-c0', content: '', type: 'text', isHidden: true },
+          { id: 'm3-c1', content: '', type: 'input' },
+        ],
+      },
+    ] as unknown as TableRow[];
+    const { result } = setup({ rows, dynamicRowConfigs: makeConfigs('g1') });
+
+    expect(result.current.displayRows.map((r) => r.id)).toEqual(['m1', 'm3']);
+    expect(result.current.displayRows[0]?.cells[0]?.rowspan).toBe(2);
+  });
+
+  it('빈 columnFilteredRows: 행 산출물은 비고, null 앵커 셀렉터는 헤더 아래 배치된다', () => {
+    const { result } = setup({
+      rows: makeRows(),
+      columnFilteredRows: [],
+      dynamicRowConfigs: makeConfigs('g1'),
+    });
+    expect(result.current.displayRows).toEqual([]);
+    expect(result.current.rowCompletionMap.size).toBe(0);
+    expect(result.current.selectorGridMap.get('g1')).toBe(2);
+  });
 });
 
 describe('useDynamicRows — 선택 상태와 핸들러', () => {
@@ -122,6 +176,15 @@ describe('useDynamicRows — 선택 상태와 핸들러', () => {
       value: { __selectedRowIds: ['d1', 'd1', 'd2'] },
     });
     expect(result.current.selectedRowIds).toEqual(['d1', 'd2']);
+  });
+
+  it('groupSelectedCountMap: 그룹별 선택 행 수를 집계한다', () => {
+    const { result } = setup({
+      dynamicRowConfigs: makeConfigs('g1', 'g2'),
+      value: { __selectedRowIds: ['d1', 'd2', 'e1'] },
+    });
+    expect(result.current.groupSelectedCountMap.get('g1')).toBe(2);
+    expect(result.current.groupSelectedCountMap.get('g2')).toBe(1);
   });
 
   it('handleDynamicRowSelect: 다른 그룹의 기존 선택을 보존하고 onChange 로 병합 전달', () => {
@@ -200,6 +263,44 @@ describe('useDynamicRows — 셀렉터 배치와 펼침', () => {
       hiddenGroupIds: new Set(['g1']),
     });
     expect(result.current.selectorGridMap.has('g1')).toBe(false);
+  });
+
+  it('insertAfterRowId 앵커 행이 숨겨지면 가장 가까운 보이는 행으로 역추적', () => {
+    // 동적 행(d1/d2)이 g1 에 실재해야 앵커가 생성된다 — 기본 픽스처 사용
+    const configs: DynamicRowGroupConfig[] = [
+      { groupId: 'g1', enabled: true, insertAfterRowId: 'r2' },
+    ];
+    const { result } = setup({
+      dynamicRowConfigs: configs,
+      conditionVisibleRowIds: new Set(['r1']),
+    });
+    // r2 숨김 → r1 로 역추적: r1(grid 2) 바로 다음에 셀렉터(3)
+    expect(result.current.selectorGridMap.get('g1')).toBe(3);
+  });
+
+  it('앵커 후보가 전부 숨겨지면 null fallback 으로 헤더 바로 아래 배치', () => {
+    const configs: DynamicRowGroupConfig[] = [
+      { groupId: 'g1', enabled: true, insertAfterRowId: 'r2' },
+    ];
+    const { result } = setup({
+      dynamicRowConfigs: configs,
+      conditionVisibleRowIds: new Set<string>(),
+    });
+    expect(result.current.selectorGridMap.get('g1')).toBe(2);
+  });
+
+  it('숨김 그룹은 펼쳐져 있어도 grid 좌표를 받지 않고 가시 행의 슬롯도 소비하지 않는다', () => {
+    const { result } = setup({
+      dynamicRowConfigs: makeConfigs('g1'),
+      hiddenGroupIds: new Set(['g1']),
+      value: { __selectedRowIds: ['d1'] },
+    });
+    act(() => result.current.toggleGroupExpanded('g1'));
+
+    expect(result.current.rowGridMap.has('d1')).toBe(false);
+    expect(result.current.rowGridMap.get('r1')).toBe(2);
+    // 완료 맵에는 펼친 행이 남는 비대칭은 pre-existing 동작 — 렌더가 .get 조회만 하므로 무해
+    expect(result.current.rowCompletionMap.has('d1')).toBe(true);
   });
 
   it('펼친 그룹: 선택된 행 + showWhen 행이 expandedGroupRows 로 노출되고 grid 좌표를 받는다', () => {
