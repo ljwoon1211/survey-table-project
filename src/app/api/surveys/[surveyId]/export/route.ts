@@ -5,13 +5,14 @@ import { and, count, eq, inArray } from 'drizzle-orm';
 import { db } from '@/db';
 import { contactTargets, surveyResponses, surveys } from '@/db/schema';
 import { completedResponse, notDeletedResponse } from '@/data/response-filters';
+import { normalizeQuestions } from '@/lib/question';
 import { requireAuth } from '@/lib/auth';
 import { generateRawDataWorkbook, type RawExportResponseRow } from '@/lib/analytics/raw-workbook';
 import { buildSplitWorkbook } from '@/lib/analytics/split-workbook';
 import { planSplit } from '@/lib/analytics/split-export';
 import { hydrateQuestionsForSpss } from '@/lib/spss/hydrate-questions';
 import { isSpssVarNameError } from '@/lib/spss/variable-name-guard';
-import { Question, SurveySubmission } from '@/types/survey';
+import { SurveySubmission } from '@/types/survey';
 
 // Vercel serverless 최대 실행시간 30초 (기본 10초)
 export const maxDuration = 30;
@@ -47,9 +48,7 @@ export async function GET(
     }
 
     // strip된 셀/옵션 파생 필드 hydrate (cellCode, exportLabel, optionCode 복원)
-    const hydratedQuestions = hydrateQuestionsForSpss(
-      surveyData.questions as unknown as Question[],
-    );
+    const hydratedQuestions = hydrateQuestionsForSpss(normalizeQuestions(surveyData.questions));
 
     // 2. 응답 데이터 조회 (sav 전용 공용 블록)
     // raw/raw-split는 자체 모수와 가드를 별도로 가지므로 이 블록을 건너뛴다.

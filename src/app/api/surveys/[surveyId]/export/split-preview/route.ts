@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { surveyResponses, surveys } from '@/db/schema';
 import { completedResponse, notDeletedResponse } from '@/data/response-filters';
+import { normalizeQuestions } from '@/lib/question';
 import { requireAuth } from '@/lib/auth';
 import {
   detectSplitCandidates,
@@ -13,7 +14,6 @@ import {
   SPLIT_EXCEL_LIMIT,
 } from '@/lib/analytics/split-export';
 import { generateSPSSColumns } from '@/lib/analytics/spss-excel-export';
-import type { Question } from '@/types/survey';
 import { hydrateQuestionsForSpss } from '@/lib/spss/hydrate-questions';
 
 export const maxDuration = 30;
@@ -34,9 +34,7 @@ export async function GET(
     if (!surveyData) return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
 
     // 셀/옵션 코드 hydrate (export/route.ts와 공용 헬퍼)
-    const questions = hydrateQuestionsForSpss(
-      surveyData.questions as unknown as Question[],
-    );
+    const questions = hydrateQuestionsForSpss(normalizeQuestions(surveyData.questions));
 
     if (!basis) {
       const totalVars = generateSPSSColumns([...questions].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))).length;

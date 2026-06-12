@@ -11,9 +11,18 @@ import {
   TableQuestionSchema,
   TextQuestionSchema,
   TextareaQuestionSchema,
+  isCheckboxQuestion,
   isChoiceGroupQuestion,
   isEmbeddedTableQuestion,
+  isMultiselectQuestion,
+  isNoticeQuestion,
   isOptionListQuestion,
+  isRadioQuestion,
+  isRankingQuestion,
+  isSelectQuestion,
+  isTableQuestion,
+  isTextQuestion,
+  isTextareaQuestion,
   toFlatQuestion,
 } from '@/lib/question';
 import type { Question } from '@/types/survey';
@@ -170,6 +179,27 @@ describe('분류 가드', () => {
       'checkbox',
       'ranking',
     ]);
+  });
+
+  it('유형별 분류 가드 9종은 자기 유형에서만 참이다', () => {
+    const guardsByType = {
+      text: isTextQuestion,
+      textarea: isTextareaQuestion,
+      radio: isRadioQuestion,
+      checkbox: isCheckboxQuestion,
+      select: isSelectQuestion,
+      multiselect: isMultiselectQuestion,
+      ranking: isRankingQuestion,
+      table: isTableQuestion,
+      notice: isNoticeQuestion,
+    } as const;
+    for (const question of makeAllQuestionVariants()) {
+      for (const [type, guard] of Object.entries(guardsByType)) {
+        expect(guard(question), `${type} 가드 × ${question.type} 입력`).toBe(
+          question.type === type,
+        );
+      }
+    }
   });
 
   it('가드는 flat Question 입력에서도 동작한다', () => {

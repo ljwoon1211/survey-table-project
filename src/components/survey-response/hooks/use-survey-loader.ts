@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 
 import { client } from '@/shared/lib/rpc';
+import { normalizeQuestions } from '@/lib/question';
 import { parsesurveyIdentifier } from '@/lib/survey-url';
 import type { SurveyVersionSnapshot } from '@/db/schema';
-import type { Question, QuestionGroup, Survey } from '@/types/survey';
+import type { QuestionGroup, Survey } from '@/types/survey';
 import type { SaveAdminEditPayload } from '@/features/survey-response/domain/response-edit';
 
 type ResponsesMap = Record<string, unknown>;
@@ -92,7 +93,9 @@ export function useSurveyLoader({
                 ? { description: snapshot.description }
                 : {}),
               groups: snapshot.groups as QuestionGroup[],
-              questions: snapshot.questions as unknown as Question[],
+              // 세대별 키셋이 다른 스냅샷 질문은 읽기 경계 정규화(보존 모드)로 수렴 —
+              // 기존 단언과 거동 동일, 알 수 없는 형태만 관측 로그.
+              questions: normalizeQuestions(snapshot.questions),
               settings: {
                 isPublic: snapshot.settings.isPublic,
                 allowMultipleResponses: snapshot.settings.allowMultipleResponses,
