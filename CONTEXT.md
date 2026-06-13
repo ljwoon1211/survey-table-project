@@ -40,3 +40,17 @@ _Avoid_: 모드 분기, isTestMode 스위치
 
 **SurveyDiffPayload 조립 (diff-payload)**:
 changeset snapshot + 현재 설문 상태 → 저장 payload 변환 규칙(`src/lib/survey-builder/diff-payload.ts`, 순수 함수). dirtyIds = added∪updated 필터, 메타데이터 조건부 필드, reordered 전체 id 순서를 소유한다. use-survey-sync는 저장 오케스트레이션만 담당한다.
+
+### 질문 유형과 정규화
+
+**질문 유형 레지스트리 (question type registry)**:
+9개 질문 유형 리터럴의 런타임 SSOT(`src/types/question-types.ts`) — QUESTION_TYPES와 그룹 상수 4종(내장 테이블 / choice 그룹 / 옵션 목록 / 코드드 choice) + 멤버십 가드. 유형 멤버십 분기는 사설 Set·배열을 만들지 않고 여기를 경유한다. TS QuestionType과의 양방향 동치는 컴파일 프로브로 강제된다.
+_Avoid_: 인라인 type 배열 비교, needsOptions류 사설 분기 함수
+
+**질문 variant (QuestionVariant)**:
+유형별 필드 소유를 박제한 판별 유니언(`src/lib/question/variants.ts`). 필드 타입의 단일 출처는 flat Question이고 variant는 Pick 합성이다 — flat으로의 단방향 할당 호환(`toFlatQuestion`)이 유지 축. 내장 테이블 capability는 table 전용이 아니라 radio·checkbox·ranking·table 4유형 공유다. TS variant ↔ zod 스키마의 키셋 동치는 드리프트 게이트가 지킨다. 분류 가드(`is*Question`, guards.ts)는 전부 "유형 멤버십"이다 — choiceGroups 데이터 실재로 분기하는 isGroupedChoiceQuestion(grouped 응답 shape 어휘)과 별개 개념이며, 후자를 멤버십 가드로 치환하면 required 영구 미충족/무력화 사고가 난다.
+_Avoid_: 테이블 필드 = table 유형 전용이라는 가정, isChoiceGroupCapableQuestion(멤버십)과 isGroupedChoiceQuestion(데이터 실재)의 혼용
+
+**질문 정규화 경계 (question normalize boundary)**:
+스냅샷·export 등 신뢰 불가 직렬화 데이터가 `Question[]`로 들어오는 읽기 경계의 단일 거처(`src/lib/question/normalize.ts`). preserve(판별자만 검증, 무변형 passthrough + 관측)와 strict(zod parse + cross-type 오염 키 소거) 2모드. 경계 캐스트는 이 module 안 한 곳에만 존재한다 — 새 역직렬화 지점에서 `as unknown as Question[]`을 만들지 않는다.
+_Avoid_: 역직렬화 단언, 호출처별 자가 검증

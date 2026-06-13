@@ -385,8 +385,8 @@ mail_billing_periods / webhook_events (standalone)
 | `textarea` | 장문형 텍스트 | - |
 | `radio` | 단일 선택 | options, allowOtherOption |
 | `checkbox` | 복수 선택 | options, allowOtherOption, minSelections, maxSelections |
-| `select` | 드롭다운 단일 선택 | options, selectLevels (다단계) |
-| `multiselect` | 드롭다운 복수 선택 | options |
+| `select` | 드롭다운 단일 선택 | options, allowOtherOption |
+| `multiselect` | 드롭다운 복수 선택 | selectLevels (다단계 — 옵션 리스트는 selectLevels 내부 소유) |
 | `ranking` | 순위형 | rankingConfig, optionsSource (manual\|table) |
 | `table` | 매트릭스/그리드 | tableColumns, tableRowsData, tableHeaderGrid, tableValidationRules, dynamicRowConfigs |
 | `notice` | 안내문 | noticeContent, requiresAcknowledgment |
@@ -422,7 +422,7 @@ RSC (서버 컴포넌트)
 - 서버 상태는 TanStack Query, 클라이언트 상태는 Zustand로 분리. mutation 후 RSC 데이터 갱신은 `router.refresh()` (revalidatePath는 procedure에서 불가).
 - 인증: `authed`(admin, supabase session) / `pub`(응답자 — 응답 mutation·공개 설문 조회·컨택 attrs·수신거부 lookup).
 - 잔존 서버 액션은 `actions/` 3파일뿐 (auth login/logout + unsubscribe form — 의도적 유지).
-- **feature 마이그레이션 패턴/함정**: domain zod는 `@/types/survey` 방향 통일 + null-coalescing(as unknown as 금지), service input은 zod infer, `.returning()` 후 non-null throw, 컴포넌트는 hook/helper 시그니처 유지로 무수정. `survey-save.service.ts`는 spread 미사용 explicit field set — 신규 컬럼 추가 시 values/onConflictDoUpdate 양쪽 점검 필수 (tsc 미검출).
+- **feature 마이그레이션 패턴/함정**: domain zod는 `@/types/survey` 방향 통일 + null-coalescing(as unknown as 금지), service input은 zod infer, `.returning()` 후 non-null throw, 컴포넌트는 hook/helper 시그니처 유지로 무수정. 질문 영속 쓰기는 explicit field set(spread 금지) + `PERSISTED_QUESTION_FIELDS` SSOT 로 tsc 관할 — 신규 컬럼은 SSOT 등재만 하면 모든 쓰기 지점(survey-save values/onConflict, create, duplicate, updateQuestion 순회)이 컴파일 에러로 호명된다.
 - feature 간 직접 import 금지 (ESLint 강제) — 공용은 `@/shared` 승격 또는 RPC 경유. 서버 내부의 타 도메인 테이블 직접 쿼리는 허용.
 
 ---
