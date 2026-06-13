@@ -19,7 +19,8 @@ describe('hydrateQuestionsForSpss', () => {
     } as unknown as Question;
 
     const [hydrated] = hydrateQuestionsForSpss([question]);
-    const cell = hydrated!.tableRowsData?.[0]?.cells[0];
+    // hydrate 출력은 QuestionVariant — 파생 필드 복원은 평면 형태 관심사라 평면 뷰로 검사한다.
+    const cell = (hydrated as Question | undefined)?.tableRowsData?.[0]?.cells[0];
     expect(cell?.cellCode).toBeTruthy();
   });
 
@@ -35,7 +36,7 @@ describe('hydrateQuestionsForSpss', () => {
     } as unknown as Question;
 
     const [hydrated] = hydrateQuestionsForSpss([question]);
-    expect(hydrated!.options?.[0]?.optionCode).toBeTruthy();
+    expect((hydrated as Question | undefined)?.options?.[0]?.optionCode).toBeTruthy();
   });
 
   it('원본 배열을 변형하지 않는다', () => {
@@ -59,6 +60,6 @@ describe('hydrateQuestionsForSpss', () => {
     } as unknown as Question;
 
     const [hydrated] = hydrateQuestionsForSpss([question]);
-    expect(hydrated!.options?.[0]?.optionCode).toBeTruthy();
+    expect((hydrated as Question | undefined)?.options?.[0]?.optionCode).toBeTruthy();
   });
 });

@@ -9,6 +9,7 @@
  * 과거 엑셀 Blob/워크북/코딩북 헬퍼는 UI에서 제거됨에 따라 함께 삭제되었다.
  */
 import { getOptionText } from '@/lib/option-text-read';
+import type { QuestionVariant } from '@/lib/question';
 import {
   transformMultiselect,
   transformNumericText,
@@ -119,7 +120,7 @@ export interface SPSSExportColumn {
  * - checkbox는 옵션별 분리 (Q2M1, Q2M2...)
  * - 나머지는 열 1개
  */
-export function generateSPSSColumns(questions: Question[]): SPSSExportColumn[] {
+export function generateSPSSColumns(questions: QuestionVariant[]): SPSSExportColumn[] {
   const columns: SPSSExportColumn[] = [];
 
   for (const q of questions) {
@@ -752,7 +753,7 @@ function findTableCellCheckboxOptions(question: Question, cellId: string) {
  */
 export function buildDataRows(
   columns: SPSSExportColumn[],
-  questions: Question[],
+  questions: QuestionVariant[],
   submissions: SurveySubmission[],
 ): (string | number | null)[][] {
   const questionMap = new Map(questions.map((q) => [q.id, q]));
@@ -776,7 +777,7 @@ function resolveGroupedRankingValue(col: SPSSExportColumn, rawValue: unknown): u
 
 export function buildDataRow(
   columns: SPSSExportColumn[],
-  questionMap: ReadonlyMap<string, Question>,
+  questionMap: ReadonlyMap<string, QuestionVariant>,
   sub: SurveySubmission,
 ): (string | number | null)[] {
   return columns.map((col) => {
