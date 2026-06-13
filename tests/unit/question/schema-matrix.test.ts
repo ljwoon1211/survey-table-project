@@ -11,8 +11,9 @@ import {
   TableQuestionSchema,
   TextQuestionSchema,
   TextareaQuestionSchema,
+  assertNeverQuestionType,
   isCheckboxQuestion,
-  isChoiceGroupQuestion,
+  isChoiceGroupCapableQuestion,
   isEmbeddedTableQuestion,
   isMultiselectQuestion,
   isNoticeQuestion,
@@ -25,6 +26,7 @@ import {
   isTextareaQuestion,
   toFlatQuestion,
 } from '@/lib/question';
+import type { QuestionVariant } from '@/lib/question';
 import type { Question } from '@/types/survey';
 
 import { makeAllQuestionVariants, makeQuestion } from '../../helpers/question-factory';
@@ -174,7 +176,7 @@ describe('분류 가드', () => {
       'select',
       'ranking',
     ]);
-    expect(all.filter(isChoiceGroupQuestion).map((q) => q.type)).toEqual([
+    expect(all.filter(isChoiceGroupCapableQuestion).map((q) => q.type)).toEqual([
       'radio',
       'checkbox',
       'ranking',
@@ -209,5 +211,33 @@ describe('분류 가드', () => {
       // narrowing 후에도 flat 필드 접근이 유지되는지 (교차 타입)
       expect(flat.tableColumns).toBeDefined();
     }
+  });
+
+  it('switch 전수 분기 + assertNeverQuestionType 으로 exhaustiveness 가 컴파일 계약이 된다', () => {
+    // 9유형 case 를 하나라도 지우면 default 의 type 이 never 가 아니게 되어 컴파일 에러.
+    function classify(type: QuestionVariant['type']): string {
+      switch (type) {
+        case 'text':
+        case 'textarea':
+          return 'freeform';
+        case 'radio':
+        case 'checkbox':
+        case 'select':
+        case 'multiselect':
+        case 'ranking':
+          return 'choice';
+        case 'table':
+          return 'table';
+        case 'notice':
+          return 'static';
+        default:
+          return assertNeverQuestionType(type);
+      }
+    }
+    for (const question of makeAllQuestionVariants()) {
+      expect(classify(question.type)).toBeTruthy();
+    }
+    // 런타임 도달 시(타입 우회 데이터) 명시적으로 throw 한다
+    expect(() => assertNeverQuestionType('file-upload' as never)).toThrow('처리되지 않은 질문 유형');
   });
 });

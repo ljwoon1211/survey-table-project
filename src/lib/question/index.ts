@@ -9,11 +9,12 @@
 
 export type {
   CheckboxQuestion,
-  ChoiceGroupQuestion,
+  ChoiceGroupCapableQuestion,
   EmbeddedTableQuestion,
   MultiselectQuestion,
   NoticeQuestion,
   OptionListQuestion,
+  QuestionGroupAlignmentGates,
   QuestionVariant,
   RadioQuestion,
   RankingQuestion,
@@ -36,12 +37,12 @@ export {
   TextQuestionSchema,
   TextareaQuestionSchema,
 } from './schema';
-export type { QuestionSchemaDriftGates } from './schema';
+export type { QuestionEnumLeafGates, QuestionSchemaDriftGates } from './schema';
 
 export {
   assertNeverQuestionType,
   isCheckboxQuestion,
-  isChoiceGroupQuestion,
+  isChoiceGroupCapableQuestion,
   isEmbeddedTableQuestion,
   isMultiselectQuestion,
   isNoticeQuestion,

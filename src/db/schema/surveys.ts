@@ -113,7 +113,8 @@ export const questions = pgTable('questions', {
   tableHeaderGrid: jsonb('table_header_grid').$type<HeaderCell[][]>(),
 
   // 레거시 — 질문 레벨 미디어는 어디서도 읽고 쓰지 않는다(Question 타입에서 제거됨, 실DB 값 0건 확인).
-  // 컬럼 자체는 비파괴 원칙으로 잔존. drop 은 별도 마이그레이션 결정 사안.
+  // 컬럼 자체는 비파괴 원칙으로 잔존. drop 은 별도 마이그레이션 결정 사안이며,
+  // drop 시 scripts/restore-survey-from-backup.ts(gitignored)가 이 두 컬럼에 기입하므로 동시 수정 필요.
   imageUrl: text('image_url'),
   videoUrl: text('video_url'),
 

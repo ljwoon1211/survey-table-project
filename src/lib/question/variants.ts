@@ -1,3 +1,8 @@
+import type {
+  ChoiceGroupType,
+  EmbeddedTableType,
+  OptionListType,
+} from '@/types/question-types';
 import type { Question } from '@/types/survey';
 
 /**
@@ -122,8 +127,24 @@ export type OptionListQuestion = RadioQuestion | CheckboxQuestion | SelectQuesti
 /** 내장 테이블 capability 보유 유형 (EMBEDDED_TABLE_TYPES 와 정렬). */
 export type EmbeddedTableQuestion = RadioQuestion | CheckboxQuestion | RankingQuestion | TableQuestion;
 
-/** choiceGroups 소비 유형 (CHOICE_GROUP_TYPES 와 정렬). */
-export type ChoiceGroupQuestion = RadioQuestion | CheckboxQuestion | RankingQuestion;
+/**
+ * choiceGroups 를 소비할 수 있는 유형 (CHOICE_GROUP_TYPES 와 정렬) — capability 멤버십.
+ * choiceGroups 실재로 분기하는 grouped 응답 shape 어휘(isGroupedChoiceQuestion)와
+ * 다른 개념이라 이름을 Capable 로 구분한다 (guards.ts 헤더 주의 2).
+ */
+export type ChoiceGroupCapableQuestion = RadioQuestion | CheckboxQuestion | RankingQuestion;
+
+// ── 그룹 union 정렬 게이트 ────────────────────────────────────────
+// 위 3개 부분집합 union 의 판별자 집합이 question-types 의 그룹 상수와 동치임을
+// 컴파일로 강제한다 — "와 정렬" 주석이 주장이 아니라 검사가 되도록.
+type Expect<T extends true> = T;
+type MutuallyAssignable<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+
+export type QuestionGroupAlignmentGates = [
+  Expect<MutuallyAssignable<OptionListQuestion['type'], OptionListType>>,
+  Expect<MutuallyAssignable<EmbeddedTableQuestion['type'], EmbeddedTableType>>,
+  Expect<MutuallyAssignable<ChoiceGroupCapableQuestion['type'], ChoiceGroupType>>,
+];
 
 // 전환기 호환성 축 — 모든 variant 는 기존 flat Question 에 캐스트 없이 단방향 할당
 // 가능해야 한다. 이 보장이 깨지면(필드 타입/optional 정밀도 드리프트) 아래가 컴파일 에러.

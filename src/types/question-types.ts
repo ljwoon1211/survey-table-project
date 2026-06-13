@@ -52,7 +52,13 @@ export const OPTION_LIST_TYPES = [
   'ranking',
 ] as const satisfies readonly QuestionType[];
 
-/** 옵션에 optionCode/spssNumericCode 가 발번되는 선택 컨트롤 유형 (SPSS hydrate·코드 정리 대상). */
+/**
+ * 옵션에 optionCode/spssNumericCode 가 발번되는 선택 컨트롤 유형 (SPSS hydrate·코드 정리 대상).
+ * multiselect 의 옵션 리스트는 question.options 가 아니라 selectLevels[].options 소유다 —
+ * hydrate 의 question.options 게이트는 multiselect 에서 레거시 오염 데이터에만 닿는다
+ * (variant 어휘와의 이 긴장은 운영 데이터 0건 유형이라 후속 wave 에서 selectLevels
+ * 발번 경로를 정리할 때 해소한다).
+ */
 export const CODED_CHOICE_TYPES = [
   'radio',
   'checkbox',

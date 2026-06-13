@@ -24,7 +24,9 @@ import type {
  * - z.object 의 기본 strip 동작이 곧 오염 흡수 메커니즘이다: 스냅샷·편집 모달이
  *   심어 놓은 cross-type 키(예: radio 행의 noticeContent)는 strict parse 시 소거된다.
  * - variants.ts(TS)와 이 파일(zod)의 키셋 드리프트는 아래 QuestionSchemaDriftGates 가
- *   컴파일로 차단한다. 값 타입은 양쪽 모두 flat Question 에서 끌어와 원천 동일.
+ *   컴파일로 차단한다. JSONB 복합 필드의 값 타입은 양쪽 모두 flat Question 에서
+ *   끌어와 원천 동일하지만, enum 리프(spssVarType/spssMeasure/inputType)는 z.enum
+ *   으로 어휘를 재기술한다 — 이쪽 드리프트는 QuestionEnumLeafGates 가 차단한다.
  */
 
 const base = z.object({
@@ -156,4 +158,14 @@ export type QuestionSchemaDriftGates = [
   // 판별자 어휘가 QUESTION_TYPES 와 동치인지 (union 옵션 누락/과잉 차단)
   Expect<KeysEqual<Record<z.output<typeof QuestionVariantSchema>['type'], 0>, Record<(typeof QUESTION_TYPES)[number], 0>>>,
   Expect<KeysEqual<Record<QuestionVariant['type'], 0>, Record<(typeof QUESTION_TYPES)[number], 0>>>,
+];
+
+// enum 리프는 z.enum 으로 어휘를 재기술하므로 키셋 게이트가 못 잡는다 —
+// 리터럴 union 의 상호 할당 가능성으로 flat Question 과의 어휘 동치를 강제한다.
+type MutuallyAssignable<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+
+export type QuestionEnumLeafGates = [
+  Expect<MutuallyAssignable<z.output<typeof base>['spssVarType'], Question['spssVarType'] | undefined>>,
+  Expect<MutuallyAssignable<z.output<typeof base>['spssMeasure'], Question['spssMeasure'] | undefined>>,
+  Expect<MutuallyAssignable<z.output<typeof TextQuestionSchema>['inputType'], Question['inputType'] | undefined>>,
 ];
