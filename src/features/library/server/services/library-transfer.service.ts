@@ -10,8 +10,8 @@ import {
   questionCategories,
   savedQuestions,
 } from '@/db/schema';
+import { normalizeQuestions } from '@/lib/question';
 import { promoteSurveyImages } from '@/lib/survey/survey-image-promote';
-import type { Question } from '@/types/survey';
 
 import { listSavedQuestions } from './saved-questions.service';
 
@@ -29,9 +29,11 @@ export async function importLibrary(json: string): Promise<void> {
     const data = JSON.parse(json);
 
     if (data.savedQuestions) {
-      // tmp/survey/ URL 포함 가능성 (다른 환경 export) → promote 후 insert
-      const rawQuestions: Question[] = data.savedQuestions.map(
-        (sq: NewSavedQuestion) => sq.question as unknown as Question,
+      // tmp/survey/ URL 포함 가능성 (다른 환경 export) → promote 후 insert.
+      // 외부 JSON 역직렬화 경계: 읽기 경계 정규화(보존 모드)로 수렴 — 무변형 passthrough,
+      // 알 수 없는 형태만 관측 로그. 이후 promote/insert 거동은 동일.
+      const rawQuestions = normalizeQuestions(
+        data.savedQuestions.map((sq: NewSavedQuestion) => sq.question),
       );
       const promotedQuestions = await promoteSurveyImages(rawQuestions);
 

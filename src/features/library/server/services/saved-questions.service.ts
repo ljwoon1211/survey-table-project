@@ -7,6 +7,7 @@ import { NewSavedQuestion, savedQuestions } from '@/db/schema/surveys';
 import { extractImageUrlsFromQuestion } from '@/lib/image-extractor';
 import { deleteImagesFromR2Server } from '@/lib/image-utils-server';
 import { escapeLikePattern } from '@/lib/operations/filter-shared';
+import { normalizeQuestion } from '@/lib/question';
 import { promoteSurveyImages } from '@/lib/survey/survey-image-promote';
 import { generateId } from '@/lib/utils';
 import type { Question, SavedQuestion } from '@/types/survey';
@@ -19,13 +20,14 @@ import type {
 // drizzle $inferSelect row -> domain SavedQuestion 명시 변환
 // tags: string[] | null -> string[] (null -> 빈 배열)
 // description: string | null -> string | undefined (domain은 optional, exactOptionalPropertyTypes 대응)
-// question: QuestionData (JSONB) -> Question
+// question: QuestionData (JSONB) -> 읽기 경계 정규화(보존 모드). 기존 단언과 거동 동일,
+//   세대별 키셋이 다른 보관함 질문의 알 수 없는 형태만 관측 로그.
 function toDomainSavedQuestion(
   row: typeof savedQuestions.$inferSelect,
 ): SavedQuestion {
   const result: SavedQuestion = {
     id: row.id,
-    question: row.question as unknown as Question,
+    question: normalizeQuestion(row.question),
     name: row.name,
     tags: row.tags ?? [],
     category: row.category,
@@ -159,7 +161,7 @@ export async function deleteSavedQuestion(id: string): Promise<void> {
   });
 
   if (savedQuestion) {
-    const question = savedQuestion.question as unknown as Question;
+    const question = normalizeQuestion(savedQuestion.question);
     const images = extractImageUrlsFromQuestion(question);
 
     if (images.length > 0) {
@@ -191,7 +193,7 @@ export async function applySavedQuestion(id: string): Promise<Question | null> {
 
   if (!updated) return null;
 
-  const question = updated.question as unknown as Question;
+  const question = normalizeQuestion(updated.question);
   const { groupId: _g, ...questionWithoutGroup } = question;
   return {
     ...questionWithoutGroup,
@@ -228,7 +230,7 @@ export async function applyMultipleSavedQuestions(ids: string[]): Promise<Questi
     .filter((saved): saved is (typeof savedItems)[number] => saved !== undefined);
 
   return orderedItems.map((saved) => {
-    const question = saved.question as unknown as Question;
+    const question = normalizeQuestion(saved.question);
     const { groupId: _g, ...questionWithoutGroup } = question;
     return {
       ...questionWithoutGroup,

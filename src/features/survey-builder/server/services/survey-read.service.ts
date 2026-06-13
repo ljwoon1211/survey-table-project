@@ -12,6 +12,7 @@ import {
   getVariableCatalog,
   type VariableDef,
 } from '@/components/operations/mail-template/variable-catalog';
+import { normalizeQuestions } from '@/lib/question';
 import type { QuestionGroup, Question as QuestionType, Survey as SurveyType } from '@/types/survey';
 import { generateAllCellCodes } from '@/utils/table-cell-code-generator';
 
@@ -197,7 +198,10 @@ export async function getSurveyForResponse(
         ...(survey.slug != null ? { slug: survey.slug } : {}),
         ...(survey.privateToken != null ? { privateToken: survey.privateToken } : {}),
         groups: snapshot.groups,
-        questions: snapshot.questions.map((q) => {
+        // survey_versions 스냅샷 읽기 경계(공개 응답자 경로): 세대별 키셋이 다른 질문을
+        // 정규화(보존 모드)로 수렴 — 무변형 passthrough, 알 수 없는 형태만 관측 로그.
+        // 이후 table 셀 코드 복원 불변식은 동일하게 유지한다.
+        questions: normalizeQuestions(snapshot.questions).map((q) => {
           if (q.type === 'table' && q.tableRowsData && q.tableColumns) {
             return {
               ...q,
