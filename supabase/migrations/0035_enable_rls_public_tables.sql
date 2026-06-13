@@ -27,7 +27,7 @@ ALTER TABLE public.mail_campaigns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.mail_recipients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.mail_billing_periods ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.webhook_events ENABLE ROW LEVEL SECURITY;
--- 레거시 고아 테이블(mail_* 리팩토링 이전 email_*) — 사용 안 하지만 노출 차단 위해 함께 활성
+-- 레거시 고아 테이블(mail_* 리팩토링 이전 email_*) — 미사용이나 일관성 위해 동일 적용
 ALTER TABLE public.email_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.email_attachments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.email_campaigns ENABLE ROW LEVEL SECURITY;
